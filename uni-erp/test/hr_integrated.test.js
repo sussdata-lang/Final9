@@ -99,7 +99,7 @@ test('معادلات منظومة شؤون الموظفين المتكاملة (
 
 test('التكامل الشامل لواجهات /api/hr-pro/* وعدم التعارض مع /api/admin/hr/*', async (t) => {
   const app = await createApp({ dbPath: ':memory:', port: 0, scryptN: 1024, cookieSecure: false });
-  await ensureCoreAccounts(app, '1572690');
+  await ensureCoreAccounts(app, 'Test-Only-Pass-1!');
   await new Promise((r) => app.server.listen(0, '127.0.0.1', r));
   t.after(() => app.close());
   const base = `http://127.0.0.1:${app.server.address().port}`;
@@ -107,7 +107,7 @@ test('التكامل الشامل لواجهات /api/hr-pro/* وعدم التع
   const loginRes = await fetch(`${base}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: 'admin', password: '1572690' }),
+    body: JSON.stringify({ username: 'admin', password: 'Test-Only-Pass-1!' }),
   });
   assert.equal(loginRes.status, 200);
   const { token } = await loginRes.json();

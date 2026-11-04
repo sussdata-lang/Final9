@@ -5,7 +5,7 @@ import { ensureCoreAccounts } from '../server/services/bootstrap.js';
 
 async function startServer() {
   const app = await createApp({ dbPath: ':memory:', port: 0, scryptN: 1024, cookieSecure: false });
-  await ensureCoreAccounts(app, '1572690');
+  await ensureCoreAccounts(app, 'Test-Only-Pass-1!');
   await new Promise((r) => app.server.listen(0, '127.0.0.1', r));
   const port = app.server.address().port;
   return { app, base: `http://127.0.0.1:${port}` };
@@ -19,7 +19,7 @@ test('Uni-ERP v12 — Phases 1 to 4 Complete Integration Suite', async (t) => {
   const loginRes = await fetch(`${base}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: 'admin', password: '1572690' }),
+    body: JSON.stringify({ username: 'admin', password: 'Test-Only-Pass-1!' }),
   });
   assert.equal(loginRes.status, 200);
   const loginData = await loginRes.json();
