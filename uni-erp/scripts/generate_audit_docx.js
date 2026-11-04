@@ -198,10 +198,8 @@ const buf = writeDocx(blocks, {
   title: 'التقرير الهندسي والأمني الموسّع لفحص واختبار المنظومة الجامعية Uni-ERP'
 });
 
-const outDirs = [
-  path.join(__dirname, '..', 'public', 'reports'),
-  path.join(__dirname, '..', '..', 'public', 'reports')
-];
+// تقرير داخلي: لا يوضع في public لأن كل ما فيه يُنزَّل دون تسجيل دخول
+const outDirs = [path.join(__dirname, '..', 'docs', 'reports')];
 
 for (const dir of outDirs) {
   fs.mkdirSync(dir, { recursive: true });
