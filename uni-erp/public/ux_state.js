@@ -10,7 +10,6 @@
     mainTab: 'unified', // unified | work | myprofile
     hrSection: 'payroll', // payroll | att_leaves | biometrics | appraisals | enterprise_hr
     auditSection: 'chain', // chain | logs | devops | exec_offline
-    acadExtraTab: '', // '' | 'exam_master' | 'enterprise_acad'
     guideMode: 'depts', // depts | hierarchy | lifecycle | corr_rules | governance
     guideSection: 'all',
     guideDeptFilter: 'all',
@@ -22,7 +21,7 @@
     corrReqFilter: 'all',
     examSchedule: {
       examType: 'امتحان فصلي نهائي (Final)',
-      academicYear: '2025/2026',
+      academicYear: (() => { const n = new Date(), y = n.getFullYear(); return n.getMonth() >= 8 ? `${y}/${y + 1}` : `${y - 1}/${y}`; })(),
       semester: 'الفصل الأول',
       startDate: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
       defaultTime: '09:00',

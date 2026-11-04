@@ -35,8 +35,31 @@
         }
       });
       U.examSchedule.loaded = true;
+      await loadSavedExams();
     } catch { /* ignore */ }
   }
+
+  // ما حُفظ من قبل يملأ الأداة، فيُعدَّل بدل أن يُكرَّر
+  async function loadSavedExams() {
+    U.examSchedule.saved = (await api('GET', '/api/expansions/exams').catch(() => ({ exams: [] }))).exams || [];
+    applySavedExams();
+  }
+  function applySavedExams() {
+    const E = U.examSchedule, today = new Date().toISOString().slice(0, 10);
+    const inTerm = (x) => (x.exam_type === E.examType && x.academic_year === E.academicYear && x.semester === E.semester) || (!x.academic_year && x.exam_date >= today);
+    const minutes = (t) => { const [h, m] = String(t).split(':').map(Number); return h * 60 + m; };
+    for (const c of E.courses || []) {
+      const row = E.rows[c.id] || (E.rows[c.id] = {});
+      const x = (E.saved || []).find((s) => s.course_code === c.code && inTerm(s));
+      row.savedId = x ? x.id : null;
+      if (!x) continue;
+      Object.assign(row, { date: x.exam_date, time: x.start_time, duration: (minutes(x.end_time) - minutes(x.start_time)) || 120, hall: x.hall_name, proctor: x.proctor_name, groupId: x.group_id || null, capacity: Number(x.capacity) || 0 });
+    }
+  }
+  function refreshExamBuilder() {
+    if (S.view === 'expansions') { const banner = document.getElementById('exp-master-exam-banner'); if (banner) banner.innerHTML = UA.renderMasterExamBuilder(); } else UA.render();
+  }
+  const canScheduleExams = () => can('grade:manage') || can('course:manage') || can('exams_housing:write') || can('exams_housing:edit') || can('exams_housing:approve');
 
   function syncExamDomToState() {
     const tp = document.getElementById('exm-type');
@@ -63,6 +86,8 @@
       if (dt) row.date = dt.value;
       if (tm) row.time = tm.value;
       if (dur) row.duration = Number(dur.value) || 120;
+      const cap = tr.querySelector('.exm-cap');
+      if (cap) row.capacity = Number(cap.value) || 0;
       if (hl) row.hall = hl.value;
       if (pr) row.proctor = pr.value;
     });
@@ -166,7 +191,7 @@
   }
 
   UA.renderMasterExamBuilder = () => {
-    if (!can('grade:manage') && !can('course:manage')) return '';   // أداة موظفي الامتحانات، لا تظهر للطالب ولا لغيرهم
+    if (!canScheduleExams()) return '';   // أداة موظفي الامتحانات، لا تظهر للطالب ولا لغيرهم
     const courses = U.examSchedule.courses || [];
     const examTypes = ((S.limits && S.limits.dropdowns && S.limits.dropdowns.examTypes) || [
       'امتحان فصلي نهائي (Final)',
@@ -206,7 +231,7 @@
       return `<tr data-exm-cid="${c.id}">
         <td><input type="checkbox" class="exm-inc" ${r.included !== false ? 'checked' : ''} aria-label="تضمين المقرر"></td>
         <td class="mono" dir="ltr"><b>${esc(c.code)}</b></td>
-        <td><b>${esc(c.name)}</b><div class="small">${esc(c.programName || c.faculty || '')} · السنة ${esc(c.levelLabel || c.level || '')}</div></td>
+        <td><b>${esc(c.name)}</b><div class="small">${esc(c.programName || c.faculty || '')} · السنة ${esc(c.levelLabel || c.level || '')}${r.savedId ? ' · <span class="pill p-approved">محفوظ</span>' : ''}</div></td>
         <td><select class="exm-group" aria-label="فئة الطلاب"><option value="">كل الطلاب</option>${(U.examSchedule.groups || []).map((g) => `<option value="${g.id}"${g.id === r.groupId ? ' selected' : ''}>${esc(g.name)} (${g.count})</option>`).join('')}</select></td>
         <td><input type="date" class="exm-date" value="${esc(r.date || U.examSchedule.startDate)}" dir="ltr" required></td>
         <td><input type="time" class="exm-time" value="${esc(r.time || '09:00')}" dir="ltr" style="width:105px"></td>
@@ -216,6 +241,7 @@
             ${halls.map((h) => `<option value="${esc(h)}"${h === r.hall ? ' selected' : ''}>${esc(h)}</option>`).join('')}
           </select>
         </td>
+        <td><input type="number" class="exm-cap" min="0" value="${Number(r.capacity) || 0}" style="width:75px" aria-label="سعة القاعة"></td>
         <td><input type="text" class="exm-proc" value="${esc(r.proctor || '')}" placeholder="اسم المراقب / المدرس" style="min-width:140px"></td>
       </tr>`;
     }).join('');
@@ -223,12 +249,12 @@
     return `<section class="card" id="master-exam-builder-card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
         <div>
-          <h2 style="margin:0;color:#054239">منظومة إنشاء فحص الامتحان الشامل لكافة المواد + إصدار ملف PDF رسمي</h2>
+          <h2 style="margin:0;color:#054239">الجدولة الجماعية للامتحانات وإصدار ملف PDF</h2>
           <p class="hint" style="margin:4px 0 0">فورم موحد يحتوي على كافة المقررات الدراسية في الجامعة مع تحديد تاريخ الفحص، الساعة، القاعة، والمراقب لكل مادة، مع إمكانية التوزيع التلقائي للتواريخ وإنشاء ملف PDF مصدّق للطباعة والنشر.</p>
         </div>
         <div class="actions" style="margin:0">
           <button type="button" class="btn" data-act="exmautodates">📅 توزيع تلقائي لتواريخ الفحص</button>
-          <button type="button" class="btn pri" data-act="exmsaveall">💾 حفظ واعتماد جدول الفحص (${filtered.length} مادة)</button>
+          <button type="button" class="btn pri" data-act="exmsaveall">💾 حفظ جدول الفحص (${filtered.length} مادة)</button>
           <button type="button" class="btn ok" data-act="exmpdf">📄 إنشاء وتصدير ملف PDF لجدول الفحص</button>
         </div>
       </div>
@@ -270,11 +296,12 @@
               <th>وقت البدء</th>
               <th>المدة</th>
               <th>القاعة الامتحانية</th>
+              <th>السعة</th>
               <th>المراقب / مدرس المقرر</th>
             </tr>
           </thead>
           <tbody>
-            ${rowsHtml || '<tr><td colspan="9" class="empty">لا توجد مواد مطابقة للبحث.</td></tr>'}
+            ${rowsHtml || '<tr><td colspan="10" class="empty">لا توجد مواد مطابقة للبحث.</td></tr>'}
           </tbody>
         </table>
       </div>
@@ -292,68 +319,6 @@
       U.acadTab === 'members' && UA.loadFacultyMembers ? UA.loadFacultyMembers().catch(() => {}) : Promise.resolve(),
     ]);
   };
-
-  /* دمج LMS Quiz ومحاكي المعدل التراكمي وفورم فحص الامتحان في قسم «المواد والعلامات والامتحانات» */
-  function renderLmsQuizBlock() {
-    const es = (window.UA && window.UA.enterpriseData) || {};
-    const q = (es.quizzes || [])[0];
-    if (!q) return '<section class="card" style="margin-top:0"><h2 style="margin-top:0">📝 الامتحانات الإلكترونية</h2><p class="hint">لا توجد اختبارات إلكترونية بعد. أضفها من الاستيراد أو من شاشة التعلم الإلكتروني.</p></section>';
-    const quizResult = U.lastQuizResult;
-    const subs = es.quizSubmissions || [];
-
-    return `<section class="card" style="margin-top:0">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
-        <h2 style="margin:0;display:flex;align-items:center;gap:8px">
-          <span>📝 الامتحانات الإلكترونية والتصحيح الفوري (LMS Quiz)</span>
-        </h2>
-        <span style="background:#054239;color:#D5B65D;font-weight:800;font-size:11px;padding:3px 9px;border-radius:6px;font-family:monospace">ميزة #2 المنقولة</span>
-      </div>
-      <p class="sub" style="margin-top:0;color:#64748b;font-size:13px">اختبارات إلكترونية ومؤتمتة بالكامل مرتبطة بمخرجات التعلم مع تصحيح آلي فوري وترحيل معتمد للعلامات.</p>
-      
-      <div style="background:rgba(14,102,85,.05);padding:14px;border-radius:12px;margin-bottom:16px;border:1px solid #cbd5e1">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-          <strong style="color:#054239;font-size:14px">${esc(q.title)} (${esc(q.course_code)})</strong>
-          <span class="pill p-review">الدرجة العظمى: ${q.total_marks} درجة · المدة: ${q.duration_min} دقيقة</span>
-        </div>
-        <form id="lms-live-quiz-form" class="form" style="border:0;padding:0;background:transparent;display:grid;gap:10px">
-          ${q.questions.map((item, idx) => `
-            <div style="background:#fff;padding:12px 14px;border-radius:8px;border:1px solid #e2e8f0">
-              <div style="font-weight:700;font-size:13px;margin-bottom:8px">س${idx + 1}: ${esc(item.q)}</div>
-              <div style="display:flex;flex-direction:column;gap:6px">
-                ${item.options.map((opt, oIdx) => `
-                  <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
-                    <input type="radio" name="lms_q_${idx}" value="${oIdx}">
-                    <span>${esc(opt)}</span>
-                  </label>
-                `).join('')}
-              </div>
-            </div>
-          `).join('')}
-          <div class="actions" style="margin:4px 0 0">
-            <button class="btn ok" type="button" data-act="submitlmsquiz" style="padding:0 20px;height:38px;background:#054239;color:#fff;font-weight:700">تسليم الاختبار والتصحيح الآلي الفوري</button>
-          </div>
-        </form>
-        ${quizResult ? `<div class="ok-t" style="margin-top:12px;padding:12px;background:rgba(16,185,129,.15);border:1px solid #10b981;border-radius:8px;font-weight:700">
-          ✓ ${quizResult}
-        </div>` : ''}
-      </div>
-
-      <h3 style="font-size:14px;margin:16px 0 8px">أحدث تسليمات الطلاب المصححة آلياً في النظام</h3>
-      <div class="tbl-wrap">
-        <table>
-          <thead><tr><th>الطالب</th><th>الرقم الجامعي</th><th>النتيجة الفورية</th><th>وقت التسليم</th></tr></thead>
-          <tbody>
-            ${subs.map((s) => `<tr>
-              <td><b>${esc(s.student_name)}</b></td>
-              <td class="mono">${esc(s.student_no)}</td>
-              <td><b style="color:#0e6655">${s.score} / ${s.total_marks}</b> (${Math.round((s.score / s.total_marks) * 100)}%)</td>
-              <td>${new Date(s.submitted_at).toLocaleString('ar-SY')}</td>
-            </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>
-    </section>`;
-  }
 
   function renderGpaSimBlock() {
     const es = (window.UA && window.UA.enterpriseData) || {};
@@ -424,13 +389,11 @@
   }
 
   UA.views.academics = () => {
-    const cur = U.acadTab || (UA.can('grade:approve_own') && !UA.can('grade:manage') ? 'my_grades' : 'courses');
+    const cur = U.acadTab || (UA.can('grade:approve_own') && (!UA.can('grade:manage') || S.me?.role === 'admin') ? 'my_grades' : 'courses');
     const tabs = [
       ...(UA.can('grade:approve_own') ? [['my_grades', 'علامات موادي']] : []),
       ['courses', 'دليل المواد والمقررات'],
       ['grades', 'جدول العلامات والامتحانات'],
-      ['exam_master', '📄 إنشاء فحص الامتحان (PDF)'],
-      ['lms_quiz', '📝 الامتحانات الإلكترونية (LMS Quiz)'],
       ['gpa_sim', '🎓 محاكي المعدل التراكمي (GPA Simulator)'],
     ];
     if (UA.can('faculty:manage')) tabs.push(['members', 'أعضاء هيئة التدريس']);
@@ -440,12 +403,10 @@
     </div>`;
 
     if (cur === 'my_grades' && UA.renderMyGrades) return bar + UA.renderMyGrades();
-    if (cur === 'exam_master') return bar + UA.renderMasterExamBuilder();
-    if (cur === 'lms_quiz') return bar + renderLmsQuizBlock();
     if (cur === 'gpa_sim') return bar + renderGpaSimBlock();
     if (cur === 'members' && UA.facultyView) return bar + UA.facultyView();
     return bar + (origAcadView ? origAcadView().replace(/<div class="sub-tabs[^"]*"[^>]*>[\s\S]*?<\/div>/, '') : '');
   };
 
-  UA.examBuilder = { ensureExamCoursesLoaded, syncExamDomToState, generateExamSchedulePdf };
+  UA.examBuilder = { ensureExamCoursesLoaded, syncExamDomToState, generateExamSchedulePdf, loadSavedExams, applySavedExams, refreshExamBuilder, canScheduleExams };
 })();

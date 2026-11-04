@@ -293,7 +293,7 @@
           <div class="v12-card">
             <div class="v12-bar">
               <h3>بنك الاختبارات الإلكترونية الذاتية</h3>
-              <button class="btn pri" id="btn-add-quiz">＋ إنشاء اختبار إلكتروني</button>
+              ${UA.S?.me?.role === 'student' ? '' : '<button class="btn pri" id="btn-add-quiz">＋ إنشاء اختبار إلكتروني</button>'}
             </div>
             <div class="tbl-wrap">
               <table class="grid-tbl">
@@ -308,15 +308,17 @@
                       <td>${q.total_marks} درجة</td>
                       <td>${fmt(q.attempts_count)} طالب</td>
                       <td><b>${q.avg_score}</b> / ${q.total_marks}</td>
-                      <td><button class="btn sm pri btn-try-quiz" data-id="${q.id}">معاينة الاختبار</button></td>
+                      <td><button class="btn sm pri btn-try-quiz" data-id="${q.source}:${q.id}" ${UA.S?.me?.role === 'student' && !q.open ? 'disabled' : ''}>${UA.S?.me?.role === 'student' ? 'تقديم الاختبار' : 'معاينة الاختبار'}</button></td>
                     </tr>
                   `).join('')}
                 </tbody>
               </table>
             </div>
           </div>
+          ${(d.quizSubmissions || []).length ? `<div class="v12-card"><div class="v12-bar"><h3>أحدث التسليمات المصححة آلياً</h3></div><div class="tbl-wrap"><table class="grid-tbl"><thead><tr><th>الطالب</th><th>الرقم الجامعي</th><th>النتيجة</th><th>وقت التسليم</th></tr></thead><tbody>${d.quizSubmissions.map((x) => `<tr><td><b>${esc(x.student_name)}</b></td><td class="mono">${esc(x.student_no)}</td><td><b>${x.score} / ${x.total_marks}</b></td><td>${new Date(Number(x.submitted_at)).toLocaleString('ar-SY')}</td></tr>`).join('')}</tbody></table></div></div>` : ''}
         `;
-        box.querySelector('#btn-add-quiz').onclick = () => openModal('إنشاء اختبار إلكتروني جديد', `
+        const addQuizBtn = box.querySelector('#btn-add-quiz');
+        if (addQuizBtn) addQuizBtn.onclick = () => openModal('إنشاء اختبار إلكتروني جديد', `
           <label>رمز المقرر <input name="course_code" placeholder="CYB-101" required></label>
           <label>اسم المقرر <input name="course_name" placeholder="مبادئ الأمن السيبراني والتشفير" required></label>
           <label>عنوان الاختبار <input name="title" placeholder="مثال: اختبار الأسبوع الرابع" required></label>
@@ -330,8 +332,17 @@
         });
         box.querySelectorAll('.btn-try-quiz').forEach((btn) => {
           btn.onclick = () => {
-            const q = d.quizzes.find((x) => String(x.id) === btn.dataset.id);
+            const q = d.quizzes.find((x) => `${x.source}:${x.id}` === btn.dataset.id);
             if (!q) return;
+            if (UA.S?.me?.role === 'student') {
+              openModal(q.title, q.questions.map((it, i) => `<fieldset style="grid-column:1/-1;border:1px solid var(--line,#dce3dd);border-radius:8px;padding:10px"><legend style="font-weight:700">س${i + 1}: ${esc(it.q)}</legend>${(it.options || []).map((o, k) => `<label style="display:block"><input type="radio" name="q_${i}" value="${k}"> ${esc(o)}</label>`).join('')}</fieldset>`).join(''), async (data) => {
+                const answers = q.questions.map((_, i) => (data[`q_${i}`] === undefined ? null : Number(data[`q_${i}`])));
+                const r = await api('POST', q.source === 'lms' ? `/api/lms/quizzes/${q.id}/submit` : `/api/enterprise/quizzes/${q.id}/submit`, { answers });
+                notify(`النتيجة: ${r.score} من ${r.totalMarks} (${r.correctCount} من ${r.questionsCount} إجابات صحيحة)`);
+                render();
+              });
+              return;
+            }
             notify(`معاينة: «${q.title}» (${q.questions.length} سؤال — التصحيح الآلي مفعّل)`);
           };
         });
@@ -879,10 +890,11 @@
       const box = el.querySelector('#v12-exp-body');
       if (activeTab === 'exams') {
         box.innerHTML = `
+          <div id="exp-master-exam-banner"></div>
           <div class="v12-card">
             <div class="v12-bar">
               <h3>جدول الامتحانات النهائية والعملية وتوزيع القاعات والمراقبين</h3>
-              <button class="btn pri" id="btn-add-exam">＋ جدولة امتحان جديد</button>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">${UA.examBuilder?.canScheduleExams() ? '<button class="btn" id="btn-bulk-exam">جدولة جماعية وملف PDF</button>' : ''}<button class="btn pri" id="btn-add-exam">＋ جدولة امتحان جديد</button></div>
             </div>
             <div class="tbl-wrap">
               <table class="grid-tbl">
@@ -892,7 +904,7 @@
                     <tr>
                       <td class="mono">${esc(x.course_code)}</td>
                       <td><b>${esc(x.course_name)}</b><div class="small hint">${esc(x.program_name)}</div></td>
-                      <td><span class="pill p-review">${esc(x.exam_type)}</span>${x.group_name ? `<div class="small">فئة: ${esc(x.group_name)}</div>` : ''}</td>
+                      <td><span class="pill p-review">${esc(x.exam_type)}</span>${x.academic_year ? `<div class="small">${esc([x.academic_year, x.semester].filter(Boolean).join(' · '))}</div>` : ''}${x.group_name ? `<div class="small">فئة: ${esc(x.group_name)}</div>` : ''}</td>
                       <td class="mono">${esc(x.exam_date)} · ${esc(x.start_time)}-${esc(x.end_time)}</td>
                       <td><b>${esc(x.hall_name)}</b></td>
                       <td>${x.enrolled_count} / ${x.capacity} طالب</td>
@@ -931,6 +943,15 @@
             </div>
           </div>
         `;
+        const bulkBtn = box.querySelector('#btn-bulk-exam');
+        const showBulk = async () => {
+          const banner = box.querySelector('#exp-master-exam-banner');
+          if (!banner) return;
+          if (!UA.uxState.examBuilderOpen) { banner.innerHTML = ''; return; }
+          await UA.examBuilder.ensureExamCoursesLoaded();
+          banner.innerHTML = UA.renderMasterExamBuilder();
+        };
+        if (bulkBtn) { bulkBtn.onclick = () => { UA.uxState.examBuilderOpen = !UA.uxState.examBuilderOpen; showBulk(); }; showBulk(); }
         box.querySelector('#btn-add-exam').onclick = () => openModal('جدولة امتحان وتخصيص قاعة', `
           <label>رمز المقرر <input name="course_code" placeholder="CYB-305" required></label>
           <label>اسم المقرر <input name="course_name" required placeholder="مثال: التحقيق الجنائي الرقمي"></label>
@@ -944,7 +965,9 @@
           <label>المراقب المكلف <input name="proctor_name" placeholder="د. خالد الشامي"></label>
         `, async (data) => {
           const made = await api('POST', '/api/expansions/exams', data);
-          notify(made.capacityWarning ? `جُدول الامتحان. تنبيه: ${made.capacityWarning}` : 'تمت جدولة الامتحان بنجاح');
+          const warn = made.conflictWarning || made.capacityWarning;
+          notify(warn ? `جُدول الامتحان. تنبيه: ${warn}` : 'تمت جدولة الامتحان بنجاح');
+          if (UA.examBuilder) await UA.examBuilder.loadSavedExams();
           render();
         });
         box.querySelector('#btn-add-appeal').onclick = () => openModal('تسجيل طلب تظلم امتحاني', `

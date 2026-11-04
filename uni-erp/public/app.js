@@ -137,7 +137,7 @@ Object.assign(window.UA, {
     if (hasAffairs) {
       v.push(['affairs', can('student:read') || can('student:register') || can('sa_admissions:view') || can('sa_advising:view') || can('sa_scholarships:view') ? tr('شؤون الطلاب') : can('request:read_all') ? tr('الطلبات') : tr('الطلبات المحالة لقسمي')]);
     }
-    // 2) الأكاديمي والامتحانات (تضم المقررات والعلامات وإنشاء فحص الامتحان PDF وميزات التطوير الأكاديمي)
+    // 2) الأكاديمي والامتحانات (تضم المقررات والعلامات وميزات التطوير الأكاديمي)
     if (can('course:manage') || can('grade:manage') || can('grade:approve') || can('grade:approve_own') || can('faculty:manage')) v.push(['academics', tr('المواد والعلامات والامتحانات')]);
     if (can('attendance:manage')) v.push(['attendance', tr('سجل القاعات')]);
     v.push(['expansions', tr('الامتحانات والتقييم')]);

@@ -1,4 +1,5 @@
 import { docNo, academicYear } from '../lib/doc_no.js';
+import { listQuizzes, withoutAnswers, submitQuiz } from './quizzes.js';
 import { groupsOfStudent, listGroups, groupSize } from './student_groups.js';
 import { HttpError } from '../http.js';
 import { log } from '../lib/logger.js';
@@ -214,7 +215,7 @@ export async function registerV12Modules(r, deps) {
     const rows = db.prepare(`SELECT * FROM lms_lectures ${isStudent(c) ? 'WHERE published <> 0' : ''} ORDER BY week_no ASC, id DESC`).all();
     const lectureFiles = filesFor(db, rows.map((l) => l.id));
     const lectures = rows.map((l) => ({ ...l, files: lectureFiles.get(l.id) ?? [] }));
-    const quizzes = db.prepare('SELECT * FROM lms_quizzes ORDER BY id DESC').all();
+    const quizzes = listQuizzes(db).filter((q) => !isStudent(c) || q.open);
     const books = db.prepare('SELECT * FROM library_books ORDER BY id DESC').all();
     const loanSql = (where) => `SELECT l.*, b.title AS book_title, b.isbn FROM library_loans l JOIN library_books b ON b.id = l.book_id ${where} ORDER BY l.id DESC`;
     const loans = seesAllLoans ? db.prepare(loanSql('')).all() : isStudent(c) && c.user.student_no ? db.prepare(loanSql('WHERE l.borrower_no = ?')).all(c.user.student_no) : [];
@@ -228,10 +229,9 @@ export async function registerV12Modules(r, deps) {
       },
       lectures,
       // الإجابة الصحيحة لا تصل إلا لمن يدير المحتوى
-      quizzes: quizzes.map(({ questions_json, ...q }) => {
-        const questions = JSON.parse(questions_json || '[]');
-        return { ...q, questions: canManage ? questions : questions.map(({ ans, answer, ...x }) => x) };
-      }),
+      quizzes: quizzes.map((q) => { if (!canManage) return withoutAnswers(q); const { questions_json, ...rest } = q; return rest; }),
+      quizSubmissions: canManage ? db.prepare('SELECT * FROM online_quiz_submissions ORDER BY submitted_at DESC LIMIT 30').all()
+        : isStudent(c) && c.user.student_no ? db.prepare('SELECT * FROM online_quiz_submissions WHERE student_no = ? ORDER BY submitted_at DESC LIMIT 30').all(c.user.student_no) : [],
       books,
       loans,
     });
@@ -306,6 +306,8 @@ export async function registerV12Modules(r, deps) {
     audit(db, c.user, 'إنشاء اختبار إلكتروني LMS', title, c.ip);
     c.json(201, { id: Number(res.lastInsertRowid) });
   });
+
+  r.add('POST', '/api/lms/quizzes/:id/submit', (c) => { c.json(200, submitQuiz(db, c.user, 'lms', c.params.id, c.body?.answers)); });
 
   r.add('POST', '/api/lms/books', (c) => {
     requireV12Perm(c, 'holds:manage', 'lms_lib:write', 'lms_lib:edit', 'course:manage');
@@ -624,7 +626,7 @@ export async function registerV12Modules(r, deps) {
   // 5.5 جداول الامتحانات والتظلمات + 5.6 الساعات المكتبية والترقيات + 5.7 السكن والمنح والأنشطة + 5.8 التقييم والتدريب والبصمة
   r.add('GET', '/api/expansions/overview', (c) => {
     // موارد الموظفين تقرأ من هنا التقييم والبصمة
-    if (!isStudent(c)) requireV12Perm(c, ...EXAMS_READ, ...HR_READ);
+    if (!isStudent(c)) requireV12Perm(c, ...EXAMS_READ, ...HR_READ, 'grade:manage', 'grade:approve', 'course:manage');
     const own = (rows) => rows.filter((x) => x.student_no === c.user.student_no);
     // لكل قسم جمهوره: الطالب يرى ما يخصه، والموظف ما تغطيه صلاحياته
     const section = (rows, perms) => (isStudent(c) ? own(rows) : hasV12Perm(c, perms) ? rows : []);
@@ -667,6 +669,54 @@ export async function registerV12Modules(r, deps) {
     });
   });
 
+  // قاعة واحدة لا تستضيف امتحانين في وقت واحد: تنبيه لا يمنع الحفظ، فبعض القاعات تتسع لأكثر من مقرر
+  const hallClash = (date, hall, start, end, exceptId = 0) => db.prepare('SELECT course_name FROM exam_schedules WHERE exam_date = ? AND hall_name = ? AND start_time < ? AND end_time > ? AND id <> ? LIMIT 1').get(date, hall, end, start, exceptId);
+  const clashText = (name, hall, other) => `${name}: القاعة ${hall} محجوزة لمقرر «${other}» في الوقت نفسه.`;
+
+  r.add('GET', '/api/expansions/exams', (c) => {
+    requireV12Perm(c, ...EXAMS_READ, 'course:manage', 'grade:manage');
+    c.json(200, { exams: db.prepare('SELECT e.*, g.name AS group_name FROM exam_schedules e LEFT JOIN student_groups g ON g.id = e.group_id ORDER BY e.exam_date ASC, e.start_time ASC').all() });
+  });
+
+  // الجدولة الجماعية: إعادة الحفظ تحدّث امتحان المقرر نفسه في الدورة نفسها ولا تكرره.
+  // ما حُفظ قبل إضافة العام والفصل يُعدّ من الدورة الحالية إذا كان موعده لم يمض.
+  r.add('POST', '/api/expansions/exams/bulk', (c) => {
+    requireV12Perm(c, ...EXAMS_MANAGE, 'course:manage', 'grade:manage');
+    const b = c.body ?? {};
+    const items = Array.isArray(b.items) ? b.items : [];
+    if (!items.length) throw new HttpError(400, 'لم تحدد أي مقرر.', 'validation');
+    const examType = clean(b.exam_type || 'نهائي', 30), year = need(b.academic_year, 'العام الدراسي', 20), semester = need(b.semester, 'الفصل الدراسي', 40);
+    const today = new Date().toISOString().slice(0, 10);
+    const out = tx(db, () => {
+      let created = 0, updated = 0;
+      const warnings = [];
+      for (const it of items) {
+        const code = need(it.course_code, 'رمز المقرر', 30), name = clean(it.course_name, 100);
+        const date = need(it.exam_date, 'تاريخ الامتحان', 20), start = need(it.start_time, 'وقت البدء', 10), end = need(it.end_time, 'وقت الانتهاء', 10), hall = need(it.hall_name, 'القاعة', 60);
+        const groupId = Number(it.group_id) || null;
+        if (groupId && !db.prepare('SELECT 1 AS x FROM student_groups WHERE id = ?').get(groupId)) throw new HttpError(400, 'الفئة غير موجودة.', 'validation', 'group_id');
+        const enrolled = groupId ? groupSize(db, groupId) : 0, capacity = Number(it.capacity) || 0;
+        const old = db.prepare(`SELECT id FROM exam_schedules WHERE course_code = ? AND COALESCE(group_id, 0) = ?
+          AND ((exam_type = ? AND academic_year = ? AND semester = ?) OR (academic_year IS NULL AND exam_date >= ?)) ORDER BY id DESC LIMIT 1`).get(code, groupId ?? 0, examType, year, semester, today);
+        const clash = hallClash(date, hall, start, end, old?.id ?? 0);
+        if (clash) warnings.push(clashText(name || code, hall, clash.course_name));
+        if (capacity && enrolled > capacity) warnings.push(`${name || code}: عدد طلاب الفئة (${enrolled}) يتجاوز سعة القاعة (${capacity}).`);
+        if (old) {
+          db.prepare('UPDATE exam_schedules SET course_name = ?, program_name = ?, exam_type = ?, academic_year = ?, semester = ?, exam_date = ?, start_time = ?, end_time = ?, hall_name = ?, capacity = ?, enrolled_count = ?, proctor_name = ?, group_id = ? WHERE id = ?')
+            .run(name, clean(it.program_name, 100), examType, year, semester, date, start, end, hall, capacity, enrolled, clean(it.proctor_name || 'لجنة المراقبة', 100), groupId, old.id);
+          updated++;
+        } else {
+          db.prepare("INSERT INTO exam_schedules (course_code, course_name, program_name, exam_type, academic_year, semester, exam_date, start_time, end_time, hall_name, capacity, enrolled_count, proctor_name, group_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'مجدول', ?)")
+            .run(code, name, clean(it.program_name, 100), examType, year, semester, date, start, end, hall, capacity, enrolled, clean(it.proctor_name || 'لجنة المراقبة', 100), groupId, Date.now());
+          created++;
+        }
+      }
+      return { created, updated, warnings };
+    });
+    audit(db, c.user, 'جدولة جماعية للامتحانات', `${year} ${semester}: ${out.created} جديد، ${out.updated} محدّث`, c.ip);
+    c.json(200, out);
+  });
+
   r.add('POST', '/api/expansions/exams', (c) => {
     requireV12Perm(c, ...EXAMS_MANAGE, 'course:manage');
     const b = c.body ?? {};
@@ -674,13 +724,15 @@ export async function registerV12Modules(r, deps) {
     if (groupId && !db.prepare('SELECT 1 AS x FROM student_groups WHERE id = ?').get(groupId)) throw new HttpError(400, 'الفئة غير موجودة.', 'validation', 'group_id');
     const groupCount = groupId ? groupSize(db, groupId) : null;
     const res = db.prepare(`
-      INSERT INTO exam_schedules (course_code, course_name, program_name, exam_type, exam_date, start_time, end_time, hall_name, capacity, enrolled_count, proctor_name, group_id, status, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'مجدول', ?)
+      INSERT INTO exam_schedules (course_code, course_name, program_name, exam_type, academic_year, semester, exam_date, start_time, end_time, hall_name, capacity, enrolled_count, proctor_name, group_id, status, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'مجدول', ?)
     `).run(
       need(b.course_code, 'رمز المقرر', 30),
       clean(b.course_name, 100),
       clean(b.program_name, 100),
       clean(b.exam_type || 'نهائي', 30),
+      clean(b.academic_year || academicYear(), 20),
+      clean(b.semester, 40) || null,
       clean(b.exam_date || new Date().toISOString().slice(0, 10), 20),
       clean(b.start_time || '09:00', 10),
       clean(b.end_time || '11:00', 10),
@@ -693,7 +745,8 @@ export async function registerV12Modules(r, deps) {
     );
     audit(db, c.user, 'جدولة امتحان وتوزيع قاعة', clean(b.course_name, 60), c.ip);
     const capacity = Number(b.capacity) || 0;
-    c.json(201, { id: Number(res.lastInsertRowid), ...(groupCount !== null && capacity && groupCount > capacity ? { capacityWarning: `عدد طلاب الفئة (${groupCount}) يتجاوز سعة القاعة (${capacity}).` } : {}) });
+    const clash = hallClash(clean(b.exam_date || new Date().toISOString().slice(0, 10), 20), clean(b.hall_name || 'المدرج A2', 60), clean(b.start_time || '09:00', 10), clean(b.end_time || '11:00', 10), Number(res.lastInsertRowid));
+    c.json(201, { id: Number(res.lastInsertRowid), ...(clash ? { conflictWarning: clashText(clean(b.course_name, 60), clean(b.hall_name || 'المدرج A2', 60), clash.course_name) } : {}), ...(groupCount !== null && capacity && groupCount > capacity ? { capacityWarning: `عدد طلاب الفئة (${groupCount}) يتجاوز سعة القاعة (${capacity}).` } : {}) });
   });
 
   r.add('POST', '/api/expansions/appeals', (c) => {

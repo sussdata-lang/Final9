@@ -27,9 +27,7 @@
     context: '',
     loading: false,
     data: null,
-    activeQuizId: 1,
     quizAnswers: {},
-    quizResult: null,
     gpaResult: null,
     verifyResult: null,
     cmdOpen: false,
@@ -162,8 +160,6 @@
   /* ---------- التبويب 1: الشؤون الأكاديمية والامتحانات (1-3) ---------- */
   function viewAcademics(D) {
     const slots = D.scheduleSlots || [];
-    const quizzes = D.quizzes || [];
-    const activeQ = quizzes.find((q) => q.id === Number(E.activeQuizId)) || quizzes[0];
     const plan = D.advisingPlan || [];
     const gpa = E.gpaResult;
 
@@ -207,54 +203,6 @@
           </div>
         </section>
 
-        <!-- 2. بنك الأسئلة والامتحانات الإلكترونية والتصحيح الفوري -->
-        <section class="es-card">
-          <h2><span>📝 الامتحانات الإلكترونية والتصحيح الفوري (LMS Quiz)</span><span class="es-num">ميزة #2</span></h2>
-          <p class="sub">اختبارات مؤتمتة مرتبطة بمخرجات التعلم مع تصحيح آلي وترحيل فوري للعلامة.</p>
-          ${activeQ ? `
-            <div style="background:rgba(14,102,85,.06);padding:12px;border-radius:10px;margin-bottom:12px">
-              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
-                <strong>${esc(activeQ.title)} (${esc(activeQ.course_code)})</strong>
-                <span class="pill p-review">الدرجة العظمى: ${activeQ.total_marks} · المدة: ${activeQ.duration_min} د</span>
-              </div>
-              <form id="es-quiz-form" style="margin-top:10px;display:grid;gap:10px">
-                ${activeQ.questions.map((q, idx) => `
-                  <div style="background:var(--surface,#fff);padding:10px;border-radius:8px;border:1px solid var(--line,#dce3dd)">
-                    <div style="font-weight:700;font-size:13px;margin-bottom:6px">س${idx + 1}: ${esc(q.q)}</div>
-                    <div style="display:flex;flex-wrap:wrap;gap:10px">
-                      ${q.options.map((opt, oIdx) => `
-                        <label style="display:inline-flex;align-items:center;gap:5px;font-size:12.5px;cursor:pointer">
-                          <input type="radio" name="q_${idx}" value="${oIdx}">
-                          <span>${esc(opt)}</span>
-                        </label>
-                      `).join('')}
-                    </div>
-                  </div>
-                `).join('')}
-                <div class="actions" style="margin:4px 0 0">
-                  <button class="btn ok" type="submit">تسليم الاختبار والتصحيح الآلي الفوري</button>
-                </div>
-              </form>
-              ${E.quizResult ? `<div class="ok-t" style="margin-top:10px;padding:10px;background:rgba(16,185,129,.12);border-radius:8px;font-weight:700">
-                ✓ تم التصحيح الآلي الفوري: حصلت على ${E.quizResult.score} من ${E.quizResult.totalMarks} (${E.quizResult.correctCount}/${E.quizResult.questionsCount} إجابات صحيحة).
-              </div>` : ''}
-            </div>
-          ` : ''}
-          <h3 style="font-size:13.5px;margin:10px 0 6px">أحدث تسليمات الطلاب المصححة آلياً</h3>
-          <div class="tbl-wrap">
-            <table>
-              <thead><tr><th>الطالب</th><th>الرقم الجامعي</th><th>النتيجة</th><th>وقت التسليم</th></tr></thead>
-              <tbody>
-                ${(D.quizSubmissions || []).map((sub) => `<tr>
-                  <td>${esc(sub.student_name)}</td>
-                  <td class="mono">${esc(sub.student_no)}</td>
-                  <td><b style="color:#0e6655">${sub.score} / ${sub.total_marks}</b></td>
-                  <td>${dt(sub.submitted_at)}</td>
-                </tr>`).join('')}
-              </tbody>
-            </table>
-          </div>
-        </section>
       </div>
 
       <!-- 3. شجرة الإرشاد الأكاديمي التفاعلي ومحاكي المعدل التراكمي -->
@@ -800,18 +748,6 @@
       await UA.loaders.enterprise();
       render();
       toast('✓ تم فحص الجدول وإدراج المحاضرة بدون أي تضارب قاعات أو محاضرين');
-    },
-    'es-quiz-form': async (formEl) => {
-      const activeQ = (E.data?.quizzes || [])[0];
-      if (!activeQ) return;
-      const answers = activeQ.questions.map((_q, idx) => {
-        const checked = formEl.querySelector(`input[name="q_${idx}"]:checked`);
-        return checked ? Number(checked.value) : 0;
-      });
-      E.quizResult = await api('POST', `/api/enterprise/quizzes/${activeQ.id}/submit`, { answers });
-      await UA.loaders.enterprise();
-      render();
-      toast(`تم التصحيح الفوري: الدرجة ${E.quizResult.score}/${E.quizResult.totalMarks}`);
     },
     'es-gpa-form': async () => {
       E.gpaResult = await api('POST', '/api/enterprise/gpa-simulate', {

@@ -5,7 +5,7 @@
    - قرار الطلب يُرسل بعد مهلة تراجع قصيرة: لا تراجع عن إصدار الوثيقة في الخادم، فالتراجع يسبق الإرسال. */
 (function () {
   const UA = window.UA, { S, api, esc, toast } = UA;
-  const EXTRA_TAB_ACTS = ['hrtab', 'crfilter', 'actab', 'acadxtab', 'admtab', 'audtab'];
+  const EXTRA_TAB_ACTS = ['hrtab', 'crfilter', 'actab', 'admtab', 'audtab'];
   const LOADING_TEXTS = new Set(['جارٍ التحميل…', 'جارٍ التحميل...', 'Loading…', 'Loading...']);
   const UNDO_MS = 6000;
 

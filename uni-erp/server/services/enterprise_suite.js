@@ -1,4 +1,5 @@
 import { docNo, academicYear } from '../lib/doc_no.js';
+import { listQuizzes, withoutAnswers, submitQuiz } from './quizzes.js';
 import crypto from 'node:crypto';
 import { HttpError } from '../http.js';
 import { audit } from '../audit.js';
@@ -89,10 +90,7 @@ function executiveKpisFrom(db) {
 
 export function buildEnterpriseSuiteOverview(db) {
   const scheduleSlots = db.prepare('SELECT * FROM smart_schedule_slots ORDER BY id DESC').all();
-  const quizzes = db.prepare('SELECT * FROM online_quizzes ORDER BY id DESC').all().map((q) => ({
-    ...q,
-    questions: JSON.parse(q.questions_json || '[]'),
-  }));
+  const quizzes = listQuizzes(db);
   const quizSubmissions = db.prepare('SELECT * FROM online_quiz_submissions ORDER BY submitted_at DESC LIMIT 30').all();
   const selfEnrollments = db.prepare('SELECT * FROM student_self_enrollments ORDER BY registered_at DESC').all();
   const facultyOverloads = db.prepare('SELECT * FROM faculty_overload_records ORDER BY id DESC').all();
@@ -129,7 +127,7 @@ export function enterpriseOverviewFor(db, user) {
   return {
     ...ov,
     advisingPlan: user.role === 'student' ? advisingPlanFor(db, user.id) : [],
-    quizzes: canAny(user, 'course:manage', 'grade:manage') ? ov.quizzes : ov.quizzes.map(({ questions_json, ...q }) => ({ ...q, questions: q.questions.map(({ answer, ...rest }) => rest) })),
+    quizzes: canAny(user, 'course:manage', 'grade:manage') ? ov.quizzes : ov.quizzes.filter((q) => user.role !== 'student' || q.open).map(withoutAnswers),
     quizSubmissions: seesAcademic ? ov.quizSubmissions : own(ov.quizSubmissions),
     selfEnrollments: seesAcademic || user.can('student:read') ? ov.selfEnrollments : own(ov.selfEnrollments),
     facultyOverloads: canAny(user, ...SEES_PAYROLL, 'faculty:manage') ? ov.facultyOverloads : [],
@@ -182,28 +180,7 @@ export function registerEnterpriseSuiteRoutes(r, deps) {
 
   // 2. تقديم اختبار إلكتروني وتصحيح فوري آلي (Online Quiz Auto-Grading)
   r.add('POST', '/api/enterprise/quizzes/:id/submit', (c) => {
-    const quizId = Number(c.params.id);
-    const quiz = db.prepare('SELECT * FROM online_quizzes WHERE id = ?').get(quizId);
-    if (!quiz) throw new HttpError(404, 'الاختبار غير موجود.');
-    if (!c.user.student_no) throw new HttpError(403, 'تقديم الاختبار متاح للطلاب فقط.', 'forbidden');
-    if (quiz.status !== 'نشط') throw new HttpError(409, 'هذا الاختبار غير متاح حالياً.', 'quiz_closed');
-    if (db.prepare('SELECT 1 AS x FROM online_quiz_submissions WHERE quiz_id = ? AND student_no = ? LIMIT 1').get(quizId, c.user.student_no)) throw new HttpError(409, 'قدّمت هذا الاختبار من قبل، ويُسمح بمحاولة واحدة.', 'quiz_already_submitted');
-    const questions = JSON.parse(quiz.questions_json || '[]');
-    const answers = Array.isArray(c.body?.answers) ? c.body.answers : [];
-    let correct = 0;
-    questions.forEach((q, idx) => {
-      if (Number(answers[idx]) === Number(q.answer)) correct++;
-    });
-    const score = questions.length > 0 ? Math.round((correct / questions.length) * quiz.total_marks * 10) / 10 : quiz.total_marks;
-    const studentNo = c.user.student_no;
-    const studentName = c.user.display_name;
-
-    db.prepare(`
-      INSERT INTO online_quiz_submissions (quiz_id, student_no, student_name, score, total_marks, answers_json, submitted_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(quizId, studentNo, studentName, score, quiz.total_marks, JSON.stringify(answers), Date.now());
-
-    c.json(200, { ok: true, score, totalMarks: quiz.total_marks, correctCount: correct, questionsCount: questions.length });
+    c.json(200, submitQuiz(db, c.user, 'online', c.params.id, c.body?.answers));
   });
 
   // 3. محاكي المعدل التراكمي (GPA Simulator)

@@ -884,7 +884,7 @@ export function computeAllowedViews(effectivePerms = [], explicitAllowedViews = 
   if (has('request:read_all', 'request:read_unit', 'student:read', 'student:register', 'sa_admissions:view', 'sa_advising:view', 'sa_scholarships:view')) out.push('affairs');
   if (has('academic:read', 'course:manage', 'grade:manage', 'grade:approve', 'grade:approve_own', 'faculty:manage')) out.push('academics');
   if (has('attendance:manage')) out.push('attendance');
-  if (has('exams_housing:view', 'exams_housing:write', 'exams_housing:edit', 'exams_housing:approve', 'academic:read')) out.push('expansions');
+  if (has('exams_housing:view', 'exams_housing:write', 'exams_housing:edit', 'exams_housing:approve', 'academic:read', 'grade:manage', 'grade:approve', 'course:manage')) out.push('expansions');
   if (has('sa_housing:view', 'sa_housing:manage')) out.push('student_life');
   if (has('lms_lib:view', 'lms_lib:write', 'lms_lib:edit', 'lms_lib:approve', 'academic:read', 'course:manage')) out.push('lms');
   if (has('research_grad:view', 'research_grad:write', 'research_grad:edit', 'research_grad:approve', 'faculty:manage')) out.push('research');

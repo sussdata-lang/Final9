@@ -474,21 +474,6 @@
       saPki.dataset.mounted = '1';
       saPki.innerHTML = UA.renderEnterpriseSection('student_pki');
     }
-    // إضافة زر سريع لنظام إنشاء فحص الامتحان PDF في صفحة الامتحانات والسكن (expansions)
-    if (S.view === 'expansions') {
-      const mount = document.getElementById('ua-view-mount');
-      if (mount && !mount.querySelector('#exp-master-exam-banner')) {
-        ensureExamCoursesLoaded().then(() => {
-          if (mount.querySelector('#exp-master-exam-banner')) return;
-          const wrap = document.createElement('div');
-          wrap.id = 'exp-master-exam-banner';
-          wrap.style.marginBottom = '16px';
-          wrap.innerHTML = UA.renderMasterExamBuilder();
-          mount.prepend(wrap);
-          enhanceSelectsWithOtherOption();
-        });
-      }
-    }
   }
 
   /* ==========================================================================
@@ -548,7 +533,7 @@
     if (view === 'payroll' || view === 'hr') return { subAct: 'hrunified', subVal: U.hrSection || 'payroll', subLabel: U.hrSection === 'biometrics' ? 'البصمة' : U.hrSection === 'appraisals' ? 'تقييم الأداء' : U.hrSection === 'att_leaves' ? 'الحضور والإجازات' : U.hrSection === 'enterprise_hr' ? 'التطوير المؤسسي للموارد البشرية' : 'الرواتب' };
     if (view === 'audit') return { subAct: 'audtab2', subVal: U.auditSection || 'chain', subLabel: U.auditSection === 'hc_perf' ? 'الأداء الفائق' : U.auditSection === 'exec_offline' ? 'المراقبة المؤسسية' : U.auditSection === 'devops' ? 'البنية التحتية DevOps' : U.auditSection === 'waf_sec' ? 'جدار الحماية WAF' : 'السلسلة' };
     if (view === 'admin') return { subAct: 'admtab', subVal: S.adminTab || 'general', subLabel: S.adminTab === 'verify_merged' ? 'التحقق العام' : S.adminTab === 'units_merged' ? 'الهيكل والصلاحيات' : S.adminTab === 'mysettings' ? 'إعداداتي' : 'الإعدادات' };
-    if (view === 'academics') return { subAct: U.acadExtraTab ? 'acadxtab' : 'actab', subVal: U.acadExtraTab || S.acTab || 'courses', subLabel: U.acadExtraTab === 'exam_master' ? 'جدول الفحص PDF' : U.acadExtraTab === 'enterprise_acad' ? 'القاعات الذكية وبنك الأسئلة' : 'المقررات والعلامات' };
+    if (view === 'academics') return { subAct: 'actab', subVal: S.acTab || 'courses', subLabel: 'المقررات والعلامات' };
     if (view === 'guidelines') return { subAct: 'guidetab', subVal: U.guideMode || 'depts', subLabel: U.guideMode === 'hierarchy' ? 'الهيكل التنظيمي' : U.guideMode === 'lifecycle' ? 'دورة الطلبات' : U.guideMode === 'archify' ? 'خرائط Archify' : 'الأقسام' };
     return { subAct: '', subVal: 'main', subLabel: '' };
   }
@@ -597,7 +582,6 @@
     if (act === 'corrunified' && val === 'in') return (S.corr && S.corr.docs && S.corr.docs.length) || 0;
     if (act === 'corrunified' && val === 'notifs') return (S.corr && S.corr.unread) || 0;
     if (act === 'corrunified' && val === 'internal_requests') return (S.requests || []).length || 0;
-    if (act === 'acadxtab' && val === 'exam_master') return (U.examSchedule.courses || []).length || 0;
     return 0;
   }
 
@@ -795,7 +779,7 @@
       { cat: 'الديوان والمراسلات', title: '✍️ الديوان والمراسلات · إنشاء كتاب أو مراسلة جديدة', view: 'corr', act: 'corrunified', val: 'new_corr' },
       { cat: 'الشؤون الأكاديمية', title: '📚 الشؤون الأكاديمية · دليل المقررات والخطط الدراسية', view: 'academics', act: 'acadtab', val: 'courses' },
       { cat: 'الشؤون الأكاديمية', title: '📊 الشؤون الأكاديمية · جدول العلامات والترتيب', view: 'academics', act: 'acadtab', val: 'grades' },
-      { cat: 'الشؤون الأكاديمية', title: '🗓️ الشؤون الأكاديمية · إنشاء جدول فحص الامتحانات الشامل + PDF', view: 'academics', act: 'acadtab', val: 'exam_master' },
+      { cat: 'الشؤون الأكاديمية', title: '🗓️ الامتحانات · جدولة جماعية وملف PDF', view: 'expansions' },
       { cat: 'شؤون الموظفين', title: '👥 شؤون الموظفين · ملفات الموظفين والعقود والرواتب', view: 'payroll', act: 'hrunified', val: 'payroll' },
       { cat: 'شؤون الموظفين', title: '🕒 شؤون الموظفين · الحضور والانصراف والإجازات', view: 'payroll', act: 'hrunified', val: 'att_leaves' },
       { cat: 'شؤون الموظفين', title: '🔐 شؤون الموظفين · منظومة البصمة وأجهزة الحضور الحيوي', view: 'payroll', act: 'hrunified', val: 'biometrics' },
@@ -1127,6 +1111,11 @@
   document.addEventListener('change', (e) => {
     const t = e.target;
     if (!t) return;
+    if (t.id === 'exm-type' || t.id === 'exm-year' || t.id === 'exm-sem') {
+      syncExamDomToState();
+      UA.examBuilder.applySavedExams();
+      UA.examBuilder.refreshExamBuilder();
+    }
     if (t.id === 'exm-toggle-all') {
       const checked = t.checked;
       document.querySelectorAll('#exm-master-table .exm-inc').forEach((chk) => { chk.checked = checked; });
@@ -1301,31 +1290,12 @@
         UA.render();
       }
     },
-    acadxtab: async (el, d) => {
-      U.acadExtraTab = (d && (d.t || d.s)) || '';
-      U.acadTab = U.acadExtraTab || 'courses';
-      if (U.acadExtraTab === 'exam_master') await ensureExamCoursesLoaded();
-      UA.render();
-    },
     acadtab: async (el, d) => {
       U.acadTab = (d && (d.t || d.s)) || 'courses';
       // هذان التبويبان يرسمهما staff.js حسب حالته هو، فلا يكفي تغيير U.acadTab وإلا ظهر التبويب السابق
       if ((U.acadTab === 'courses' || U.acadTab === 'grades') && UA.actions.actab) { await UA.actions.actab(el, { t: U.acadTab }); return; }
-      if (U.acadTab === 'exam_master') await ensureExamCoursesLoaded();
       // التبويب كان يبقى على «جارٍ التحميل» لأن قائمة الأعضاء لا تُحمَّل إلا عبر المسار القديم
       if (U.acadTab === 'members' && UA.loadFacultyMembers) await UA.loadFacultyMembers();
-      UA.render();
-    },
-    submitlmsquiz: async () => {
-      const q = ((window.UA.enterpriseData || {}).quizzes || [])[0];
-      if (!q) return;
-      const answers = q.questions.map((_, i) => { const el = document.querySelector(`input[name="lms_q_${i}"]:checked`); return el ? Number(el.value) : null; });
-      try {
-        const r = await api('POST', `/api/enterprise/quizzes/${q.id}/submit`, { answers });
-        U.lastQuizResult = `تم التصحيح الآلي: النتيجة ${r.score} / ${r.totalMarks} (${r.correctCount} من ${r.questionsCount} إجابات صحيحة).`;
-        if (UA.loaders.enterprise) await UA.loaders.enterprise().catch(() => {});
-        toast('تم التصحيح وتسجيل المحاولة');
-      } catch (e) { toast(e.message); return; }
       UA.render();
     },
     calcgpasim: () => {
@@ -1617,25 +1587,18 @@
       const courses = U.examSchedule.courses || [];
       const selected = courses.filter((c) => U.examSchedule.rows[c.id]?.included !== false);
       const endOf = (start, minutes) => { const [h, m] = String(start).split(':').map(Number), t = h * 60 + m + Number(minutes); return `${String(Math.floor(t / 60) % 24).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; };
-      let saved = 0, firstErr = '';
-      for (const c of selected) {
-        const r = U.examSchedule.rows[c.id] || {}, start = r.time || '09:00';
-        try {
-          await api('POST', '/api/expansions/exams', {
-            course_code: c.code,
-            course_name: c.name,
-            program_name: c.program || c.programName || c.faculty || '',
-            exam_date: r.date || U.examSchedule.startDate,
-            start_time: start,
-            end_time: endOf(start, r.duration || 120),
-            hall_name: r.hall || 'المدرج الكبير A1',
-            proctor_name: r.proctor || c.instructor || 'لجنة المراقبة',
-            group_id: r.groupId || null,
-          });
-          saved++;
-        } catch (e) { if (!e.status) throw e; firstErr ||= e.message; }
-      }
-      toast(saved === selected.length ? `حُفظ جدول الفحص لـ ${saved} مقرر` : `حُفظ ${saved} من ${selected.length} مقرر. ${firstErr}`);
+      if (!selected.length) { toast('حدّد مقرراً واحداً على الأقل.'); return; }
+      const E = U.examSchedule;
+      const items = selected.map((c) => {
+        const r = E.rows[c.id] || {}, start = r.time || '09:00';
+        return { course_code: c.code, course_name: c.name, program_name: c.program || c.programName || c.faculty || '', exam_date: r.date || E.startDate, start_time: start, end_time: endOf(start, r.duration || 120), hall_name: r.hall || 'المدرج الكبير A1', capacity: Number(r.capacity) || 0, proctor_name: r.proctor || c.instructor || 'لجنة المراقبة', group_id: r.groupId || null };
+      });
+      try {
+        const out = await api('POST', '/api/expansions/exams/bulk', { exam_type: E.examType, academic_year: E.academicYear, semester: E.semester, items });
+        await UA.examBuilder.loadSavedExams();
+        UA.render();
+        toast(`حُفظ الجدول: ${out.created} جديد و${out.updated} محدّث.${out.warnings.length ? ' تنبيه: ' + out.warnings[0] + (out.warnings.length > 1 ? ` و${out.warnings.length - 1} تنبيهات أخرى.` : '') : ''}`);
+      } catch (e) { if (!e.status) throw e; toast(e.message); }
     },
     exmpdf: () => {
       generateExamSchedulePdf();
@@ -1765,7 +1728,6 @@
   const origActab = UA.actions.actab;
   if (origActab) {
     UA.actions.actab = async (el, d) => {
-      U.acadExtraTab = '';
       if (d && d.t) U.acadTab = d.t;
       await origActab(el, d);
     };
