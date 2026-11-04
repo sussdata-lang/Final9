@@ -563,6 +563,10 @@ async function syncIdentitySequences(pool) {
   `);
 }
 
+const RENAMED_MIGRATIONS = { '029_student_affairs_suite.sql': '029b_student_affairs_suite.sql' };
+// الملف باسمه القديم لا يُنفَّذ حتى لو بقي على الخادم
+export const migrationFiles = (names) => names.filter((n) => n.endsWith('.sql') && !(n in RENAMED_MIGRATIONS)).sort();
+
 async function runMigrations(poolConfig) {
   const pool = new Pool({
     ...poolConfig,
@@ -598,14 +602,16 @@ async function runMigrations(poolConfig) {
       )
     `);
 
-    // أُعيدت تسمية ترحيل كان يتشارك الرقم 029: ما طُبّق باسمه القديم لا يُعاد تنفيذه، والترتيب لم يتغير
-    await pool.query("UPDATE schema_migrations SET name = '029b_student_affairs_suite.sql' WHERE name = '029_student_affairs_suite.sql'");
+    // أُعيدت تسمية ترحيل كان يتشارك الرقم 029: ما طُبّق باسمه القديم لا يُعاد تنفيذه، والترتيب لم يتغير.
+    // قد يوجد الاسمان معاً إذا بقي الملف القديم في المستودع بعد النشر، فلا يُحدَّث الاسم فوق صف موجود
+    for (const [from, to] of Object.entries(RENAMED_MIGRATIONS)) {
+      await pool.query('UPDATE schema_migrations SET name = $2 WHERE name = $1 AND NOT EXISTS (SELECT 1 FROM schema_migrations WHERE name = $2)', [from, to]);
+      await pool.query('DELETE FROM schema_migrations WHERE name = $1', [from]);
+    }
     const { rows: done } = await pool.query('SELECT name FROM schema_migrations');
     const doneSet = new Set(done.map((r) => r.name));
 
-    const files = fs.readdirSync(MIGRATIONS)
-      .filter((n) => n.endsWith('.sql'))
-      .sort();
+    const files = migrationFiles(fs.readdirSync(MIGRATIONS));
 
     // رموز SQLSTATE المقبولة عند إعادة تطبيق ترحيل: الكائن موجود مسبقاً (جدول/عمود/فهرس/قيد/نوع)
     const BENIGN = new Set(['42P07', '42701', '42710', '42P06', '42P04']);
