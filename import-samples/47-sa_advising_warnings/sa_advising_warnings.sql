@@ -1,0 +1,1 @@
+INSERT INTO sa_advising_warnings (student_no, warning_type, severity, advisor_name, action_plan, session_date, gpa_snapshot, absence_rate, failed_courses_count, status) VALUES ('SAMPLE-1', 'انخفاض المعدل', 'تحذير', 'مرشد تجريبي', 'متابعة أسبوعية', '2026-02-01', NULL, NULL, NULL, 'مفتوح');

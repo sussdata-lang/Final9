@@ -1,0 +1,1 @@
+INSERT INTO faculty_promotions (faculty_name, specialty, current_rank, target_rank, submitted_at, research_points, required_points, teaching_years, committee_status) VALUES ('د. مثال تجريبي', 'تخصص تجريبي', 'مدرس', 'أستاذ مساعد', '2026-01-10', '40', '100', '4', NULL);

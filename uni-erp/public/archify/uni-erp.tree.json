@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "diagram_type": "tree",
+  "meta": {
+    "title": "Uni-ERP v12 — Unified 17-Module & Organizational Capability Tree",
+    "subtitle": "Complete functional decomposition of the Syrian University for Security Sciences ERP platform.",
+    "output": "tree.html",
+    "quality_profile": "showcase"
+  },
+  "nodes": [
+    { "id": "root", "label": "Uni-ERP v12 Platform", "sublabel": "17 Integrated Modules" },
+    { "id": "command", "label": "Presidency & Command", "parent": "root", "sublabel": "Executive & Governance" },
+    { "id": "academic_pole", "label": "Academic & Student Pole", "parent": "root", "sublabel": "Teaching & Affairs" },
+    { "id": "admin_pole", "label": "HR, Finance & Diwan Pole", "parent": "root", "sublabel": "Operations & Ledger" },
+    { "id": "sec_pole", "label": "Security, Audit & AI Pole", "parent": "root", "sublabel": "WAF, 10K Perf & AI" },
+
+    { "id": "overview_hub", "label": "Unified Main Dashboard", "parent": "command", "sublabel": "KPIs + My Desk + Profile" },
+    { "id": "admin_central", "label": "Central Administration", "parent": "command", "sublabel": "Org Units + RBAC + Verify" },
+    { "id": "guidelines_hub", "label": "Interactive Guidelines", "parent": "command", "sublabel": "Hierarchy + Archify Maps" },
+
+    { "id": "student_affairs", "label": "Student Affairs Suite", "parent": "academic_pole", "sublabel": "Admissions, PKI & Discipline" },
+    { "id": "academics_exams", "label": "Academics & Exam PDF", "parent": "academic_pole", "sublabel": "Courses, Grades & Scheduler" },
+    { "id": "lms_library", "label": "LMS & Digital Library", "parent": "academic_pole", "sublabel": "Lectures, Quizzes & Loans" },
+    { "id": "research_qa", "label": "Research, Alumni & QA", "parent": "academic_pole", "sublabel": "Grants, Jobs & Accreditation" },
+
+    { "id": "hr_unified", "label": "Unified HR & Payroll", "parent": "admin_pole", "sublabel": "Contracts, Biometrics & KPIs" },
+    { "id": "diwan_corr", "label": "Unified Diwan & Requests", "parent": "admin_pole", "sublabel": "Inbound, Outbound & Internal" },
+    { "id": "finance_proc", "label": "Finance & Procurement", "parent": "admin_pole", "sublabel": "Double-Entry, Fees & Stock" },
+
+    { "id": "hc_engine", "label": "10K High-Concurrency", "parent": "sec_pole", "sublabel": "L1 LRU + Redis + 85 Indexes" },
+    { "id": "audit_waf", "label": "Audit Chain & DevOps", "parent": "sec_pole", "sublabel": "SHA-256 Chain + AES Snapshots" },
+    { "id": "uni_ai", "label": "University AI Advisor", "parent": "sec_pole", "sublabel": "Early Warning & Triage" }
+  ]
+}

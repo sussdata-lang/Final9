@@ -1,0 +1,169 @@
+{
+  "schema_version": 1,
+  "diagram_type": "erd",
+  "meta": {
+    "title": "Uni-ERP v12 — High-Frequency Relational Schema (ERD)",
+    "locale": "en",
+    "output": "erd.html",
+    "quality_profile": "standard",
+    "views": [
+      {
+        "id": "identity_org",
+        "label": "Identity & Org Hierarchy",
+        "focus": ["users", "org_units"],
+        "note": "Cached in L1/Redis memory with composite indexes on role, unit_id, and student_no."
+      },
+      {
+        "id": "workflows",
+        "label": "Requests & Correspondence",
+        "focus": ["requests", "corr_docs", "documents"],
+        "note": "High-throughput tables handling 10+ writes/sec with Ed25519 signed document outputs."
+      },
+      {
+        "id": "hr_finance",
+        "label": "HR, Payroll & Finance Ledger",
+        "focus": ["hr_employees", "fin_entries"],
+        "note": "Double-entry financial ledger and biometric/contract employee records."
+      }
+    ]
+  },
+  "layout": {
+    "mode": "grid",
+    "gapY": 42,
+    "gapX": 74
+  },
+  "entities": [
+    {
+      "id": "org_units",
+      "label": "org_units",
+      "tag": "identity",
+      "row": 0,
+      "col": 0,
+      "attributes": [
+        { "name": "id", "type": "integer", "key": "pk" },
+        { "name": "code", "type": "varchar(32)", "key": "uk" },
+        { "name": "name", "type": "varchar(160)" },
+        { "name": "kind", "type": "varchar(32)" },
+        { "name": "parent_id", "type": "integer" }
+      ]
+    },
+    {
+      "id": "users",
+      "label": "users",
+      "tag": "identity",
+      "row": 1,
+      "col": 0,
+      "attributes": [
+        { "name": "id", "type": "integer", "key": "pk" },
+        { "name": "username", "type": "varchar(64)", "key": "uk" },
+        { "name": "role", "type": "varchar(32)" },
+        { "name": "unit_id", "type": "integer", "key": "fk", "references": "org_units.id" },
+        { "name": "student_no", "type": "varchar(32)", "key": "uk" },
+        { "name": "status", "type": "varchar(24)" }
+      ]
+    },
+    {
+      "id": "requests",
+      "label": "requests",
+      "tag": "operations",
+      "row": 0,
+      "col": 1,
+      "attributes": [
+        { "name": "id", "type": "integer", "key": "pk" },
+        { "name": "req_no", "type": "varchar(40)", "key": "uk" },
+        { "name": "student_id", "type": "integer", "key": "fk", "references": "users.id" },
+        { "name": "current_unit_id", "type": "integer", "key": "fk", "references": "org_units.id" },
+        { "name": "service_code", "type": "varchar(40)" },
+        { "name": "status", "type": "varchar(24)" },
+        { "name": "created_at", "type": "bigint" }
+      ]
+    },
+    {
+      "id": "corr_docs",
+      "label": "corr_docs",
+      "tag": "operations",
+      "row": 1,
+      "col": 1,
+      "attributes": [
+        { "name": "id", "type": "integer", "key": "pk" },
+        { "name": "ref_no", "type": "varchar(48)", "key": "uk" },
+        { "name": "from_unit_id", "type": "integer", "key": "fk", "references": "org_units.id" },
+        { "name": "created_by", "type": "integer", "key": "fk", "references": "users.id" },
+        { "name": "priority", "type": "varchar(16)" },
+        { "name": "status", "type": "varchar(24)" }
+      ]
+    },
+    {
+      "id": "documents",
+      "label": "documents",
+      "tag": "governance",
+      "row": 0,
+      "col": 2,
+      "attributes": [
+        { "name": "id", "type": "integer", "key": "pk" },
+        { "name": "verify_code", "type": "varchar(48)", "key": "uk" },
+        { "name": "request_id", "type": "integer", "key": "fk", "references": "requests.id" },
+        { "name": "ed25519_sig", "type": "text" },
+        { "name": "issued_at", "type": "bigint" }
+      ]
+    },
+    {
+      "id": "hr_employees",
+      "label": "hr_employees",
+      "tag": "governance",
+      "row": 1,
+      "col": 2,
+      "attributes": [
+        { "name": "id", "type": "integer", "key": "pk" },
+        { "name": "emp_no", "type": "varchar(32)", "key": "uk" },
+        { "name": "user_id", "type": "integer", "key": "fk", "references": "users.id" },
+        { "name": "unit_id", "type": "integer", "key": "fk", "references": "org_units.id" },
+        { "name": "base_salary", "type": "numeric(14,2)" }
+      ]
+    },
+    {
+      "id": "fin_entries",
+      "label": "fin_entries",
+      "tag": "finance",
+      "row": 0,
+      "col": 3,
+      "attributes": [
+        { "name": "id", "type": "integer", "key": "pk" },
+        { "name": "entry_no", "type": "varchar(40)", "key": "uk" },
+        { "name": "created_by", "type": "integer", "key": "fk", "references": "users.id" },
+        { "name": "total_debit", "type": "numeric(14,2)" },
+        { "name": "status", "type": "varchar(24)" },
+        { "name": "created_at", "type": "bigint" }
+      ]
+    }
+  ],
+  "relationships": [
+    { "id": "r_user_unit", "from": "users", "to": "org_units", "fromCardinality": "many", "toCardinality": "one" },
+    { "id": "r_req_user", "from": "requests", "to": "users", "fromCardinality": "many", "toCardinality": "one" },
+    { "id": "r_req_unit", "from": "requests", "to": "org_units", "fromCardinality": "many", "toCardinality": "one" },
+    { "id": "r_corr_unit", "from": "corr_docs", "to": "org_units", "fromCardinality": "many", "toCardinality": "one" },
+    { "id": "r_corr_user", "from": "corr_docs", "to": "users", "fromCardinality": "many", "toCardinality": "one" },
+    { "id": "r_doc_req", "from": "documents", "to": "requests", "fromCardinality": "many", "toCardinality": "one" },
+    { "id": "r_emp_user", "from": "hr_employees", "to": "users", "fromCardinality": "many", "toCardinality": "one" },
+    { "id": "r_emp_unit", "from": "hr_employees", "to": "org_units", "fromCardinality": "many", "toCardinality": "one" },
+    { "id": "r_fin_user", "from": "fin_entries", "to": "users", "fromCardinality": "many", "toCardinality": "one" }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "High-Frequency Composite Indexes (031_high_frequency_table_indexes)",
+      "items": [
+        "users(role, status, unit_id) and org_units(parent_id, kind) power O(1) L1/Redis cache warming",
+        "requests(status, current_unit_id, created_at DESC) eliminates full-table scans on My Desk"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Write-Through Cache Invalidation",
+      "items": [
+        "Mutations on users, org_units, requests, or corr_docs selectively invalidate only their affected namespace",
+        "Sustains 10,000+ concurrent readers and 50+ write transactions/sec under benchmark load"
+      ]
+    }
+  ]
+}

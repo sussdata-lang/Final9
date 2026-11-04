@@ -1,0 +1,1 @@
+INSERT INTO postgrad_theses (student_no, student_name, degree, program_name, title, supervisor_name, co_supervisor, stage, defense_date, grade_label) VALUES ('PG-SMPL-1', 'باحث تجريبي', 'ماجستير', 'برنامج تجريبي', 'رسالة تجريبية', 'د. مثال تجريبي', NULL, NULL, NULL, NULL);

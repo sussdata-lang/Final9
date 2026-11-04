@@ -1,0 +1,1 @@
+INSERT INTO faculty_overload_records (instructor_name, academic_rank, faculty_name, quorum_hours, actual_teaching_hours, supervision_hours, hourly_rate, semester, status) VALUES ('د. مثال تجريبي', 'أستاذ مساعد', 'كلية تجريبية', '10', '14', '2', '1000', 'الفصل الأول 2026/2027', NULL);

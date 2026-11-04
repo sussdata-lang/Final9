@@ -1,0 +1,1 @@
+INSERT INTO alumni_records (student_no, full_name, faculty_name, program_name, grad_year, gpa, honor_rank, current_employer, job_title, email, phone) VALUES ('GRAD-SMPL-1', 'خريج تجريبي', 'كلية تجريبية', 'برنامج تجريبي', '2025', '85', 'جيد جداً', NULL, NULL, NULL, NULL);

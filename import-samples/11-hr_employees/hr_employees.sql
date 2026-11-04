@@ -1,0 +1,1 @@
+INSERT INTO hr_employees (employee_no, name, personal_id, hire_date, email, phone, department_name, position, unit_code, contract_type_label, emp_status_label, annual_leave_quota) VALUES ('EMP-SMPL', 'موظف تجريبي', '00000000000', '2026-01-01', NULL, NULL, 'الشؤون الإدارية', 'إداري', NULL, NULL, 'نشط', '21');

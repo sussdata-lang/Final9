@@ -1,0 +1,1 @@
+INSERT INTO dorm_allocations (building_name, room_no, student_no, faculty_name, check_in_date, academic_year, payment_status, status) VALUES ('مبنى تجريبي', '101', 'SAMPLE-1', 'الشؤون الإدارية', '2026-09-01', '2026/2027', 'غير مسدد', NULL);

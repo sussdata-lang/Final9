@@ -1,0 +1,414 @@
+// /api/finance/* — يُسجَّل من routes.js عبر registerFinance(r, deps, helpers)
+import { HttpError } from '../../http.js';
+const need = (ctx, perm) => { if (!ctx.user.can(perm)) throw new HttpError(403, 'لا تملك صلاحية هذا الإجراء.', 'forbidden'); };
+import * as C from './core.js';
+import * as R from './reports.js';
+import * as F from './fees.js';
+
+// helpers لكتابة الإكسل
+let xlsxLib = null; const xlsx = () => xlsxLib ?? (xlsxLib = import('../../lib/xlsx.js'));
+
+export async function registerFinance(r, deps, { writeXlsx }) {
+  const { db } = deps;
+  const fin = (perm, handler, successCode = 200) => async (c) => {
+    need(c, perm);
+    const body = c.body ?? {};
+    const q = c.query ?? {};
+    const result = await handler(c, body, q);
+    if (result === null || result === undefined) return c.json(204, {});
+    return c.json(successCode, result);
+  };
+  const finC = (perm, handler) => fin(perm, handler, 201);
+
+  /* ---- لوحة المعلومات ---- */
+  r.add('GET', '/api/finance/overview', fin('finance:read', () => R.overview(deps)));
+
+  /* ---- السنوات المالية ---- */
+  const getYearsHandler = () => { const y = C.listYears(db); return { years: y, fiscalYears: y }; };
+  r.add('GET', '/api/finance/years', fin('finance:read', getYearsHandler));
+  r.add('GET', '/api/finance/fiscal-years', fin('finance:read', getYearsHandler));
+  r.add('POST', '/api/finance/years', finC('finance:setup', (c, b) => C.createYear(deps, c.user, b, c.ip)));
+  r.add('POST', '/api/finance/fiscal-years', finC('finance:setup', (c, b) => C.createYear(deps, c.user, b, c.ip)));
+  r.add('POST', '/api/finance/fiscal-years/:id/close', fin('finance:setup', (c, b) => F.closeYear(deps, c.user, c.params.id, c.ip)));
+
+  /* ---- دليل الحسابات ---- */
+  r.add('GET', '/api/finance/accounts', fin('finance:read', () => ({ accounts: C.listAccounts(db) })));
+  r.add('POST', '/api/finance/accounts', finC('finance:setup', (c, b) => C.createAccount(deps, c.user, b, c.ip)));
+  r.add('PUT', '/api/finance/accounts/:id', fin('finance:setup', (c, b) => C.updateAccount(deps, c.user, c.params.id, b, c.ip)));
+  r.add('POST', '/api/finance/accounts/:id/toggle', fin('finance:setup', (c, b) => C.toggleAccount(deps, c.user, c.params.id, b?.active !== false, c.ip)));
+  r.add('DELETE', '/api/finance/accounts/:id', fin('finance:setup', (c) => C.deleteAccount(deps, c.user, c.params.id, c.ip)));
+
+  /* ---- القيود اليومية ---- */
+  r.add('GET', '/api/finance/entries', fin('finance:read', (_c, _b, q) => C.listEntries(deps, q)));
+  r.add('GET', '/api/finance/entries/:id', fin('finance:read', (c) => C.getEntry(deps, c.params.id)));
+  r.add('POST', '/api/finance/entries', finC('finance:entry', (c, b) => C.createEntry(deps, c.user, b, c.ip)));
+  r.add('PUT', '/api/finance/entries/:id', fin('finance:entry', (c, b) => C.updateEntry(deps, c.user, c.params.id, b, c.ip)));
+  r.add('DELETE', '/api/finance/entries/:id', fin('finance:entry', (c) => C.deleteEntry(deps, c.user, c.params.id, c.ip)));
+  r.add('POST', '/api/finance/entries/:id/post', fin('finance:post', (c, b) => C.postEntry(deps, c.user, c.params.id, c.ip)));
+  r.add('POST', '/api/finance/entries/:id/reverse', finC('finance:post', (c, b) => C.reverseEntry(deps, c.user, c.params.id, b, c.ip)));
+
+  /* مسارات توافقية لدفتر اليومية /api/finance/journal */
+  r.add('GET', '/api/finance/journal', fin('finance:read', (_c, _b, q) => C.listEntries(deps, q)));
+  r.add('GET', '/api/finance/journal/:id', fin('finance:read', (c) => C.getEntry(deps, c.params.id)));
+  r.add('POST', '/api/finance/journal', finC('finance:entry', (c, b) => C.createEntry(deps, c.user, b, c.ip)));
+  r.add('PUT', '/api/finance/journal/:id', fin('finance:entry', (c, b) => C.updateEntry(deps, c.user, c.params.id, b, c.ip)));
+  r.add('DELETE', '/api/finance/journal/:id', fin('finance:entry', (c) => C.deleteEntry(deps, c.user, c.params.id, c.ip)));
+  r.add('POST', '/api/finance/journal/:id/post', fin('finance:post', (c, b) => C.postEntry(deps, c.user, c.params.id, c.ip)));
+  r.add('POST', '/api/finance/journal/:id/reverse', finC('finance:post', (c, b) => C.reverseEntry(deps, c.user, c.params.id, b, c.ip)));
+
+  /* ---- الخزينة والسندات والذمم (Vouchers & Invoices) ---- */
+  r.add('GET', '/api/finance/vouchers', fin('finance:read', () => {
+    C.ready(db);
+    const rows = db.prepare(`SELECT e.id, e.no, e.type, e.entry_day, e.description,
+        (SELECT p.name FROM fin_lines l JOIN fin_parties p ON p.id=l.party_id WHERE l.entry_id=e.id LIMIT 1) party_name,
+        (SELECT COALESCE(SUM(l.debit),0) FROM fin_lines l WHERE l.entry_id=e.id) / 100.0 amount
+      FROM fin_entries e WHERE e.type IN ('RV','PV') AND e.status='posted' ORDER BY e.id DESC LIMIT 200`).all();
+    return {
+      vouchers: rows.map((v) => ({
+        id: v.id,
+        no: v.no || `VCH-${v.id}`,
+        kind: v.type === 'RV' ? 'receipt' : 'payment',
+        voucherDay: v.entry_day,
+        partyName: v.party_name || 'الخزينة المركزية',
+        method: 'cash',
+        amount: v.amount,
+        description: v.description,
+        journalId: v.id
+      }))
+    };
+  }));
+
+  r.add('POST', '/api/finance/vouchers', finC('finance:entry', (c, b) => {
+    C.ready(db);
+    const kind = b?.kind === 'payment' ? 'PV' : 'RV';
+    const amt = Number(b?.amount || 0);
+    if (!amt || amt <= 0) throw C.bad('المبلغ غير صالح.');
+    const cashAccId = Number(b?.cashAccountId) || C.sysAccount(db, 'cash').id;
+    const cntAccId = Number(b?.counterAccountId) || C.sysAccount(db, kind === 'RV' ? 'rev_tuition' : 'general_exp').id;
+    const day = b?.voucherDay || C.today();
+    const desc = b?.description || (kind === 'RV' ? 'سند قبض خزينة' : 'سند صرف خزينة');
+    const pId = b?.partyId ? Number(b.partyId) : null;
+    const lines = kind === 'RV'
+      ? [{ accountId: cashAccId, debit: amt, credit: 0, partyId: pId, note: desc }, { accountId: cntAccId, debit: 0, credit: amt, partyId: pId, note: desc }]
+      : [{ accountId: cntAccId, debit: amt, credit: 0, partyId: pId, note: desc }, { accountId: cashAccId, debit: 0, credit: amt, partyId: pId, note: desc }];
+    const entry = C.createEntry(deps, c.user, { day, description: desc, lines, post: true }, c.ip, { type: kind, post: true, system: true });
+    return { voucher: { id: entry.id, no: entry.no, amount: amt, kind: b?.kind } };
+  }));
+
+  r.add('GET', '/api/finance/invoices', fin('finance:read', () => {
+    C.ready(db);
+    const rows = db.prepare(`SELECT e.id, e.no, e.type, e.entry_day, e.description,
+        (SELECT p.name FROM fin_lines l JOIN fin_parties p ON p.id=l.party_id WHERE l.entry_id=e.id LIMIT 1) party_name,
+        (SELECT COALESCE(SUM(l.debit),0) FROM fin_lines l WHERE l.entry_id=e.id) / 100.0 amount
+      FROM fin_entries e WHERE e.type='JV' AND e.reference LIKE 'INV-%' ORDER BY e.id DESC LIMIT 100`).all();
+    return {
+      invoices: rows.map((r) => ({
+        id: r.id,
+        no: r.no || `INV-${r.id}`,
+        kind: 'sale',
+        partyName: r.party_name || 'عميل أكاديمي',
+        issueDay: r.entry_day,
+        total: r.amount,
+        paidAmount: r.amount,
+        status: 'paid'
+      }))
+    };
+  }));
+
+  r.add('POST', '/api/finance/invoices', finC('finance:entry', (c, b) => {
+    C.ready(db);
+    const day = b?.issueDay || C.today();
+    const party = db.prepare('SELECT * FROM fin_parties WHERE id=?').get(Number(b?.partyId));
+    const pName = party?.name || 'جهة معتمدة';
+    const total = (b?.lines || []).reduce((s, l) => s + (Number(l.qty || 1) * Number(l.unitPrice || 0)), 0) || 100000;
+    const desc = `فاتورة ذمم: ${pName} — ${(b?.lines || [])[0]?.description || 'خدمات'}`;
+    const recAcc = C.sysAccount(db, 'students').id;
+    const revAcc = C.sysAccount(db, 'rev_tuition').id;
+    const lines = [
+      { accountId: recAcc, debit: total, credit: 0, partyId: party?.id ?? null, note: desc },
+      { accountId: revAcc, debit: 0, credit: total, partyId: party?.id ?? null, note: desc }
+    ];
+    const entry = C.createEntry(deps, c.user, { day, reference: `INV-${Date.now()}`, description: desc, lines, post: true }, c.ip, { type: 'JV', post: true, system: true });
+    return { invoice: { id: entry.id, no: entry.no, total, status: 'issued' } };
+  }));
+
+  r.add('POST', '/api/finance/invoices/:id/issue', fin('finance:entry', () => ({ ok: true })));
+  r.add('POST', '/api/finance/invoices/:id/cancel', fin('finance:entry', () => ({ ok: true })));
+
+  /* ---- الأطراف ---- */
+  r.add('GET', '/api/finance/parties', fin('finance:read', (_c, _b, q) => {
+    C.ready(db);
+    const w = [], a = [];
+    if (q.kind) { w.push('kind=?'); a.push(q.kind); }
+    if (q.q) { const l = `%${q.q.slice(0, 40)}%`; w.push("name LIKE ? ESCAPE '\\'"); a.push(l); }
+    const where = w.length ? 'WHERE ' + w.join(' AND ') : '';
+    return { parties: db.prepare(`SELECT * FROM fin_parties ${where} ORDER BY name LIMIT 200`).all(...a) };
+  }));
+  r.add('POST', '/api/finance/parties', finC('finance:setup', (c, b) => {
+    C.ready(db);
+    const name = C.clean(b?.name, 100, 'اسم الطرف', 2), kind = ['supplier','customer','employee','other'].includes(b?.kind) ? b.kind : 'other';
+    const accId = b?.accountId ? Number(b.accountId) : null;
+    if (accId && !db.prepare('SELECT 1 FROM fin_accounts WHERE id=? AND active=1 AND postable=1').get(accId)) throw C.bad('الحساب غير صالح.');
+    const id = Number(db.prepare('INSERT INTO fin_parties (kind,name,phone,email,notes,account_id,created_at) VALUES (?,?,?,?,?,?,?)').run(kind, name, b?.phone ?? null, b?.email ?? null, b?.notes ?? null, accId, Date.now()).lastInsertRowid);
+    return { party: db.prepare('SELECT * FROM fin_parties WHERE id=?').get(id) };
+  }));
+  r.add('PUT', '/api/finance/parties/:id', fin('finance:setup', (c, b) => {
+    C.ready(db);
+    const p = db.prepare('SELECT * FROM fin_parties WHERE id=?').get(Number(c.params.id)); if (!p) throw C.bad('الطرف غير موجود.', 404, 'not_found');
+    const name = C.clean(b?.name ?? p.name, 100, 'اسم الطرف', 2), kind = ['supplier','customer','employee','other'].includes(b?.kind) ? b.kind : p.kind;
+    db.prepare('UPDATE fin_parties SET name=?,kind=?,phone=?,email=?,notes=?,account_id=? WHERE id=?').run(name, kind, b?.phone ?? p.phone, b?.email ?? p.email, b?.notes ?? p.notes, b?.accountId ?? p.account_id, p.id);
+    return { party: db.prepare('SELECT * FROM fin_parties WHERE id=?').get(p.id) };
+  }));
+  r.add('POST', '/api/finance/parties/:id/toggle', fin('finance:setup', (c, b) => {
+    C.ready(db);
+    db.prepare('UPDATE fin_parties SET active=? WHERE id=?').run(b?.active !== false ? 1 : 0, Number(c.params.id)); return { ok: true };
+  }));
+
+  /* ---- مراكز الكلفة ---- */
+  r.add('GET', '/api/finance/cost-centers', fin('finance:read', () => {
+    C.ready(db); return { costCenters: db.prepare('SELECT cc.*, u.name unit_name FROM fin_cost_centers cc LEFT JOIN org_units u ON u.id=cc.unit_id ORDER BY cc.code').all() };
+  }));
+  r.add('POST', '/api/finance/cost-centers', finC('finance:setup', (c, b) => {
+    C.ready(db);
+    const code = C.clean(b?.code, 20, 'رمز مركز الكلفة'), name = C.clean(b?.name, 100, 'اسم مركز الكلفة', 2);
+    if (db.prepare('SELECT 1 FROM fin_cost_centers WHERE code=?').get(code)) throw C.bad('الرمز مستخدم.', 409, 'conflict');
+    const id = Number(db.prepare('INSERT INTO fin_cost_centers (code,name,unit_id) VALUES (?,?,?)').run(code, name, b?.unitId ?? null).lastInsertRowid);
+    return { costCenter: db.prepare('SELECT * FROM fin_cost_centers WHERE id=?').get(id) };
+  }));
+  r.add('PUT', '/api/finance/cost-centers/:id', fin('finance:setup', (c, b) => {
+    C.ready(db);
+    const cc = db.prepare('SELECT * FROM fin_cost_centers WHERE id=?').get(Number(c.params.id)); if (!cc) throw C.bad('مركز الكلفة غير موجود.', 404, 'not_found');
+    const code = C.clean(b?.code ?? cc.code, 20, 'رمز مركز الكلفة'), name = C.clean(b?.name ?? cc.name, 100, 'اسم مركز الكلفة', 2);
+    if (code !== cc.code && db.prepare('SELECT 1 FROM fin_cost_centers WHERE code=? AND id!=?').get(code, cc.id)) throw C.bad('الرمز مستخدم.', 409, 'conflict');
+    db.prepare('UPDATE fin_cost_centers SET code=?,name=?,unit_id=? WHERE id=?').run(code, name, b?.unitId ?? cc.unit_id, cc.id);
+    return { costCenter: db.prepare('SELECT * FROM fin_cost_centers WHERE id=?').get(cc.id) };
+  }));
+  r.add('POST', '/api/finance/cost-centers/:id/toggle', fin('finance:setup', (c, b) => {
+    C.ready(db); db.prepare('UPDATE fin_cost_centers SET active=? WHERE id=?').run(b?.active !== false ? 1 : 0, Number(c.params.id)); return { ok: true };
+  }));
+
+  /* ---- العملات ---- */
+  r.add('GET', '/api/finance/currencies', fin('finance:read', () => {
+    C.ready(db); return { currencies: db.prepare('SELECT * FROM fin_currencies ORDER BY is_base DESC, code').all() };
+  }));
+  r.add('PUT', '/api/finance/currencies/:code', fin('finance:setup', (c, b) => {
+    C.ready(db);
+    const cur = db.prepare('SELECT * FROM fin_currencies WHERE code=?').get(c.params.code); if (!cur) throw C.bad('العملة غير موجودة.', 404, 'not_found');
+    if (b?.rate !== undefined) { const r = Number(b.rate); if (!Number.isFinite(r) || r <= 0) throw C.bad('سعر الصرف غير صالح.'); db.prepare('UPDATE fin_currencies SET rate=? WHERE code=?').run(r, cur.code); }
+    if (b?.active !== undefined) db.prepare('UPDATE fin_currencies SET active=? WHERE code=?').run(b.active ? 1 : 0, cur.code);
+    return { currency: db.prepare('SELECT * FROM fin_currencies WHERE code=?').get(cur.code) };
+  }));
+
+  /* ---- التقارير ---- */
+  r.add('GET', '/api/finance/reports/trial-balance', fin('finance:read', (_c, _b, q) => R.trialBalance(deps, q)));
+  r.add('GET', '/api/finance/reports/ledger', fin('finance:read', (_c, _b, q) => R.ledger(deps, { ...q, account: q.accountId ?? q.account })));
+  r.add('GET', '/api/finance/reports/income', fin('finance:read', (_c, _b, q) => R.incomeStatement(deps, q)));
+  r.add('GET', '/api/finance/reports/income-statement', fin('finance:read', (_c, _b, q) => {
+    const inc = R.incomeStatement(deps, q);
+    return {
+      ...inc,
+      revenues: inc.revenue?.rows || [],
+      expenses: inc.expense?.rows || [],
+      totalRevenue: inc.revenue?.total || 0,
+      totalExpense: inc.expense?.total || 0,
+      netIncome: inc.surplus || 0
+    };
+  }));
+  r.add('GET', '/api/finance/reports/balance-sheet', fin('finance:read', (_c, _b, q) => R.balanceSheet(deps, q)));
+  r.add('GET', '/api/finance/reports/cash-book', fin('finance:read', (_c, _b, q) => {
+    const cb = R.cashBook(deps, q);
+    return {
+      ...cb,
+      grandTotal: cb.totalClosing || 0,
+      accounts: (cb.books || []).map((b) => ({
+        account: b.account,
+        closingBalance: b.closing,
+        rows: (b.lines || []).map((l) => ({
+          entry_day: l.day,
+          no: l.no,
+          memo: l.description,
+          debit: l.debit,
+          credit: l.credit,
+          balance: l.balance
+        }))
+      }))
+    };
+  }));
+  r.add('GET', '/api/finance/reports/cost-centers', fin('finance:read', (_c, _b, q) => R.costCenterReport(deps, q)));
+  r.add('GET', '/api/finance/reports/party', fin('finance:read', (_c, _b, q) => R.partyStatement(deps, { ...q, party: q.partyId ?? q.party })));
+  r.add('GET', '/api/finance/reports/party-statement', fin('finance:read', (_c, _b, q) => {
+    const ps = R.partyStatement(deps, { ...q, party: q.partyId ?? q.party });
+    return {
+      ...ps,
+      totalInvoiced: ps.totals?.debit ?? 0,
+      totalVoucher: ps.totals?.credit ?? 0,
+      outstanding: Math.abs(ps.closing ?? 0)
+    };
+  }));
+
+  /* إكسل - ميزان المراجعة */
+  r.add('GET', '/api/finance/reports/trial-balance.xlsx', async (c) => {
+    need(c, 'finance:read');
+    const { from, to } = c.query;
+    const tb = R.trialBalance(deps, { from, to });
+    const { writeXlsx: wx } = await xlsx();
+    const buf = await wx([{ name: 'ميزان المراجعة', rows: tb.rows.map((r) => [r.code, r.name, r.openDebit, r.openCredit, r.debit, r.credit, r.closeDebit, r.closeCredit]), headers: ['الرمز','الحساب','مدين افتتاحي','دائن افتتاحي','مدين','دائن','مدين ختامي','دائن ختامي'] }]);
+    c.res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    c.res.setHeader('Content-Disposition', 'attachment; filename="trial-balance.xlsx"');
+    c.res.end(buf);
+  });
+
+  /* ---- رسوم الطلاب ---- */
+  r.add('GET', '/api/finance/fee-types', fin('finance:fees', () => F.listFeeTypes(deps)));
+  r.add('POST', '/api/finance/fee-types', fin('finance:fees', (c, b) => F.saveFeeType(deps, c.user, b, c.ip)));
+  r.add('POST', '/api/finance/fee-types/:id/toggle', fin('finance:fees', (c, b) => F.toggleFeeType(deps, c.user, c.params.id, b?.active !== false, c.ip)));
+  r.add('GET', '/api/finance/charges', fin('finance:fees', (_c, _b, q) => ({ charges: F.listCharges(deps, q) })));
+  r.add('POST', '/api/finance/charges', finC('finance:fees', (c, b) => F.createCharge(deps, c.user, b, c.ip)));
+  r.add('POST', '/api/finance/charges/:id/void', fin('finance:fees', (c, b) => F.voidCharge(deps, c.user, c.params.id, b, c.ip)));
+  r.add('GET', '/api/finance/payments', fin('finance:fees', (_c, _b, q) => ({ payments: F.listPayments(deps, q) })));
+  r.add('POST', '/api/finance/payments', finC('finance:fees', (c, b) => F.createPayment(deps, c.user, b, c.ip)));
+  r.add('POST', '/api/finance/payments/:id/void', fin('finance:fees', (c, b) => F.voidPayment(deps, c.user, c.params.id, b, c.ip)));
+  r.add('GET', '/api/finance/student-statement/:id', fin('finance:fees', (c) => F.studentStatement(deps, c.params.id)));
+  r.add('GET', '/api/finance/payroll-months', fin('finance:read', () => F.payrollMonths(deps)));
+  r.add('GET', '/api/finance/payroll-preview', fin('finance:read', (_c, _b, q) => F.payrollPreview(deps, q.month)));
+  r.add('POST', '/api/finance/payroll-entry', fin('finance:post', (c, b) => F.payrollEntry(deps, c.user, b, c.ip)));
+  r.add('POST', '/api/finance/years/:id/close', fin('finance:setup', (c, b) => F.closeYear(deps, c.user, c.params.id, c.ip)));
+
+  /* مسارات الرسوم الطلابية الإضافية لشاشة محاسبة الطلاب */
+  r.add('GET', '/api/finance/fees/overview', fin('finance:read', () => {
+    C.ready(db);
+    const charges = F.listCharges(deps);
+    const payments = F.listPayments(deps);
+    const billed = charges.filter((c) => c.status === 'open').reduce((s, c) => s + Number(c.amount || 0), 0);
+    const collected = payments.filter((p) => p.status === 'ok').reduce((s, p) => s + Number(p.amount || 0), 0);
+    const rem = Math.max(0, billed - collected);
+    return {
+      invoicesCount: charges.length,
+      totalBilled: billed,
+      totalCollected: collected,
+      totalRemaining: rem,
+      collectionRate: billed > 0 ? Math.round((collected / billed) * 100) : 100,
+      overdueCount: 0
+    };
+  }));
+
+  r.add('GET', '/api/finance/fee-structures', fin('finance:read', () => {
+    C.ready(db);
+    const rows = db.prepare(`SELECT fs.*, p.name programName FROM fin_fee_structures fs LEFT JOIN programs p ON p.id=fs.program_id ORDER BY fs.id DESC`).all();
+    return {
+      programs: db.prepare('SELECT id, name FROM programs WHERE active = 1 ORDER BY name').all(),
+      structures: rows.map((r) => ({
+        id: r.id,
+        programName: r.programName || 'برنامج أكاديمي',
+        academicYear: r.academic_year,
+        semester: r.semester,
+        tuitionFee: r.tuition_fee,
+        registrationFee: r.registration_fee,
+        totalFee: r.total_fee
+      }))
+    };
+  }));
+
+  r.add('POST', '/api/finance/fee-structures', finC('finance:setup', (c, b) => {
+    C.ready(db);
+    const tui = Number(b?.tuitionFee || 0);
+    const reg = Number(b?.registrationFee || 0);
+    const id = Number(db.prepare(`INSERT INTO fin_fee_structures (program_id, academic_year, semester, tuition_fee, registration_fee, total_fee, created_at) VALUES (?,?,?,?,?,?,?)`)
+      .run(Number(b?.programId) || 1, String(b?.academicYear || '2025/2026'), Number(b?.semester) || 1, tui, reg, tui + reg, Date.now()).lastInsertRowid);
+    return { ok: true, id };
+  }));
+
+  r.add('GET', '/api/finance/student-invoices', fin('finance:read', () => {
+    C.ready(db);
+    const charges = F.listCharges(deps);
+    return {
+      invoices: charges.map((ch) => ({
+        id: ch.id,
+        no: `CHG-${ch.id}`,
+        studentName: 'طالب جامعي',
+        studentNo: `STU-${ch.studentId}`,
+        academicYear: ch.academicYear || '2025/2026',
+        semester: 1,
+        totalAmount: ch.amount,
+        discountAmount: 0,
+        netAmount: ch.amount,
+        paidAmount: ch.status === 'open' ? 0 : ch.amount,
+        status: ch.status === 'open' ? 'unpaid' : 'paid',
+        installments: [{ seq: 1, dueDay: ch.dueDay, amount: ch.amount, paidAmount: 0, status: ch.status }]
+      }))
+    };
+  }));
+
+  r.add('POST', '/api/finance/student-invoices', finC('finance:fees', (c, b) => {
+    const ft = F.listFeeTypes(deps).find((f) => f.kind === 'fee' && f.active) || { id: 1 };
+    return F.createCharge(deps, c.user, {
+      studentId: b?.studentId,
+      feeTypeId: ft.id,
+      amount: b?.totalAmount,
+      dueDay: (b?.installments || [])[0]?.dueDay || C.today(),
+      academicYear: b?.academicYear || '2025/2026',
+      note: 'فاتورة رسوم دراسية معتمدة'
+    }, c.ip);
+  }));
+
+  r.add('GET', '/api/finance/student-invoices/:id', fin('finance:read', (c) => {
+    const ch = db.prepare('SELECT * FROM fin_charges WHERE id=?').get(Number(c.params.id));
+    if (!ch) throw C.bad('الفاتورة غير موجودة', 404, 'not_found');
+    return {
+      invoice: {
+        id: ch.id,
+        no: `CHG-${ch.id}`,
+        studentName: 'طالب جامعي',
+        netAmount: ch.amount / 100.0,
+        paidAmount: ch.status === 'open' ? 0 : ch.amount / 100.0,
+        installments: [{ seq: 1, dueDay: ch.due_day, amount: ch.amount / 100.0, paidAmount: 0, status: ch.status }]
+      }
+    };
+  }));
+
+  r.add('POST', '/api/finance/student-invoices/:id/pay', finC('finance:fees', (c, b) => {
+    const ch = db.prepare('SELECT * FROM fin_charges WHERE id=?').get(Number(c.params.id));
+    if (!ch) throw C.bad('الفاتورة غير موجودة', 404, 'not_found');
+    return F.createPayment(deps, c.user, {
+      studentId: ch.student_id,
+      amount: Number(b?.amount) || (ch.amount / 100.0),
+      method: b?.method || 'cash',
+      paidDay: C.today(),
+      note: `سداد الفاتورة CHG-${ch.id}`
+    }, c.ip);
+  }));
+
+  r.add('GET', '/api/finance/discounts', fin('finance:read', () => ({ discounts: [] })));
+  r.add('POST', '/api/finance/discounts', finC('finance:fees', () => ({ ok: true })));
+  r.add('GET', '/api/finance/fees/overdue', fin('finance:read', () => ({ installments: [] })));
+
+  r.add('GET', '/api/payroll/runs', fin('finance:read', () => {
+    const pm = F.payrollMonths(deps);
+    return {
+      runs: (pm.months || []).map((m, idx) => ({
+        id: idx + 1,
+        period: m.month,
+        title: `مسير رواتب شهر ${m.month}`,
+        status: m.entry ? 'approved' : 'draft',
+        totalNet: m.total,
+        finJournalId: m.entry?.id || null
+      }))
+    };
+  }));
+
+  r.add('POST', '/api/finance/payroll/:id/post', fin('finance:post', (c) => {
+    const pm = F.payrollMonths(deps);
+    const m = (pm.months || [])[Number(c.params.id) - 1] || (pm.months || [])[0];
+    if (!m) throw C.bad('الشهر غير موجود', 404, 'not_found');
+    const res = F.payrollEntry(deps, c.user, { month: m.month }, c.ip);
+    return { journalNo: res.entry.no };
+  }));
+
+  /* ---- رسوم الطالب (self) ---- */
+  r.add('GET', '/api/me/fees', async (c) => {
+    if (!c.user) { c.res.writeHead(401); c.res.end(); return; }
+    if (c.user.role !== 'student' && !c.user.can('finance:fees')) { c.res.writeHead(403); c.res.end(); return; }
+    const id = c.user.role === 'student' ? c.user.id : Number(c.query?.studentId ?? c.user.id);
+    c.json(200, F.studentStatement(deps, id));
+  });
+}

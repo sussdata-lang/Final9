@@ -1,0 +1,22 @@
+# Dockerfile.railway (جذر المستودع) — نشر منظومة uni-erp على Railway مع PostgreSQL
+# المتطلبات (Variables في لوحة Railway):
+#   DATABASE_URL=postgres://user:pass@host:5432/dbname   ← خدمة PostgreSQL في Railway
+#   COOKIE_SECURE=1 TRUST_PROXY=1
+# تُثبَّت اعتمادية uni-erp (pg) داخل uni-erp/node_modules؛ لا حاجة لاعتماديات الاستوديو في هذا النشر.
+FROM node:22-alpine
+WORKDIR /app
+# pg_dump/pg_restore مطلوبان للنسخ الاحتياطي (BACKUP_AUTO)
+RUN apk add --no-cache postgresql-client su-exec
+COPY uni-erp/package.json ./uni-erp/package.json
+RUN cd uni-erp && npm install --omit=dev --no-audit --no-fund && npm cache clean --force
+COPY --chown=node:node uni-erp ./uni-erp
+COPY --chown=node:node scripts ./scripts
+# ضغط مسبق (Brotli مستوى 11 + Gzip) للملفات الثابتة: يقلّل حجم النقل نحو 75% ويلغي كلفة الضغط عند أول طلب
+RUN node uni-erp/scripts/precompress.js
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh 2>/dev/null; mkdir -p data uploads logs backups && chown -R node:node /app && chmod 700 data
+ENV NODE_ENV=production HOST=0.0.0.0 COOKIE_SECURE=1 TRUST_PROXY=1 NODE_OPTIONS="--max-old-space-size=512"
+# يبدأ كـ root لإصلاح ملكية القرص المركَّب ثم يُسقط الصلاحيات إلى node (انظر docker-entrypoint.sh)
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+EXPOSE 3000
+CMD ["node", "--disable-warning=ExperimentalWarning", "scripts/start-cloud.js"]

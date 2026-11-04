@@ -1,0 +1,1 @@
+INSERT INTO career_jobs (title, company_name, sector, location, job_type, salary_range, requirements, deadline, active) VALUES ('وظيفة تجريبية', 'شركة تجريبية', 'تقانة', 'دمشق', 'دوام كامل', NULL, NULL, NULL, 'نعم');

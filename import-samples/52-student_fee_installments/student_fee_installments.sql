@@ -1,0 +1,1 @@
+INSERT INTO student_fee_installments (installment_code, student_no, faculty_name, installment_no, amount, due_date, paid_amount, payment_method, receipt_no) VALUES ('INST-SMPL-1', 'SAMPLE-1', 'الشؤون الإدارية', '1', '500000', '2026-12-01', NULL, NULL, NULL);

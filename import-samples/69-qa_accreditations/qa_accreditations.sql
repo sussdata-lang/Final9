@@ -1,0 +1,1 @@
+INSERT INTO qa_accreditations (program_name, agency_name, standard_code, self_study_progress, audit_date, status, notes) VALUES ('برنامج تجريبي', 'هيئة تجريبية', 'STD-SMPL', '80', '2026-12-15', NULL, NULL);

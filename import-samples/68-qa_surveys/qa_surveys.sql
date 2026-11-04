@@ -1,0 +1,1 @@
+INSERT INTO qa_surveys (course_code, course_name, instructor_name, semester, responses_count, content_score, teaching_score, assessment_score, notes) VALUES ('SMPL-101', 'مقرر تجريبي', 'د. مثال تجريبي', 'الفصل الأول 2026/2027', '50', '4.5', '4.5', '4.5', NULL);

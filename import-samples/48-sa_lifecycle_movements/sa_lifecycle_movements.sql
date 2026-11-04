@@ -1,0 +1,1 @@
+INSERT INTO sa_lifecycle_movements (movement_no, student_no, movement_type, academic_year, semester, reason, decision_no, to_program) VALUES ('MOV-SMPL-1', 'SAMPLE-1', 'تأجيل', '2025-2026', '1', 'ظروف صحية', NULL, NULL);

@@ -1,0 +1,1 @@
+INSERT INTO online_quizzes (course_code, course_name, title, instructor_name, duration_min, total_marks, questions, status) VALUES ('SMPL-101', 'مقرر تجريبي', 'اختبار تجريبي', 'د. مثال تجريبي', '30', '20', '[{"q":"سؤال تجريبي","options":["أ","ب"],"answer":0}]', NULL);

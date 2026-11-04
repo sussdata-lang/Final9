@@ -1,0 +1,395 @@
+/* ================================================================
+   ux_enhancements.css — تحسينات تجربة المستخدم الشاملة v1.0
+   ================================================================ */
+
+/* ──────────────────────────────────────────────────────────────
+   § Smooth Micro-Transitions — انتقالات ناعمة عامة
+   ────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  .tab, .btn, .chip, .svc, .row td, .sub-tabs .btn {
+    transition: background .15s ease, color .15s ease, border-color .15s ease, box-shadow .15s ease;
+  }
+  .top, #ws-tabs-bar, .sub-tabs--sticky {
+    transition: box-shadow .2s ease;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────
+   § 1. Sticky Sub-Tabs Bar
+   ────────────────────────────────────────────────────────────── */
+.sub-tabs--sticky {
+  position: sticky;
+  top: var(--sticky-top, 64px);
+  z-index: 4;
+  background: var(--bg);
+  /* خلفية ضبابية خفيفة للمتصفحات الداعمة */
+  -webkit-backdrop-filter: blur(8px) saturate(140%);
+  backdrop-filter: blur(8px) saturate(140%);
+  background-color: color-mix(in srgb, var(--bg) 85%, transparent);
+  padding: 8px 0 4px;
+  margin-inline: -16px;
+  padding-inline: 16px;
+  border-bottom: 1px solid var(--line);
+  /* ظل خفيف يظهر عند التمرير */
+  box-shadow: 0 2px 8px -4px rgba(0,0,0,.12);
+}
+/* fallback لمتصفحات لا تدعم color-mix */
+@supports not (background-color: color-mix(in srgb, red 50%, blue)) {
+  .sub-tabs--sticky { background: var(--bg); }
+}
+
+/* ──────────────────────────────────────────────────────────────
+   § 2. Workspace Tabs Bar
+   ────────────────────────────────────────────────────────────── */
+.ws-tabs-bar {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  padding: 4px 16px;
+  margin-inline: -16px;
+  overflow: hidden;
+}
+.ws-tabs__inner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 1080px;
+  margin-inline: auto;
+  overflow: hidden;
+}
+.ws-tabs__label {
+  font-size: 13px;
+  color: var(--muted);
+  flex: none;
+  padding-inline-end: 4px;
+}
+.ws-tabs__list {
+  display: flex;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+  flex: 1;
+}
+.ws-tabs__list::-webkit-scrollbar { height: 3px; }
+.ws-tabs__list::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+
+.ws-tab {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex: none;
+}
+.ws-tab--pinned .ws-tab__btn {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.ws-tab__btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--line);
+  background: var(--surface2);
+  border-radius: 7px 0 0 7px;
+  padding: 4px 10px 4px 4px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  color: var(--fg);
+  line-height: 1.4;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ws-tab__btn:hover { border-color: var(--accent); background: var(--accent-soft); }
+.ws-tab__btn small { color: var(--muted); font-size: 11px; }
+.ws-tab__icon { font-size: 14px; flex: none; }
+.ws-tab__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-tab__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--bad);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  flex: none;
+  margin-inline-start: 2px;
+}
+.ws-tab__badge[hidden] { display: none; }
+.ws-tab__pin {
+  border: 1px solid var(--line);
+  border-inline-start: 0;
+  background: var(--surface2);
+  border-radius: 0 7px 7px 0;
+  padding: 4px 6px;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--muted);
+  line-height: 1;
+}
+.ws-tab__pin:hover { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
+
+/* ──────────────────────────────────────────────────────────────
+   § 4. Command Palette (Ctrl+K)
+   ────────────────────────────────────────────────────────────── */
+.cmd-palette {
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 16, 14, .55);
+  z-index: 50;
+  display: grid;
+  place-items: start center;
+  padding: max(60px, 10vh) 16px 24px;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+.cmd-palette[hidden] { display: none; }
+.cmd-palette__box {
+  width: min(560px, 100%);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 24px 64px -12px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.04);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.cmd-palette__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.cmd-palette__icon {
+  font-size: 18px;
+  flex: none;
+  color: var(--accent);
+}
+.cmd-palette__input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  font-size: 16px;
+  outline: none;
+  color: var(--fg);
+  caret-color: var(--accent);
+}
+.cmd-palette__input::placeholder { color: var(--muted); }
+.cmd-palette__esc {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 2px 7px;
+  color: var(--muted);
+  cursor: pointer;
+  flex: none;
+  background: var(--surface2);
+}
+.cmd-palette__list {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  max-height: 340px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cmd-palette__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14.5px;
+}
+.cmd-palette__item:hover,
+.cmd-palette__item--active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.cmd-palette__item-icon { font-size: 16px; flex: none; }
+.cmd-palette__hint {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 8px 14px;
+  border-top: 1px solid var(--line);
+  text-align: center;
+}
+
+/* ──────────────────────────────────────────────────────────────
+   § 5. Collapsible Sidebar
+   ────────────────────────────────────────────────────────────── */
+.sidebar-toggle-btn {
+  margin-inline-start: 6px;
+  padding: 5px 9px;
+  font-size: 13px;
+  flex: none;
+}
+/* عند الطي: إخفاء نص التبويبات، إبقاء الأيقونات فقط */
+:root.sidebar--collapsed .tab:not([aria-selected="true"]) {
+  padding-inline: 10px;
+  overflow: hidden;
+  max-width: 40px;
+}
+/* منح المحتوى عرضاً أكبر */
+:root.sidebar--collapsed .grid2 {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* ──────────────────────────────────────────────────────────────
+   § 6. Accessibility Controls Bar
+   ────────────────────────────────────────────────────────────── */
+.a11y-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-inline-start: auto;
+}
+.a11y-btn {
+  border: 1px solid var(--line);
+  background: var(--surface2);
+  border-radius: 6px;
+  padding: 3px 9px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--muted);
+  line-height: 1.5;
+  font-weight: 600;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.a11y-btn:hover, .a11y-btn.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.a11y-val {
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 34px;
+  text-align: center;
+}
+.a11y-sep {
+  color: var(--line);
+  font-size: 14px;
+  padding-inline: 2px;
+}
+
+/* ──────────────────────────────────────────────────────────────
+   § كثافة الجداول (Display Density)
+   ────────────────────────────────────────────────────────────── */
+:root[data-density="compact"] td  { padding-block: 5px; font-size: 13px; }
+:root[data-density="compact"] th  { padding-block: 5px; font-size: 12px; }
+:root[data-density="compact"] .req { padding: 10px; }
+:root[data-density="comfortable"] td  { padding-block: 9px; }
+
+/* ──────────────────────────────────────────────────────────────
+   § تباين عالٍ (High Contrast)
+   ────────────────────────────────────────────────────────────── */
+:root.high-contrast {
+  --line: #888;
+  --muted: #555;
+  --surface2: #F0F0F0;
+}
+:root.high-contrast[data-theme="dark"],
+@media (prefers-color-scheme: dark) {
+  :root.high-contrast:not([data-theme="light"]) {
+    --line: #AAA;
+    --muted: #BBB;
+    --surface2: #1A3830;
+    --fg: #FFFFFF;
+    --bg: #000000;
+  }
+}
+:root.high-contrast .tab[aria-selected="true"] {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+/* حلقة تركيز واضحة */
+:root.high-contrast :focus-visible {
+  outline: 3px solid var(--accent) !important;
+  outline-offset: 3px !important;
+}
+
+/* ──────────────────────────────────────────────────────────────
+   § 9. Skeleton Loaders
+   ────────────────────────────────────────────────────────────── */
+@keyframes sk-shimmer {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+.skeleton-block {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+.sk-line {
+  height: 14px;
+  border-radius: 6px;
+  background: linear-gradient(90deg,
+    var(--surface2) 25%,
+    var(--line)     50%,
+    var(--surface2) 75%
+  );
+  background-size: 400% 100%;
+  animation: sk-shimmer 1.5s ease-in-out infinite;
+}
+.sk-line--lg  { height: 20px; width: 60%; }
+.sk-line--sm  { width: 40%; }
+@media (prefers-reduced-motion: reduce) {
+  .sk-line { animation: none; }
+}
+
+/* ──────────────────────────────────────────────────────────────
+   § Live Badge على .tab
+   ────────────────────────────────────────────────────────────── */
+.tab { position: relative; }
+.tab .live-badge {
+  position: absolute;
+  top: -4px;
+  inset-inline-start: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--bad);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  border: 2px solid var(--bg);
+  animation: badge-pop .25s ease-out;
+}
+@keyframes badge-pop {
+  from { transform: scale(0); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+/* ──────────────────────────────────────────────────────────────
+   § متجاوب — شاشات صغيرة
+   ────────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .ws-tabs-bar { padding-inline: 8px; }
+  .ws-tab__label { max-width: 60px; }
+  .a11y-bar { gap: 2px; }
+  .a11y-btn { padding: 3px 6px; font-size: 12px; }
+  .a11y-sep { display: none; }
+  .cmd-palette { padding-top: 20px; }
+  .cmd-palette__box { border-radius: 12px; }
+}

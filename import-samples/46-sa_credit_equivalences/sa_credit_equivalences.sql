@@ -1,0 +1,1 @@
+INSERT INTO sa_credit_equivalences (student_no, source_university, external_course_code, external_course_name, external_hours, external_mark, internal_course, equivalence_status, note) VALUES ('SAMPLE-1', 'جامعة تجريبية', 'EXT-SMPL', 'مقرر خارجي', '3', '75', 'COURSE-A', 'معتمدة', NULL);

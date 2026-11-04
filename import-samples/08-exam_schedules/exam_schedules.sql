@@ -1,0 +1,1 @@
+INSERT INTO exam_schedules (course_code, course_name, program_name, exam_type, exam_date, start_time, end_time, hall_name, capacity, enrolled_count, proctor_name, status) VALUES ('SMPL-101', 'مقرر تجريبي', 'برنامج تجريبي', 'نهائي', '2026-12-20', '09:00', '11:00', 'القاعة 1', '60', '40', 'مراقب تجريبي', NULL);

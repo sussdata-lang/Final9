@@ -1,0 +1,1 @@
+INSERT INTO hr_trainings (title, trainer_name, target_department, start_date, hours_count, enrolled_count, status) VALUES ('دورة تجريبية', 'مدرب تجريبي', 'الموارد البشرية', '2026-03-01', '20', '15', NULL);

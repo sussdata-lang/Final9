@@ -1,0 +1,1 @@
+INSERT INTO hr_contracts (employee_no, contract_type, contract_type_ar, title, start_date, end_date, salary, notes) VALUES ('EMP-SMPL', 'محدد المدة', 'دوام كامل', NULL, '2026-01-01', '2026-12-31', NULL, NULL);

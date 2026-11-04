@@ -1,0 +1,61 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Uni-ERP — Request, Correspondence & PKI Document Workflow",
+    "animation": "trace",
+    "visual_preset": "signal-flow",
+    "quality_profile": "standard",
+    "output": "workflow.html"
+  },
+  "lanes": [
+    { "id": "applicant", "label": "Student / Staff Portal" },
+    { "id": "diwan", "label": "Diwan & Automated Rules" },
+    { "id": "authority", "label": "Academic / Financial Review", "variant": "exception" },
+    { "id": "crypto", "label": "PKI Signing & Audit Ledger" }
+  ],
+  "phases": [
+    { "id": "submit", "label": "1. Intake & Validation", "fromCol": 0, "toCol": 1 },
+    { "id": "triage", "label": "2. Routing & Decision", "fromCol": 2, "toCol": 3, "variant": "emphasis" },
+    { "id": "issuance", "label": "3. PKI Issuance & Audit", "fromCol": 4, "toCol": 5, "variant": "dashed" }
+  ],
+  "mainPath": ["portal_req", "auto_hold_check", "unit_routing", "dean_decision", "pki_sign", "verified_doc"],
+  "nodes": [
+    { "id": "portal_req", "lane": "applicant", "col": 0, "type": "frontend", "label": "Submit Request", "sublabel": "Student or Internal", "width": 136 },
+    { "id": "verified_doc", "lane": "applicant", "col": 5, "type": "frontend", "label": "Issued PDF + QR", "sublabel": "Instant Download", "width": 136 },
+    { "id": "auto_hold_check", "lane": "diwan", "col": 1, "type": "security", "label": "Hold & Rule Gate", "sublabel": "Financial / Disciplinary", "tag": "Auto-Check", "width": 136 },
+    { "id": "unit_routing", "lane": "diwan", "col": 2, "type": "backend", "label": "Org Unit Router", "sublabel": "Hierarchy Dispatch", "width": 136 },
+    { "id": "dean_decision", "lane": "authority", "col": 3, "type": "backend", "label": "Officer / Dean Gate", "sublabel": "Approve or Forward", "tag": "SLA Tracked", "width": 136 },
+    { "id": "rejected_state", "lane": "authority", "col": 4, "type": "security", "label": "Rejected / Returned", "sublabel": "Reason Recorded", "width": 136 },
+    { "id": "pki_sign", "lane": "crypto", "col": 4, "type": "security", "label": "Ed25519 PKI Signer", "sublabel": "Digital Stamp & QR", "tag": "Ed25519", "width": 136 },
+    { "id": "audit_hash", "lane": "crypto", "col": 3, "type": "database", "label": "SHA-256 Audit Log", "sublabel": "Immutable Chain", "width": 136 }
+  ],
+  "edges": [
+    { "id": "e1", "from": "portal_req", "to": "auto_hold_check", "variant": "emphasis" },
+    { "id": "e2", "from": "auto_hold_check", "to": "unit_routing", "label": "clear", "variant": "emphasis" },
+    { "id": "e3", "from": "auto_hold_check", "to": "rejected_state", "label": "active hold", "variant": "security", "role": "error" },
+    { "id": "e4", "from": "unit_routing", "to": "dean_decision", "variant": "default" },
+    { "id": "e5", "from": "dean_decision", "to": "pki_sign", "label": "approved", "variant": "emphasis" },
+    { "id": "e6", "from": "dean_decision", "to": "rejected_state", "label": "rejected", "variant": "security", "role": "error" },
+    { "id": "e7", "from": "dean_decision", "to": "audit_hash", "label": "log event", "variant": "dashed" },
+    { "id": "e8", "from": "pki_sign", "to": "verified_doc", "variant": "emphasis" }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Automated Compliance & Hold Screening",
+      "items": [
+        "Every student or internal request is screened against active financial, library, and disciplinary holds",
+        "Org-unit routing resolves target departments in O(1) via the in-memory hierarchy cache"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Cryptographic Issuance (Ed25519 + SHA-256)",
+      "items": [
+        "Approved requests generate an official document signed with the university Ed25519 private key",
+        "Every state transition appends a linked SHA-256 entry to the immutable audit log"
+      ]
+    }
+  ]
+}

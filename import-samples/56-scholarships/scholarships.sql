@@ -1,0 +1,1 @@
+INSERT INTO scholarships (student_no, program_name, scholarship_type, discount_percent, amount_covered, academic_year, status) VALUES ('SAMPLE-1', 'برنامج تجريبي', 'تفوق أكاديمي', '50', '0', '2026/2027', NULL);

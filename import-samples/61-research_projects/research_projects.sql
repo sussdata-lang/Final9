@@ -1,0 +1,1 @@
+INSERT INTO research_projects (code, title, principal_investigator, faculty_name, domain, budget, journal_name, impact_factor, citations_count, status, published_at) VALUES ('RES-SMPL-1', 'بحث تجريبي', 'د. مثال تجريبي', 'كلية تجريبية', 'الأمن السيبراني', '0', NULL, NULL, NULL, NULL, NULL);

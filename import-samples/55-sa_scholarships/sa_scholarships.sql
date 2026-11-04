@@ -1,0 +1,1 @@
+INSERT INTO sa_scholarships (grant_no, student_no, scholarship_type, discount_percent, amount, academic_year, gpa_at_grant, note) VALUES ('SCH-SMPL-1', 'SAMPLE-1', 'تفوق أكاديمي', '50', '750000', '2026/2027', NULL, NULL);

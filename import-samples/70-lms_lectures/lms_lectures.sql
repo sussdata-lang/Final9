@@ -1,0 +1,1 @@
+INSERT INTO lms_lectures (course_code, course_name, title, kind_type, week_no, instructor_name, content_url, summary, published) VALUES ('SMPL-101', 'مقرر تجريبي', 'محاضرة تجريبية', 'ملف PDF', '1', 'د. مثال تجريبي', NULL, NULL, 'نعم');

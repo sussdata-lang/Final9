@@ -1,0 +1,1 @@
+INSERT INTO student_activities (club_name, title, category, event_date, location, supervisor_name, participants_count, budget, status) VALUES ('نادي تجريبي', 'نشاط تجريبي', 'علمي', '2026-12-10', 'القاعة 1', 'د. مثال تجريبي', '25', NULL, NULL);

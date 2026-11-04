@@ -1,0 +1,1 @@
+INSERT INTO student_self_enrollments (student_no, course_code, course_name, credits, semester, prerequisite_code, status) VALUES ('SAMPLE-1', 'SMPL-101', 'مقرر تجريبي', '3', 'الفصل الأول 2026/2027', NULL, NULL);

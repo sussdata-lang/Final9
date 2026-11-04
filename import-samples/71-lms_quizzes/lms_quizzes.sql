@@ -1,0 +1,1 @@
+INSERT INTO lms_quizzes (course_code, course_name, title, duration_min, total_marks, questions, published) VALUES ('SMPL-101', 'مقرر تجريبي', 'اختبار تجريبي', '30', '20', '[{"q":"سؤال تجريبي","options":["أ","ب"],"ans":0}]', 'نعم');

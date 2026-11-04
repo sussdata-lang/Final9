@@ -1,0 +1,1 @@
+INSERT INTO hr_advances (advance_code, employee_no, advance_date, amount, installments_count, paid_installments, status, notes) VALUES ('ADV-SMPL', 'EMP-SMPL', '2026-01-15', '100000', '4', '0', 'مستحقة', NULL);

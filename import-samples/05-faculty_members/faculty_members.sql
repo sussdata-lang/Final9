@@ -1,0 +1,1 @@
+INSERT INTO faculty_members (name, rank, unit_code, specialty, email, phone, office_hours, office_location, status, hire_date, notes) VALUES ('د. مثال تجريبي', 'أستاذ مساعد', NULL, NULL, NULL, NULL, NULL, NULL, 'على رأس العمل', NULL, NULL);

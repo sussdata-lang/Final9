@@ -1,0 +1,1 @@
+INSERT INTO proc_assets (code, name, category, warehouse_code, status, purchase_day, cost, supplier_code, assigned_to, notes) VALUES ('AST-SMPL', 'أصل تجريبي', 'عام', NULL, 'متاح', NULL, NULL, NULL, NULL, NULL);

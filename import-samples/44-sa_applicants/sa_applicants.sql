@@ -1,0 +1,1 @@
+INSERT INTO sa_applicants (application_no, full_name, national_id, phone, hs_type, hs_score, hs_year, category, pref1, pref2, pref3, notes) VALUES ('ADM-SMPL-1', 'متقدم تجريبي', '00000000001', NULL, 'علمي', '220', '2026', 'عام', 'المعهد العالي للعلوم الأمنية', NULL, NULL, NULL);

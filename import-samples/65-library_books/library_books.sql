@@ -1,0 +1,1 @@
+INSERT INTO library_books (isbn, title, author, category, publish_year, copies_total, shelf_code, digital_available) VALUES ('978-SMPL-1', 'كتاب تجريبي', 'مؤلف تجريبي', 'عام', '2024', '5', 'A-01', 'لا');

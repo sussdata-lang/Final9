@@ -1,0 +1,1 @@
+INSERT INTO hr_appraisals (employee_name, department, period_label, punctuality_score, productivity_score, teamwork_score, recommendation, evaluator_name) VALUES ('موظف تجريبي', 'الشؤون الإدارية', 'التقييم السنوي 2026', '90', '90', '90', NULL, NULL);

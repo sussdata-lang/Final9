@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Uni-ERP v12 — High-Concurrency & Security Architecture",
+    "subtitle": "Syrian University for Security Sciences · 10,000+ Concurrent Users · L1/Redis Cache · Ed25519 PKI · SHA-256 Audit Chain",
+    "output": "architecture.html",
+    "quality_profile": "standard"
+  },
+  "components": [
+    { "id": "clients", "type": "external", "label": "Students & Staff", "sublabel": "10,000+ Concurrent", "pos": [40, 280], "size": [145, 64] },
+    { "id": "public_qr", "type": "external", "label": "Public Verifiers", "sublabel": "QR / PKI Check", "pos": [40, 470], "size": [145, 64] },
+    { "id": "waf", "type": "security", "label": "WAF & Rate Limiter", "sublabel": "CSP / CSRF / RBAC", "pos": [270, 280], "size": [155, 64], "tag": "Zero-Trust" },
+    { "id": "spa", "type": "frontend", "label": "Uni-ERP Web Shell", "sublabel": "RTL / Workspace Tabs", "pos": [510, 90], "size": [160, 64], "tag": "Ctrl+K + A11y" },
+    { "id": "api", "type": "backend", "label": "Core API Server", "sublabel": "Node.js 22 :3000", "pos": [510, 280], "size": [160, 64] },
+    { "id": "pki", "type": "security", "label": "Ed25519 PKI Engine", "sublabel": "Signed Docs & Payslips", "pos": [510, 470], "size": [160, 64], "tag": "Ed25519 + QR" },
+    { "id": "cache", "type": "database", "label": "L1 LRU + Redis L2", "sublabel": "Identity & Org Units", "pos": [770, 90], "size": [165, 64], "tag": "98% Hit Rate" },
+    { "id": "modules", "type": "backend", "label": "17 Domain Engines", "sublabel": "Acad / HR / Fin / Corr", "pos": [770, 280], "size": [165, 64] },
+    { "id": "sse", "type": "messagebus", "label": "SSE & Offline Sync", "sublabel": "Push + Exam Queue", "pos": [770, 470], "size": [165, 64] },
+    { "id": "db_wal", "type": "database", "label": "SQLite WAL + PG 16", "sublabel": "256MB MMAP · 85+ Idx", "pos": [1040, 280], "size": [170, 64], "tag": "High-Throughput" },
+    { "id": "audit", "type": "security", "label": "Audit Hash Chain", "sublabel": "SHA-256 + AES-256 Snap", "pos": [1040, 470], "size": [170, 64] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Uni-ERP Production Runtime Boundary", "wraps": ["waf", "spa", "api", "pki", "cache", "modules", "sse", "db_wal", "audit"] },
+    { "kind": "security-group", "label": "Cryptographic & Persistence Zone", "wraps": ["db_wal", "audit", "pki"] }
+  ],
+  "connections": [
+    { "id": "c1", "from": "clients", "to": "waf", "label": "HTTPS", "variant": "emphasis" },
+    { "id": "c2", "from": "public_qr", "to": "pki", "label": "verify QR", "variant": "security" },
+    { "id": "c3", "from": "waf", "to": "api", "label": "sanitized" },
+    { "id": "c4", "from": "spa", "to": "api", "label": "REST + Token", "fromSide": "bottom", "toSide": "top", "labelDy": 58 },
+    { "id": "c5", "from": "api", "to": "cache", "label": "read-through", "variant": "emphasis", "fromSide": "top", "toSide": "bottom" },
+    { "id": "c6", "from": "api", "to": "modules", "label": "dispatch" },
+    { "id": "c7", "from": "api", "to": "pki", "label": "sign PDF/QR", "fromSide": "bottom", "toSide": "top", "labelDy": 58 },
+    { "id": "c8", "from": "modules", "to": "sse", "label": "broadcast", "variant": "dashed", "fromSide": "bottom", "toSide": "top", "labelDy": 58 },
+    { "id": "c9", "from": "modules", "to": "db_wal", "label": "indexed SQL", "variant": "emphasis" },
+    { "id": "c10", "from": "modules", "to": "audit", "label": "append hash", "variant": "security" }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "High-Concurrency Engine (10,000+ Users)",
+      "items": [
+        "Dual-layer L1 In-Memory LRU + Redis L2 cache for Identity, Org Units, Desk & Sessions",
+        "SQLite WAL with 256MB MMAP & 85+ composite indexes + PostgreSQL 16 connection pool"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "17 Unified University Modules",
+      "items": [
+        "Student Affairs, Academics & Exam PDF Builder, LMS, Research, Alumni & QA",
+        "Unified HR & Payroll, Biometrics, Correspondence & Internal Requests, Finance & Procurement"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Defense-in-Depth & Cryptographic Integrity",
+      "items": [
+        "WAF request inspection, rate limiting, scrypt password hashing & RBAC permissions",
+        "Ed25519 digital signatures on official certificates/payslips + SHA-256 tamper-evident audit chain"
+      ]
+    }
+  ]
+}

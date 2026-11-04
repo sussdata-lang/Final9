@@ -1,0 +1,235 @@
+/* بطاقة الطالب (باركود + بيانات الدخول) + طباعة آمنة + صورة الطالب (رفع ملف / تصوير بالكاميرا) */
+(function () {
+  const UA = window.UA, { esc, S, api, toast } = UA;
+
+  /* ---------- طباعة عنصر واحد: ننسخه إلى جذر طباعة مستقل بدل إخفاء الصفحة (الإخفاء كان يقصّ البطاقة داخل النوافذ المنبثقة) ---------- */
+  // بطاقة بمقاس ISO ID-1 (85.6×54 مم): تُصغَّر لتملأ صفحة بحجم البطاقة، وصفحة لكل طالب في الطباعة الجماعية
+  const CARD_W = 540, PAGE_W = 323.5, PAGE_H = 204.1;
+  function fitCards(root, cards) {
+    root.className = 'ux-print-cards';
+    root.innerHTML = cards.map((h) => `<div class="ux-cr80"><div class="ux-cr80-in">${h}</div></div>`).join('');
+    root.style.cssText = `display:block;position:fixed;left:-9999px;top:0;visibility:hidden;width:${CARD_W}px`;
+    let tall = 0;
+    for (const el of root.querySelectorAll('.ux-cr80-in')) { el.style.width = `${CARD_W}px`; tall = Math.max(tall, el.firstElementChild.offsetHeight); }
+    root.style.cssText = '';
+    root.style.setProperty('--ux-card-zoom', Math.min(PAGE_W / CARD_W, PAGE_H / (tall || 1)).toFixed(4));
+  }
+  UA.printHtml = function (html, opts = {}) {
+    let root = document.getElementById('printroot');
+    if (!root) { root = document.createElement('div'); root.id = 'printroot'; document.body.appendChild(root); }
+    root.className = '';
+    root.removeAttribute('style');
+    if (opts.card) {
+      fitCards(root, Array.isArray(html) ? html : [html]);
+      // قاعدة الصفحة تُضاف عند الطباعة فقط: إبقاؤها دائماً يجعل كل طباعة أخرى بحجم البطاقة
+      const size = document.createElement('style');
+      size.id = 'ux-card-page';
+      size.textContent = '@page{size:85.6mm 54mm;margin:0}';
+      document.head.appendChild(size);
+      window.addEventListener('afterprint', () => size.remove(), { once: true });
+    } else root.innerHTML = html;
+    document.body.classList.add('print-root');
+    const done = () => { document.body.classList.remove('print-root'); root.innerHTML = ''; };
+    window.addEventListener('afterprint', done, { once: true });
+    setTimeout(() => { try { window.print(); } catch { done(); } }, 80);
+  };
+
+  /* ---------- توليد تكويد باركود أمني فريد مشفر ومضاد للتزوير (Anti-Counterfeiting Checksum) ---------- */
+  function generateStudentSecureBarcode(studentNo, seed = '') {
+    const s = String(studentNo || '').trim().toUpperCase();
+    if (!s) return 'SUSS-0000-00';
+    let h1 = 0x811c9dc5, h2 = 0x5bd1e995;
+    const combined = `SUSS:SECURE:TOKEN:2026:${s}:${seed}`;
+    for (let i = 0; i < combined.length; i++) {
+      const code = combined.charCodeAt(i);
+      h1 ^= code;
+      h1 = Math.imul(h1, 0x01000193);
+      h2 ^= code;
+      h2 = Math.imul(h2, 0x5bd1e995);
+    }
+    const hex = (Math.abs(h1 ^ h2) >>> 0).toString(16).toUpperCase().padStart(8, '0').slice(0, 6);
+    return `SUSS-${s}-${hex}`;
+  }
+  UA.generateStudentSecureBarcode = generateStudentSecureBarcode;
+
+  /* ---------- بطاقة تسجيل الطالب (الشكل الوحيد المعتمد): كل ما في «شهادة تسجيل طالب» + الباركود + بيانات الدخول ---------- */
+  const photoOf = (files) => (files || []).filter((f) => f.kind === 'photo').pop() || null;
+  const tm = (ms) => { try { return new Date(ms).toISOString().slice(0, 16).replace('T', ' ') + ' UTC'; } catch { return '—'; } };
+  function card(st, o = {}) {
+    const pr = st.program || {}, pf = st.profile || {};
+    const ph = o.photoUrl || (photoOf(o.files) || {}).url;
+    const uni = /[؀-ۿ]/.test(String(S.uni || '')) ? String(S.uni) : 'الجامعة السورية للعلوم الأمنية';
+    const fac = pr.faculty || '', prog = pr.name && pr.name !== pr.faculty ? [pr.degree, pr.name].filter(Boolean).join(' ') : '';
+    const rows = [['اسم الطالب', st.name], ['الرقم الجامعي', st.studentNo], ['الكلية / المعهد', fac], prog && ['البرنامج', prog], st.levelLabel && ['السنة الدراسية', st.levelLabel],
+      ['سنة القيد', st.enrollYear || pf.enroll_year], ['فصل القيد', pf.enroll_term], st.createdAt && ['تاريخ ووقت إنشاء الحساب', tm(st.createdAt), 1]].filter((r) => r && r[1] !== undefined && r[1] !== null && r[1] !== '');
+    const extra = (st.extra || []).filter((x) => x && x.label);
+    const cert = o.cert;
+    const ver = cert
+      ? `<div class="idc-v"><div class="idc-vt">التحقق والتوقيع الرقمي</div><div class="idc-vb">${cert.qrSvg ? `<div class="idc-qr">${cert.qrSvg}<small>امسح الرمز للتحقق من صحة الوثيقة</small></div>` : ''}<dl>
+          <dt>رمز التحقق</dt><dd dir="ltr">${esc(cert.code)}</dd>${cert.payloadSha256 ? `<dt>بصمة SHA-256 لبيانات الشهادة</dt><dd dir="ltr" class="idc-h256">${esc(cert.payloadSha256.slice(0, 32))}<br>${esc(cert.payloadSha256.slice(32))}</dd>` : ''}
+          <dt>وقت التوقيع</dt><dd dir="ltr">${esc(tm(cert.signedAt))}</dd><dt>الموقِّع (X.509)</dt><dd dir="ltr">${esc(String(cert.signer || '').match(/CN=([^,]+)/)?.[1] || cert.signer || '')}</dd>
+          ${cert.url ? `<dt>رابط التحقق</dt><dd dir="ltr" class="idc-url">${esc(cert.url.replace(/^https?:\/\//, ''))}</dd>` : ''}</dl></div></div>`
+      : '<p class="idc-wait no-print">جارٍ إصدار شهادة التسجيل الموقَّعة… ستظهر بيانات التحقق عند فتح ملف الطالب.</p>';
+    const cred = o.cred
+      ? `<dl class="idc-k"><div><dt>اسم المستخدم</dt><dd dir="ltr">${esc(o.cred.username)}</dd></div><div><dt>كلمة المرور المؤقتة</dt><dd dir="ltr">${esc(o.cred.tempPassword)}</dd></div></dl>
+         <p class="idc-note">كلمة المرور المؤقتة تُعرض مرة واحدة فقط، ويُطلب من الطالب تغييرها عند أول دخول.</p>` : '';
+    const secureBc = st.barcode || generateStudentSecureBarcode(st.studentNo, pf.national_id || pf.enroll_year || '2026');
+    return `<div class="idc" id="idcard">
+      <div class="idc-h"><img src="/brand/crest.svg" alt="" width="46" height="54"><div><b>${esc(uni)}</b><span>وزارة الداخلية — قسم شؤون الطلاب</span></div></div>
+      <div class="idc-t">شهادة تسجيل وبطاقة طالب مصدقة</div>
+      <div class="idc-b">
+        <div class="idc-top">${ph ? `<img class="idc-ph" src="${esc(ph)}" alt="">` : ''}<dl class="idc-rows">${rows.map((r) => `<div><dt>${esc(r[0])}</dt><dd${r[2] ? ' dir="ltr"' : ''}>${esc(r[1])}</dd></div>`).join('')}</dl></div>
+        ${extra.length ? `<dl class="idc-rows idc-ex">${extra.map((x) => `<div><dt>${esc(x.label)}</dt><dd>${esc(x.value)}</dd></div>`).join('')}</dl>` : ''}
+        <div class="idc-bc" title="باركود التحقق المشفر المضاد للتزوير">${UA.code128 ? UA.code128(secureBc) : ''}</div>
+        ${cred}
+        ${ver}
+      </div>
+      <div class="idc-f">${esc(uni)} · وثيقة إلكترونية موقَّعة رقمياً بصيغة PDF/A-2b</div>
+    </div>`;
+  }
+  UA.idCard = card;
+
+  /* ---------- الكاميرا عالية الدقة (4K UHD / Full HD 1080p / HD 720p) ---------- */
+  const CAM_PRESETS = {
+    uhd4k: { label: '4K UHD فائقة الدقة (3840×2160)', w: 3840, h: 2160, maxOut: 2400, quality: 0.96 },
+    fhd1080: { label: 'Full HD عالية الدقة (1920×1080)', w: 1920, h: 1080, maxOut: 1800, quality: 0.95 },
+    hd720: { label: 'HD قياسية (1280×720)', w: 1280, h: 720, maxOut: 1280, quality: 0.92 },
+  };
+  function camera(onFile) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { toast('المتصفح لا يدعم الكاميرا؛ استخدم رفع ملف.'); return; }
+    const ov = document.createElement('div');
+    ov.className = 'overlay cam-ov'; ov.setAttribute('dir', 'rtl'); ov.style.zIndex = '70';
+    ov.innerHTML = `<div class="sheet cam-sheet" role="dialog" aria-modal="true" aria-label="تصوير الصورة الشخصية بالدقة العالية" style="max-width:580px">
+      <div class="sheet-bar">
+        <div><b>تصوير بالكاميرا عالية الدقة (HD / 1080p / 4K)</b> <span id="cam-res-badge" class="pill p-approved" style="font-size:11px;margin-inline-start:6px">Full HD</span></div>
+        <button class="btn sm" data-cam="close">إغلاق</button>
+      </div>
+      <div class="inline-form" style="padding:8px 12px;background:#f8fafc;border-bottom:1px solid #e2e8f0;gap:8px">
+        <label style="flex:1;font-size:12px">دقة التصوير المطلوبة
+          <select id="cam-res-sel">
+            <option value="uhd4k">4K UHD فائقة الدقة (3840×2160)</option>
+            <option value="fhd1080" selected>Full HD عالية الدقة (1920×1080)</option>
+            <option value="hd720">HD قياسية (1280×720)</option>
+          </select>
+        </label>
+        <label style="flex:1;font-size:12px">عدسة الكاميرا
+          <select id="cam-dev-sel"><option value="user">الكاميرا الأمامية</option><option value="environment">الكاميرا الخلفية عالية الدقة</option></select>
+        </label>
+      </div>
+      <div class="cam-box"><video autoplay playsinline muted></video><img alt="" hidden><div class="cam-frame" aria-hidden="true"></div></div>
+      <p class="hint cam-msg" role="status">جارٍ تشغيل الكاميرا بالدقة العالية…</p>
+      <div class="actions">
+        <button class="btn pri" data-cam="shot" disabled>التقاط بدقة عالية</button>
+        <button class="btn" data-cam="again" hidden>إعادة التقاط</button>
+        <button class="btn pri" data-cam="use" hidden>اعتماد واستخدام الصورة عالية الدقة</button>
+      </div></div>`;
+    document.body.appendChild(ov);
+    const $ = (s) => ov.querySelector(s), video = $('video'), prev = $('.cam-box img'), msg = $('.cam-msg');
+    const resSel = $('#cam-res-sel'), devSel = $('#cam-dev-sel'), badge = $('#cam-res-badge');
+    let stream = null, blob = null;
+    const stop = () => { if (stream) stream.getTracks().forEach((t) => t.stop()); stream = null; };
+    const close = () => { stop(); ov.remove(); };
+
+    if (navigator.mediaDevices.enumerateDevices) {
+      navigator.mediaDevices.enumerateDevices().then((devs) => {
+        const cams = devs.filter((d) => d.kind === 'videoinput' && d.deviceId);
+        if (cams.length > 1) {
+          devSel.innerHTML = cams.map((c, i) => `<option value="dev:${esc(c.deviceId)}">${esc(c.label || `كاميرا ${i + 1}`)}</option>`).join('') +
+            '<option value="user">الكاميرا الأمامية</option><option value="environment">الكاميرا الخلفية</option>';
+        }
+      }).catch(() => {});
+    }
+
+    const start = async () => {
+      stop();
+      const preset = CAM_PRESETS[resSel.value] || CAM_PRESETS.fhd1080;
+      const devVal = devSel.value || 'user';
+      const devConstraint = devVal.startsWith('dev:') ? { deviceId: { exact: devVal.slice(4) } } : { facingMode: devVal };
+      try {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { ...devConstraint, width: { ideal: preset.w }, height: { ideal: preset.h }, frameRate: { ideal: 30 } },
+            audio: false,
+          });
+        } catch {
+          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
+        }
+        video.srcObject = stream;
+        await video.play().catch(() => {});
+        const actualW = video.videoWidth || preset.w, actualH = video.videoHeight || preset.h;
+        if (badge) badge.textContent = `${actualW}×${actualH} px`;
+        msg.textContent = `الكاميرا جاهزة بالدقة العالية (${actualW}×${actualH} بكسل). ضع الوجه داخل الإطار ثم اضغط «التقاط بدقة عالية».`;
+        $('[data-cam=shot]').disabled = false;
+      } catch (e) {
+        msg.textContent = e && e.name === 'NotAllowedError'
+          ? 'لم يُسمح بالوصول إلى الكاميرا. فعّل الإذن من إعدادات المتصفح ثم أعد المحاولة.'
+          : 'تعذّر تشغيل الكاميرا على هذا الجهاز؛ استخدم رفع ملف.';
+      }
+    };
+    resSel.addEventListener('change', () => { if (!video.hidden) start(); });
+    devSel.addEventListener('change', () => { if (!video.hidden) start(); });
+    ov.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-cam]'); if (!b) { if (e.target === ov) close(); return; }
+      e.stopPropagation();
+      const a = b.dataset.cam;
+      if (a === 'close') close();
+      else if (a === 'shot') {
+        const preset = CAM_PRESETS[resSel.value] || CAM_PRESETS.fhd1080;
+        const w = video.videoWidth || preset.w, h = video.videoHeight || preset.h;
+        let cw = w, ch = Math.round((w * 4) / 3); if (ch > h) { ch = h; cw = Math.round((h * 3) / 4); }
+        const cv = document.createElement('canvas');
+        cv.width = Math.min(cw, preset.maxOut);
+        cv.height = Math.round((cv.width * 4) / 3);
+        const ctx = cv.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(video, (w - cw) / 2, (h - ch) / 2, cw, ch, 0, 0, cv.width, cv.height);
+        cv.toBlob((bl) => {
+          blob = bl; prev.src = URL.createObjectURL(bl); prev.hidden = false; video.hidden = true; stop();
+          if (badge) badge.textContent = `ملتقَطة ${cv.width}×${cv.height} px (${Math.round((bl ? bl.size : 0) / 1024)} ك.ب)`;
+          $('[data-cam=shot]').hidden = true; $('[data-cam=again]').hidden = false; $('[data-cam=use]').hidden = false;
+          msg.textContent = `تم الالتقاط بدقة ${cv.width}×${cv.height} بكسل وجودة عالية (96%). اضغط «اعتماد واستخدام الصورة عالية الدقة».`;
+        }, 'image/jpeg', preset.quality);
+      } else if (a === 'again') {
+        blob = null; prev.hidden = true; video.hidden = false;
+        $('[data-cam=shot]').hidden = false; $('[data-cam=again]').hidden = true; $('[data-cam=use]').hidden = true;
+        start();
+      } else if (a === 'use' && blob) {
+        const f = new File([blob], `photo-hd-${Date.now()}.jpg`, { type: 'image/jpeg' });
+        close();
+        onFile(f);
+      }
+    });
+    document.addEventListener('keydown', function esc1(e) { if (!document.body.contains(ov)) { document.removeEventListener('keydown', esc1); return; } if (e.key === 'Escape') { close(); document.removeEventListener('keydown', esc1); } });
+    start();
+  }
+  UA.camera = camera;
+
+  /* ---------- صورة الطالب في أعلى سجله (مستطيلة) ---------- */
+  UA.photoBox = function (st) {
+    const ph = photoOf(S.stFiles);
+    return `<div class="phb"><div class="phb-img">${ph ? `<a href="${esc(ph.url)}" target="_blank" rel="noopener"><img src="${esc(ph.url)}" alt="الصورة الشخصية"></a>` : `<span class="phb-ph" aria-hidden="true">${esc(String(st.name || '؟').trim()[0] || '؟')}</span>`}</div>
+      <div class="phb-a no-print"><button class="btn sm" type="button" data-act="phfile" data-id="${st.id}">${ph ? 'تغيير' : 'رفع صورة'}</button><button class="btn sm" type="button" data-act="phcam" data-id="${st.id}">كاميرا</button>
+      <input type="file" class="phb-in" id="phb-in-${st.id}" accept="image/jpeg,image/png,image/webp" hidden></div></div>`;
+  };
+  async function sendPhoto(id, file) {
+    try {
+      await UA.upload(`/api/students/${id}/files?kind=photo&name=${encodeURIComponent(file.name)}`, file);
+      S.stFiles = (await api('GET', `/api/students/${id}/files`)).files;
+      toast('حُفظت الصورة الشخصية'); UA.render();
+      if (UA.studentsTable) { if (UA.studentsTable.paint) UA.studentsTable.paint(); if (UA.studentsTable.refresh) UA.studentsTable.refresh(); }
+    } catch (e) { toast(e && e.status ? e.message : 'تعذّر رفع الصورة'); }
+  }
+  Object.assign(UA.actions, {
+    phfile: (el, d) => { const i = document.getElementById('phb-in-' + d.id); if (!i) return; i.onchange = () => { if (i.files[0]) sendPhoto(d.id, i.files[0]); }; i.click(); },
+    phcam: (el, d) => camera((f) => sendPhoto(d.id, f)),
+    // في نموذج التسجيل/التعديل: نضع الملف الملتقَط في حقل الصورة نفسه
+    formcam: () => camera((f) => {
+      const inp = document.getElementById('att-photo'); if (!inp) return;
+      try { const dt = new DataTransfer(); dt.items.add(f); inp.files = dt.files; } catch { toast('تعذّر إرفاق الصورة؛ استخدم رفع ملف.'); return; }
+      const m = document.getElementById('formcam-msg'); if (m) m.textContent = 'ستُرفَق الصورة الملتقَطة عند الحفظ.';
+    }),
+    credprint: () => { if (!S.cred || !S.cred.student) return; UA.printHtml(card(S.cred.student, { cred: S.cred, files: S.cred.files, cert: S.cred.cert })); },
+    bcprint: () => { const st = S.stSel; if (st) UA.printHtml(card(st, { files: S.stFiles, cert: S.stCert })); },
+  });
+})();
