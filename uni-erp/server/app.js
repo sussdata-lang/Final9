@@ -25,11 +25,11 @@ export async function createApp(overrides = {}) {
   // شرط التهيئة: إذا كانت قاعدة البيانات الافتراضية أو في الذاكرة
   if (!overrides.dbPath || overrides.dbPath === ':memory:') {
     const pw = seedPassword();
-    // وضع العرض يوحّد كلمات مرور كل الحسابات عند كل تشغيل، فلا يعمل إلا بطلب صريح (DEMO_MODE=1) أو في قاعدة الذاكرة للاختبار
+    // وضع العرض يعيد كلمة مرور admin وauditor1 عند كل تشغيل ويفعّل حسابات الهيكل غير المستخدمة، فلا يعمل إلا بطلب صريح (DEMO_MODE=1) أو في قاعدة الذاكرة للاختبار
     const demo = overrides.dbPath === ':memory:' || process.env.DEMO_MODE === '1';
     if (demo) {
       if (overrides.dbPath !== ':memory:') {
-        console.warn('تحذير أمني: DEMO_MODE=1 يعيد كلمة مرور جميع الحسابات عند كل تشغيل. لا تستخدمه مع بيانات حقيقية.');
+        console.warn('تحذير أمني: DEMO_MODE=1 يعيد كلمة مرور admin وauditor1 عند كل تشغيل، ويفعّل حسابات الهيكل غير المستخدمة، ويتيح تبديل الحساب محلياً. لا تستخدمه مع بيانات حقيقية.');
         if (!hasConfiguredSeedPassword()) console.warn(`SEED_PASSWORD غير مضبوط؛ كلمة مرور هذا التشغيل: ${pw}`);
       }
       await ensureCoreAccounts({ db, cfg }, pw);
