@@ -30,6 +30,10 @@ test('كل قسم يرى ما يخصه ولا يرى شاشات غيره', () =>
   }
 });
 
+test('مدير شؤون الطلاب يبقى له الإرشاد والمنح بعد تضييق التبويبات', () => {
+  for (const p of ['sa_advising:view', 'sa_scholarships:view', 'sa_discipline:view']) assert.ok(deptOf('affairs').perms.includes(p), p);
+});
+
 test('الاطلاع على المخازن للمشتريات والمالية فقط، وطلب الشراء لكل إدارة', () => {
   for (const n of STRUCTURE.filter((x) => x.kind === 'department')) {
     assert.equal(n.perms.includes('procurement:read'), ['procure', 'finance'].includes(n.code), n.code);

@@ -9,6 +9,7 @@ import { HttpError } from './http.js';
 
 const WORKER_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), 'heavy_worker.js');
 const POOL_SIZE = 2;
+const IDLE_MS = 30_000;
 
 export function createHeavyPool({ db, cfg }) {
   const slots = [];
@@ -20,6 +21,7 @@ export function createHeavyPool({ db, cfg }) {
     slot.worker = new Worker(WORKER_PATH, { workerData: { pgUrl: db.pgUrl, cfg: JSON.parse(JSON.stringify(cfg)) } });
     slot.worker.unref();
     slot.worker.on('message', (m) => finish(slot, m));
+    slot.idle = null;
     const lost = (message) => {
       const i = slots.indexOf(slot);
       if (i >= 0) slots.splice(i, 1);
@@ -34,6 +36,9 @@ export function createHeavyPool({ db, cfg }) {
   function finish(slot, m) {
     const job = slot.job; slot.job = null;
     slot.worker.unref();
+    // الخيط الخامل يحجز نحو 50 ميغابايت واتصالات بقاعدة البيانات، فيُغلق حتى تأتي عملية ثقيلة أخرى
+    slot.idle = setTimeout(() => slot.worker.terminate(), IDLE_MS);
+    slot.idle.unref();
     if (job) {
       try {
         // سجل التدقيق سلسلة بصمات لها كاتب واحد هو الخيط الرئيسي، فتُكتب بنود الخيط هنا بعد نجاحه
@@ -50,6 +55,7 @@ export function createHeavyPool({ db, cfg }) {
       const slot = slots.find((s) => !s.job) ?? (slots.length < POOL_SIZE ? spawn() : null);
       if (!slot) return;
       const job = queue.shift();
+      clearTimeout(slot.idle);
       slot.job = job;
       slot.worker.ref();
       slot.worker.postMessage({ id: job.id, name: job.name, token: job.token, args: job.args });
@@ -66,7 +72,7 @@ export function createHeavyPool({ db, cfg }) {
     },
     async close() {
       closed = true;
-      await Promise.all(slots.splice(0).map((s) => s.worker.terminate()));
+      await Promise.all(slots.splice(0).map((s) => { clearTimeout(s.idle); return s.worker.terminate(); }));
     },
   };
 }

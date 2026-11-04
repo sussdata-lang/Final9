@@ -20,12 +20,15 @@ const INBOX = ['request:read_unit', 'request:forward'];
 const INTERNAL = 'request:create_internal';
 // ما يخص طبيعة كل جهة فوق مسؤولياتها. طلب الشراء متاح لكل إدارة، أما الاطلاع على المخازن والموردين فللمشتريات والمالية فقط
 const DEPT_EXTRA = {
-  affairs: ['import:groups', 'alumni_career:view', 'enterprise_ai:use', 'sa_discipline:view'],
+  // بعد تضييق تبويبات شؤون الطلاب صارت تحتاج صلاحياتها الصريحة
+  affairs: ['import:groups', 'alumni_career:view', 'enterprise_ai:use', 'sa_discipline:view', 'sa_admissions:view', 'sa_advising:view', 'sa_advising:edit', 'sa_scholarships:view', 'sa_scholarships:write'],
+  sa_services: ['sa_scholarships:view', 'sa_scholarships:write'],
+  sa_care: ['alumni_career:view', 'sa_advising:view'],
   admission: ['import:groups'], sa_registry: ['import:groups'], of_admission: ['import:groups'],
   exams: ['academic:read', 'exams_housing:view', 'exams_housing:write', 'exams_housing:edit', 'exams_housing:approve', 'enterprise_ai:use', 'import:groups'],
   academic: ['academic:read', 'enterprise_ai:use', 'import:groups'],
   finance: ['import:finance', 'import:student_fin'], hr: ['import:hr'], procure: ['import:procurement'],
-  sa_care: ['alumni_career:view'], of_alumni: ['alumni_career:view'],
+  of_alumni: ['alumni_career:view'],
   discipline: ['sa_discipline:view'], of_grievance: ['sa_discipline:view'], legal: ['sa_discipline:view'],
 };
 // دور عضو الهيئة التدريسية: يعتمد علامات مقرراته فقط ولا يدخلها، ولا يطّلع على سجل الطلاب كاملاً

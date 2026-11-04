@@ -18,7 +18,8 @@
   function filtersHtml() {
     const o = C.opts, f = C.filters, programs = o.programs.filter((p) => !f.faculty || String(p.facultyId) === String(f.faculty));
     const sel = (key, label, items) => `<label style="flex:1;min-width:150px">${esc(label)}<select data-card-filter="${key}" data-no-other="1">${items}</select></label>`;
-    return `<div class="inline-form" style="gap:10px;align-items:flex-end">
+    return `<label style="display:block;margin-bottom:10px">بحث بالاسم أو الرقم الجامعي<input id="card-search" value="${esc(f.q || '')}" maxlength="60" placeholder="اكتب اسم الطالب أو رقمه لطباعة بطاقته وحده" autocomplete="off"></label>
+      <div class="inline-form" style="gap:10px;align-items:flex-end">
       ${sel('faculty', 'الكلية / المعهد', option('', 'كل الجهات', f.faculty) + o.faculties.map((x) => option(x.id, x.name, f.faculty)).join(''))}
       ${sel('program', 'البرنامج', option('', 'كل البرامج', f.program) + programs.map((x) => option(x.id, x.name, f.program)).join(''))}
       ${sel('level', 'السنة الدراسية', option('', 'كل السنوات', f.level) + o.levels.map((x) => option(x.value, x.label, f.level)).join(''))}
@@ -43,6 +44,12 @@
           <td>${r.receivedAt ? `<button type="button" class="btn sm" data-act="card-undo" data-id="${r.id}">إلغاء</button>` : `<button type="button" class="btn sm pri" data-act="card-give" data-id="${r.id}" data-name="${esc(r.name)}">تسليم</button>`}</td></tr>`).join('') || '<tr><td colspan="9" class="hint">لا نتائج.</td></tr>'}
       </tbody></table></div></div>`;
   }
+  // نتائج البحث: طباعة بطاقة طالب واحد من بينها
+  function matchesHtml() {
+    if (!C.filters.q || !C.list) return '';
+    const rows = C.list.students.slice(0, 30).map((s) => `<tr><td class="mono">${esc(s.studentNo)}</td><td><b>${esc(s.name)}</b></td><td>${esc(s.program.faculty || '')}</td><td>${esc(s.levelLabel)}</td><td><button type="button" class="btn sm pri" data-act="card-print-one" data-id="${s.id}">طباعة بطاقته</button></td></tr>`).join('');
+    return `<div class="tbl-wrap" style="margin-top:10px"><table><thead><tr><th>الرقم الجامعي</th><th>الطالب</th><th>الكلية</th><th>السنة</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="hint">لا طلاب مطابقون.</td></tr>'}</tbody></table></div>${C.list.students.length > 30 ? '<p class="small">تُعرض أول 30 نتيجة؛ أكمل كتابة الاسم.</p>' : ''}`;
+  }
   function panel() {
     const list = C.list, count = list ? list.total : 0;
     return `<details class="card" style="margin-top:0;margin-bottom:16px" data-card-bulk${C.open ? ' open' : ''}>
@@ -50,14 +57,16 @@
       ${!C.opts ? '<p class="hint">جارٍ التحميل…</p>' : `<div style="margin-top:12px">${filtersHtml()}
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px">
           <b>${count} طالب مطابق${list && list.truncated ? ' (يُعرض أول 2000؛ ضيّق الفلاتر)' : ''}</b>
-          <span style="display:flex;gap:8px;flex-wrap:wrap">
-            <button type="button" class="btn pri" data-act="card-print"${count ? '' : ' disabled'}>تصدير كل البطاقات (طباعة أو PDF)</button>
+          <span style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+            ${UA.cardPrintModeHtml()}
+            <button type="button" class="btn pri" data-act="card-print"${count ? '' : ' disabled'}>${count === 1 ? 'طباعة بطاقة هذا الطالب' : 'تصدير كل البطاقات (طباعة أو PDF)'}</button>
             <button type="button" class="btn" data-act="card-batch"${count ? '' : ' disabled'}>حفظها دفعة لتسجيل الاستلام</button>
           </span>
         </div>
+        ${matchesHtml()}
         ${(C.batches || []).length ? `<h4 style="margin:16px 0 6px">دفعات البطاقات</h4><div class="tbl-wrap"><table><thead><tr><th>الدفعة</th><th>أنشأها</th><th>التاريخ</th><th>المستلَم</th><th></th></tr></thead><tbody>${C.batches.map((b) => `<tr><td><b>${esc(b.label)}</b></td><td>${esc(b.creator)}</td><td class="small">${esc(dt(b.createdAt))}</td><td>${b.received} / ${b.total}</td><td><button type="button" class="btn sm" data-act="card-open" data-id="${b.id}">جدول الاستلام</button></td></tr>`).join('')}</tbody></table></div>` : '<p class="small" style="margin-top:12px">لا توجد دفعات بعد.</p>'}
         ${detailHtml()}</div>`}
-      ${C.list && C.list.students && C.list.students[0] && UA.idCard ? `<aside class="ux-card-preview" aria-label="معاينة البطاقة"><b class="small">معاينة البطاقة</b>${UA.idCard(C.list.students[0], { photoUrl: C.list.students[0].photoUrl })}</aside>` : ''}
+      ${C.list && C.list.students && C.list.students[0] && UA.digitalCardHtml ? `<aside class="ux-card-preview" aria-label="معاينة البطاقة"><b class="small">معاينة البطاقة</b>${UA.digitalCardHtml(C.list.students[0], { screen: true })}</aside>` : ''}
     </details>`;
   }
 
@@ -84,7 +93,18 @@
     if (key === 'faculty') C.filters.program = '';
     await load(); UA.render();
   });
+  let searchTimer = null;
   document.addEventListener('input', (e) => {
+    if (e.target && e.target.id === 'card-search') {
+      C.filters.q = e.target.value;
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(async () => {
+        await load(); UA.render();
+        const again = document.getElementById('card-search');
+        if (again) { again.focus(); again.setSelectionRange(again.value.length, again.value.length); }
+      }, 300);
+      return;
+    }
     if (e.target && e.target.id === 'card-q') { C.q = e.target.value; const at = e.target.selectionStart; UA.render(); const again = document.getElementById('card-q'); if (again) { again.focus(); again.setSelectionRange(at, at); } }
   });
   const reloadDetail = async () => { C.detail = await api('GET', `/api/cards/batches/${C.detail.batch.id}`); C.batches = (await api('GET', '/api/cards/batches')).batches; UA.render(); };
@@ -92,6 +112,10 @@
     'card-print': () => {
       const list = C.list && C.list.students; if (!list || !list.length) return;
       UA.printHtml(list.map((st) => UA.digitalCardHtml(st)), { card: true });
+    },
+    'card-print-one': (el, d) => {
+      const st = C.list && C.list.students.find((s) => s.id === Number(d.id));
+      if (st) UA.printHtml([UA.digitalCardHtml(st)], { card: true });
     },
     'card-batch': async () => {
       const label = window.prompt('اسم الدفعة (مثال: بطاقات السنة الأولى 2026)');

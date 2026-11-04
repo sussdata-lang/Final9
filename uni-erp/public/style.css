@@ -2081,3 +2081,9 @@ html[dir="ltr"] .ux-dev-switch{transform:translateX(-50%)}
 .sg-pick-head{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin:10px 0}
 .sg-pick-head label{flex:1 1 240px}
 .sg-split{display:grid;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+
+/* طباعة البطاقات على ورقة عادية: بحجمها الحقيقي، وعدة بطاقات في الصفحة */
+@media print{
+  body.print-root #printroot.ux-print-sheet{display:flex;flex-wrap:wrap;justify-content:center;align-content:flex-start;width:210mm}
+  #printroot.ux-print-sheet .ux-cr80,#printroot.ux-print-sheet .ux-cr80:last-child{margin:5mm 3mm;break-after:auto;page-break-after:auto}
+}

@@ -52,6 +52,10 @@ test('فلاتر البطاقات: الجهة والسنة وسنة القيد،
   const options = (await call('GET', '/api/cards/options', { cookie: staff })).json;
   assert.ok(options.faculties.length && options.programs.length);
   assert.deepEqual(options.years, [2026, 2025]);
+  // البحث يضيّق الدفعة إلى طالب واحد بالرقم الجامعي، ويتحمل رموز LIKE
+  const found = await list('q=CARD-1');
+  assert.ok(found.students.length >= 1 && found.students.every((s) => s.studentNo.includes('CARD-1')));
+  assert.equal((await list('q=' + encodeURIComponent('لا_يوجد%'))).total, 0);
   assert.equal((await call('GET', '/api/cards/students', { cookie: stu })).status, 403);
   assert.equal((await call('GET', '/api/cards/students')).status, 401);
 });

@@ -12,6 +12,12 @@ const fullName = (r) => [r.first_name, r.father_name, r.last_name].filter(Boolea
 function filterOf(q) {
   const where = [], args = [];
   const eq = (col, v) => { where.push(`${col} = ?`); args.push(v); };
+  const term = String(q.q ?? '').replace(/\s+/g, ' ').trim().slice(0, 60);
+  if (term) {
+    const like = '%' + term.replace(/[\\%_]/g, '\\$&') + '%';
+    where.push("(u.student_no LIKE ? ESCAPE '\\' OR u.display_name LIKE ? ESCAPE '\\' OR (p.first_name || ' ' || p.father_name || ' ' || p.last_name) LIKE ? ESCAPE '\\')");
+    args.push(like, like, like);
+  }
   if (Number(q.faculty) > 0) eq('f.id', Number(q.faculty));
   if (Number(q.program) > 0) eq('g.id', Number(q.program));
   if (Number(q.level) > 0) eq('p.study_level', Number(q.level));

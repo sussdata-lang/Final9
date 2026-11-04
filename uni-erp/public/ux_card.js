@@ -119,6 +119,7 @@
           <input id="digicard-stu" data-student-picker value="${esc(st.studentNo)}" placeholder="اكتب اسم الطالب أو رقمه الجامعي" style="width:100%">
           <small class="sp-name" style="display:block;margin-top:3px;color:var(--muted,#64748b);font-weight:600">👤 ${esc(st.name)}</small>
         </label>
+        ${UA.cardPrintModeHtml ? UA.cardPrintModeHtml() : ''}
         <button class="btn pri" type="button" data-act="printdigicard" style="height:38px;padding:0 18px">🖨️ طباعة البطاقة الذكية الرسمية</button>
         <button class="btn ok" type="button" data-act="certifydigicard" style="height:38px;padding:0 18px;background:#054239;color:#fff">🛡️ تصديق إلكتروني رسمي (X.509 PKI)</button>
       </div>

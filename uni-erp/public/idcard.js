@@ -5,8 +5,14 @@
   /* ---------- طباعة عنصر واحد: ننسخه إلى جذر طباعة مستقل بدل إخفاء الصفحة (الإخفاء كان يقصّ البطاقة داخل النوافذ المنبثقة) ---------- */
   // بطاقة بمقاس ISO ID-1 (85.6×54 مم): تُصغَّر لتملأ صفحة بحجم البطاقة، وصفحة لكل طالب في الطباعة الجماعية
   const CARD_W = 540, PAGE_W = 323.5, PAGE_H = 204.1;
+  // ورقة عادية: البطاقة بحجمها الحقيقي وهوامش الصفحة صفر، فلا يبقى للمتصفح مكان يطبع فيه العنوان والتاريخ والرابط.
+  // مقاس البطاقة: للحفظ PDF ولطابعات البطاقات؛ على طابعة ورق عادية يضعها المتصفح وسط الورقة ويطبع معها الرؤوس.
+  const MODE_KEY = 'ux_card_print_mode';
+  const cardMode = () => { try { return localStorage.getItem(MODE_KEY) === 'card' ? 'card' : 'sheet'; } catch { return 'sheet'; } };
+  UA.cardPrintModeHtml = () => `<label style="min-width:230px">مقاس الطباعة<select data-card-print-mode data-no-other="1"><option value="sheet"${cardMode() === 'sheet' ? ' selected' : ''}>ورقة عادية (البطاقة فقط، بحجمها الحقيقي)</option><option value="card"${cardMode() === 'card' ? ' selected' : ''}>طابعة بطاقات أو PDF بمقاس البطاقة</option></select></label>`;
+  document.addEventListener('change', (e) => { if (e.target && e.target.matches && e.target.matches('[data-card-print-mode]')) { try { localStorage.setItem(MODE_KEY, e.target.value); } catch { /* يبقى الافتراضي */ } } });
   function fitCards(root, cards) {
-    root.className = 'ux-print-cards';
+    root.className = cardMode() === 'sheet' ? 'ux-print-cards ux-print-sheet' : 'ux-print-cards';
     root.innerHTML = cards.map((h) => `<div class="ux-cr80"><div class="ux-cr80-in">${h}</div></div>`).join('');
     root.style.cssText = `display:block;position:fixed;left:-9999px;top:0;visibility:hidden;width:${CARD_W}px`;
     let tall = 0;
@@ -24,7 +30,7 @@
       // قاعدة الصفحة تُضاف عند الطباعة فقط: إبقاؤها دائماً يجعل كل طباعة أخرى بحجم البطاقة
       const size = document.createElement('style');
       size.id = 'ux-card-page';
-      size.textContent = '@page{size:85.6mm 54mm;margin:0}';
+      size.textContent = cardMode() === 'sheet' ? '@page{size:A4 portrait;margin:0}' : '@page{size:85.6mm 54mm;margin:0}';
       document.head.appendChild(size);
       window.addEventListener('afterprint', () => size.remove(), { once: true });
     } else root.innerHTML = html;
