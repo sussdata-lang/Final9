@@ -73,6 +73,11 @@ test('الميزانية العمومية تقرأ الصفوف والإجمال
   for (const part of ['bs.assets.rows.map(', 'bs.liabilities.rows.map(', 'bs.equity.rows.map(', 'bs.equity.surplus']) assert.ok(src.includes(part), part);
 });
 
+test('تبويبا دليل المواد وجدول العلامات يغيّران حالة staff.js التي ترسمهما', () => {
+  const src = fs.readFileSync(path.join(PUBLIC_DIR, 'ux_restructure.js'), 'utf8');
+  assert.match(src, /U\.acadTab === 'courses' \|\| U\.acadTab === 'grades'\) && UA\.actions\.actab\) \{ await UA\.actions\.actab\(el, \{ t: U\.acadTab \}\); return; \}/);
+});
+
 test('لا معالجات أحداث مضمنة في الواجهة، فسياسة CSP تمنعها', () => {
   const inline = /<[^>]*\son(click|change|input|submit|error|load|key\w+|mouse\w+|focus|blur)=/;
   const found = fs.readdirSync(PUBLIC_DIR).filter((f) => /\.(js|html)$/.test(f))

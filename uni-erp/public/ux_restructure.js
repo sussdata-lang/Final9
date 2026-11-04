@@ -1309,6 +1309,8 @@
     },
     acadtab: async (el, d) => {
       U.acadTab = (d && (d.t || d.s)) || 'courses';
+      // هذان التبويبان يرسمهما staff.js حسب حالته هو، فلا يكفي تغيير U.acadTab وإلا ظهر التبويب السابق
+      if ((U.acadTab === 'courses' || U.acadTab === 'grades') && UA.actions.actab) { await UA.actions.actab(el, { t: U.acadTab }); return; }
       if (U.acadTab === 'exam_master') await ensureExamCoursesLoaded();
       // التبويب كان يبقى على «جارٍ التحميل» لأن قائمة الأعضاء لا تُحمَّل إلا عبر المسار القديم
       if (U.acadTab === 'members' && UA.loadFacultyMembers) await UA.loadFacultyMembers();
@@ -1764,6 +1766,7 @@
   if (origActab) {
     UA.actions.actab = async (el, d) => {
       U.acadExtraTab = '';
+      if (d && d.t) U.acadTab = d.t;
       await origActab(el, d);
     };
   }
