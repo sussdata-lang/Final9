@@ -501,7 +501,7 @@
     const rows = filteredUsers
       .map((u) => {
         const self = S.me && u.id === S.me.id;
-        const permCount = (u.effectivePermissions || []).length;
+        const permCount = u.permissionCount || 0;
         const modeTag = MODE_LABELS[u.accessMode || 'role'] || 'تلقائي';
         const scopeTag = SCOPE_LABELS[u.dataScope || 'unit'] || 'نطاق الوحدة';
         return `<tr${X.edit === u.id ? ' style="background:rgba(5,66,57,0.08)"' : ''}>
@@ -519,7 +519,7 @@
             <div class="small">${esc(scopeTag)}</div>
           </td>
           <td>
-            <div class="small"><b>${permCount}</b> صلاحية فعّالة · <b>${(u.allowedViews || []).length}</b> شاشة</div>
+            <div class="small"><b>${permCount}</b> صلاحية فعّالة · <b>${u.viewCount || 0}</b> شاشة</div>
             ${renderUserCapabilitiesBadges(u)}
           </td>
           <td>
@@ -1104,10 +1104,10 @@
       }
       UA.render();
     },
-    xuedit: async (el, d) => {
+    xuedit: (el, d) => run(async () => {
       const uid = Number(d.id);
-      const u = X.data.users.find((x) => x.id === uid);
-      if (!u) return;
+      // تفاصيل صلاحيات الحساب لا تأتي مع القائمة
+      const { user: u } = await api('GET', `/api/admin/users/${uid}/access`);
       X.edit = uid;
       X.editBuilder = {
         roleKey: u.roleKey || u.role,
@@ -1122,7 +1122,7 @@
       UA.render();
       const panel = $id('xedit-panel');
       if (panel && panel.scrollIntoView) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    },
+    }),
     xucancel: async () => {
       X.edit = null;
       X.editBuilder = null;

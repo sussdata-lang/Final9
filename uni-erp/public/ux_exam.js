@@ -12,8 +12,9 @@
   async function ensureExamCoursesLoaded() {
     if (U.examSchedule.loaded && U.examSchedule.courses.length) return;
     try {
-      const r = await api('GET', '/api/courses').catch(() => ({ courses: [] }));
+      const [r, g] = await Promise.all([api('GET', '/api/courses').catch(() => ({ courses: [] })), can('grade:manage') || can('course:manage') ? api('GET', '/api/student-groups').catch(() => ({ groups: [] })) : { groups: [] }]);
       const list = Array.isArray(r.courses) ? r.courses : [];
+      U.examSchedule.groups = g.groups || [];
       U.examSchedule.courses = list;
       const baseDate = new Date(U.examSchedule.startDate || Date.now() + 7 * 86400000);
       const halls = ((S.limits && S.limits.dropdowns && S.limits.dropdowns.halls) || ['المدرج الكبير A1', 'المدرج الثاني A2', 'قاعة الامتحانات المركزية B1', 'قاعة المحاضرات B2', 'مخبر الأمن السيبراني C1']);
@@ -56,6 +57,8 @@
       const dur = tr.querySelector('.exm-dur');
       const hl = tr.querySelector('.exm-hall');
       const pr = tr.querySelector('.exm-proc');
+      const gr = tr.querySelector('.exm-group');
+      if (gr) row.groupId = Number(gr.value) || null;
       if (inc) row.included = inc.checked;
       if (dt) row.date = dt.value;
       if (tm) row.time = tm.value;
@@ -70,7 +73,7 @@
     const courses = U.examSchedule.courses || [];
     const selected = courses
       .filter((c) => (U.examSchedule.rows[c.id]?.included ?? true))
-      .map((c) => ({ ...c, ...(U.examSchedule.rows[c.id] || {}) }))
+      .map((c) => ({ ...c, ...(U.examSchedule.rows[c.id] || {}), groupName: (U.examSchedule.groups || []).find((g) => g.id === U.examSchedule.rows[c.id]?.groupId)?.name || '' }))
       .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.time || '').localeCompare(String(b.time || '')));
 
     if (!selected.length) {
@@ -83,7 +86,7 @@
     const rowsHtml = selected.map((c, idx) => `<tr>
       <td style="text-align:center;font-weight:700">${idx + 1}</td>
       <td class="mono" dir="ltr" style="font-weight:700">${esc(c.code)}</td>
-      <td><b>${esc(c.name)}</b></td>
+      <td><b>${esc(c.name)}</b>${c.groupName ? `<div>الفئة: ${esc(c.groupName)}</div>` : ''}</td>
       <td>${esc(c.programName || c.faculty || 'البرنامج العام')} · السنة ${esc(c.levelLabel || c.level || '')}</td>
       <td class="mono" dir="ltr" style="font-weight:700;color:#054239">${esc(c.date || '—')}</td>
       <td class="mono" dir="ltr">${esc(c.time || '09:00')} (${c.duration || 120} د)</td>
@@ -204,6 +207,7 @@
         <td><input type="checkbox" class="exm-inc" ${r.included !== false ? 'checked' : ''} aria-label="تضمين المقرر"></td>
         <td class="mono" dir="ltr"><b>${esc(c.code)}</b></td>
         <td><b>${esc(c.name)}</b><div class="small">${esc(c.programName || c.faculty || '')} · السنة ${esc(c.levelLabel || c.level || '')}</div></td>
+        <td><select class="exm-group" aria-label="فئة الطلاب"><option value="">كل الطلاب</option>${(U.examSchedule.groups || []).map((g) => `<option value="${g.id}"${g.id === r.groupId ? ' selected' : ''}>${esc(g.name)} (${g.count})</option>`).join('')}</select></td>
         <td><input type="date" class="exm-date" value="${esc(r.date || U.examSchedule.startDate)}" dir="ltr" required></td>
         <td><input type="time" class="exm-time" value="${esc(r.time || '09:00')}" dir="ltr" style="width:105px"></td>
         <td><input type="number" class="exm-dur" min="30" max="300" step="15" value="${r.duration || 120}" style="width:75px"> د</td>
@@ -261,6 +265,7 @@
               <th style="width:36px"><input type="checkbox" id="exm-toggle-all" checked title="تحديد / إلغاء تحديد الكل"></th>
               <th>الرمز</th>
               <th>المادة الدراسية والبرنامج</th>
+              <th>فئة الطلاب</th>
               <th>تاريخ الفحص</th>
               <th>وقت البدء</th>
               <th>المدة</th>
@@ -269,7 +274,7 @@
             </tr>
           </thead>
           <tbody>
-            ${rowsHtml || '<tr><td colspan="8" class="empty">لا توجد مواد مطابقة للبحث.</td></tr>'}
+            ${rowsHtml || '<tr><td colspan="9" class="empty">لا توجد مواد مطابقة للبحث.</td></tr>'}
           </tbody>
         </table>
       </div>

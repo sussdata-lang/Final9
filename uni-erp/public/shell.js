@@ -51,18 +51,18 @@
     film: '<rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/>',
   };
   const ico = (n, s = 20) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[n] || ''}</svg>`;
-  const NAV_ICON = { desk: 'home', overview: 'home', enterprise: 'layers', home: 'home', guide: 'guide', grades: 'bars', tx: 'file', affairs: 'users', dashboard: 'bars', academics: 'book', comms: 'news', exchange: 'exchange', internal: 'file', corr: 'mail', hr: 'briefcase', payroll: 'briefcase', procurement: 'box', finance: 'wallet', settings: 'settings', units: 'layers', import: 'upload', export: 'download', attendance: 'calendar', admin: 'settings', access: 'shield', audit: 'audit', verify: 'check', lms: 'library', research: 'research', alumni: 'graduation', qa: 'quality', expansions: 'clipboard', devops: 'settings', ai: 'spark', guidelines: 'guide' };
+  const NAV_ICON = { desk: 'home', overview: 'home', enterprise: 'layers', home: 'home', guide: 'guide', grades: 'bars', fees: 'wallet', tx: 'file', affairs: 'users', student_life: 'layers', dashboard: 'bars', academics: 'book', comms: 'news', exchange: 'exchange', internal: 'file', corr: 'mail', hr: 'briefcase', payroll: 'briefcase', procurement: 'box', finance: 'wallet', settings: 'settings', units: 'layers', import: 'upload', export: 'download', attendance: 'calendar', admin: 'settings', access: 'shield', audit: 'audit', verify: 'check', lms: 'library', research: 'research', alumni: 'graduation', qa: 'quality', expansions: 'clipboard', devops: 'settings', ai: 'spark', guidelines: 'guide' };
   const PARENT = { site: 'admin', services: 'admin' };
   /* مجموعات القائمة الجانبية وترتيبها */
   const NAV_GROUP = {
     overview: 'الرئيسية', desk: 'الرئيسية',
-    affairs: 'الشؤون الطلابية',
+    affairs: 'الشؤون الطلابية', student_life: 'الشؤون الطلابية',
     academics: 'الشؤون الأكاديمية', attendance: 'الشؤون الأكاديمية', expansions: 'الشؤون الأكاديمية', lms: 'الشؤون الأكاديمية', research: 'الشؤون الأكاديمية', alumni: 'الشؤون الأكاديمية', qa: 'الشؤون الأكاديمية',
     payroll: 'الإدارة والموارد', hr: 'الإدارة والموارد', corr: 'الإدارة والموارد', internal: 'الإدارة والموارد', finance: 'الإدارة والموارد', procurement: 'الإدارة والموارد',
     dashboard: 'البيانات والتقارير', exchange: 'البيانات والتقارير', ai: 'البيانات والتقارير', comms: 'البيانات والتقارير',
     admin: 'الإدارة والحوكمة', access: 'الإدارة والحوكمة', audit: 'الإدارة والحوكمة', units: 'الإدارة والحوكمة', verify: 'الإدارة والحوكمة', guidelines: 'الإدارة والحوكمة',
   };
-  const NAV_ORDER = ['overview', 'desk', 'affairs', 'academics', 'attendance', 'expansions', 'lms', 'research', 'alumni', 'qa', 'payroll', 'hr', 'corr', 'internal', 'finance', 'procurement', 'dashboard', 'exchange', 'ai', 'comms', 'admin', 'access', 'audit', 'units', 'verify', 'guidelines'];
+  const NAV_ORDER = ['overview', 'desk', 'affairs', 'student_life', 'academics', 'attendance', 'expansions', 'lms', 'research', 'alumni', 'qa', 'payroll', 'hr', 'corr', 'internal', 'finance', 'procurement', 'dashboard', 'exchange', 'ai', 'comms', 'admin', 'access', 'audit', 'units', 'verify', 'guidelines'];
   const SIDE_LABEL = { corr: 'الديوان والمراسلات', guidelines: 'دليل الإرشادات التفاعلي' };
   const EXTRA_LABEL = { site: 'إعدادات الموقع', services: 'الخدمات' };
 

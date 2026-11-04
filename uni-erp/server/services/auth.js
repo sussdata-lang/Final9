@@ -35,7 +35,7 @@ export function publicUser(db, u) {
       accessMode: u.access_mode ?? 'role',
       dataScope: u.data_scope ?? 'unit',
       permissions: perms,
-      allowedViews: computeAllowedViews(perms, explicitViews, u.role, u.role === 'student' ? studentViewsOf(db) : null),
+      allowedViews: computeAllowedViews(perms, explicitViews, u.role, u.role === 'student' ? studentViewsOf(db, u.id) : null),
       hiddenTabs: safeJsonParse(u.hidden_tabs_json, []),
       accessProfile: summarizeUserAccessProfile(u, perms),
     };

@@ -654,19 +654,25 @@
   function primaryCell(tds) {
     const hasWords = (td) => /[\p{L}]{2}/u.test(td.textContent);
     const pick = tds.slice(0, 2).find((td) => hasWords(td) && /[\u0600-\u06FF]/.test(td.textContent)) || tds.slice(0, 2).find(hasWords);
-    return pick && !pick.querySelector('a, button, input, select, textarea') ? pick : null;
+    const cell = pick || tds.find((td) => td.textContent.trim());   // صف أرقام وتواريخ كسجل التدقيق
+    return cell && !cell.querySelector('a, button, input, select, textarea') ? cell : null;
   }
+  // الوسم لكل صف لا لكل جدول: الشاشات غير المتزامنة تعيد رسم الصفوف، والصف الذي فيه حقول إدخال جزء من نموذج
+  let previewTimer = 0;
+  new MutationObserver(() => { clearTimeout(previewTimer); previewTimer = setTimeout(enhanceTablesWithQuickPreview, 120); }).observe(document.documentElement, { childList: true, subtree: true });
   function enhanceTablesWithQuickPreview() {
-    document.querySelectorAll('.sx-page .tbl-wrap table, .sx-page table.sx-table').forEach((tbl) => {
-      if (tbl.id === 'exm-master-table' || tbl.dataset.sxPreviewEnhanced) return;
+    document.querySelectorAll('.sx-page table').forEach((tbl) => {
+      if (tbl.id === 'exm-master-table' || tbl.closest('.modal, dialog, form, #printroot')) return;
       const ths = [...tbl.querySelectorAll('thead th')].map((th) => th.textContent.trim());
       if (ths.length < 3) return;
-      tbl.dataset.sxPreviewEnhanced = '1';
       tbl.querySelectorAll('tbody tr').forEach((tr) => {
+        if (tr.dataset.sxPreview) return;
+        tr.dataset.sxPreview = '1';
         const tds = [...tr.querySelectorAll('td')];
-        if (tds.length < 3 || tr.dataset.act || tr.querySelector('.sx-primary-cell')) return;
+        if (tds.length < 3 || tr.dataset.act || tr.querySelector('.sx-primary-cell, input, select, textarea')) return;
         const primary = primaryCell(tds);
         if (!primary) return;
+        tr.classList.add('sx-row-click');
         primary.classList.add('sx-primary-cell');
         primary.tabIndex = 0;
         primary.setAttribute('role', 'button');
@@ -691,7 +697,11 @@
           }
           ov.hidden = false;
         };
-        primary.addEventListener('click', openPreview);
+        // النقر في أي مكان من الصف عدا أزراره وروابطه، وتحديد النص لا يفتح التفاصيل
+        tr.addEventListener('click', (ev) => {
+          if (ev.target.closest('a, button, input, select, textarea, label, [data-act]') || String(window.getSelection?.() || '')) return;
+          openPreview(ev);
+        });
         primary.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openPreview(ev); } });
       });
     });
@@ -770,7 +780,8 @@
       { cat: 'التقارير', title: '📈 الإحصاءات والتقارير', view: 'dashboard' },
       { cat: 'الشؤون الأكاديمية', title: '👨‍🏫 الشؤون الأكاديمية · أعضاء هيئة التدريس', view: 'academics', act: 'acadtab', val: 'members' },
       { cat: 'الشؤون الأكاديمية', title: '🚪 سجل القاعات', view: 'attendance' },
-      { cat: 'الشؤون الأكاديمية', title: '🏠 الامتحانات والسكن والتقييم', view: 'expansions' },
+      { cat: 'الشؤون الأكاديمية', title: '📅 الامتحانات والتقييم', view: 'expansions' },
+      { cat: 'الشؤون الطلابية', title: '🏠 السكن والساعات المكتبية', view: 'student_life' },
       { cat: 'المنظومة الأكاديمية', title: '💻 التعلم الإلكتروني والمكتبة', view: 'lms' },
       { cat: 'المنظومة الأكاديمية', title: '🔬 البحث والدراسات العليا', view: 'research' },
       { cat: 'المنظومة الأكاديمية', title: '🎓 الخريجون والتوظيف', view: 'alumni' },
@@ -1617,6 +1628,7 @@
             end_time: endOf(start, r.duration || 120),
             hall_name: r.hall || 'المدرج الكبير A1',
             proctor_name: r.proctor || c.instructor || 'لجنة المراقبة',
+            group_id: r.groupId || null,
           });
           saved++;
         } catch (e) { if (!e.status) throw e; firstErr ||= e.message; }

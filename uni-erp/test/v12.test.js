@@ -66,7 +66,8 @@ test('Uni-ERP v12 — Phases 1 to 4 Complete Integration Suite', async (t) => {
   assert.equal(expRes.status, 200);
   const exp = await expRes.json();
   assert.equal(exp.exams.length, 0);
-  assert.equal(exp.dormRooms.length, 0);
+  const life = await (await fetch(`${base}/api/student-life/overview`, { headers })).json();
+  assert.equal(life.dormRooms.length, 0);
   assert.equal(exp.biometrics.length, 0);
 
   // 7. Phase 3 (Scalability & DevOps)

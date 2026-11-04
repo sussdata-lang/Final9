@@ -12,8 +12,8 @@ const toMin = (s, label) => {
 };
 
 export function getSlots(db, courseId) {
-  return db.prepare('SELECT id, day, start_min, end_min, hall FROM course_schedules WHERE course_id = ? ORDER BY day, start_min').all(Number(courseId))
-    .map((r) => ({ id: r.id, day: r.day, dayLabel: DAYS[r.day], start: hm(r.start_min), end: hm(r.end_min), hall: r.hall ?? '' }));
+  return db.prepare('SELECT s.id, s.day, s.start_min, s.end_min, s.hall, s.group_id, g.name AS group_name FROM course_schedules s LEFT JOIN student_groups g ON g.id = s.group_id WHERE s.course_id = ? ORDER BY s.day, s.start_min').all(Number(courseId))
+    .map((r) => ({ id: r.id, day: r.day, dayLabel: DAYS[r.day], start: hm(r.start_min), end: hm(r.end_min), hall: r.hall ?? '', groupId: r.group_id ?? null, groupName: r.group_name ?? '' }));
 }
 
 export function setSlots({ db }, actor, courseId, slots, ip) {
@@ -26,23 +26,42 @@ export function setSlots({ db }, actor, courseId, slots, ip) {
     const a = toMin(s.start, `الموعد ${i + 1} (البداية)`), b = toMin(s.end, `الموعد ${i + 1} (النهاية)`);
     if (b <= a) throw new HttpError(400, `الموعد ${i + 1}: النهاية يجب أن تكون بعد البداية.`, 'validation');
     const hall = String(s.hall ?? '').replace(/\s+/g, ' ').trim().slice(0, 60);
-    return { day, a, b, hall: hall || null };
+    const groupId = Number(s.groupId) || null;
+    if (groupId && !db.prepare('SELECT 1 AS x FROM student_groups WHERE id = ?').get(groupId)) throw new HttpError(400, `الموعد ${i + 1}: الفئة غير موجودة.`, 'validation');
+    return { day, a, b, hall: hall || null, groupId };
   });
   tx(db, () => {
     db.prepare('DELETE FROM course_schedules WHERE course_id = ?').run(c.id);
-    for (const s of clean) db.prepare('INSERT INTO course_schedules (course_id, day, start_min, end_min, hall) VALUES (?,?,?,?,?)').run(c.id, s.day, s.a, s.b, s.hall);
+    for (const s of clean) db.prepare('INSERT INTO course_schedules (course_id, day, start_min, end_min, hall, group_id) VALUES (?,?,?,?,?,?)').run(c.id, s.day, s.a, s.b, s.hall, s.groupId);
     audit(db, actor, 'تعديل جدول محاضرات مقرر', c.name.slice(0, 80), ip);
   });
   return { slots: getSlots(db, c.id) };
 }
 
-// مقررات الطالب الحالية = مقررات برنامجه في سنته الدراسية غير المنجَزة (لم ينجح فيها بعلامة معتمدة). التعارض يُفحص داخل الفصل نفسه.
-export function detectScheduleConflicts(db, studentId) {
+// مقررات الطالب الحالية = مقررات برنامجه في سنته الدراسية غير المنجَزة (لم ينجح فيها بعلامة معتمدة).
+function currentCourses(db, studentId) {
   const p = db.prepare('SELECT program_id, study_level FROM student_profiles WHERE user_id = ?').get(Number(studentId));
   if (!p) throw new HttpError(404, 'الطالب غير موجود.', 'not_found');
   const courses = db.prepare(`SELECT c.id, c.name, c.semester FROM courses c WHERE c.program_id = ? AND c.level = ? AND c.active = 1
     AND NOT EXISTS (SELECT 1 FROM grades g WHERE g.student_id = ? AND g.course_id = c.id AND g.workflow_status = 'approved' AND g.mark >= 60)`).all(p.program_id, p.study_level, Number(studentId));
-  const slots = db.prepare(`SELECT course_id, day, start_min, end_min, hall FROM course_schedules WHERE course_id IN (${courses.map(() => '?').join(',') || 'NULL'})`).all(...courses.map((c) => c.id));
+  return { p, courses };
+}
+// مواعيد مقررات الطالب: موعد الفئة يخص أعضاءها، وما لا فئة له يخص الجميع
+function studentSlots(db, studentId, courses) {
+  return db.prepare(`SELECT s.course_id, s.day, s.start_min, s.end_min, s.hall, s.group_id, g.name AS group_name FROM course_schedules s LEFT JOIN student_groups g ON g.id = s.group_id
+    WHERE s.course_id IN (${courses.map(() => '?').join(',') || 'NULL'}) AND (s.group_id IS NULL OR EXISTS (SELECT 1 FROM student_group_members m WHERE m.group_id = s.group_id AND m.student_id = ?))`).all(...courses.map((c) => c.id), Number(studentId));
+}
+export function studentTimetable(db, studentId) {
+  const { courses } = currentCourses(db, studentId), byId = new Map(courses.map((c) => [c.id, c]));
+  return studentSlots(db, studentId, courses)
+    .sort((a, b) => a.day - b.day || a.start_min - b.start_min)
+    .map((s) => ({ course: byId.get(s.course_id).name, semester: byId.get(s.course_id).semester, day: s.day, dayLabel: DAYS[s.day], start: hm(s.start_min), end: hm(s.end_min), hall: s.hall ?? '', groupName: s.group_name ?? '' }));
+}
+
+// التعارض يُفحص داخل الفصل نفسه.
+export function detectScheduleConflicts(db, studentId) {
+  const { p, courses } = currentCourses(db, studentId);
+  const slots = studentSlots(db, studentId, courses);
   const conflicts = [], withSlots = new Set(slots.map((s) => s.course_id));
   for (const sem of [1, 2]) {
     const cs = courses.filter((c) => c.semester === sem), list = slots.filter((s) => cs.some((c) => c.id === s.course_id));

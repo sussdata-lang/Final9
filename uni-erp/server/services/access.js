@@ -14,8 +14,7 @@ import {
   ALL_STAFF_VIEWS,
   safeJsonParse,
   resolveModulePermissions,
-  summarizeOperationCapabilities,
-} from '../permissions.js';
+  } from '../permissions.js';
 import { SCHEMA, getSetting, studentPermSetting, STUDENT_VIEW_KEYS } from './settings.js';
 import { writeXlsx } from '../lib/xlsx.js';
 import {
@@ -63,7 +62,6 @@ export function listRoles(db) {
       label: ROLE_LABEL[k],
       description: ROLE_DESC[k],
       permissions: PERMISSIONS[k],
-      capabilities: summarizeOperationCapabilities(PERMISSIONS[k]),
       builtin: true,
       active: true,
       users: roleCounts.get(k) || 0,
@@ -75,7 +73,6 @@ export function listRoles(db) {
         label: r.label,
         description: r.description,
         permissions: perms,
-        capabilities: summarizeOperationCapabilities(perms),
         builtin: false,
         active: !!r.active,
         users: roleKeyCounts.get(r.key) || 0,
@@ -210,7 +207,6 @@ export function listUnits(db) {
         defaultPermissions: mergedPerms,
         defaultModuleAccess,
         allowedViews,
-        capabilities: summarizeOperationCapabilities(mergedPerms),
         effectiveDefaultPermissionsCount: mergedPerms.length,
         heads: headsByUnit.get(u.id) || [],
         users: activeUsersByUnit.get(u.id) || 0,

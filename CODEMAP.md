@@ -49,7 +49,11 @@ public/<module>.js ── api() ──► server/http.js (WAF، CSP، الجلس
 | بوابة الطالب | `student.js`، `transcript.js` | `students.js`، `academics.js`، `transcriptpdf.js`، `transcriptmodel.js` | `student_certs` (007) |
 | المواد والعلامات `academics` | `ux_restructure.js:1008` ← يستدعي الأصل `staff.js:160`، `faculty.js` | `academics.js`، `workflow.js`، `schedule.js`، `faculty.js` | `courses`، `grades`، `grade_changes` (003، 011، 020) |
 | سجل القاعات `attendance` | `attendance.js` | `services/attendance.js` | `hall_logs` (010) |
-| الامتحانات والسكن `expansions` | `v12_views.js:752` + توسعات `ux_restructure.js:2832` و`3357` و`3913` | `v12_modules.js` | `exam_schedules`، `dorm_*` (025) |
+| الامتحانات والتظلمات `expansions` | `v12_views.js:752` + توسعات `ux_restructure.js:2832` و`3357` و`3913` | `v12_modules.js` | `exam_schedules`، `dorm_*` (025) |
+| السكن والساعات المكتبية والمنح والأنشطة `student_life` (شؤون الطلاب، صلاحيتا `sa_housing:*`) | `v12_views.js` (`UA.views.student_life`) | `v12_modules.js` (`/api/student-life/overview`) | `office_hour_bookings`، `dorm_*`، `scholarships`، `student_activities` |
+| كشف الرسوم للطالب `fees` | `student.js` (`feesD`) | `finance/routes.js` (`/api/me/fees`) | `fin_charges`، `fin_payments` |
+| جدول محاضرات الطالب (يراعي الفئة) | `student.js` (`guideD`) | `schedule.js` (`studentTimetable`، `/api/me/timetable`) | `course_schedules.group_id` (051) |
+| صفحة الحسابات: قائمة خفيفة، والتفاصيل عند الفتح | `access.js` (`xuedit`) | `useradmin.js` (`listStaffLight`، `staffDetail`، `/api/admin/users/:id/access`) | `users` |
 | LMS / البحث / الخريجون / الجودة | `v12_views.js` (`lms:105`، `research:325`، `alumni:454`، `qa:593`) | `v12_modules.js` | (025) |
 | الذكاء الاصطناعي `ai` | `v12_views.js:1618` | `v12_modules.js` | `ai_*` (025) |
 | شؤون الموظفين `payroll` | `ux_restructure.js:347` ← `payroll.js`، `staffatt.js` | `hr_integrated.js`، `hr_calculations.js`، `hr.js`، `staffatt.js` | `hr_*` (021، 026)، (016) |

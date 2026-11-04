@@ -127,7 +127,7 @@ const view = (db, u) => {
     revokedPermissions: safeJsonParse(u.revoked_permissions_json, []),
     explicitAllowedViews: explicitViews,
     hiddenTabs: safeJsonParse(u.hidden_tabs_json, []),
-    allowedViews: computeAllowedViews(perms, explicitViews, u.role, u.role === 'student' ? studentViewsOf(db) : null),
+    allowedViews: computeAllowedViews(perms, explicitViews, u.role, u.role === 'student' ? studentViewsOf(db, u.id) : null),
     effectivePermissions: perms,
     permissions: perms,
     accessProfile: profile,
@@ -145,6 +145,24 @@ export const listStaff = (db) =>
   cacheGetOrSet(db, 'identity', 'staff:list_full', () =>
     db.prepare("SELECT * FROM users WHERE role != 'student' ORDER BY id").all().map((u) => view(db, u)),
   );
+
+// قائمة خفيفة لصفحة الحسابات: الأعداد فقط؛ تفاصيل صلاحيات الحساب تُجلب عند فتحه للتعديل
+export const listStaffLight = (db) => listStaff(db).map((u) => {
+  const { viewCount, writeCount, editCount, approveCount, deleteCount } = u.accessProfile.capabilities;
+  return {
+    id: u.id, username: u.username, name: u.name, displayName: u.displayName, role: u.role, roleKey: u.roleKey, roleLabel: u.roleLabel, roleActive: u.roleActive,
+    unit: u.unit, unitId: u.unitId, staffKind: u.staffKind, jobTitle: u.jobTitle, active: u.active, mustChange: u.mustChange, locked: u.locked,
+    accessMode: u.accessMode, dataScope: u.dataScope, accessSummary: u.accessSummary,
+    permissionCount: u.effectivePermissions.length, viewCount: u.allowedViews.length,
+    accessProfile: { capabilities: { viewCount, writeCount, editCount, approveCount, deleteCount } },
+  };
+});
+
+export function staffDetail(db, id) {
+  const u = db.prepare("SELECT * FROM users WHERE id = ? AND role != 'student'").get(Number(id));
+  if (!u) throw new HttpError(404, 'الحساب غير موجود.', 'not_found');
+  return view(db, u);
+}
 
 const KINDS = ['admin', 'faculty'];
 const kindOf = (v, dflt = 'admin') => { if (v === undefined || v === null || v === '') return dflt; if (!KINDS.includes(v)) throw bad('نوع العضو: هيئة إدارية أو تدريسية.'); return v; };

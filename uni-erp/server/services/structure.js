@@ -21,9 +21,10 @@ const INTERNAL = 'request:create_internal';
 // ما يخص طبيعة كل جهة فوق مسؤولياتها. طلب الشراء متاح لكل إدارة، أما الاطلاع على المخازن والموردين فللمشتريات والمالية فقط
 const DEPT_EXTRA = {
   // بعد تضييق تبويبات شؤون الطلاب صارت تحتاج صلاحياتها الصريحة
-  affairs: ['import:groups', 'alumni_career:view', 'enterprise_ai:use', 'sa_discipline:view', 'sa_admissions:view', 'sa_advising:view', 'sa_advising:edit', 'sa_scholarships:view', 'sa_scholarships:write'],
-  sa_services: ['sa_scholarships:view', 'sa_scholarships:write'],
-  sa_care: ['alumni_career:view', 'sa_advising:view'],
+  affairs: ['import:groups', 'alumni_career:view', 'enterprise_ai:use', 'sa_discipline:view', 'sa_admissions:view', 'sa_advising:view', 'sa_advising:edit', 'sa_scholarships:view', 'sa_scholarships:write', 'sa_housing:view', 'sa_housing:manage'],
+  sa_services: ['sa_scholarships:view', 'sa_scholarships:write', 'sa_housing:view', 'sa_housing:manage'],
+  of_housing: ['sa_housing:view', 'sa_housing:manage'],
+  sa_care: ['alumni_career:view', 'sa_advising:view', 'sa_housing:view'],
   admission: ['import:groups'], sa_registry: ['import:groups'], of_admission: ['import:groups'],
   exams: ['academic:read', 'exams_housing:view', 'exams_housing:write', 'exams_housing:edit', 'exams_housing:approve', 'enterprise_ai:use', 'import:groups'],
   academic: ['academic:read', 'enterprise_ai:use', 'import:groups'],

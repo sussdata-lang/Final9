@@ -33,6 +33,8 @@ export const PERMISSION_CATALOG = [
       { key: 'sa_advising:view', label: 'عرض الخطة التفاعلية والإرشاد الأكاديمي والإنذار المبكر', op: 'view', module: 'admissions_advising' },
       { key: 'sa_advising:edit', label: 'تعديل الخطة الدراسية للطالب وتوثيق جلسات الإرشاد', op: 'edit', module: 'admissions_advising' },
       { key: 'sa_scholarships:view', label: 'عرض المنح والإعفاءات والرعاية الطلابية وطابور مكتب الخدمة', op: 'view', module: 'admissions_advising' },
+      { key: 'sa_housing:view', label: 'عرض السكن الجامعي والساعات المكتبية والأنشطة الطلابية', op: 'view', module: 'admissions_advising' },
+      { key: 'sa_housing:manage', label: 'تسكين الطلاب وحجز الساعات المكتبية', op: 'edit', module: 'admissions_advising' },
       { key: 'sa_discipline:view', label: 'عرض سجل اللجان الانضباطية والتأديبية', op: 'view', module: 'admissions_advising' },
       { key: 'sa_scholarships:write', label: 'كتابة وتسجيل منح وإعفاءات جديدة وتذاكر خدمة الطالب', op: 'write', module: 'admissions_advising' },
       { key: 'sa_scholarships:approve', label: 'اعتماد المنح وترحيل الإعفاءات مالياً وإصدار الوثائق الفورية', op: 'approve', module: 'admissions_advising' },
@@ -44,7 +46,7 @@ export const PERMISSION_CATALOG = [
       { key: 'academic:read', label: 'عرض دليل المواد والجداول والعلامات وأعضاء هيئة التدريس', op: 'view', module: 'academics' },
       { key: 'course:manage', label: 'كتابة وتعديل دليل المواد والمتطلبات السابقة والجداول', op: 'edit', module: 'academics' },
       { key: 'grade:manage', label: 'إدخال العلامات وتعديلها قبل الاعتماد', op: 'write', module: 'academics' },
-      { key: 'grade:approve', label: 'اعتماد العلامات وقفلها (وتعديل المعتمد بتبرير)', op: 'approve', module: 'academics' },
+      { key: 'grade:approve', label: 'اعتماد علامات المقررات غير المسندة لعضو هيئة، وتعديل المعتمد بتبرير', op: 'approve', module: 'academics' },
       { key: 'grade:approve_own', label: 'اعتماد علامات المقررات المسندة إليه فقط، بعد إرسالها من قسم الامتحانات', op: 'approve', module: 'academics' },
       { key: 'attendance:manage', label: 'تسجيل وإدارة سجل دخول وخروج القاعات (مسح الباركود)', op: 'write', module: 'academics' },
       { key: 'faculty:manage', label: 'إدارة ملفات أعضاء هيئة التدريس والعبء التدريسي', op: 'edit', module: 'academics' },
@@ -92,12 +94,12 @@ export const PERMISSION_CATALOG = [
     ],
   },
   {
-    group: 'الامتحانات والسكن والتعلم الإلكتروني',
+    group: 'الامتحانات والتعلم الإلكتروني',
     items: [
-      { key: 'exams_housing:view', label: 'عرض جداول الامتحانات، السكن الجامعي، ونتائج التقييم', op: 'view', module: 'exams_housing' },
-      { key: 'exams_housing:write', label: 'إضافة جلسات امتحانية وتوزيع المراقبين وطلبات السكن', op: 'write', module: 'exams_housing' },
-      { key: 'exams_housing:edit', label: 'تعديل القاعات الامتحانية وتسكين الغرف وضبط التقييم', op: 'edit', module: 'exams_housing' },
-      { key: 'exams_housing:approve', label: 'اعتماد جداول الامتحانات النهائية وقرارات التسكين', op: 'approve', module: 'exams_housing' },
+      { key: 'exams_housing:view', label: 'عرض جداول الامتحانات ونتائج التقييم', op: 'view', module: 'exams_housing' },
+      { key: 'exams_housing:write', label: 'إضافة جلسات امتحانية وتوزيع المراقبين', op: 'write', module: 'exams_housing' },
+      { key: 'exams_housing:edit', label: 'تعديل القاعات الامتحانية وضبط التقييم', op: 'edit', module: 'exams_housing' },
+      { key: 'exams_housing:approve', label: 'اعتماد جداول الامتحانات النهائية', op: 'approve', module: 'exams_housing' },
       { key: 'lms_lib:view', label: 'عرض المقررات الإلكترونية وفهرس المكتبة الرقمية والإعارات', op: 'view', module: 'lms_library' },
       { key: 'lms_lib:write', label: 'رفع المحاضرات والواجبات وإضافة كتب ومراجع جديدة', op: 'write', module: 'lms_library' },
       { key: 'lms_lib:edit', label: 'تعديل محتوى المقررات الرقمية وإدارة الإعارات والاسترجاع', op: 'edit', module: 'lms_library' },
@@ -187,12 +189,12 @@ export const PLATFORM_MODULES_MATRIX = [
     label: 'القبول والمفاضلة والإرشاد والمنح الطلابية',
     department: 'مديرية القبول والإرشاد والمنح',
     description: 'المفاضلة الإلكترونية، معادلة المواد، الخطة التفاعلية، الإنذار المبكر، والمنح والإعفاءات',
-    viewKeys: ['affairs'],
-    views: ['affairs'],
+    viewKeys: ['affairs', 'student_life'],
+    views: ['affairs', 'student_life'],
     actions: {
-      view: { label: 'عرض المفاضلة والإرشاد والمنح', perms: ['sa_admissions:view', 'sa_advising:view', 'sa_scholarships:view'] },
+      view: { label: 'عرض المفاضلة والإرشاد والمنح', perms: ['sa_admissions:view', 'sa_advising:view', 'sa_scholarships:view', 'sa_housing:view'] },
       write: { label: 'إدخال طلبات المفاضلة والمنح', perms: ['sa_admissions:write', 'sa_scholarships:write'] },
-      edit: { label: 'تعديل الخطط وجلسات الإرشاد', perms: ['sa_advising:edit'] },
+      edit: { label: 'تعديل الخطط وجلسات الإرشاد والتسكين', perms: ['sa_advising:edit', 'sa_housing:manage'] },
       approve: { label: 'اعتماد القبول والمنح مالياً', perms: ['sa_admissions:approve', 'sa_scholarships:approve'] },
       delete: { label: 'تصدير قوائم القبول والمنح', perms: ['data:export'] },
     },
@@ -295,18 +297,18 @@ export const PLATFORM_MODULES_MATRIX = [
   },
   {
     id: 'exams_housing',
-    title: 'الامتحانات والسكن الجامعي والتقييم الأكاديمي',
-    label: 'الامتحانات والسكن الجامعي والتقييم الأكاديمي',
-    department: 'دائرة الامتحانات والسكن الجامعي',
+    title: 'الامتحانات والتقييم الأكاديمي',
+    label: 'الامتحانات والتقييم الأكاديمي',
+    department: 'دائرة الامتحانات',
     description: 'توزيع القاعات والمراقبين، جلسات الامتحانات، تسكين الطلاب، وتقييم المقررات',
     viewKeys: ['expansions'],
     views: ['expansions'],
     actions: {
-      view: { label: 'عرض الامتحانات والسكن والتقييم', perms: ['exams_housing:view'] },
-      write: { label: 'إضافة جلسات امتحانية وطلبات سكن', perms: ['exams_housing:write'] },
-      edit: { label: 'تعديل القاعات وتسكين الغرف', perms: ['exams_housing:edit'] },
-      approve: { label: 'اعتماد الجداول وقرارات السكن', perms: ['exams_housing:approve'] },
-      delete: { label: 'تصدير كشوف الامتحانات والسكن', perms: ['data:export'] },
+      view: { label: 'عرض الامتحانات والتقييم', perms: ['exams_housing:view'] },
+      write: { label: 'إضافة جلسات امتحانية', perms: ['exams_housing:write'] },
+      edit: { label: 'تعديل القاعات', perms: ['exams_housing:edit'] },
+      approve: { label: 'اعتماد الجداول', perms: ['exams_housing:approve'] },
+      delete: { label: 'تصدير كشوف الامتحانات', perms: ['data:export'] },
     },
   },
   {
@@ -480,7 +482,7 @@ export const DEPARTMENT_ROLE_PRESETS = [
       'student:read', 'student:register', 'student:update', 'student:reset_password',
       'sa_admissions:view', 'sa_admissions:write', 'sa_admissions:approve',
       'sa_advising:view', 'sa_advising:edit',
-      'sa_scholarships:view', 'sa_scholarships:write', 'sa_scholarships:approve',
+      'sa_scholarships:view', 'sa_scholarships:write', 'sa_scholarships:approve', 'sa_housing:view', 'sa_housing:manage',
       'request:read_all', 'request:decide', 'request:forward', 'request:create_internal', 'request:import',
       'document:read_all', 'corr:use', 'staffatt:self', 'stats:read', 'data:export',
     ],
@@ -629,7 +631,8 @@ export const ALL_STAFF_VIEWS = [
   { key: 'affairs', label: 'شؤون الطلاب والقبول والمنح', group: 'الطلاب والشؤون الأكاديمية' },
   { key: 'academics', label: 'الشؤون الأكاديمية والعلامات وفحص الامتحان PDF', group: 'الطلاب والشؤون الأكاديمية' },
   { key: 'attendance', label: 'سجل القاعات والباركود', group: 'الطلاب والشؤون الأكاديمية' },
-  { key: 'expansions', label: 'الامتحانات والسكن والتقييم', group: 'الطلاب والشؤون الأكاديمية' },
+  { key: 'expansions', label: 'الامتحانات والتقييم', group: 'الطلاب والشؤون الأكاديمية' },
+  { key: 'student_life', label: 'السكن والساعات المكتبية', group: 'الطلاب والشؤون الأكاديمية' },
   { key: 'lms', label: 'التعلم الإلكتروني والمكتبة', group: 'الطلاب والشؤون الأكاديمية' },
   { key: 'research', label: 'البحث العلمي والدراسات العليا', group: 'البحث والجودة والخريجون' },
   { key: 'alumni', label: 'الخريجون والتوظيف', group: 'البحث والجودة والخريجون' },
@@ -677,7 +680,7 @@ export const PERMISSIONS = {
     'academic:read', 'course:manage', 'grade:manage', 'attendance:manage', 'faculty:manage',
     'comms:read', 'news:manage', 'complaint:manage', 'data:export', 'alumni_career:view', 'sa_discipline:view',
   ],
-  auditor: ['request:read_all', 'corr:read_all', 'document:read_all', 'audit:read', 'stats:read', 'student:read', 'academic:read', 'comms:read', 'finance:read', 'procurement:read', 'qa_inst:view', 'alumni_career:view', 'sa_discipline:view'],
+  auditor: ['request:read_all', 'corr:read_all', 'document:read_all', 'audit:read', 'stats:read', 'student:read', 'academic:read', 'comms:read', 'finance:read', 'procurement:read', 'qa_inst:view', 'alumni_career:view', 'sa_discipline:view', 'sa_housing:view'],
   admin: [...ASSIGNABLE],
 };
 
@@ -872,7 +875,7 @@ export function summarizeOperationCapabilities(effectivePerms = []) {
 
 export function computeAllowedViews(effectivePerms = [], explicitAllowedViews = [], role = 'staff', studentViews = null) {
   if (role === 'student') {
-    return Array.isArray(studentViews) ? studentViews : ['home', 'enterprise', 'guide', 'grades', 'lms', 'expansions', 'alumni', 'ai', 'news', 'tx'];
+    return Array.isArray(studentViews) ? studentViews : ['home', 'enterprise', 'guide', 'grades', 'fees', 'lms', 'expansions', 'student_life', 'alumni', 'ai', 'news', 'tx'];
   }
   const pSet = new Set(effectivePerms);
   const has = (...keys) => keys.some((k) => pSet.has(k));
@@ -882,6 +885,7 @@ export function computeAllowedViews(effectivePerms = [], explicitAllowedViews = 
   if (has('academic:read', 'course:manage', 'grade:manage', 'grade:approve', 'grade:approve_own', 'faculty:manage')) out.push('academics');
   if (has('attendance:manage')) out.push('attendance');
   if (has('exams_housing:view', 'exams_housing:write', 'exams_housing:edit', 'exams_housing:approve', 'academic:read')) out.push('expansions');
+  if (has('sa_housing:view', 'sa_housing:manage')) out.push('student_life');
   if (has('lms_lib:view', 'lms_lib:write', 'lms_lib:edit', 'lms_lib:approve', 'academic:read', 'course:manage')) out.push('lms');
   if (has('research_grad:view', 'research_grad:write', 'research_grad:edit', 'research_grad:approve', 'faculty:manage')) out.push('research');
   if (has('alumni_career:view', 'alumni_career:write', 'alumni_career:edit')) out.push('alumni');
@@ -1042,7 +1046,7 @@ export function effectiveAccessProfile(db, u) {
       unitViews = [];
     }
   }
-  const allowedViews = computeAllowedViews(perms, explicitViews.length > 0 ? explicitViews : unitViews, u.role, u.role === 'student' ? studentViewsOf(db) : null);
+  const allowedViews = computeAllowedViews(perms, explicitViews.length > 0 ? explicitViews : unitViews, u.role, u.role === 'student' ? studentViewsOf(db, u.id) : null);
   return {
     accessMode: u.access_mode || 'role',
     dataScope: u.data_scope || (u.role === 'admin' ? 'all' : 'unit'),

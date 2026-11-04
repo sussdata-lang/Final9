@@ -80,11 +80,11 @@
     dlg.className = 'v12-dlg';
     dlg.innerHTML = `
       <h3>${esc(title)}</h3>
-      <form id="v12-modal-form">
-        ${fieldsHtml}
-        <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:1rem">
-          <button type="button" class="btn" id="v12-dlg-cancel">إلغاء</button>
+      <form id="v12-modal-form" class="uf bare">
+        <div class="uf-grid">${fieldsHtml}</div>
+        <div class="uf-actions">
           <button type="submit" class="btn pri">حفظ واعتماد</button>
+          <button type="button" class="btn" id="v12-dlg-cancel">إلغاء</button>
         </div>
       </form>
     `;
@@ -857,15 +857,14 @@
         <div class="v12-wrap">
           <div class="v12-hero">
             <div>
-              <span class="v12-badge-gold">الوحدات 5.5 · 5.6 · 5.7</span>
-              <h1>الامتحانات والتظلمات · السكن الجامعي والمنح</h1>
-              <p>جداول الامتحانات والقاعات والتظلمات، الساعات المكتبية والترقيات العلمية، والسكن الجامعي والمنح والأنشطة.</p>
+              <span class="v12-badge-gold">الوحدتان 5.5 · 5.6</span>
+              <h1>الامتحانات والتظلمات</h1>
+              <p>جداول الامتحانات والقاعات والتظلمات، والترقيات العلمية.</p>
             </div>
           </div>
           <div class="v12-tabs">
             <button class="v12-tab ${activeTab === 'exams' ? 'active' : ''}" data-t="exams">📅 5.5 جداول الامتحانات والتظلمات</button>
-            <button class="v12-tab ${activeTab === 'faculty' ? 'active' : ''}" data-t="faculty">👨‍🏫 5.6 الساعات المكتبية والترقيات</button>
-            <button class="v12-tab ${activeTab === 'dorms' ? 'active' : ''}" data-t="dorms">🏢 5.7 السكن الجامعي والمنح والأنشطة</button>
+            <button class="v12-tab ${activeTab === 'faculty' ? 'active' : ''}" data-t="faculty">👨‍🏫 5.6 الترقيات العلمية</button>
           </div>
           <div id="v12-exp-body"></div>
         </div>
@@ -980,7 +979,63 @@
         });
       } else if (activeTab === 'faculty') {
         box.innerHTML = `
-          <div class="v12-grid2">
+            <div class="v12-card">
+              <h3>ملفات الترقيات العلمية لأعضاء هيئة التدريس</h3>
+              <div class="tbl-wrap">
+                <table class="grid-tbl">
+                  <thead><tr><th>العضو</th><th>الرتبة الحالية ← المستهدفة</th><th>نقاط الأبحاث</th><th>سنوات الخدمة</th><th>حالة لجنة الترقيات</th></tr></thead>
+                  <tbody>
+                    ${d.promotions.map((p) => `
+                      <tr>
+                        <td><b>${esc(p.faculty_name)}</b><div class="small hint">${esc(p.specialty)}</div></td>
+                        <td>${esc(p.current_rank)} ← <b>${esc(p.target_rank)}</b></td>
+                        <td class="mono"><b>${p.research_points}</b> / ${p.required_points}</td>
+                        <td>${p.teaching_years} سنوات</td>
+                        <td><span class="pill ${p.committee_status === 'مستوفٍ للشروط' ? 'p-approved' : 'p-review'}">${esc(p.committee_status)}</span></td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+        `;
+      }
+    }
+    await render();
+  };
+
+  /* السكن والساعات المكتبية والمنح والأنشطة: خدمات شؤون الطلاب، منفصلة عن الامتحانات */
+  UA.views.student_life = async function (el) {
+    let activeTab = UA.gate ? UA.gate.firstTab('student_life', 'office') : 'office';
+    async function render() {
+      const d = await api('GET', '/api/student-life/overview');
+      el.innerHTML = `
+        ${SHARED_CSS}
+        <div class="v12-wrap">
+          <div class="v12-hero">
+            <div>
+              <span class="v12-badge-gold">شؤون الطلاب</span>
+              <h1>السكن والساعات المكتبية</h1>
+              <p>حجوزات الساعات المكتبية، والسكن الجامعي، والمنح، والأنشطة الطلابية.</p>
+            </div>
+          </div>
+          <div class="v12-tabs">
+            <button class="v12-tab ${activeTab === 'office' ? 'active' : ''}" data-t="office">👨‍🏫 الساعات المكتبية</button>
+            <button class="v12-tab ${activeTab === 'dorms' ? 'active' : ''}" data-t="dorms">🏢 السكن والمنح والأنشطة</button>
+          </div>
+          <div id="v12-life-body"></div>
+        </div>
+      `;
+      el.querySelectorAll('.v12-tab').forEach((b) => {
+        b.onclick = () => { activeTab = b.dataset.t; renderBody(d); el.querySelectorAll('.v12-tab').forEach((x) => x.classList.toggle('active', x.dataset.t === activeTab)); };
+      });
+      renderBody(d);
+    }
+
+    function renderBody(d) {
+      const box = el.querySelector('#v12-life-body');
+      if (activeTab === 'office') {
+        box.innerHTML = `
             <div class="v12-card">
               <div class="v12-bar">
                 <h3>حجوزات الساعات المكتبية والإرشاد</h3>
@@ -1003,26 +1058,6 @@
                 </table>
               </div>
             </div>
-            <div class="v12-card">
-              <h3>ملفات الترقيات العلمية لأعضاء هيئة التدريس</h3>
-              <div class="tbl-wrap">
-                <table class="grid-tbl">
-                  <thead><tr><th>العضو</th><th>الرتبة الحالية ← المستهدفة</th><th>نقاط الأبحاث</th><th>سنوات الخدمة</th><th>حالة لجنة الترقيات</th></tr></thead>
-                  <tbody>
-                    ${d.promotions.map((p) => `
-                      <tr>
-                        <td><b>${esc(p.faculty_name)}</b><div class="small hint">${esc(p.specialty)}</div></td>
-                        <td>${esc(p.current_rank)} ← <b>${esc(p.target_rank)}</b></td>
-                        <td class="mono"><b>${p.research_points}</b> / ${p.required_points}</td>
-                        <td>${p.teaching_years} سنوات</td>
-                        <td><span class="pill ${p.committee_status === 'مستوفٍ للشروط' ? 'p-approved' : 'p-review'}">${esc(p.committee_status)}</span></td>
-                      </tr>
-                    `).join('')}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
         `;
         box.querySelector('#btn-add-oh').onclick = () => openModal('حجز موعد ساعة مكتبية مع أستاذ المقرر', `
           <label>عضو هيئة التدريس <input name="faculty_name" placeholder="أ.د. مازن الحسن" required></label>
@@ -1540,7 +1575,6 @@
         // Tab Infra
         const dbCfg = d.settings.db_engine || {};
         const redisCfg = d.settings.redis_cluster || {};
-        const ssoCfg = d.settings.sso_auth || {};
 
         box.innerHTML = `
           <div class="v12-grid2">
@@ -1565,8 +1599,8 @@
                 <tbody>
                   <tr><td><b>وضع الجلسات ومحدد المعدل</b></td><td><span class="pill ${redisCfg.mode ? 'p-approved' : 'p-review'}">${esc(redisCfg.mode || 'غير مضبوط')}</span></td></tr>
                   <tr><td><b>نسبة إصابة الكاش (Cache Hit Ratio)</b></td><td>${redisCfg.hitRatio ? `<b>${redisCfg.hitRatio}%</b>` : 'لا قياس'}${redisCfg.sessionTtlSec ? ` · TTL: ${redisCfg.sessionTtlSec} ثانية` : ''}</td></tr>
-                  <tr><td><b>الدخول الموحد LDAP / Active Directory</b></td><td><span class="pill ${ssoCfg.ldapEnabled ? 'p-approved' : 'p-review'}">${ssoCfg.ldapEnabled ? `مفعّل (${esc(ssoCfg.ldapUrl || '')})` : 'غير مفعّل'}</span></td></tr>
-                  <tr><td><b>Microsoft Entra ID & Google Workspace</b></td><td><span class="pill ${ssoCfg.microsoftEntraEnabled || ssoCfg.googleWorkspaceEnabled ? 'p-approved' : 'p-review'}">${ssoCfg.microsoftEntraEnabled || ssoCfg.googleWorkspaceEnabled ? 'مفعّل' : 'غير مفعّل'}</span></td></tr>
+                  <tr><td><b>الدخول الموحد LDAP / Active Directory</b></td><td><span class="pill p-review">غير منفَّذ بعد</span></td></tr>
+                  <tr><td><b>Microsoft Entra ID & Google Workspace</b></td><td><span class="pill p-review">غير منفَّذ بعد</span></td></tr>
                 </tbody>
               </table>
             </div>
@@ -1781,8 +1815,8 @@
     [['#btn-add-exam'], [...EXAM_W, 'course:manage']],
     [['#btn-add-appeal'], [...EXAM_W, 'grade:manage', 'grade:approve'], true],
     [['.btn-acc-app', '.btn-rej-app'], ['grade:approve', 'exams_housing:approve']],
-    [['#btn-add-oh'], [...EXAM_W, 'academic:read', 'faculty:manage'], true],
-    [['#btn-add-dorm'], EXAM_W],
+    [['#btn-add-oh'], ['sa_housing:manage', 'faculty:manage'], true],
+    [['#btn-add-dorm'], ['sa_housing:manage']],
     [['#btn-add-sch'], ['sa_scholarships:approve', 'finance:fees']],
     [['#btn-add-appr'], ['hr_emp:edit', 'hr:manage']],
     [['#btn-sync-bio'], ['hr:manage', 'staffatt:manage']],
@@ -1803,7 +1837,7 @@
       .flatMap(([selectors]) => selectors);
     style.textContent = hidden.length ? `${hidden.join(',')}{display:none!important}` : '';
   }
-  for (const key of ['lms', 'research', 'alumni', 'qa', 'expansions', 'ai']) {
+  for (const key of ['lms', 'research', 'alumni', 'qa', 'expansions', 'student_life', 'ai']) {
     const view = UA.views[key];
     // معامل صريح: render يميّز شاشات التركيب غير المتزامنة بعدد المعاملات، و(...args) طوله صفر فتُعرض [object Promise]
     if (view) UA.views[key] = function (el, ...rest) { applyWriteRules(); return view.call(this, el, ...rest); };

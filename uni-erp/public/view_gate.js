@@ -10,12 +10,13 @@
   const IMPORT_ANY = ['student:register', 'course:manage', 'grade:manage', 'request:import', 'import:academic', 'import:procurement', 'import:finance', 'import:hr', 'import:student_fin', 'import:misc'];
   const LMS_READ = ['course:manage', 'lms_lib:write', 'lms_lib:edit', 'lms_lib:approve', 'lms_lib:view', 'academic:read'];
   const EXAMS_READ = ['exams_housing:write', 'exams_housing:edit', 'exams_housing:approve', 'exams_housing:view', 'academic:read'];
+  const HOUSING = ['sa_housing:view', 'sa_housing:manage'];
   const RESEARCH = ['research_grad:view', 'research_grad:write', 'research_grad:edit', 'research_grad:approve', 'faculty:manage'];
   const ALUMNI = ['alumni_career:view', 'alumni_career:write', 'alumni_career:edit'];
   const QA = ['qa_inst:view', 'qa_inst:edit', 'qa_inst:approve'];
   const AI_READ = ['enterprise_ai:use', 'academic:read', 'sa_advising:view', 'sa_advising:edit'];
   // شاشات v12 مفتوحة للطالب ببياناته هو، عدا ما يخص الموظفين
-  const STUDENT_HIDDEN = new Set(['v12:ai:triage']);
+  const STUDENT_HIDDEN = new Set(['v12:ai:triage', 'v12:expansions:faculty']);
   const TABS = {
     overview: [['maindashtab', 'unified', 'اللوحة الرئيسية'], ['maindashtab', 'work', 'أعمالي'], ['maindashtab', 'myprofile', 'ملفي']],
     affairs: [['sttab', 'requests', 'الطلبات', ['request:read_all', 'request:read_unit']], ['sttab', 'list', 'سجل الطلاب', ['student:read']], ['sttab', 'new', 'تسجيل طالب جديد', ['student:register']], ['sttab', 'groups', 'فئات الطلاب', ['student:update', 'course:manage', 'attendance:manage', 'grade:manage', 'grade:approve', 'exams_housing:view', 'exams_housing:write', 'exams_housing:edit', 'exams_housing:approve', 'audit:read']], ['sttab', 'digital_card', 'البطاقة الجامعية', ['student:register', 'student:update']],
@@ -23,7 +24,8 @@
       ['sttab', 'disciplinary', 'اللجنة التأديبية', ['sa_discipline:view']], ['sttab', 'scholarships', 'المنح والإعفاءات', ['sa_scholarships:view', 'sa_scholarships:write', 'sa_scholarships:approve', 'finance:fees']], ['sttab', 'desk_queue', 'مكتب خدمة الطالب', ['sa_desk:view', 'sa_scholarships:write', 'student:update', 'request:read_all']]],
     corr: [['corrunified', 'in', 'الوارد'], ['corrunified', 'out', 'الصادر'], ['corrunified', 'pending_all', 'بانتظار توقيعي'], ['corrunified', 'internal_requests', 'الطلبات الداخلية'], ['corrunified', 'internal_new', 'طلب داخلي جديد', ['request:create_internal']], ['corrunified', 'new_corr', 'كتاب رسمي جديد', ['corr:use']], ['corrunified', 'tpl', 'قوالب المراسلات', ['corr:templates']], ['corrunified', 'notifs', 'تنبيهات الاعتماد']],
     academics: [['acadtab', 'my_grades', 'علامات موادي', ['grade:approve_own']], ['acadtab', 'courses', 'دليل المواد'], ['acadtab', 'grades', 'جدول العلامات', ['grade:manage', 'grade:approve', 'academic:read']], ['acadtab', 'exam_master', 'فحص الامتحان PDF', ['grade:manage', 'course:manage']], ['acadtab', 'lms_quiz', 'الامتحانات الإلكترونية'], ['acadtab', 'gpa_sim', 'محاكي المعدل'], ['acadtab', 'members', 'أعضاء هيئة التدريس', ['faculty:manage']]],
-    expansions: [['v12:expansions', 'exams', 'جداول الامتحانات والتظلمات', EXAMS_READ.concat('grade:manage', 'grade:approve')], ['v12:expansions', 'faculty', 'الساعات المكتبية والترقيات', EXAMS_READ.concat('faculty:manage')], ['v12:expansions', 'dorms', 'السكن والمنح والأنشطة', EXAMS_READ]],
+    expansions: [['v12:expansions', 'exams', 'جداول الامتحانات والتظلمات', EXAMS_READ.concat('grade:manage', 'grade:approve')], ['v12:expansions', 'faculty', 'الترقيات العلمية', ['faculty:manage', ...HR_ANY]]],
+    student_life: [['v12:student_life', 'office', 'الساعات المكتبية', HOUSING.concat('faculty:manage')], ['v12:student_life', 'dorms', 'السكن والمنح والأنشطة', HOUSING]],
     lms: [['v12:lms', 'lectures', 'المحاضرات والمحتوى الرقمي', LMS_READ], ['v12:lms', 'quizzes', 'بنك الأسئلة والاختبارات', LMS_READ], ['v12:lms', 'library', 'المكتبة الرقمية والإعارة', LMS_READ]],
     research: [['v12:research', 'projects', 'المشاريع والأبحاث', RESEARCH], ['v12:research', 'theses', 'رسائل الدراسات العليا', RESEARCH]],
     alumni: [['v12:alumni', 'alumni', 'سجل الخريجين', ALUMNI], ['v12:alumni', 'jobs', 'معرض الوظائف والتدريب', ALUMNI]],

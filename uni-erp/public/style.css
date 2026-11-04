@@ -2087,3 +2087,16 @@ html[dir="ltr"] .ux-dev-switch{transform:translateX(-50%)}
   body.print-root #printroot.ux-print-sheet{display:flex;flex-wrap:wrap;justify-content:center;align-content:flex-start;width:210mm}
   #printroot.ux-print-sheet .ux-cr80,#printroot.ux-print-sheet .ux-cr80:last-child{margin:5mm 3mm;break-after:auto;page-break-after:auto}
 }
+
+/* القالب الموحد على كل نوافذ الإدخال ونماذجها دون المساس بمنطقها: حقول بعرض مرن، وأقسام، وشريط إجراءات */
+:where(.modal,.v12-dlg,form.form,.card>form) label:not(:has(>input[type=checkbox],>input[type=radio])){display:grid;gap:4px;min-width:0}
+:where(.modal,.v12-dlg,form.form,.card>form) :is(input:not([type=checkbox],[type=radio],[type=file]),select,textarea){width:100%;box-sizing:border-box}
+:where(.modal,.v12-dlg,form.form,.card>form) .two{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+:where(.modal,.v12-dlg,form.form,.card>form) fieldset{border:1px solid var(--line,#e2e8f0);border-radius:10px;padding:10px 12px;margin:0;min-width:0}
+:where(.modal,.v12-dlg,form.form,.card>form) legend{font-weight:800;font-size:13.5px;padding:0 6px}
+:where(form,.modal)>.actions{border-top:1px solid var(--line,#e2e8f0);padding-top:12px}
+.v12-dlg .uf-grid>label{margin:0}
+.uf-grid>:is(p,.hint,.small),.uf-grid>label:has(textarea){grid-column:1/-1}
+.v12-dlg .uf-actions{margin-top:0}
+tr.sx-row-click{cursor:pointer}
+tr.sx-row-click:hover>td{background:rgba(213,182,93,.08)}

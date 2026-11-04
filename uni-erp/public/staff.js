@@ -81,7 +81,7 @@
     let btn = '';
     if (on && UA.can('grade:manage')) {
       if (x.workflowStatus === 'draft') btn = `<button class="btn sm" data-act="gtwf" data-id="${x.id}" data-stage="reviewed">مراجعة ✓</button>`;
-      else if (x.workflowStatus === 'reviewed') btn = (ap ? `<button class="btn sm ok" data-act="gtwf" data-id="${x.id}" data-stage="approved">اعتماد 🔒</button> ` : '') + `<button class="btn sm" data-act="gtwf" data-id="${x.id}" data-stage="draft">إعادة</button>`;
+      else if (x.workflowStatus === 'reviewed') btn = (x.approverId && x.approverId !== UA.S.me.id ? '<span class="small">بانتظار موافقة عضو الهيئة</span> ' : ap ? `<button class="btn sm ok" data-act="gtwf" data-id="${x.id}" data-stage="approved">اعتماد 🔒</button> ` : '') + `<button class="btn sm" data-act="gtwf" data-id="${x.id}" data-stage="draft">إعادة</button>`;
       else if (ap) btn = `<button class="btn sm" data-act="gtwf" data-id="${x.id}" data-stage="reviewed">إعادة فتح</button>`;
     }
     return `<td class="nowrap"><span class="pill ${w[0]}">${w[1]}</span> ${btn}</td>`;
@@ -133,7 +133,7 @@
       <div class="two"><label>الساعات<input id="ac-nhours" type="number" min="0" max="${(UA.S.limits || {}).maxCourseHours || 12}" value="${ce ? ce.hours : (dr.hours || (UA.S.limits || {}).defaultCourseHours || 3)}"></label><label>الرمز (اختياري)<input id="ac-ncode" maxlength="20" dir="ltr" value="${ce ? esc(ce.code || '') : esc(dr.code || '')}"></label></div>
       <label>المدرّس (اختياري)<input id="ac-ninst" maxlength="80"${ce && ce.memberId ? ' readonly' : ''} value="${ce ? esc(ce.instructor || '') : esc(dr.inst || '')}"></label>
       ${ce && ce.memberId ? '<p class="small" style="margin:4px 0 0">مسند إلى عضو من «أعضاء هيئة التدريس»؛ التعديل والإسناد من هناك.</p>' : ''}
-      ${ce ? `<fieldset class="slots"><legend>مواعيد المحاضرات (لكشف تعارض جدول الطالب)</legend>${(m.slots || []).map((sl, i) => `<div class="slot-row"><label>اليوم<select data-slot="day">${opts(DAYN.map((n, k) => [k, n]), sl.day)}</select></label><label>من<input type="time" data-slot="start" value="${esc(sl.start)}"></label><label>إلى<input type="time" data-slot="end" value="${esc(sl.end)}"></label><label>القاعة<input data-slot="hall" maxlength="60" value="${esc(sl.hall || '')}"></label><button class="btn sm bad" type="button" data-act="slotdel" data-i="${i}">حذف</button></div>`).join('') || '<p class="small">لا مواعيد بعد.</p>'}<button class="btn sm" type="button" data-act="slotadd">＋ موعد</button></fieldset>` : '<p class="small">يمكن إضافة مواعيد المحاضرات بعد إنشاء المقرر (تعديل المقرر).</p>'}
+      ${ce ? `<fieldset class="slots"><legend>مواعيد المحاضرات (لكشف تعارض جدول الطالب)</legend>${(m.slots || []).map((sl, i) => `<div class="slot-row"><label>اليوم<select data-slot="day">${opts(DAYN.map((n, k) => [k, n]), sl.day)}</select></label><label>من<input type="time" data-slot="start" value="${esc(sl.start)}"></label><label>إلى<input type="time" data-slot="end" value="${esc(sl.end)}"></label><label>القاعة<input data-slot="hall" maxlength="60" value="${esc(sl.hall || '')}"></label><label>فئة الطلاب<select data-slot="group"><option value="">كل طلاب المقرر</option>${(A.modal.groups || []).map((g) => `<option value="${g.id}"${g.id === sl.groupId ? ' selected' : ''}>${esc(g.name)}</option>`).join('')}</select></label><button class="btn sm bad" type="button" data-act="slotdel" data-i="${i}">حذف</button></div>`).join('') || '<p class="small">لا مواعيد بعد.</p>'}<button class="btn sm" type="button" data-act="slotadd">＋ موعد</button></fieldset>` : '<p class="small">يمكن إضافة مواعيد المحاضرات بعد إنشاء المقرر (تعديل المقرر).</p>'}
       <div class="actions"><button class="btn pri" type="submit">${ce ? 'حفظ التعديل' : 'إضافة المقرر'}</button><button class="btn" type="button" data-act="mclose">إلغاء</button></div></form>`;
   }
   function gradeModal(m) {
@@ -182,7 +182,7 @@
       keepCourseDraft(); UA.render();
     }
   });
-  const keepSlots = () => { if (!A.modal || !A.modal.slots) return; A.modal.slots = [...document.querySelectorAll('.slot-row')].map((r) => { const g = (k) => r.querySelector(`[data-slot=${k}]`).value; return { day: Number(g('day')), start: g('start'), end: g('end'), hall: g('hall') }; }); };
+  const keepSlots = () => { if (!A.modal || !A.modal.slots) return; A.modal.slots = [...document.querySelectorAll('.slot-row')].map((r) => { const g = (k) => r.querySelector(`[data-slot=${k}]`).value; return { day: Number(g('day')), start: g('start'), end: g('end'), hall: g('hall'), groupId: Number(g('group')) || null }; }); };
   const keepCourseDraft = () => { const g = (id) => { const el = document.getElementById(id); return el ? el.value : ''; }; A.modal.d = { name: g('ac-nname'), hours: g('ac-nhours'), code: g('ac-ncode'), inst: g('ac-ninst'), lvl: g('ac-nlvl'), sem: g('ac-nsem') }; };
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && A.modal) { A.modal = null; UA.render(); } });
 
@@ -199,7 +199,7 @@
     crpage: async (el, d) => { A.cf.page = Number(d.p); UA.render(); },
     crclear: async () => { A.cf = Object.assign(cfDef(), { sort: A.cf.sort, dir: A.cf.dir, size: A.cf.size }); UA.render(); },
     acnew: async () => { A.modal = { type: 'course', edit: null, faculty: A.cf.faculty, program: A.cf.program }; UA.render(); },
-    acedit: async (el, d) => { A.modal = { type: 'course', edit: Number(d.id), slots: [] }; try { A.modal.slots = (await api('GET', `/api/courses/${d.id}/schedule`)).slots; } catch (e) { if (!e.status) throw e; } UA.render(); },
+    acedit: async (el, d) => { A.modal = { type: 'course', edit: Number(d.id), slots: [] }; try { [A.modal.slots, A.modal.groups] = await Promise.all([api('GET', `/api/courses/${d.id}/schedule`).then((r) => r.slots), api('GET', '/api/student-groups').then((r) => r.groups).catch(() => [])]); } catch (e) { if (!e.status) throw e; } UA.render(); },
     actoggle: async (el, d) => { try { await api('POST', `/api/courses/${d.id}/toggle`, { enabled: d.on === '1' }); await loadCourses(); UA.render(); } catch (e) { if (!e.status) throw e; toast(e.message); } },
     acdel: async (el, d) => {
       const c = A.courses.find((x) => x.id === Number(d.id)); if (!c || !confirm(`حذف المقرر «${c.name}» نهائياً؟${c.grades ? `\nله ${c.grades} علامة مسجَّلة وسيُرفض الحذف؛ عطّله بدلاً من ذلك.` : ''}`)) return;
@@ -228,10 +228,10 @@
       const from = d.stage === 'reviewed' ? 'draft' : 'reviewed', ids = A.gt.data.rows.filter((r) => r.workflowStatus === from).map((r) => r.id);
       if (!ids.length) { toast('لا علامات مناسبة في هذه الصفحة'); return; }
       if (!confirm(`${d.stage === 'approved' ? 'اعتماد' : 'مراجعة'} ${ids.length} علامة؟${d.stage === 'approved' ? '\nستظهر للطلاب وتُقفل.' : ''}`)) return;
-      try { const r = await api('POST', '/api/grades/workflow', { gradeIds: ids, stage: d.stage }); await loadGrades(); UA.render(); toast(`تم تحديث ${r.updated} علامة`); } catch (e) { if (!e.status) throw e; toast(e.message); }
+      try { const r = await api('POST', '/api/grades/workflow', { gradeIds: ids, stage: d.stage }); await loadGrades(); UA.render(); const waiting = Array.isArray(r.skipped) ? r.skipped.filter((x) => String(x.reason).includes('عضو الهيئة')).length : 0; toast(`تم تحديث ${r.updated} علامة${waiting ? `، و${waiting} بانتظار موافقة عضو الهيئة` : ''}`); } catch (e) { if (!e.status) throw e; toast(e.message); }
     },
     gtwfset: async (el) => { try { await api('POST', '/api/grades/workflow-setting', { enabled: el.checked }); await loadGrades(); UA.render(); toast(el.checked ? 'فُعّلت مراحل الاعتماد' : 'أُوقفت مراحل الاعتماد'); } catch (e) { if (!e.status) throw e; el.checked = !el.checked; toast(e.message); } },
-    slotadd: async () => { keepSlots(); A.modal.slots.push({ day: 0, start: '08:00', end: '10:00', hall: '' }); keepCourseDraft(); UA.render(); },
+    slotadd: async () => { keepSlots(); A.modal.slots.push({ day: 0, start: '08:00', end: '10:00', hall: '', groupId: null }); keepCourseDraft(); UA.render(); },
     slotdel: async (el, d) => { keepSlots(); A.modal.slots.splice(Number(d.i), 1); keepCourseDraft(); UA.render(); },
     gmpick: async (el, d) => { await pickStudent(d.id); UA.render(); },
     gmchange: async () => { Object.assign(A.modal, { student: null, found: null, msg: '', err: '' }); UA.render(); },

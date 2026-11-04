@@ -5,7 +5,7 @@
   const STAR = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="m12 3.5 2.6 5.4 5.9.8-4.3 4.1 1 5.9-5.2-2.8-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z"/></svg>';
   const RECENT_MAX = 5;
   const HINTS = {
-    attendance: 'مسح الباركود وسجل الدخول والخروج', expansions: 'جداول الامتحانات والسكن والمنح', lms: 'المحاضرات والاختبارات والمكتبة', research: 'المشاريع البحثية والرسائل الجامعية', alumni: 'سجل الخريجين وفرص العمل', qa: 'مؤشرات الأداء والاعتماد المؤسسي', comms: 'نشر الأخبار ومعالجة الشكاوى', ai: 'الإنذار المبكر والمرشد وفرز المراسلات', access: 'حسابات الموظفين وأدوارهم وصلاحياتهم',
+    attendance: 'مسح الباركود وسجل الدخول والخروج', expansions: 'جداول الامتحانات والتظلمات', student_life: 'السكن والساعات المكتبية والمنح والأنشطة', lms: 'المحاضرات والاختبارات والمكتبة', research: 'المشاريع البحثية والرسائل الجامعية', alumni: 'سجل الخريجين وفرص العمل', qa: 'مؤشرات الأداء والاعتماد المؤسسي', comms: 'نشر الأخبار ومعالجة الشكاوى', ai: 'الإنذار المبكر والمرشد وفرز المراسلات', access: 'حسابات الموظفين وأدوارهم وصلاحياتهم',
   };
   const IMPORT_ANY = ['student:register', 'course:manage', 'grade:manage', 'request:import', 'import:academic', 'import:procurement', 'import:finance', 'import:hr', 'import:student_fin', 'import:misc'];
   const ACTIONS = [

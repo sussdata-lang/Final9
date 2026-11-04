@@ -1,5 +1,6 @@
 import { groupsOfStudent, listGroups, groupSize } from './student_groups.js';
 import { HttpError } from '../http.js';
+import { log } from '../lib/logger.js';
 import { audit } from '../audit.js';
 import { tx } from '../db.js';
 import { appealGrade, applyAppealMark } from './academics.js';
@@ -11,29 +12,24 @@ const clean = (v, max = 300) => String(v ?? '').trim().slice(0, max);
 const need = (v, label, max = 300) => { const s = clean(v, max); if (!s) throw new HttpError(400, `«${label}» مطلوب.`, 'validation'); return s; };
 
 // استدعاء Gemini AI من الخادم (مع بديل ذكي فوري في حال عدم توفر المفتاح أو انتهاء المهلة في بيئة الاختبار)
-async function callGeminiAI(systemPrompt, userPrompt, fallbackFn) {
+export async function callGeminiAI(systemPrompt, userPrompt, fallbackFn) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (apiKey && apiKey !== 'MY_GEMINI_API_KEY' && !process.env.NODE_TEST_CONTEXT) {
     try {
-      const { GoogleGenAI } = await import('@google/genai');
-      const ai = new GoogleGenAI({
-        apiKey,
-        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } },
+      // واجهة Gemini مباشرة، بلا مكتبة إضافية
+      const model = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: JSON.stringify({ systemInstruction: { parts: [{ text: systemPrompt }] }, contents: [{ role: 'user', parts: [{ text: userPrompt }] }], generationConfig: { temperature: 0.4 } }),
+        signal: AbortSignal.timeout(15000),
       });
-      const response = await Promise.race([
-        ai.models.generateContent({
-          model: 'gemini-3.8-flash',
-          contents: userPrompt,
-          config: {
-            systemInstruction: systemPrompt,
-            temperature: 0.4,
-          },
-        }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3500)),
-      ]);
-      if (response && response.text) return { text: response.text, model: 'gemini-3.8-flash' };
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const text = ((await res.json()).candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? '').join('');
+      if (text) return { text, model };
     } catch (err) {
-      // في حال تعذر الاتصال، ننتقل للتحليل المحلي المدمج دون تعطيل النظام
+      // في حال تعذر الاتصال، ننتقل للتحليل المحلي المدمج دون تعطيل النظام، ويبقى السبب في السجل
+      log.warn('gemini: ' + err.message);
     }
   }
   return { text: fallbackFn(), model: 'uni-ai-engine-v12' };
@@ -204,6 +200,7 @@ export async function registerV12Modules(r, deps) {
   const QA_WRITE = ['qa_inst:edit', 'qa_inst:approve'];
   const EXAMS_MANAGE = ['exams_housing:write', 'exams_housing:edit', 'exams_housing:approve'];
   const EXAMS_READ = [...EXAMS_MANAGE, 'exams_housing:view', 'academic:read'];
+  const HOUSING_READ = ['sa_housing:view', 'sa_housing:manage'];
   const HR_READ = ['hr_emp:view', 'hr_emp:write', 'hr_emp:edit', 'hr:manage', 'staffatt:manage'];
   const DEVOPS_ACCESS = ['audit:read', 'devops:manage', 'settings:manage', 'backup:manage'];
   const AI_READ = ['enterprise_ai:use', 'academic:read', 'sa_advising:view', 'sa_advising:edit'];
@@ -629,7 +626,8 @@ export async function registerV12Modules(r, deps) {
   // ==================== المرحلة 2: توسيع الوحدات الجزئية (5.5، 5.6، 5.7، 5.8) ====================
   // 5.5 جداول الامتحانات والتظلمات + 5.6 الساعات المكتبية والترقيات + 5.7 السكن والمنح والأنشطة + 5.8 التقييم والتدريب والبصمة
   r.add('GET', '/api/expansions/overview', (c) => {
-    if (!isStudent(c)) requireV12Perm(c, ...EXAMS_READ);
+    // موارد الموظفين تقرأ من هنا التقييم والبصمة
+    if (!isStudent(c)) requireV12Perm(c, ...EXAMS_READ, ...HR_READ);
     const own = (rows) => rows.filter((x) => x.student_no === c.user.student_no);
     // لكل قسم جمهوره: الطالب يرى ما يخصه، والموظف ما تغطيه صلاحياته
     const section = (rows, perms) => (isStudent(c) ? own(rows) : hasV12Perm(c, perms) ? rows : []);
@@ -638,17 +636,7 @@ export async function registerV12Modules(r, deps) {
     const myGroups = isStudent(c) ? new Set(groupsOfStudent(db, c.user.id).map((g) => g.id)) : null;
     const exams = db.prepare('SELECT e.*, g.name AS group_name FROM exam_schedules e LEFT JOIN student_groups g ON g.id = e.group_id ORDER BY e.exam_date ASC, e.start_time ASC').all().filter((e) => !myGroups || !e.group_id || myGroups.has(e.group_id));
     const appeals = db.prepare('SELECT * FROM grade_appeals ORDER BY id DESC').all();
-    const officeBookings = db.prepare('SELECT * FROM office_hour_bookings ORDER BY id DESC').all();
     const promotions = db.prepare('SELECT * FROM faculty_promotions ORDER BY id DESC').all();
-    const dormRooms = db.prepare('SELECT * FROM dorm_rooms ORDER BY building_name, room_no').all();
-    const dormAllocations = db.prepare(`
-      SELECT a.*, r.building_name, r.room_no
-      FROM dorm_allocations a
-      JOIN dorm_rooms r ON r.id = a.room_id
-      ORDER BY a.id DESC
-    `).all();
-    const scholarships = db.prepare('SELECT * FROM scholarships ORDER BY id DESC').all();
-    const activities = db.prepare('SELECT * FROM student_activities ORDER BY id DESC').all();
     const appraisals = db.prepare('SELECT * FROM hr_appraisals ORDER BY id DESC').all();
     const trainings = db.prepare('SELECT * FROM hr_trainings ORDER BY id DESC').all();
     const biometrics = db.prepare('SELECT * FROM hr_biometric_devices ORDER BY id ASC').all();
@@ -657,15 +645,28 @@ export async function registerV12Modules(r, deps) {
       exams,
       studentGroups: isStudent(c) ? [] : listGroups(db),
       appeals: section(appeals, [...EXAMS_READ, 'grade:manage', 'grade:approve']),
-      officeBookings: section(officeBookings, [...EXAMS_READ, 'faculty:manage']),
       promotions: hasV12Perm(c, ['faculty:manage', ...HR_READ]) ? promotions : [],
-      dormRooms,
-      dormAllocations: section(dormAllocations, [...EXAMS_MANAGE, 'exams_housing:view', 'student:read']),
-      scholarships: section(scholarships, [...EXAMS_MANAGE, 'sa_scholarships:view', 'sa_scholarships:write', 'sa_scholarships:approve', 'finance:read', 'finance:fees', 'student:read']),
-      activities,
       appraisals: hrOnly(appraisals),
       trainings: hrOnly(trainings),
       biometrics: hrOnly(biometrics),
+    });
+  });
+
+  // السكن والساعات المكتبية والمنح والأنشطة: خدمات شؤون الطلاب، منفصلة عن الامتحانات
+  r.add('GET', '/api/student-life/overview', (c) => {
+    if (!isStudent(c)) requireV12Perm(c, ...HOUSING_READ, 'faculty:manage');
+    const section = (rows, perms) => (isStudent(c) ? rows.filter((x) => x.student_no === c.user.student_no) : hasV12Perm(c, perms) ? rows : []);
+    c.json(200, {
+      officeBookings: section(db.prepare('SELECT * FROM office_hour_bookings ORDER BY id DESC').all(), [...HOUSING_READ, 'faculty:manage']),
+      dormRooms: db.prepare('SELECT * FROM dorm_rooms ORDER BY building_name, room_no').all(),
+      dormAllocations: section(db.prepare(`
+        SELECT a.*, r.building_name, r.room_no
+        FROM dorm_allocations a
+        JOIN dorm_rooms r ON r.id = a.room_id
+        ORDER BY a.id DESC
+      `).all(), [...HOUSING_READ, 'student:read']),
+      scholarships: section(db.prepare('SELECT * FROM scholarships ORDER BY id DESC').all(), [...HOUSING_READ, 'sa_scholarships:view', 'sa_scholarships:write', 'sa_scholarships:approve', 'finance:read', 'finance:fees', 'student:read']),
+      activities: db.prepare('SELECT * FROM student_activities ORDER BY id DESC').all(),
     });
   });
 
@@ -739,7 +740,7 @@ export async function registerV12Modules(r, deps) {
   });
 
   r.add('POST', '/api/expansions/office-bookings', (c) => {
-    if (!isStudent(c)) requireV12Perm(c, ...EXAMS_MANAGE, 'academic:read', 'faculty:manage');
+    if (!isStudent(c)) requireV12Perm(c, 'sa_housing:manage', 'faculty:manage');
     const b = { ...(c.body ?? {}), ...(isStudent(c) ? { student_no: c.user.student_no, student_name: c.user.display_name } : {}) };
     const res = db.prepare(`
       INSERT INTO office_hour_bookings (faculty_name, student_name, student_no, slot_day, slot_time, topic, status, created_at)
@@ -757,7 +758,7 @@ export async function registerV12Modules(r, deps) {
   });
 
   r.add('POST', '/api/expansions/dorm-allocations', (c) => {
-    requireV12Perm(c, ...EXAMS_MANAGE);
+    requireV12Perm(c, 'sa_housing:manage');
     const b = c.body ?? {};
     const roomId = Number(b.room_id);
     if (!db.prepare('SELECT 1 AS x FROM dorm_rooms WHERE id = ?').get(roomId)) throw new HttpError(400, 'اختر غرفة موجودة.', 'validation');

@@ -9,7 +9,7 @@ import { registerHrIntegratedRoutes } from './services/hr_integrated.js';
 import { registerEnterpriseSuiteRoutes } from './services/enterprise_suite.js';
 import { registerStudentAffairsSuiteRoutes } from './services/student_affairs_suite.js';
 import { login, logout, publicUser, changePassword, getSessionCacheStats, invalidateSessionCache } from './services/auth.js';
-import { listStaff, createUser, updateUser, setUserActive, resetUserPassword, deleteUser } from './services/useradmin.js';
+import { listStaff, listStaffLight, staffDetail, createUser, updateUser, setUserActive, resetUserPassword, deleteUser } from './services/useradmin.js';
 import { getTranscriptTemplate, setTranscriptTemplate, getSite, saveSite, universityName } from './services/site.js';
 import { listServices, createService, updateService } from './services/catalog.js';
 import { updateHold, deleteHold, createRule, updateRule, deleteRule } from './services/admindata.js';
@@ -44,7 +44,7 @@ import { overview, createRole, updateRole, deleteRole, createUnit, updateUnit, d
 import { registrationOptions, registerStudent, listStudents, listStudentsTable, getStudent, updateStudent, resetStudentPassword, myProfile, updateOwnContact, listPrograms, addProgram, toggleProgram, listFaculties, addFaculty, toggleFaculty, updateFaculty, deleteFaculty, updateProgram, deleteProgram, deleteStudent } from './services/students.js';
 import { listCourses, listGradesTable, createCourse, toggleCourse, updateCourse, deleteCourse, myGrades, gradesFor, enterGrade, deleteGrade, listNews, createNews, updateNews, deleteNews, createComplaint, listComplaints, respondComplaint, deleteComplaint } from './services/academics.js';
 import { transitionGrades, gradeHistory, workflowOn, setWorkflow, myCourseGrades } from './services/workflow.js';
-import { getSlots, setSlots, detectScheduleConflicts, DAYS } from './services/schedule.js';
+import { getSlots, setSlots, detectScheduleConflicts, studentTimetable, DAYS } from './services/schedule.js';
 import { getUnifiedStudentRecord } from './services/record360.js';
 import { expandFields, requesterKind, createRequest, listRequests, getRequest, decide, forwardRequest, stats, readAttachment } from './services/requests.js';
 import { getDocument, verifyPublic } from './services/documents.js';
@@ -131,6 +131,7 @@ export async function buildRouter(deps) {
   r.add('POST', '/api/grades/workflow-setting', (c) => { need(c, 'grade:approve'); c.json(200, setWorkflow(deps, c.user, !!c.body?.enabled, c.ip)); });
   r.add('GET', '/api/courses/:id/schedule', (c) => { need(c, 'course:manage'); c.json(200, { slots: getSlots(db, c.params.id), days: DAYS }); });
   r.add('PUT', '/api/courses/:id/schedule', (c) => { need(c, 'course:manage'); c.json(200, setSlots(deps, c.user, c.params.id, c.body?.slots, c.ip)); });
+  r.add('GET', '/api/me/timetable', (c) => { c.json(200, { slots: c.user.role === 'student' ? studentTimetable(db, c.user.id) : [] }); });
   r.add('GET', '/api/students/:id/schedule-conflicts', (c) => {
     if (!c.user.can('student:read') && c.params.id !== String(c.user.id)) throw new HttpError(403, 'لا تملك صلاحية هذا الإجراء.', 'forbidden');
     c.json(200, detectScheduleConflicts(db, c.params.id));
@@ -467,6 +468,7 @@ export async function buildRouter(deps) {
 
   // ---- الإدارة ----
   r.add('GET', '/api/admin/users', (c) => { need(c, 'user:manage'); c.json(200, { users: listStaff(db) }); });
+  r.add('GET', '/api/admin/users/:id/access', (c) => { need(c, 'user:manage'); c.json(200, { user: staffDetail(db, c.params.id) }); });
   r.add('POST', '/api/admin/users', async (c) => { need(c, 'user:manage'); c.json(201, await createUser(deps, c.user, c.body, c.ip)); });
   r.add('PUT', '/api/admin/users/:id', (c) => { need(c, 'user:manage'); c.json(200, updateUser(deps, c.user, c.params.id, c.body, c.ip)); });
   r.add('DELETE', '/api/admin/users/:id', (c) => { need(c, 'user:manage'); c.json(200, deleteUser(deps, c.user, c.params.id, c.ip)); });
@@ -476,9 +478,7 @@ export async function buildRouter(deps) {
   // ---- الأدوار والوحدات وروابطها ----
   r.add('GET', '/api/admin/access', (c) => {
     if (!c.user.can('user:manage') && !c.user.can('role:manage')) throw new HttpError(403, 'لا تملك صلاحية هذا الإجراء.', 'forbidden');
-    // الواجهة تحتاج من ملف الوصول القدرات فقط؛ حالة كل وحدة لكل حساب تضاعف حجم الرد
-    const users = listStaff(db).map((u) => { if (!u.accessProfile) return u; const { moduleState: _unused, ...accessProfile } = u.accessProfile; return { ...u, accessProfile }; });
-    c.json(200, { ...overview(db), users, canManageRoles: c.user.can('role:manage'), canManageUsers: c.user.can('user:manage') });
+    c.json(200, { ...overview(db), users: listStaffLight(db), canManageRoles: c.user.can('role:manage'), canManageUsers: c.user.can('user:manage') });
   });
   r.add('GET', '/api/admin/access/matrix.xlsx', (c) => {
     if (!c.user.can('user:manage') && !c.user.can('role:manage')) throw new HttpError(403, 'لا تملك صلاحية هذا الإجراء.', 'forbidden');

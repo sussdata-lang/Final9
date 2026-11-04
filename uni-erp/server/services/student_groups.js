@@ -72,6 +72,7 @@ export function deleteGroup({ db }, actor, id, ip) {
   const g = getGroup(db, id);
   tx(db, () => {
     db.prepare('UPDATE exam_schedules SET group_id = NULL WHERE group_id = ?').run(g.id);   // الامتحان يبقى، ويفقد ربطه فقط
+    db.prepare('UPDATE course_schedules SET group_id = NULL WHERE group_id = ?').run(g.id);
     db.prepare('DELETE FROM student_groups WHERE id = ?').run(g.id);
     audit(db, actor, 'حذف فئة طلاب', g.name, ip);
   });

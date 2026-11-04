@@ -53,6 +53,7 @@ const col = (rows, start) => rows[0].findIndex((h) => String(h).startsWith(start
 const FIX = {
   career_applications: (rows) => { rows[1][col(rows, 'المسمى الوظيفي')] = 'وظيفة مرجعية'; },
   unit_links: (rows) => { const u = db.prepare('SELECT code FROM org_units WHERE code IS NOT NULL ORDER BY id LIMIT 2').all(); rows[1][0] = u[0].code; rows[1][1] = u[1].code; },
+  student_group_members: (rows) => { rows[1][0] = db.prepare('SELECT name FROM student_groups ORDER BY id LIMIT 1').get()?.name ?? rows[1][0]; rows[1][col(rows, 'الرقم الجامعي')] = 'SAMPLE-1'; },
   course_schedules: (rows) => { rows[1][0] = 'COURSE-A'; },
   course_prerequisites: (rows) => { rows[1][0] = 'COURSE-B'; rows[1][1] = 'COURSE-A'; },
   programs: (rows) => { rows[1][0] = db.prepare('SELECT code FROM faculties ORDER BY id LIMIT 1').get().code; },

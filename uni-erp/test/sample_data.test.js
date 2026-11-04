@@ -13,7 +13,7 @@ const SAMPLE_TABLES = ['lms_lectures', 'lms_quizzes', 'library_books', 'library_
   'hr_appraisals', 'hr_trainings', 'hr_biometric_devices', 'infra_settings', 'ai_early_warnings', 'ai_triage_logs', 'devops_incident_reports', 'sa_card_activity_logs', 'smart_schedule_slots',
   'online_quizzes', 'online_quiz_submissions', 'student_self_enrollments', 'faculty_overload_records', 'hr_signed_payslips', 'student_fee_installments', 'multi_channel_notifications', 'encrypted_snapshots',
   'offline_sync_batches', 'sa_applicants', 'sa_credit_equivalences', 'sa_advising_warnings', 'sa_lifecycle_movements', 'sa_disciplinary_details', 'sa_scholarships', 'sa_desk_appointments', 'sa_course_prerequisites', 'courses', 'grades'];
-const READ_SCREENS = ['/api/enterprise/overview', '/api/student-affairs-suite/overview', '/api/devops/overview', '/api/hr-pro/overview', '/api/lms/overview', '/api/expansions/overview', '/api/ai/overview', '/api/research/overview', '/api/alumni/overview', '/api/qa/overview', '/api/analytics', '/api/stats'];
+const READ_SCREENS = ['/api/enterprise/overview', '/api/student-affairs-suite/overview', '/api/devops/overview', '/api/hr-pro/overview', '/api/lms/overview', '/api/expansions/overview', '/api/student-life/overview', '/api/ai/overview', '/api/research/overview', '/api/alumni/overview', '/api/qa/overview', '/api/analytics', '/api/stats'];
 
 let app, call, adm;
 const count = (t) => Number(app.db.prepare(`SELECT COUNT(*) c FROM ${t}`).get().c);

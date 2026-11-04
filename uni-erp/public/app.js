@@ -120,8 +120,10 @@ Object.assign(window.UA, {
         ['home', tr('اللوحة الرئيسية')],
         ['guide', tr('دليل المواد والخطة')],
         ['grades', tr('علاماتي والسجل الأكاديمي')],
+        ['fees', tr('كشف الرسوم')],
         ['lms', tr('التعلم الإلكتروني والمكتبة')],
-        ['expansions', tr('الامتحانات والسكن والأنشطة')],
+        ['expansions', tr('الامتحانات والتظلمات')],
+        ['student_life', tr('السكن والساعات المكتبية')],
         ['alumni', tr('الخريجون والتوظيف')],
         ['ai', tr('المرشد الذكي AI')],
         ['news', tr('الأخبار والإعلانات')],
@@ -143,7 +145,8 @@ Object.assign(window.UA, {
     // 2) الأكاديمي والامتحانات (تضم المقررات والعلامات وإنشاء فحص الامتحان PDF وميزات التطوير الأكاديمي)
     if (can('course:manage') || can('grade:manage') || can('grade:approve') || can('grade:approve_own') || can('faculty:manage')) v.push(['academics', tr('المواد والعلامات والامتحانات')]);
     if (can('attendance:manage')) v.push(['attendance', tr('سجل القاعات')]);
-    v.push(['expansions', tr('الامتحانات والسكن والتقييم')]);
+    v.push(['expansions', tr('الامتحانات والتقييم')]);
+    v.push(['student_life', tr('السكن والساعات المكتبية')]);
     // 2-ب) الوحدات المتقدمة (5.12–5.15)
     v.push(['lms', tr('التعلم الإلكتروني والمكتبة')]);
     v.push(['research', tr('البحث والدراسات العليا')]);
@@ -618,7 +621,7 @@ Object.assign(window.UA, {
     restoreScrollAndFocus(snap);
   }
   /* ---------- ملفات الأقسام الكبيرة تُحمَّل عند فتحها ---------- */
-  const LAZY = { finance: ['finance.js'], procurement: ['procurement.js'], access: ['access.js'], guidelines: ['guidelines.js'], lms: ['v12_views.js'], research: ['v12_views.js'], alumni: ['v12_views.js'], qa: ['v12_views.js'], expansions: ['v12_views.js'], ai: ['v12_views.js'], audit: ['v12_views.js'] };
+  const LAZY = { finance: ['finance.js'], procurement: ['procurement.js'], access: ['access.js'], guidelines: ['guidelines.js'], lms: ['v12_views.js'], research: ['v12_views.js'], alumni: ['v12_views.js'], qa: ['v12_views.js'], expansions: ['v12_views.js'], student_life: ['v12_views.js'], ai: ['v12_views.js'], audit: ['v12_views.js'] };
   const ASSET_V = (document.currentScript && document.currentScript.src.split('?')[1]) || '';
   const scripts = new Map();
   function loadScript(file) {

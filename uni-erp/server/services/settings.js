@@ -31,7 +31,9 @@ export const SCHEMA = [
     { key: 'student_portal.view_guide', label: 'دليل المواد والخطة الدراسية', type: 'bool', default: true },
     { key: 'student_portal.view_grades', label: 'علاماتي والسجل الأكاديمي', type: 'bool', default: true },
     { key: 'student_portal.view_lms', label: 'التعلم الإلكتروني والمكتبة', type: 'bool', default: true },
-    { key: 'student_portal.view_expansions', label: 'الامتحانات والسكن والأنشطة', type: 'bool', default: true },
+    { key: 'student_portal.view_fees', label: 'كشف الرسوم', type: 'bool', default: true },
+    { key: 'student_portal.view_expansions', label: 'الامتحانات والتظلمات', type: 'bool', default: true },
+    { key: 'student_portal.view_student_life', label: 'السكن والساعات المكتبية', type: 'bool', default: true },
     { key: 'student_portal.view_alumni', label: 'الخريجون والتوظيف', type: 'bool', default: true },
     { key: 'student_portal.view_ai', label: 'المرشد الذكي (AI)', type: 'bool', default: true },
     { key: 'student_portal.view_news', label: 'الأخبار والإعلانات', type: 'bool', default: true },
@@ -252,11 +254,14 @@ export function publicLimits(db) {
 }
 
 export const studentPermSetting = (perm) => `student_portal.perm_${perm.replace(':', '_')}`;
-export const STUDENT_VIEW_KEYS = ['guide', 'grades', 'lms', 'expansions', 'alumni', 'ai', 'news', 'tx'];
+export const STUDENT_VIEW_KEYS = ['guide', 'grades', 'fees', 'lms', 'expansions', 'student_life', 'alumni', 'ai', 'news', 'tx'];
 // صلاحيات حساب الطالب بعد إعدادات «بوابة الطالب»
 export function studentPermsOf(db, all) { return all.filter((p) => getSetting(db, studentPermSetting(p), true) !== false); }
 // الشاشات التي يراها حساب الطالب بحسب إعدادات «بوابة الطالب»؛ 'home' و'enterprise' ثابتتان
-export function studentViewsOf(db) {
+export function studentViewsOf(db, studentId = null) {
   const on = (k) => getSetting(db, `student_portal.view_${k}`, true) !== false;
-  return ['home', 'enterprise', ...STUDENT_VIEW_KEYS.filter(on)];
+  const views = ['home', 'enterprise', ...STUDENT_VIEW_KEYS.filter(on)];
+  // قسم الخريجين للخريج فقط
+  if (studentId && db.prepare('SELECT status FROM student_profiles WHERE user_id = ?').get(Number(studentId))?.status !== 'graduated') return views.filter((v) => v !== 'alumni');
+  return views;
 }

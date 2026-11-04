@@ -17,7 +17,14 @@ export function setWorkflow({ db }, actor, on, ip) {
 export const canApprove = (actor) => !!actor?.can?.('grade:approve');
 // المقرر مسند إلى عضو هيئة مرتبط بهذا الحساب
 const ownsCourse = (db, actor, courseId) => !!courseId && !!db.prepare('SELECT 1 AS x FROM courses c JOIN faculty_members m ON m.id = c.member_id WHERE c.id = ? AND m.user_id = ?').get(Number(courseId), Number(actor?.id));
-const canApproveGrade = (db, actor, g) => canApprove(actor) || (!!actor?.can?.('grade:approve_own') && ownsCourse(db, actor, g.course_id));
+// حساب عضو الهيئة المسند إليه المقرر، إن وُجد
+export const courseApprover = (db, courseId) => (courseId ? db.prepare('SELECT m.user_id AS uid FROM courses c JOIN faculty_members m ON m.id = c.member_id WHERE c.id = ?').get(Number(courseId))?.uid ?? null : null);
+// مقرر له عضو هيئة مرتبط بحساب: لا يعتمده غيره. وما لا عضو له يعتمده حامل grade:approve
+const canApproveGrade = (db, actor, g) => {
+  const owner = courseApprover(db, g.course_id);
+  if (owner) return Number(owner) === Number(actor?.id) && (canApprove(actor) || !!actor?.can?.('grade:approve_own'));
+  return canApprove(actor);
+};
 
 // مقررات عضو الهيئة وما أرسله قسم الامتحانات منها (المسودات لا تصله)
 export function myCourseGrades({ db }, actor) {
@@ -62,14 +69,19 @@ export function transitionGrades({ db }, actor, b, ip) {
       if (from === stage) { skipped.push({ id, reason: 'في هذه المرحلة أصلاً' }); continue; }
       const forward = STAGES.indexOf(stage) === STAGES.indexOf(from) + 1;
       // عضو الهيئة لا يدخل العلامات: يعتمد ما أُرسل لمقرراته أو يعيده بسبب، ولا يعيد فتح المعتمدة
-      const ownerOnly = !actor?.can?.('grade:manage');
+      const ownerOnly = !actor?.can?.('grade:manage') && !canApprove(actor);
       if (ownerOnly) {
         if (!actor?.can?.('grade:approve_own') || !ownsCourse(db, actor, g.course_id)) throw new HttpError(403, 'هذا المقرر غير مسند إليك.', 'forbidden');
         if (from !== 'reviewed' || (stage !== 'approved' && stage !== 'draft')) throw new HttpError(403, 'يعتمد المدرّس العلامات المرسلة من قسم الامتحانات أو يعيدها فقط.', 'forbidden');
         if (stage === 'draft') needJustification(just, b?.decisionNo);
       }
       if (stage === 'approved') {
-        if (!canApproveGrade(db, actor, g)) throw new HttpError(403, 'لا تملك صلاحية اعتماد العلامات.', 'forbidden');
+        if (!canApproveGrade(db, actor, g)) {
+          const waiting = canApprove(actor) && courseApprover(db, g.course_id);
+          // الاعتماد الجماعي يتجاوز علامات المقررات المسندة ولا يفشل كله بسببها
+          if (waiting && ids.length > 1) { skipped.push({ id, reason: 'بانتظار موافقة عضو الهيئة التدريسية' }); continue; }
+          throw new HttpError(403, waiting ? 'علامات هذا المقرر يعتمدها عضو الهيئة التدريسية المسند إليه.' : 'لا تملك صلاحية اعتماد العلامات.', 'forbidden');
+        }
         if (!forward) { skipped.push({ id, reason: 'يجب مراجعتها أولاً' }); continue; }
         if ((g.entered_by && Number(g.entered_by) === Number(actor?.id)) || (g.reviewed_by && Number(g.reviewed_by) === Number(actor?.id))) {
           throw new HttpError(403, 'خرق سياسة فصل المهام (SoD): لا يجوز لمدخل العلامة أو مراجعها أن يكون هو نفسه المعتمد النهائي.', 'sod_violation');

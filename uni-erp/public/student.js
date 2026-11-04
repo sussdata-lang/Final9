@@ -74,7 +74,9 @@
     if (T.loading.guide || !T.courses) body = sxWait();
     else if (!T.courses.length) body = sxEmpty('لا توجد مقررات مسجَّلة لهذه السنة بعد', 'تُضاف المقررات من قسم شؤون الطلاب.');
     else body = `<table class="sx-table rsp"><thead><tr><th>المقرر</th><th>الفصل</th><th>المدرّس</th><th>الساعات</th></tr></thead><tbody>${T.courses.map((c) => `<tr><td><strong>${esc(c.name)}</strong>${c.code ? `<div class="sx-sub">${esc(c.code)}</div>` : ''}</td><td data-l="الفصل">${SEM_LABEL[c.semester] || ''}</td><td class="sx-muted" data-l="المدرّس">${esc(c.instructor || 'غير محدد')}</td><td data-l="الساعات">${dash(c.hours)}</td></tr>`).join('')}</tbody></table>`;
-    return sxHead('دليل المواد', 'مقررات برنامجك الدراسي حسب السنة والفصل.') + confBanner() + `<article class="sx-panel"><div class="sx-bar">${sxTabs('glvl', lv)}${sxSem('gsem', T.guide.sem)}</div><div class="sx-tscroll">${body}</div></article>`;
+    const slots = T.timetable || [];
+    const timetable = slots.length ? `<article class="sx-panel" style="margin-top:16px"><div class="sx-ph"><div><h2>جدول محاضراتي</h2><p>مواعيد مقرراتك الحالية، ومنها ما يخص فئتك</p></div></div><div class="sx-tscroll"><table class="sx-table rsp"><thead><tr><th>المقرر</th><th>اليوم</th><th>الوقت</th><th>القاعة</th><th>الفئة</th></tr></thead><tbody>${slots.map((s) => `<tr><td><strong>${esc(s.course)}</strong><div class="sx-sub rtl">${SEM_LABEL[s.semester] || ''}</div></td><td data-l="اليوم">${esc(s.dayLabel)}</td><td data-l="الوقت">${esc(s.start)} – ${esc(s.end)}</td><td data-l="القاعة">${dash(s.hall)}</td><td data-l="الفئة">${dash(s.groupName)}</td></tr>`).join('')}</tbody></table></div></article>` : '';
+    return sxHead('دليل المواد', 'مقررات برنامجك الدراسي حسب السنة والفصل.') + confBanner() + `<article class="sx-panel"><div class="sx-bar">${sxTabs('glvl', lv)}${sxSem('gsem', T.guide.sem)}</div><div class="sx-tscroll">${body}</div></article>` + timetable;
   }
   function gradesD() {
     const lv = T.gr.level || curLevel();
@@ -94,6 +96,18 @@
       body = list.length ? `<table class="sx-table rsp"><thead><tr><th>المقرر</th><th>الفصل</th><th>النظري</th><th>العملي</th><th>المجموع</th><th>النتيجة</th><th></th></tr></thead><tbody>${rows}</tbody></table>` : sxEmpty('لا توجد علامات لهذه السنة بعد', 'تظهر العلامات هنا فور اعتمادها من شؤون الطلاب.');
     }
     return sxHead('علاماتي', 'نتائجك في كل مقرر، مع المحاولات السابقة إن وُجدت.') + cards + `<article class="sx-panel"><div class="sx-bar">${sxTabs('grlvl', lv)}${sxSem('grsem', T.gr.sem)}</div><div class="sx-tscroll">${body}</div></article>`;
+  }
+  // كشف الرسوم: مطابق لما يسجله قسم المالية، ولا يتضمن إجراء دفع
+  function feesD() {
+    const head = sxHead('كشف الرسوم', 'رسومك المستحقة وما سددته والرصيد المتبقي.');
+    const F = T.fees;
+    if (!F) return head + `<article class="sx-panel">${sxWait()}</article>`;
+    const money = (n) => `${Number(n || 0).toLocaleString('en-US')} ل.س`;
+    const open = F.charges.filter((c) => c.status === 'open'), paid = F.payments.filter((p) => p.status === 'ok');
+    const stats = `<section class="sx-stats" style="margin-bottom:16px">${sx().statCard('إجمالي الرسوم', money(F.totalCharged), `${open.length} بند`, 'file', 'blue')}${sx().statCard('المسدد', money(F.totalPaid), `${paid.length} دفعة`, 'check', 'mint')}${sx().statCard(F.balance < 0 ? 'رصيد لصالحك' : 'المتبقي', money(Math.abs(F.balance)), F.side, 'clock', 'sand')}</section>`;
+    const charges = open.length ? `<table class="sx-table rsp"><thead><tr><th>البند</th><th>العام الدراسي</th><th>تاريخ الاستحقاق</th><th>المبلغ</th></tr></thead><tbody>${open.map((c) => `<tr><td><strong>${esc(c.feeType)}</strong>${c.note ? `<div class="sx-sub rtl">${esc(c.note)}</div>` : ''}</td><td data-l="العام الدراسي">${dash(c.academicYear)}</td><td data-l="تاريخ الاستحقاق">${dash(c.dueDay)}</td><td data-l="المبلغ"><b>${esc(money(c.amount))}</b></td></tr>`).join('')}</tbody></table>` : sxEmpty('لا رسوم مسجلة عليك');
+    const payments = paid.length ? `<table class="sx-table rsp"><thead><tr><th>رقم الإيصال</th><th>التاريخ</th><th>طريقة الدفع</th><th>المبلغ</th></tr></thead><tbody>${paid.map((p) => `<tr><td><strong>${esc(p.receiptNo)}</strong></td><td data-l="التاريخ">${dash(p.paidDay)}</td><td data-l="طريقة الدفع">${dash(p.method)}</td><td data-l="المبلغ"><b>${esc(money(p.amount))}</b></td></tr>`).join('')}</tbody></table>` : sxEmpty('لا دفعات مسجلة بعد');
+    return head + stats + `<article class="sx-panel"><div class="sx-ph"><div><h2>الرسوم</h2></div></div><div class="sx-tscroll">${charges}</div></article><article class="sx-panel" style="margin-top:16px"><div class="sx-ph"><div><h2>الدفعات</h2></div></div><div class="sx-tscroll">${payments}</div></article>`;
   }
   function newsD() {
     const body = !T.news ? sxWait() : (T.news.length ? `<div class="sx-news">${T.news.map(newsCardD).join('')}</div>` : sxEmpty('لا أخبار حالياً'));
@@ -140,7 +154,7 @@
   UA.studentShell = function () {
     const act = S.view === 'verify' ? 'home' : S.view;
     // قائمة جانبية (منزلقة على الجوال) + شريط علوي
-    const pageD = S.view === 'verify' ? `<div class="sx-verify">${UA.verifyView()}</div>` : ({ home: homeD, guide: guideD, grades: gradesD, news: newsD, tx: txD, guidelines: guidelinesD }[S.view] || homeD)();
+    const pageD = S.view === 'verify' ? `<div class="sx-verify">${UA.verifyView()}</div>` : ({ home: homeD, guide: guideD, grades: gradesD, fees: feesD, news: newsD, tx: txD, guidelines: guidelinesD }[S.view] || homeD)();
     return desktopShell(pageD, act);
   };
 
@@ -156,7 +170,8 @@
       gs.filter(Boolean).forEach((r) => r.grades.forEach((g) => { count++; if (g.passed) passed++; hrs += g.hours || 0; sum += (g.hours || 0) * g.total; }));
       T.all = { count, passed, failed: count - passed, avg: hrs ? Math.round((sum / hrs) * 10) / 10 : null };
     },
-    guide: async () => { await ensureProfile(); const lv = T.guide.level || curLevel(); T.courses = (await api('GET', `/api/courses?level=${lv}${T.guide.sem ? '&semester=' + T.guide.sem : ''}`)).courses; try { T.conf = await api('GET', `/api/students/${UA.S.me.id}/schedule-conflicts`); } catch (e) { T.conf = null; } },
+    guide: async () => { await ensureProfile(); const lv = T.guide.level || curLevel(); T.courses = (await api('GET', `/api/courses?level=${lv}${T.guide.sem ? '&semester=' + T.guide.sem : ''}`)).courses; try { T.conf = await api('GET', `/api/students/${UA.S.me.id}/schedule-conflicts`); } catch (e) { T.conf = null; } try { T.timetable = (await api('GET', '/api/me/timetable')).slots; } catch (e) { T.timetable = []; } },
+    fees: async () => { T.fees = await api('GET', '/api/me/fees'); },
     grades: async () => {
       await ensureProfile(); let lv = T.gr.level || curLevel(); T.grades = await api('GET', '/api/me/grades?level=' + lv);
       if (!T.gr.level) {   // إن لم تصدر علامات السنة الحالية بعد يُعرض آخر عام فيه علامات

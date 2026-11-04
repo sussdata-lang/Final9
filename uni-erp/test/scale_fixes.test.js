@@ -59,8 +59,13 @@ test('الطلاب لا يظهرون مسؤولين للوحدات، وقائم�
   assert.ok(unit.heads.some((h) => h.username === 'adm'));
   assert.ok(!unit.heads.some((h) => h.username.startsWith('sc-')), 'الطلاب ليسوا مسؤولي وحدة');
   assert.equal(access.platformModules, undefined);
+  assert.equal(access.users[0].effectivePermissions, undefined, 'القائمة أعداد فقط');
   assert.equal(access.users[0].accessProfile.moduleState, undefined);
-  assert.ok(access.users[0].accessProfile.capabilities);
+  assert.equal(access.users[0].accessProfile.capabilities.activeModules, undefined);
+  assert.ok(access.users[0].permissionCount > 0);
+  const detail = (await call(`/api/admin/users/${access.users[0].id}/access`)).json.user;
+  assert.equal(detail.effectivePermissions.length, access.users[0].permissionCount, 'التفاصيل تُجلب عند الفتح');
+  assert.equal(detail.allowedViews.length, access.users[0].viewCount);
   const sample = (await call('/api/cards/students?limit=5')).json;
   assert.equal(sample.students.length, 5);
   assert.ok(sample.total >= 120, 'العدد الكلي لا يتبع العينة');
