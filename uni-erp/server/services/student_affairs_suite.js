@@ -306,8 +306,14 @@ export function buildFiveStageRequestTracker(request, appointment = null) {
    3. خدمات القراءة والكتابة المتكاملة مع المنظومة (Integrated Service Methods)
    ============================================================================ */
 
+// كل قائمة تُرسل أحدث سجلاتها فقط، والأعداد تُحسب من الجدول. الطالب يأتيه ما يخصه كاملاً
+const LIST_MAX = 500;
+
 export function getStudentAffairsSuiteOverview(deps, query = {}) {
   const { db } = deps;
+  const own = query.ownOnly ? Number(query.studentId) : null;
+  const scoped = (column, sqlBody, tail) => (own ? db.prepare(`${sqlBody} WHERE ${column} = ? ${tail}`).all(own) : db.prepare(`${sqlBody} ${tail} LIMIT ${LIST_MAX}`).all());
+  const count = (sql) => Number(db.prepare(sql).get().c);
 
   const programs = db
     .prepare(`
@@ -342,7 +348,7 @@ export function getStudentAffairsSuiteOverview(deps, query = {}) {
     .all();
 
   // 1. بيانات القبول والمفاضلة
-  const applicants = db
+  const applicants = own ? [] : db
     .prepare(`
       SELECT a.*,
              p1.name AS pref1Name, p2.name AS pref2Name, p3.name AS pref3Name,
@@ -355,23 +361,20 @@ export function getStudentAffairsSuiteOverview(deps, query = {}) {
       LEFT JOIN programs pa ON pa.id = a.accepted_program_id
       LEFT JOIN users u ON u.id = a.enrolled_student_id
       ORDER BY a.hs_score DESC, a.id DESC
+      LIMIT ${LIST_MAX}
     `)
     .all();
 
   // 1-ب. بيانات معادلة المواد للطلاب المحولين
-  const equivalences = db
-    .prepare(`
-      SELECT eq.*, u.display_name AS studentName, u.student_no AS studentNo,
+  const EQ_SQL = `SELECT eq.*, u.display_name AS studentName, u.student_no AS studentNo,
              c.name AS internalCourseName, c.code AS internalCourseCode, c.hours AS internalHours
       FROM sa_credit_equivalences eq
       LEFT JOIN users u ON u.id = eq.student_id
-      LEFT JOIN courses c ON c.id = eq.internal_course_id
-      ORDER BY eq.id DESC
-    `)
-    .all();
+      LEFT JOIN courses c ON c.id = eq.internal_course_id`;
+  const equivalences = scoped('eq.student_id', EQ_SQL, 'ORDER BY eq.id DESC');
 
   const targetStudentId = targetStudent?.id ?? 0;
-  const studentEquivalences = equivalences.filter((e) => e.student_id === targetStudentId);
+  const studentEquivalences = db.prepare(`${EQ_SQL} WHERE eq.student_id = ? ORDER BY eq.id DESC`).all(targetStudentId);
   const equivalenceSummary = calculateTransferEquivalenceSummary(studentEquivalences, (targetStudent ? 132 : 132));
 
   // 2. شجرة الخطة الدراسية والمتطلبات السابقة للطالب المختار
@@ -392,21 +395,16 @@ export function getStudentAffairsSuiteOverview(deps, query = {}) {
   );
 
   // 2-ب. نظام الإنذار الأكاديمي المبكر وجلسات الإرشاد
-  const advisingWarnings = db
-    .prepare(`
-      SELECT w.*, u.display_name AS studentName, u.student_no AS studentNo,
+  const advisingWarnings = scoped('w.student_id', `SELECT w.*, u.display_name AS studentName, u.student_no AS studentNo,
              p.name AS programName
       FROM sa_advising_warnings w
       LEFT JOIN users u ON u.id = w.student_id
       LEFT JOIN student_profiles sp ON sp.user_id = w.student_id
-      LEFT JOIN programs p ON p.id = sp.program_id
-      ORDER BY w.id DESC
-    `)
-    .all();
+      LEFT JOIN programs p ON p.id = sp.program_id`, 'ORDER BY w.id DESC');
 
   // رصد تلقائي للطلاب المعرضين للإنذار من جدول العلامات الفعلي
   // استعلام واحد بدل استعلام لكل طالب؛ ويُعرض الأضعف أولاً مع العدد الكلي
-  const atRiskAll = db
+  const atRiskAll = own ? [] : db
     .prepare(`
       SELECT u.id, u.display_name AS name, u.student_no AS studentNo, g.hrs, g.weighted, g.failed
       FROM (SELECT student_id, SUM(COALESCE(hours, 3)) AS hrs, SUM(COALESCE(hours, 3) * mark) AS weighted, SUM(CASE WHEN mark < 60 THEN 1 ELSE 0 END) AS failed
@@ -425,72 +423,64 @@ export function getStudentAffairsSuiteOverview(deps, query = {}) {
   const autoDetectedAtRisk = atRiskAll.slice(0, 100);
 
   // 3. حركات القيد والانضباط المسلكي (مدمجة مع student_holds و student_profiles)
-  const lifecycleMovements = db
-    .prepare(`
-      SELECT m.*, u.display_name AS studentName, u.student_no AS studentNo,
+  const lifecycleMovements = scoped('m.student_id', `SELECT m.*, u.display_name AS studentName, u.student_no AS studentNo,
              pf.name AS fromProgramName, pt.name AS toProgramName
       FROM sa_lifecycle_movements m
       LEFT JOIN users u ON u.id = m.student_id
       LEFT JOIN programs pf ON pf.id = m.from_program_id
-      LEFT JOIN programs pt ON pt.id = m.to_program_id
-      ORDER BY m.id DESC
-    `)
-    .all();
+      LEFT JOIN programs pt ON pt.id = m.to_program_id`, 'ORDER BY m.id DESC');
 
-  const disciplinaryRecords = db
-    .prepare(`
-      SELECT h.id AS holdId, h.student_id AS studentId, h.hold_type AS holdType, h.note, h.active, h.created_at AS createdAt,
+  const disciplinaryRecords = scoped('h.student_id', `SELECT h.id AS holdId, h.student_id AS studentId, h.hold_type AS holdType, h.note, h.active, h.created_at AS createdAt,
              u.display_name AS studentName, u.student_no AS studentNo,
              d.committee_decision_no AS decisionNo, d.violation_category AS violationCategory,
              d.penalty_level AS penaltyLevel, d.blocks_documents AS blocksDocuments, d.expires_at AS expiresAt
       FROM student_holds h
       JOIN users u ON u.id = h.student_id
-      LEFT JOIN sa_disciplinary_details d ON d.hold_id = h.id
-      ORDER BY h.active DESC, h.id DESC
-    `)
-    .all();
+      LEFT JOIN sa_disciplinary_details d ON d.hold_id = h.id`, 'ORDER BY h.active DESC, h.id DESC');
 
   // 5. المنح والإعفاءات والرعاية الطلابية (مدمجة مع المالية fin_charges)
-  const scholarships = db
-    .prepare(`
-      SELECT s.*, u.display_name AS studentName, u.student_no AS studentNo,
+  const scholarships = scoped('s.student_id', `SELECT s.*, u.display_name AS studentName, u.student_no AS studentNo,
              p.name AS programName,
              c.status AS finChargeStatus
       FROM sa_scholarships s
       LEFT JOIN users u ON u.id = s.student_id
       LEFT JOIN student_profiles sp ON sp.user_id = s.student_id
       LEFT JOIN programs p ON p.id = sp.program_id
-      LEFT JOIN fin_charges c ON c.id = s.fin_charge_id
-      ORDER BY s.id DESC
-    `)
-    .all();
+      LEFT JOIN fin_charges c ON c.id = s.fin_charge_id`, 'ORDER BY s.id DESC');
 
   // 6. مكتب خدمة الطالب الموحد والدور الذكي وتتبع المعاملات
-  const appointments = db
-    .prepare(`
-      SELECT a.*, u.display_name AS studentName, u.student_no AS studentNo,
+  const appointments = scoped('a.student_id', `SELECT a.*, u.display_name AS studentName, u.student_no AS studentNo,
              r.no AS requestNo, r.status AS requestStatus, st.label AS serviceLabel
       FROM sa_desk_appointments a
       LEFT JOIN users u ON u.id = a.student_id
       LEFT JOIN requests r ON r.id = a.request_id
-      LEFT JOIN service_types st ON st.code = r.service_code
-      ORDER BY CASE a.queue_status WHEN 'serving' THEN 1 WHEN 'waiting' THEN 2 ELSE 3 END, a.id DESC
-    `)
-    .all();
+      LEFT JOIN service_types st ON st.code = r.service_code`, "ORDER BY CASE a.queue_status WHEN 'serving' THEN 1 WHEN 'waiting' THEN 2 ELSE 3 END, a.id DESC");
+
+  const totals = own ? {} : {
+    applicants: count('SELECT COUNT(*) AS c FROM sa_applicants'),
+    equivalences: count('SELECT COUNT(*) AS c FROM sa_credit_equivalences'),
+    warnings: count('SELECT COUNT(*) AS c FROM sa_advising_warnings'),
+    movements: count('SELECT COUNT(*) AS c FROM sa_lifecycle_movements'),
+    disciplinary: count('SELECT COUNT(*) AS c FROM student_holds'),
+    scholarships: count('SELECT COUNT(*) AS c FROM sa_scholarships'),
+    appointments: count('SELECT COUNT(*) AS c FROM sa_desk_appointments'),
+  };
 
   return {
     kpis: {
-      totalApplicants: applicants.length,
-      acceptedApplicants: applicants.filter((a) => a.sorting_status === 'accepted' || a.sorting_status === 'enrolled').length,
-      approvedEquivalences: equivalences.filter((e) => e.equivalence_status === 'approved').length,
-      activeWarnings: advisingWarnings.filter((w) => w.status !== 'resolved').length,
-      lifecycleMovementsCount: lifecycleMovements.length,
-      activeHoldsCount: disciplinaryRecords.filter((d) => d.active).length,
-      activeScholarshipsCount: scholarships.filter((s) => s.status === 'active').length,
-      totalScholarshipAmount: scholarships.filter((s) => s.status === 'active').reduce((s, x) => s + Number(x.amount || 0), 0),
-      waitingTicketsCount: appointments.filter((a) => a.queue_status === 'waiting').length,
-      servingTicketsCount: appointments.filter((a) => a.queue_status === 'serving').length,
+      totalApplicants: totals.applicants,
+      acceptedApplicants: own ? 0 : count("SELECT COUNT(*) AS c FROM sa_applicants WHERE sorting_status IN ('accepted', 'enrolled')"),
+      approvedEquivalences: own ? 0 : count("SELECT COUNT(*) AS c FROM sa_credit_equivalences WHERE equivalence_status = 'approved'"),
+      activeWarnings: own ? 0 : count("SELECT COUNT(*) AS c FROM sa_advising_warnings WHERE status <> 'resolved'"),
+      lifecycleMovementsCount: totals.movements,
+      activeHoldsCount: own ? 0 : count('SELECT COUNT(*) AS c FROM student_holds WHERE active = 1'),
+      activeScholarshipsCount: own ? 0 : count("SELECT COUNT(*) AS c FROM sa_scholarships WHERE status = 'active'"),
+      totalScholarshipAmount: own ? 0 : Number(db.prepare("SELECT COALESCE(SUM(amount), 0) AS c FROM sa_scholarships WHERE status = 'active'").get().c),
+      waitingTicketsCount: own ? 0 : count("SELECT COUNT(*) AS c FROM sa_desk_appointments WHERE queue_status = 'waiting'"),
+      servingTicketsCount: own ? 0 : count("SELECT COUNT(*) AS c FROM sa_desk_appointments WHERE queue_status = 'serving'"),
     },
+    totals,
+    listMax: LIST_MAX,
     programs,
     students,
     courses,
@@ -1059,7 +1049,7 @@ export function updateDeskQueueStatus({ db }, actor, ticketId, status, ip) {
    ============================================================================ */
 
 export function suiteOverviewFor(deps, actor, query) {
-  if (actor?.role === 'student') return studentOverview(getStudentAffairsSuiteOverview(deps, { ...query, studentId: actor.id }), actor.id);
+  if (actor?.role === 'student') return studentOverview(getStudentAffairsSuiteOverview(deps, { ...query, studentId: actor.id, ownOnly: true }), actor.id);
   return getStudentAffairsSuiteOverview(deps, query);
 }
 

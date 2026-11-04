@@ -10,7 +10,7 @@
     C.busy = true;
     try {
       if (!C.opts) C.opts = await api('GET', '/api/cards/options');
-      const [list, batches] = await Promise.all([api('GET', `/api/cards/students?${query()}`), api('GET', '/api/cards/batches')]);
+      const [list, batches] = await Promise.all([api('GET', `/api/cards/students?limit=31&${query()}`), api('GET', '/api/cards/batches')]);
       C.list = list; C.batches = batches.batches;
     } catch (e) { if (!e.status) throw e; toast(e.message); } finally { C.busy = false; }
   }
@@ -109,8 +109,9 @@
   });
   const reloadDetail = async () => { C.detail = await api('GET', `/api/cards/batches/${C.detail.batch.id}`); C.batches = (await api('GET', '/api/cards/batches')).batches; UA.render(); };
   Object.assign(UA.actions, {
-    'card-print': () => {
-      const list = C.list && C.list.students; if (!list || !list.length) return;
+    'card-print': async () => {
+      if (!C.list || !C.list.total) return;
+      const list = (await api('GET', `/api/cards/students?${query()}`)).students;
       UA.printHtml(list.map((st) => UA.digitalCardHtml(st)), { card: true });
     },
     'card-print-one': (el, d) => {

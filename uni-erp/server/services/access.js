@@ -173,7 +173,7 @@ export function listUnits(db) {
     // جلب كافة مستخدمي الوحدات والطلبات قيد المراجعة باستعلامين مجمّعين بدلاً من 3 استعلامات لكل وحدة (توفير 100+ استعلام)
     const headsByUnit = new Map();
     const activeUsersByUnit = new Map();
-    for (const u of db.prepare('SELECT id, unit_id, username, display_name AS name, active, job_title AS jobTitle FROM users WHERE unit_id IS NOT NULL ORDER BY id').all()) {
+    for (const u of db.prepare('SELECT id, unit_id, username, display_name AS name, active, job_title AS jobTitle FROM users WHERE unit_id IS NOT NULL AND role <> \'student\' ORDER BY id').all()) {
       const uid = Number(u.unit_id);
       if (!headsByUnit.has(uid)) headsByUnit.set(uid, []);
       headsByUnit.get(uid).push({
@@ -338,9 +338,7 @@ const studentRole = (db) => ({
 export const overview = (db) => ({
   catalog: PERMISSION_CATALOG,
   modulesMatrix: PLATFORM_MODULES_MATRIX,
-  platformModules: PLATFORM_MODULES_MATRIX,
   rolePresets: DEPARTMENT_ROLE_PRESETS,
-  departmentPresets: DEPARTMENT_ROLE_PRESETS,
   allViews: ALL_STAFF_VIEWS,
   roles: listRoles(db),
   studentRole: studentRole(db),

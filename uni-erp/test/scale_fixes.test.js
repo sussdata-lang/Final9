@@ -50,6 +50,27 @@ test('لوحة شؤون الطلاب: لا قائمة بكل الطلاب، وا
   assert.equal((await call(`/api/student-affairs-suite/overview?studentId=${picked}`)).json.targetStudent.studentNo, 'SC-5');
 });
 
+test('الطلاب لا يظهرون مسؤولين للوحدات، وقائمة البطاقات عينة بعدد صحيح، وقوائم شؤون الطلاب مقيّدة بعدّها الحقيقي', async () => {
+  const uid = app.db.prepare('SELECT id FROM org_units ORDER BY id LIMIT 1').get().id;
+  app.db.prepare("UPDATE users SET unit_id = ? WHERE role = 'student'").run(uid);
+  app.db.prepare("UPDATE users SET unit_id = ? WHERE username = 'adm'").run(uid);
+  const access = (await call('/api/admin/access')).json;
+  const unit = access.units.find((u) => u.id === uid);
+  assert.ok(unit.heads.some((h) => h.username === 'adm'));
+  assert.ok(!unit.heads.some((h) => h.username.startsWith('sc-')), 'الطلاب ليسوا مسؤولي وحدة');
+  assert.equal(access.platformModules, undefined);
+  assert.equal(access.users[0].accessProfile.moduleState, undefined);
+  assert.ok(access.users[0].accessProfile.capabilities);
+  const sample = (await call('/api/cards/students?limit=5')).json;
+  assert.equal(sample.students.length, 5);
+  assert.ok(sample.total >= 120, 'العدد الكلي لا يتبع العينة');
+  assert.equal((await call('/api/cards/students')).json.students.length, sample.total);
+  const over = (await call('/api/student-affairs-suite/overview')).json;
+  assert.equal(over.listMax, 500);
+  assert.equal(typeof over.totals.warnings, 'number');
+  assert.equal(over.kpis.totalApplicants, over.totals.applicants);
+});
+
 test('سجل الطلبات يعرض المرفقات والأحداث وصاحب الطلب كما كان، بعد جمع استعلاماته', async () => {
   const stu = app.db.prepare("SELECT id FROM users WHERE student_no = 'SC-1'").get().id, svc = app.db.prepare('SELECT code, label FROM service_types LIMIT 1').get();
   const rid = Number(app.db.prepare("INSERT INTO requests (no, student_id, service_code, details_json, status, created_at) VALUES ('R-SC-1', ?, ?, '{}', 'review', ?)").run(stu, svc.code, Date.now()).lastInsertRowid);

@@ -38,15 +38,18 @@ export function cardOptions(db) {
 // صفوف البطاقات بالحقول التي يطبعها قالب البطاقة في الواجهة
 export function cardStudents({ db }, q = {}) {
   const f = filterOf(q);
+  // الشاشة تكفيها عينة وعدد؛ كل البطاقات تُجلب عند الطباعة فقط
+  const limit = Math.min(MAX_BATCH, Math.max(1, Number(q.limit) || MAX_BATCH));
+  const count = Number(db.prepare(`SELECT COUNT(*) AS c ${FROM}${f.sql}`).get(...f.args).c);
   const rows = db.prepare(`SELECT u.id, u.student_no, u.created_at AS account_at, p.first_name, p.father_name, p.last_name, p.study_level, p.enroll_year, p.enroll_term, p.national_id,
       g.name AS program_name, g.degree, g.faculty,
       (SELECT sf.id FROM student_files sf WHERE sf.student_id = u.id AND sf.kind = 'photo' ORDER BY sf.id DESC LIMIT 1) AS photo_id,
       (SELECT MAX(h.received_at) FROM card_handovers h WHERE h.student_id = u.id) AS received_at
-    ${FROM}${f.sql} ORDER BY g.faculty, p.study_level, p.first_name LIMIT ${MAX_BATCH + 1}`).all(...f.args);
+    ${FROM}${f.sql} ORDER BY g.faculty, p.study_level, p.first_name LIMIT ${limit}`).all(...f.args);
   return {
-    total: Math.min(rows.length, MAX_BATCH),
-    truncated: rows.length > MAX_BATCH,
-    students: rows.slice(0, MAX_BATCH).map((r) => ({
+    total: Math.min(count, MAX_BATCH),
+    truncated: count > MAX_BATCH,
+    students: rows.map((r) => ({
       id: r.id, studentNo: r.student_no, name: fullName(r), createdAt: Number(r.account_at), enrollYear: r.enroll_year, level: r.study_level, levelLabel: levelLabel(r.study_level, db),
       program: { name: r.program_name, degree: r.degree, faculty: r.faculty }, profile: { national_id: r.national_id, enroll_year: r.enroll_year, enroll_term: r.enroll_term },
       photoUrl: r.photo_id ? `/api/student-files/${r.photo_id}` : null, receivedAt: r.received_at ? Number(r.received_at) : null,

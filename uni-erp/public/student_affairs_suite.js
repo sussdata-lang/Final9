@@ -34,6 +34,12 @@
 
   UA.loadStudentAffairsSuite = loadSuiteData;
 
+  // يُعرض أحدث السجلات فقط إذا زاد العدد عن حد القائمة، فيُذكر ذلك صراحة
+  const listNote = (keys) => {
+    const d = SA.data || {}, max = d.listMax, over = keys.map((k) => (d.totals || {})[k] || 0).filter((n) => max && n > max);
+    return over.length ? `<p class="hint no-print">تُعرض أحدث ${nf.format(max)} سجل من أصل ${nf.format(Math.max(...over))}؛ وابحث عن طالب محدد لبقية سجلاته.</p>` : '';
+  };
+
   // حقل الطالب: يبحث في القاعدة عند الكتابة (منتقي الطلاب الموحد) بدل قائمة بكل الطلاب
   const studentField = (id, label, student) => `<label>${label}<input id="${id}" data-student-picker value="${esc(student ? student.studentNo : '')}" placeholder="اكتب اسم الطالب أو رقمه الجامعي" autocomplete="off"></label>`;
   async function studentIdOf(id) {
@@ -786,11 +792,11 @@
     load: loadSuiteData,
     kpiStrip: suiteKpiStrip,
     renderTab: (tab) => {
-      if (tab === 'admissions') return renderAdmissionsTab();
-      if (tab === 'advising') return renderAdvisingTab();
-      if (tab === 'lifecycle') return renderLifecycleTab();
-      if (tab === 'scholarships') return renderScholarshipsTab();
-      if (tab === 'desk_queue') return renderDeskQueueSection({ compact: false });
+      if (tab === 'admissions') return listNote(['applicants', 'equivalences']) + renderAdmissionsTab();
+      if (tab === 'advising') return listNote(['warnings']) + renderAdvisingTab();
+      if (tab === 'lifecycle') return listNote(['movements', 'disciplinary']) + renderLifecycleTab();
+      if (tab === 'scholarships') return listNote(['scholarships']) + renderScholarshipsTab();
+      if (tab === 'desk_queue') return listNote(['appointments']) + renderDeskQueueSection({ compact: false });
       return '';
     },
     renderQueueCompact: () => renderDeskQueueSection({ compact: true }),

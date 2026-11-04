@@ -476,7 +476,9 @@ export async function buildRouter(deps) {
   // ---- الأدوار والوحدات وروابطها ----
   r.add('GET', '/api/admin/access', (c) => {
     if (!c.user.can('user:manage') && !c.user.can('role:manage')) throw new HttpError(403, 'لا تملك صلاحية هذا الإجراء.', 'forbidden');
-    c.json(200, { ...overview(db), users: listStaff(db), canManageRoles: c.user.can('role:manage'), canManageUsers: c.user.can('user:manage') });
+    // الواجهة تحتاج من ملف الوصول القدرات فقط؛ حالة كل وحدة لكل حساب تضاعف حجم الرد
+    const users = listStaff(db).map((u) => { if (!u.accessProfile) return u; const { moduleState: _unused, ...accessProfile } = u.accessProfile; return { ...u, accessProfile }; });
+    c.json(200, { ...overview(db), users, canManageRoles: c.user.can('role:manage'), canManageUsers: c.user.can('user:manage') });
   });
   r.add('GET', '/api/admin/access/matrix.xlsx', (c) => {
     if (!c.user.can('user:manage') && !c.user.can('role:manage')) throw new HttpError(403, 'لا تملك صلاحية هذا الإجراء.', 'forbidden');
