@@ -16,7 +16,7 @@ pg.types.setTypeParser(1700, (v) => parseFloat(v)); // NUMERIC
 const poolConfig = workerData.poolConfig || {};
 const pool = new Pool({
   ...poolConfig,
-  max: 20,
+  max: workerData.poolMax,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 10000,
 });

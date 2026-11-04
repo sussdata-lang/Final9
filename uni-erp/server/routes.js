@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { Router, HttpError, sendRaw, sendStream, getHttpTelemetry, getWafStats, unbanIp, SECURITY_HEADERS as SEC } from './http.js';
-import { tx, getDbPerfStats } from './db.js';
+import { tx, getDbPerfStats, DB_POOL_MAX } from './db.js';
 import { getCacheTelemetry, flushAllCaches, getServicesSnapshot, getCachedUnitByCode, getOrgUnitsSnapshot, cacheGetOrSet } from './cache.js';
 import { registerFinance } from './services/finance/routes.js';
 import { registerProcurement } from './services/procurement/routes.js';
@@ -557,15 +557,10 @@ export async function buildRouter(deps) {
     const cacheTelemetry = getCacheTelemetry(db);
     c.json(200, {
       ok: true,
-      architecture: {
-        maxConcurrentUsersSupported: 15000,
-        targetCorrespondencePerSec: 50,
-        targetFinancialEntriesPerSec: 50,
-        dbEngine: 'PostgreSQL + Connection Pool',
-        cachingLayer: cacheTelemetry.engine,
-        postgresPoolMax: 25,
-        httpCompression: 'Gzip + Static Asset RAM Cache + ETag 304',
-        swrClientCache: 'Active (15s Fresh + Instant Optimistic Render)',
+      database: {
+        indexes: Number(db.prepare("SELECT COUNT(*) AS c FROM pg_indexes WHERE schemaname = 'public'").get().c),
+        openConnections: Number(db.prepare('SELECT COUNT(*) AS c FROM pg_stat_activity WHERE datname = current_database()').get().c),
+        poolMax: DB_POOL_MAX,
       },
       dbStats,
       sessionStats,
@@ -582,83 +577,15 @@ export async function buildRouter(deps) {
     c.json(200, { ok: true, cacheTelemetry: getCacheTelemetry(db) });
   });
 
-  r.add('POST', '/api/v12/high-concurrency/benchmark', (c) => {
+  // الاختبار يرسل طلبات حقيقية تُحسب على حد المعدل للعنوان المحلي، فلا يُكرَّر قبل انقضاء نافذة الحد
+  let lastBenchmarkAt = 0;
+  r.add('POST', '/api/v12/high-concurrency/benchmark', async (c) => {
     needAny(c, 'devops:manage', 'settings:manage');
-    const simUsers = Math.min(25000, Math.max(1000, Number(c.body?.concurrentUsers) || 10000));
-    const corrWrites = Math.min(200, Math.max(10, Number(c.body?.correspondencePerSec) || 25));
-    const finWrites = Math.min(200, Math.max(10, Number(c.body?.financialEntriesPerSec) || 25));
-
-    const tStart = performance.now();
-    const latencies = [];
-
-    // 1. اختبار قراءة الجلسات المتزامنة (10,000+ مستخدم) عبر الكاش والاستعلام المهيكل
-    const sampleUser = db.prepare('SELECT id, username, role, unit_id FROM users WHERE active = 1 LIMIT 1').get() || { id: 1, username: 'admin', role: 'admin', unit_id: 1 };
-    const memMap = new Map();
-    for (let i = 0; i < 1000; i++) {
-      memMap.set(`bench-sid-${i}`, { id: sampleUser.id, role: sampleUser.role, exp: Date.now() + 60000 });
-    }
-    for (let u = 0; u < simUsers; u++) {
-      const u0 = performance.now();
-      const hit = memMap.get(`bench-sid-${u % 1000}`);
-      if (!hit) memMap.set(`bench-sid-${u % 1000}`, sampleUser);
-      if (u % 50 === 0) latencies.push(performance.now() - u0);
-    }
-
-    // 2. اختبار الكتابة الذرية السريعة للمراسلات والقيود المالية بمعدل يفوق 10+ بالثانية (داخل SAVEPOINT معزول)
-    const wStart = performance.now();
-    db.exec('SAVEPOINT sp_hc_bench');
-    try {
-      const maxCorrId = db.prepare('SELECT COALESCE(MAX(id), 0) AS m FROM corr_docs').get().m;
-      const insCorr = db.prepare("INSERT INTO corr_docs (id, no, title, subject, body, mode, status, creator_id, unit_id, created_at) VALUES (?, ?, ?, ?, ?, 'parallel', 'pending', ?, ?, ?)");
-      const now = Date.now();
-      for (let i = 1; i <= corrWrites; i++) {
-        const w0 = performance.now();
-        const cid = maxCorrId + 100000 + i;
-        insCorr.run(cid, `BENCH-CR-${cid}`, `مراسلة اختبار ضغط عالي #${i}`, 'اختبار سرعة الاستجابة', 'محتوى اختباري', c.user?.id || 1, 1, now);
-        latencies.push(performance.now() - w0);
-      }
-
-      let yearRow = db.prepare('SELECT id FROM fin_years ORDER BY id LIMIT 1').get();
-      if (!yearRow) {
-        const yInfo = db.prepare("INSERT INTO fin_years (name, start_day, end_day, created_at) VALUES ('2026', '2026-01-01', '2026-12-31', ?)").run(now);
-        yearRow = { id: Number(yInfo.lastInsertRowid) };
-      }
-      const insFin = db.prepare("INSERT INTO fin_entries (year_id, no, type, entry_day, description, status, source, created_by, created_at) VALUES (?, ?, 'RV', '2026-10-28', ?, 'posted', NULL, ?, ?)");
-      for (let j = 1; j <= finWrites; j++) {
-        const w0 = performance.now();
-        insFin.run(yearRow.id, `BENCH-FIN-${now}-${j}`, `سند مالي اختباري للضغط العالي #${j}`, c.user?.id || 1, now);
-        latencies.push(performance.now() - w0);
-      }
-    } finally {
-      db.exec('ROLLBACK TO sp_hc_bench; RELEASE sp_hc_bench');
-    }
-    const writeDurationMs = Math.max(0.2, Math.round((performance.now() - wStart) * 100) / 100);
-    const totalElapsedMs = Math.max(0.5, Math.round((performance.now() - tStart) * 100) / 100);
-
-    latencies.sort((a, b) => a - b);
-    const pick = (p) => (latencies.length ? Math.max(0.01, Math.round(latencies[Math.min(latencies.length - 1, Math.floor(latencies.length * p))] * 1000) / 1000) : 0.05);
-    const totalWrites = corrWrites + finWrites;
-    const measuredWriteTps = Math.round((totalWrites / (writeDurationMs / 1000)));
-    const totalOps = simUsers + totalWrites;
-    const measuredTotalOpsPerSec = Math.round((totalOps / (totalElapsedMs / 1000)));
-
-    c.json(200, {
-      ok: true,
-      benchmark: {
-        concurrentUsersSimulated: simUsers,
-        correspondenceWritesTested: corrWrites,
-        financialWritesTested: finWrites,
-        totalOperations: totalOps,
-        totalElapsedMs,
-        writeBatchDurationMs: writeDurationMs,
-        measuredWriteTransactionsPerSec: measuredWriteTps,
-        measuredTotalOpsPerSec,
-        p50LatencyMs: pick(0.5),
-        p95LatencyMs: pick(0.95),
-        p99LatencyMs: pick(0.99),
-        status: 'optimal',
-      },
-    });
+    const wait = 90_000 - (Date.now() - lastBenchmarkAt);
+    if (wait > 0) throw new HttpError(429, `شغّلت الاختبار قبل قليل؛ أعد المحاولة بعد ${Math.ceil(wait / 1000)} ثانية.`, 'rate_limited');
+    lastBenchmarkAt = Date.now();
+    const benchmark = await deps.heavy.run('liveBenchmark', c, [{ port: c.req.socket.localPort, token: c.cookies.sid }]);
+    c.json(200, { ok: true, benchmark });
   });
 
   // مسار إدراج دفعات المراسلات الفورية (يدعم عشرات المراسلات في الثانية ضمن معاملة ذرية واحدة)

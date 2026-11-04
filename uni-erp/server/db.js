@@ -98,7 +98,6 @@ export function getDbPerfStats(_db) {
   const total = dbPerfStats.stmtCacheHits + dbPerfStats.stmtCacheMisses;
   return {
     ...dbPerfStats,
-    activeIndexesCount: 128,
     stmtCacheHitRate: total > 0
       ? Math.round((dbPerfStats.stmtCacheHits / total) * 1000) / 10
       : 100,
@@ -117,6 +116,7 @@ export function registerMutationListener(fn) {
 // ==============================
 // Sync Query via Worker + SharedArrayBuffer
 // ==============================
+export const DB_POOL_MAX = 20;
 const SAB_SIZE = 8 + 8 * 1024 * 1024; // header(8) + data(8MB)
 const HEADER_INTS = 2; // [status, dataLen]
 
@@ -127,7 +127,7 @@ class SyncExecutor {
     this.sa = new Int32Array(this.sab, 0, HEADER_INTS);
 
     this.worker = new Worker(WORKER_PATH, {
-      workerData: { poolConfig },
+      workerData: { poolConfig, poolMax: DB_POOL_MAX },
     });
     // لا يُبقي العاملُ العمليةَ حيّة: من لا يستدعي db.close() (سكربتات واختبارات) يجب أن تنتهي عمليته طبيعياً
     this.worker.unref();

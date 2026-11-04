@@ -10,6 +10,7 @@ import { analytics, filterOptions } from './services/analytics.js';
 import { buildReportXlsx } from './services/reports.js';
 import { exportRequests } from './services/requestsxl.js';
 import { preview as exportPreview, renderExport } from './services/dataexport.js';
+import { runLiveBenchmark } from './services/live_benchmark.js';
 
 const db = connectDb(workerData.pgUrl);
 const deps = { db, cfg: workerData.cfg };
@@ -26,6 +27,7 @@ const JOBS = {
   exportRequests: (actor, q) => exportRequests(deps, actor, q),
   exportPreview: (_actor, dataset, q) => exportPreview(db, dataset, q),
   exportFile: (_actor, opts, q) => renderExport(db, opts, q),
+  liveBenchmark: (actor, opts) => runLiveBenchmark(deps, actor, opts),
 };
 
 parentPort.on('message', async ({ id, name, token, args }) => {

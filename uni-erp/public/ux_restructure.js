@@ -1269,7 +1269,7 @@
     hcrefresh: async () => {
       try {
         U.hcTelemetry = await api('GET', '/api/v12/high-concurrency/telemetry');
-        toast('تم تحديث مؤشرات محرك الأداء الفائق والضغط العالي');
+        toast('حُدّثت مؤشرات الأداء');
         UA.render();
       } catch (e) { toast(e.message); }
     },
@@ -1278,16 +1278,13 @@
       U.hcBenchRunning = true;
       UA.render();
       try {
-        const res = await api('POST', '/api/v12/high-concurrency/benchmark', {
-          concurrentUsers: 10000,
-          correspondencePerSec: 25,
-          financialEntriesPerSec: 25,
-        });
+        const res = await api('POST', '/api/v12/high-concurrency/benchmark', {});
         U.hcBenchmarkResult = res.benchmark;
         U.hcTelemetry = await api('GET', '/api/v12/high-concurrency/telemetry');
-        toast(`اكتمل اختبار الضغط (10,000 مستخدم + 50 عملية كتابة/ثانية) بزمن ${res.benchmark.totalElapsedMs} ms`);
+        const errors = res.benchmark.stages.reduce((a, s) => a + s.errors, 0);
+        toast(errors ? `اكتمل الاختبار وفيه ${errors} طلباً فاشلاً` : 'اكتمل الاختبار الحي دون أخطاء');
       } catch (e) {
-        toast(e.message || 'تعذر تنفيذ اختبار الضغط');
+        toast(e.message || 'تعذر تنفيذ الاختبار');
       } finally {
         U.hcBenchRunning = false;
         UA.render();
