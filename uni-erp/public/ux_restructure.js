@@ -1282,7 +1282,7 @@
         U.hcBenchmarkResult = res.benchmark;
         U.hcTelemetry = await api('GET', '/api/v12/high-concurrency/telemetry');
         const errors = res.benchmark.stages.reduce((a, s) => a + s.errors, 0);
-        toast(errors ? `اكتمل الاختبار وفيه ${errors} طلباً فاشلاً` : 'اكتمل الاختبار الحي دون أخطاء');
+        toast(errors ? `اكتمل الاختبار وفيه ${errors} طلباً فاشلاً` : 'اكتمل الاختبار الحي بنجاح');
       } catch (e) {
         toast(e.message || 'تعذر تنفيذ الاختبار');
       } finally {
