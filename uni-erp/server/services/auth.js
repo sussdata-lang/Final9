@@ -46,6 +46,23 @@ export function publicUser(db, u) {
 const sessionLruCache = new Map();
 const MAX_SESSION_CACHE = 15_000;
 const SESSION_CACHE_TTL_MS = 25_000;
+// مهلة الخمول بالدقائق (0 يعطلها). تُحفظ في الذاكرة، فإعادة التشغيل تبدأ العدّ من جديد
+const SESSION_IDLE_MS = Number(process.env.SESSION_IDLE_MIN ?? 120) * 60_000;
+const sessionLastSeen = new Map();
+const MAX_LAST_SEEN = 50_000;
+export function idleExpired(db, token, now) {
+  if (!SESSION_IDLE_MS) return false;
+  const last = sessionLastSeen.get(token);
+  if (last && now - last > SESSION_IDLE_MS) {
+    sessionLastSeen.delete(token);
+    db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(sha256(token));
+    return true;
+  }
+  sessionLastSeen.delete(token);
+  if (sessionLastSeen.size >= MAX_LAST_SEEN) sessionLastSeen.delete(sessionLastSeen.keys().next().value);
+  sessionLastSeen.set(token, now);
+  return false;
+}
 let sessionCacheHits = 0;
 let sessionCacheMisses = 0;
 
@@ -81,6 +98,7 @@ export function getSessionCacheStats() {
 export function sessionUser(db, token) {
   if (!token) return null;
   const now = Date.now();
+  if (idleExpired(db, token, now)) return null;
   const cached = sessionLruCache.get(token);
   if (cached && cached.db === db && cached.cacheExp > now && cached.user.expires_at > now) {
     sessionCacheHits++;
@@ -135,7 +153,7 @@ export async function login({ db, cfg, limiter }, { username, password, ip, ua, 
     audit(db, null, 'دخول مرفوض', username, ip);
     throw new HttpError(401, 'اسم المستخدم أو كلمة المرور غير صحيحة.', 'bad_credentials');
   }
-  db.prepare('UPDATE users SET failed_logins = 0, locked_until = 0 WHERE id = ?').run(u.id);
+  if (u.failed_logins || u.locked_until) db.prepare('UPDATE users SET failed_logins = 0, locked_until = 0 WHERE id = ?').run(u.id);
   const token = newToken(), now = Date.now();
   const fp = req ? createSessionFingerprint(req) : null;
   try {

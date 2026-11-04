@@ -1,3 +1,5 @@
+import { log } from './lib/logger.js';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { Router, HttpError, sendRaw, sendStream, getHttpTelemetry, getWafStats, unbanIp, SECURITY_HEADERS as SEC } from './http.js';
 import { tx, getDbPerfStats, DB_POOL_MAX } from './db.js';
@@ -122,7 +124,7 @@ export async function buildRouter(deps) {
   // ---- مراحل اعتماد العلامات، جدول المحاضرات، السجل الموحّد ----
   r.add('GET', '/api/faculty/my-grades', (c) => { need(c, 'grade:approve_own'); c.json(200, myCourseGrades(deps, c.user)); });
   r.add('POST', '/api/grades/workflow', async (c) => {
-    if (!c.user.can('grade:approve_own')) need(c, 'grade:manage');   // صلاحية المقرر نفسه تُفحص داخل transitionGrades
+    if (!c.user.can('grade:approve_own') && !c.user.can('grade:approve')) need(c, 'grade:manage');   // صلاحية المقرر نفسه تُفحص داخل transitionGrades
     const out = await deps.heavy.run('gradeWorkflow', c, [c.body, c.ip], { writes: true });
     for (const a of out.approvedNow) notifyGrade(deps, a.studentId, a.course);
     c.json(200, { updated: out.updated, skipped: out.skipped, stage: out.stage });
@@ -225,10 +227,11 @@ export async function buildRouter(deps) {
     const locName = b.locationName || 'البوابة الرئيسية — الحرم المركزي';
     const locCode = b.locationCode || 'GATE-MAIN-01';
     const terminalId = b.terminalId || (method === 'nfc' ? 'TRM-NFC-A1' : 'SCAN-BC-04');
-    const status = b.status || 'granted';
+    const status = b.status === 'denied' ? 'denied' : 'granted';
     const reason = b.reason || (status === 'granted' ? 'تصريح دخول نظامي ساري المفعول' : 'محاولة دخول غير مصرحة');
-    const pkiHash = b.pkiHash || ('0x' + Math.random().toString(16).slice(2, 12));
     const now = Date.now();
+    // بصمة للسجل نفسه، وليست توقيعاً من البطاقة ولا قيمة يرسلها العميل
+    const pkiHash = 'sha256:' + crypto.createHash('sha256').update(`${sid}|${eventType}|${locCode}|${method}|${terminalId}|${status}|${now}`).digest('hex').slice(0, 32);
     try {
       db.prepare(`
         INSERT INTO sa_card_activity_logs 
@@ -238,7 +241,8 @@ export async function buildRouter(deps) {
       audit(db, c.user, `تحقق بطاقة (${method})`, `${eventType} - ${locName} - ${s.studentNo}`, c.ip);
       c.json(201, { ok: true, log: { student_id: sid, student_no: s.studentNo, student_name: s.name, event_type: eventType, location_name: locName, location_code: locCode, method, terminal_id: terminalId, status, reason, pki_hash: pkiHash, created_at: now } });
     } catch (err) {
-      c.json(500, { error: err.message });
+      log.error('card activity', err);
+      c.json(500, { error: 'internal', message: 'خطأ داخلي في الخادم.' });
     }
   });
   // استيراد من Excel/CSV/SQL: commit=false فحص بلا كتابة، commit=true اعتماد

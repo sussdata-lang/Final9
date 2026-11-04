@@ -1257,7 +1257,7 @@
     },
     biosync: async () => {
       if (!U.biometrics.devices.length) { toast('لا توجد أجهزة بصمة مسجلة.'); return; }
-      try { await api('POST', '/api/expansions/biometrics/sync'); await loadHrExtras(); toast('تم تحديث وقت مزامنة أجهزة البصمة'); }
+      try { const r = await api('POST', '/api/expansions/biometrics/sync'); await loadHrExtras(); toast(r.message); }
       catch (e) { toast(e.message); }
       UA.render();
     },

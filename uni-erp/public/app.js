@@ -46,21 +46,16 @@ Object.assign(window.UA, {
       }
     }
 
+    try { sessionStorage.removeItem('uni_sid'); } catch { /* غير متاح */ }   // بقايا نسخة سابقة كانت تحفظ الرمز هنا
     const runFetch = (async () => {
       const headers = body ? { 'Content-Type': 'application/json' } : {};
-      try {
-        const sid = sessionStorage.getItem('uni_sid');
-        if (sid) headers['X-Session-Token'] = sid;
-      } catch { /* ignore */ }
       const res = await fetch(url, { method: m, credentials: 'same-origin', headers, body: body ? JSON.stringify(body) : undefined });
       let j = null; try { j = await res.json(); } catch { /* ليس JSON */ }
       if (res.ok && url === '/api/auth/login' && j && j.token) {
         clearApiCache();
-        try { sessionStorage.setItem('uni_sid', j.token); } catch { /* ignore */ }
       }
       if (res.ok && url === '/api/auth/logout') {
         clearApiCache();
-        try { sessionStorage.removeItem('uni_sid'); } catch { /* ignore */ }
       }
       if (!res.ok) {
         const e = new Error((j && j.message) || 'حدث خطأ غير متوقع.'); e.status = res.status; e.code = j && j.error;
@@ -780,6 +775,12 @@ Object.assign(window.UA, {
         setTimeout(() => URL.revokeObjectURL(al.href), 4000); toast('تم حفظ الوثيقة كملف PDF');
       }
       else if (a === 'docprint') { document.body.classList.add('print-doc'); window.addEventListener('afterprint', () => document.body.classList.remove('print-doc'), { once: true }); window.print(); }
+      else if (a === 'print') { // يطبع النافذة أو البطاقة التي فيها الزر وحدها، أو ما يلي شريط الأدوات إذا كان الزر فيه (data-print-next)
+        const box = el.closest('.modal, .card');
+        const target = box && 'printNext' in d ? box.nextElementSibling : box;
+        if (target) { target.classList.add('print-target'); document.body.classList.add('print-area'); window.addEventListener('afterprint', () => { target.classList.remove('print-target'); document.body.classList.remove('print-area'); }, { once: true }); }
+        window.print();
+      }
       else if (a === 'copy') { try { await navigator.clipboard.writeText(d.c); toast('تم نسخ الرمز'); } catch { toast('الرمز: ' + d.c); } }
       else if (a === 'atab') { S.adminTab = d.t; S.edit = null; if (d.t === 'general' && UA.general) await UA.general.load(); if (UA.adminCfg && UA.adminCfg.tabs.some((x) => x[0] === d.t)) await UA.adminCfg.load(d.t); render(); }
       else if (a === 'addhold') { await api('POST', '/api/admin/holds', { studentNo: val('h-no'), holdType: val('h-type'), note: val('h-note') }); await loadFor('admin'); render(); toast('سُجّلت العقوبة'); }

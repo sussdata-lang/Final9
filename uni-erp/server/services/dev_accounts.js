@@ -6,6 +6,8 @@ import { seedPassword } from './bootstrap.js';
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
 const LOOPBACK_IPS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 export const devSwitchEnabled = (host, env = process.env) => env.DEMO_MODE === '1' && LOOPBACK_HOSTS.has(String(host));
+// وضع العرض يعيد كلمة مرور كل الحسابات عند كل تشغيل، فلا يجتمع مع بيئة الإنتاج
+export const demoModeBlocked = (env = process.env) => env.DEMO_MODE === '1' && env.NODE_ENV === 'production';
 export const isLocalRequest = (ip, hostHeader) => LOOPBACK_IPS.has(String(ip)) && LOOPBACK_HOSTS.has(String(hostHeader ?? '').replace(/:\d+$/, '').replace(/^\[|\]$/g, ''));
 
 const TYPES = [

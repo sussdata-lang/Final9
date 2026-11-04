@@ -241,11 +241,7 @@
 
   /* ---------- مهلة التراجع قبل إرسال القرار ---------- */
   const pending = new Map();
-  const sessionHeaders = () => {
-    const h = { 'Content-Type': 'application/json' };
-    try { const sid = sessionStorage.getItem('uni_sid'); if (sid) h['X-Session-Token'] = sid; } catch { /* غير متاح */ }
-    return h;
-  };
+  const sessionHeaders = () => ({ 'Content-Type': 'application/json' });
   const decisionBody = (p) => (p.action === 'reject' ? { reason: p.reason } : {});
   function undoToast(id, label) {
     const host = document.getElementById('ux-undo-host') || Object.assign(document.body.appendChild(document.createElement('div')), { id: 'ux-undo-host', className: 'ux-undo-host' });

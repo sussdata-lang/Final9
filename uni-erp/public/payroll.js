@@ -472,7 +472,7 @@
             <h2 style="margin:0">مسير الرواتب والحسابات التفصيلي</h2>
             <p class="small" style="margin:2px 0 0">يجمع تلقائياً الاستحقاقات (الأساسي + السكن + الانتقال) ويطرح الخصومات (الغياب + إجازة بدون راتب + قسط السلفة + التأمينات + الضرائب)</p>
           </div>
-          <button class="btn" onclick="window.print()">🖨️ طباعة مسير الرواتب</button>
+          <button class="btn no-print" data-act="print">🖨️ طباعة مسير الرواتب</button>
         </div>
 
         <div class="tbl-wrap">
@@ -1240,7 +1240,7 @@
           </div>
         </div>
         <div class="actions">
-          <button class="btn pri" type="button" onclick="window.print()">🖨️ طباعة القسيمة</button>
+          <button class="btn pri no-print" type="button" data-act="print">🖨️ طباعة القسيمة</button>
           <button class="btn" type="button" data-act="hrmclose">إغلاق</button>
         </div>
       `;

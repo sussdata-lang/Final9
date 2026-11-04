@@ -7,7 +7,9 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFile, execFileSync } from 'node:child_process';
 // import { DatabaseSync } from 'node:sqlite'; // ← تم إزالته (PostgreSQL)
-import { writeZip, readZip } from '../lib/zip.js';
+import { Worker } from 'node:worker_threads';
+import { readZip } from '../lib/zip.js';
+import { encrypt } from '../lib/backup_crypto.js';
 import { audit } from '../audit.js';
 import { HttpError } from '../http.js';
 
@@ -55,11 +57,7 @@ function walk(dir, base, skip, out = []) {
 const inside = (child, parent) => { const r = path.relative(parent, child); return !!r && !r.startsWith('..') && !path.isAbsolute(r); };
 
 /* ---------- التشفير الاختياري ---------- */
-export function encrypt(buf, pass) {
-  const salt = crypto.randomBytes(16), iv = crypto.randomBytes(12), key = crypto.scryptSync(pass, salt, 32);
-  const c = crypto.createCipheriv('aes-256-gcm', key, iv), ct = Buffer.concat([c.update(buf), c.final()]);
-  return Buffer.concat([MAGIC, salt, iv, c.getAuthTag(), ct]);
-}
+export { encrypt };
 export function decrypt(buf, pass) {
   if (!buf.subarray(0, 4).equals(MAGIC)) throw new HttpError(400, 'الملف ليس نسخة احتياطية مشفَّرة صالحة.', 'validation');
   if (!pass) throw new HttpError(400, 'النسخة مشفَّرة: أدخل عبارة المرور (BACKUP_PASSPHRASE).', 'validation');
@@ -69,6 +67,13 @@ export function decrypt(buf, pass) {
 }
 
 /* ---------- الإنشاء ---------- */
+const assembleInWorker = (data) => new Promise((resolve, reject) => {
+  const w = new Worker(new URL('../backup_worker.js', import.meta.url), { workerData: data });
+  w.once('message', resolve);
+  w.once('error', reject);
+  w.once('exit', (code) => { if (code !== 0) reject(new Error(`backup worker exited with code ${code}`)); });
+});
+
 export async function createBackup({ db, cfg }, { reason = 'auto', actor = null, ip = null } = {}) {
   const dir = backupDirOf(cfg), dataDir = dataDirOf(cfg), now = new Date();
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
@@ -78,20 +83,15 @@ export async function createBackup({ db, cfg }, { reason = 'auto', actor = null,
     const pgUrl = db?.pgUrl ?? cfg.pgUrl ?? (isPgUri(cfg.dbPath) ? cfg.dbPath : process.env.DATABASE_URL);
     if (!pgUrl) throw new HttpError(500, 'رابط PostgreSQL غير معروف: لا يمكن نسخ قاعدة البيانات.', 'backup_failed');
     await pgDump(pgUrl, tmp);
-    const dbBuf = fs.readFileSync(tmp);
     const skip = (full, e) => full === dir || inside(full, dir) || e.name.startsWith('.tmp-');
-    const files = [{ name: 'database/database.dump', data: dbBuf }];
     const extra = walk(dataDir, 'data', skip);
-    for (const f of extra) files.push({ name: f.name, data: fs.readFileSync(f.full) });
-    if (!inside(cfg.uploadDir, dataDir) && cfg.uploadDir !== dataDir) for (const f of walk(cfg.uploadDir, 'uploads', () => false)) files.push({ name: f.name, data: fs.readFileSync(f.full) });
-    files.push({ name: 'signing-key.txt', data: cfg.signingKey ?? '' });
-    const manifest = { app: 'uni-erp', format: 1, createdAt: now.toISOString(), reason, dbSha256: sha(dbBuf), dbBytes: dbBuf.length, files: files.length, note: 'استعد بـ: node scripts/restore.js <الملف> — والخادم متوقف.' };
-    files.unshift({ name: 'manifest.json', data: JSON.stringify(manifest, null, 2) });
-    let out = writeZip(files), name = `backup-${stamp}${reason === 'auto' ? '' : '-' + reason.replace(/[^a-z]/g, '')}.zip`;
-    if (cfg.backupPassphrase) { out = encrypt(out, cfg.backupPassphrase); name += '.enc'; }
-    const file = path.join(dir, name); fs.writeFileSync(file, out, { mode: 0o600 });
-    const res = { name, size: out.length, createdAt: now.getTime(), encrypted: !!cfg.backupPassphrase, files: files.length, uploaded: null, error: null };
-    if (cfg.backupPutUrl) res.uploaded = await upload(cfg, name, out).catch((e) => { res.error = `تعذّر الرفع الخارجي: ${e.message}`; return false; });
+    if (!inside(cfg.uploadDir, dataDir) && cfg.uploadDir !== dataDir) extra.push(...walk(cfg.uploadDir, 'uploads', () => false));
+    const name = `backup-${stamp}${reason === 'auto' ? '' : '-' + reason.replace(/[^a-z]/g, '')}.zip${cfg.backupPassphrase ? '.enc' : ''}`;
+    const file = path.join(dir, name);
+    const manifest = { app: 'uni-erp', format: 1, createdAt: now.toISOString(), reason, note: 'استعد بـ: node scripts/restore.js <الملف> — والخادم متوقف.' };
+    const built = await assembleInWorker({ dumpPath: tmp, extra, signingKey: cfg.signingKey ?? '', manifest, passphrase: cfg.backupPassphrase || null, outPath: file });
+    const res = { name, size: built.size, createdAt: now.getTime(), encrypted: !!cfg.backupPassphrase, files: built.files, uploaded: null, error: null };
+    if (cfg.backupPutUrl) res.uploaded = await upload(cfg, name, await fs.promises.readFile(file)).catch((e) => { res.error = `تعذّر الرفع الخارجي: ${e.message}`; return false; });
     prune(cfg);
     setStatus(db, res);
     if (actor) audit(db, actor, 'إنشاء نسخة احتياطية', name, ip);

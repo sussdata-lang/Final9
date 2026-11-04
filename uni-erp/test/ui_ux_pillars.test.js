@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createApp } from '../server/app.js';
+import { hashPassword } from '../server/security.js';
 
 let app, base;
 
@@ -121,8 +122,13 @@ test('6. تكامل محرك المخططات الهندسية التفاعلي�
     '/archify/erd.html',
     '/archify/uni-erp.architecture.json',
   ];
+  const pw = 'Archify#Pass12345';
+  app.db.prepare("INSERT INTO users (username, display_name, password_hash, role, active, must_change_password, created_at) VALUES ('archify_staff', 'x', ?, 'staff', 1, 0, ?)").run(await hashPassword(pw, 1024), Date.now());
+  const login = await fetch(base + '/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base }, body: JSON.stringify({ username: 'archify_staff', password: pw }) });
+  const Cookie = login.headers.get('set-cookie').split(';')[0];
   for (const p of paths) {
-    const res = await fetch(base + p);
+    assert.equal((await fetch(base + p)).status, 404, `المخطط ${p} لا يُفتح دون جلسة`);
+    const res = await fetch(base + p, { headers: { Cookie } });
     assert.equal(res.status, 200, `يجب أن يتوفر ملف المخطط التفاعلي ${p}`);
   }
   const uxRes = await fetch(base + '/ux_restructure.js');

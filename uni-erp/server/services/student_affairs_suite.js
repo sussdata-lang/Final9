@@ -1,3 +1,5 @@
+import { docNo } from '../lib/doc_no.js';
+import { SOD_SENSITIVE_PERMISSIONS } from '../permissions.js';
 import { audit } from '../audit.js';
 import { HttpError } from '../http.js';
 import { registerStudent, STATUS_LABEL } from './students.js';
@@ -544,8 +546,11 @@ export function removeCoursePrerequisite({ db }, actor, id, ip) {
   return { ok: true };
 }
 
+// تجاوز المدير لا يشمل صلاحيات حُجبت عنه بفصل المهام
+const adminBypass = (actor, perms) => actor.role === 'admin' && !perms.every((p) => SOD_SENSITIVE_PERMISSIONS.has(p) && !actor.can?.(p));
+
 function requireSuitePerm(actor, ...perms) {
-  if (!actor || (actor.role !== 'admin' && !perms.some((p) => actor.can?.(p)))) {
+  if (!actor || (!adminBypass(actor, perms) && !perms.some((p) => actor.can?.(p)))) {
     throw new HttpError(403, 'لا تملك صلاحية تنفيذ هذا الإجراء.', 'forbidden');
   }
 }
@@ -819,7 +824,7 @@ export const LIFECYCLE_IMPACT = {
 };
 
 export function executeLifecycleMovement({ db }, actor, body, ip) {
-  if (!actor || (actor.role !== 'admin' && !actor.can?.('student:update') && !actor.can?.('sa_reg:approve'))) {
+  if (!actor || (actor.role !== 'admin' && !actor.can?.('student:update'))) {
     throw new HttpError(403, 'لا تملك صلاحية تعديل حالة قيد الطالب (يتطلب صلاحية student:update).', 'forbidden');
   }
   const studentId = Number(body?.studentId);
@@ -870,12 +875,12 @@ export function executeLifecycleMovement({ db }, actor, body, ip) {
 }
 
 export function createDisciplinaryRecord({ db }, actor, body, ip) {
-  if (!actor || (actor.role !== 'admin' && !actor.can?.('holds:manage') && !actor.can?.('discipline:manage'))) {
+  if (!actor || (actor.role !== 'admin' && !actor.can?.('holds:manage'))) {
     throw new HttpError(403, 'لا تملك صلاحية فرض عقوبة انضباطية أو حجب وثائق (يتطلب صلاحية holds:manage).', 'forbidden');
   }
   const studentId = Number(body?.studentId);
   const note = String(body?.note || '').trim();
-  const decisionNo = String(body?.decisionNo || `DISC-${new Date().getFullYear()}-${Math.floor(10 + Math.random() * 89)}`).trim();
+  const decisionNo = String(body?.decisionNo || docNo(`DISC-${new Date().getFullYear()}`)).trim();
   const violationCategory = String(body?.violationCategory || 'exam_misconduct');
   const penaltyLevel = String(body?.penaltyLevel || 'warning');
   const expiresAt = String(body?.expiresAt || '2026-12-31');
@@ -902,7 +907,7 @@ export function createDisciplinaryRecord({ db }, actor, body, ip) {
 /* ---------- 5. المنح والإعفاءات المدمجة مع المالية ---------- */
 
 export function grantStudentScholarship(deps, actor, body, ip) {
-  if (!actor || (actor.role !== 'admin' && !actor.can?.('finance:fees') && !actor.can?.('sa_aid:approve') && !actor.can?.('student:update'))) {
+  if (!actor || (!adminBypass(actor, ['finance:fees', 'sa_scholarships:approve']) && !actor.can?.('finance:fees') && !actor.can?.('sa_scholarships:approve'))) {
     throw new HttpError(403, 'لا تملك صلاحية منح الإعفاءات والحسومات المالية للطلاب.', 'forbidden');
   }
   const { db } = deps;

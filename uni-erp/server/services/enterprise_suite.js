@@ -1,3 +1,4 @@
+import { docNo, academicYear } from '../lib/doc_no.js';
 import crypto from 'node:crypto';
 import { HttpError } from '../http.js';
 import { audit } from '../audit.js';
@@ -155,7 +156,7 @@ export function registerEnterpriseSuiteRoutes(r, deps) {
     if (!b.course_code || !b.course_name || !b.instructor_name || !b.hall_code || !b.day_name || !b.time_slot) {
       throw new HttpError(400, 'جميع حقول المقرر والقاعة والمحاضر والتوقيت مطلوبة.');
     }
-    const existing = db.prepare('SELECT * FROM smart_schedule_slots').all();
+    const existing = db.prepare('SELECT * FROM smart_schedule_slots WHERE day_name = ? AND time_slot = ?').all(b.day_name, b.time_slot);
     const check = detectTimetableConflict(existing, b);
     if (check.conflict) {
       throw new HttpError(409, check.reason, 'schedule_conflict');
@@ -184,6 +185,9 @@ export function registerEnterpriseSuiteRoutes(r, deps) {
     const quizId = Number(c.params.id);
     const quiz = db.prepare('SELECT * FROM online_quizzes WHERE id = ?').get(quizId);
     if (!quiz) throw new HttpError(404, 'الاختبار غير موجود.');
+    if (!c.user.student_no) throw new HttpError(403, 'تقديم الاختبار متاح للطلاب فقط.', 'forbidden');
+    if (quiz.status !== 'نشط') throw new HttpError(409, 'هذا الاختبار غير متاح حالياً.', 'quiz_closed');
+    if (db.prepare('SELECT 1 AS x FROM online_quiz_submissions WHERE quiz_id = ? AND student_no = ? LIMIT 1').get(quizId, c.user.student_no)) throw new HttpError(409, 'قدّمت هذا الاختبار من قبل، ويُسمح بمحاولة واحدة.', 'quiz_already_submitted');
     const questions = JSON.parse(quiz.questions_json || '[]');
     const answers = Array.isArray(c.body?.answers) ? c.body.answers : [];
     let correct = 0;
@@ -191,7 +195,6 @@ export function registerEnterpriseSuiteRoutes(r, deps) {
       if (Number(answers[idx]) === Number(q.answer)) correct++;
     });
     const score = questions.length > 0 ? Math.round((correct / questions.length) * quiz.total_marks * 10) / 10 : quiz.total_marks;
-    if (!c.user.student_no) throw new HttpError(403, 'تقديم الاختبار متاح للطلاب فقط.', 'forbidden');
     const studentNo = c.user.student_no;
     const studentName = c.user.display_name;
 
@@ -277,7 +280,7 @@ export function registerEnterpriseSuiteRoutes(r, deps) {
 
     db.prepare(`
       INSERT INTO student_self_enrollments (student_no, student_name, course_code, course_name, credits, semester, prerequisite_code, status, registered_at)
-      VALUES (?, ?, ?, ?, ?, 'الفصل الأول 2026/2027', ?, 'مسجل ومعتمد آلياً', ?)
+      VALUES (?, ?, ?, ?, ?, 'الفصل الأول ${academicYear()}', ?, 'مسجل ومعتمد آلياً', ?)
     `).run(studentNo, studentName, b.course_code, b.course_name, newCredits, b.prerequisite_code || 'مستوفى', Date.now());
     c.json(201, { ok: true });
   });
@@ -292,7 +295,7 @@ export function registerEnterpriseSuiteRoutes(r, deps) {
     const calc = computeFacultyOverloadPay(b.quorum_hours ?? 10, b.actual_teaching_hours ?? 14, b.supervision_hours ?? 2, b.hourly_rate ?? 100000);
     db.prepare(`
       INSERT INTO faculty_overload_records (instructor_name, academic_rank, faculty_name, quorum_hours, actual_teaching_hours, supervision_hours, overload_hours, hourly_rate, total_overload_pay, semester, status, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'الفصل الأول 2026/2027', 'معتمد للرواتب', ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'الفصل الأول ${academicYear()}', 'معتمد للرواتب', ?)
     `).run(
       b.instructor_name,
       b.academic_rank || 'أستاذ مساعد',
@@ -318,18 +321,21 @@ export function registerEnterpriseSuiteRoutes(r, deps) {
       const empExists = db.prepare('SELECT id FROM hr_employees WHERE id = ?').get(Number(b.employee_id));
       if (!empExists) throw new HttpError(404, 'سجل الموظف غير موجود في جدول الموارد البشرية (hr_employees).', 'employee_not_found');
     }
-    const basic = Number(b.basic_salary || 3500000);
-    const overload = Number(b.overload_pay || 500000);
-    const allow = Number(b.allowances || 400000);
-    const ded = Number(b.deductions || 100000);
+    if (!(Number(b.basic_salary) > 0)) throw new HttpError(400, 'الراتب الأساسي مطلوب.', 'validation');
+    const basic = Number(b.basic_salary);
+    const overload = Number(b.overload_pay) || 0;
+    const allow = Number(b.allowances) || 0;
+    const ded = Number(b.deductions) || 0;
     const net = basic + overload + allow - ded;
-    const code = `PAY-202610-${Math.floor(100 + Math.random() * 900)}`;
-    const sig = 'SIG-PKI-' + crypto.createHash('sha256').update(`${code}:${b.employee_name}:${net}`).digest('hex').slice(0, 20).toUpperCase();
+    const issued = new Date();
+    const code = docNo(`PAY-${issued.getFullYear()}${String(issued.getMonth() + 1).padStart(2, '0')}`);
+    // بصمة تحقق بلا مفتاح، وليست توقيعاً رقمياً
+    const sig = 'SHA256-' + crypto.createHash('sha256').update(`${code}:${b.employee_name}:${net}`).digest('hex').slice(0, 20).toUpperCase();
 
     db.prepare(`
       INSERT INTO hr_signed_payslips (payslip_code, employee_code, employee_name, department, month_label, basic_salary, overload_pay, allowances, deductions, net_salary, digital_signature, issued_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(code, b.employee_code || 'EMP-1099', b.employee_name, b.department || 'كلية هندسة الأمن السيبراني', b.month_label || 'تشرين الأول 2026', basic, overload, allow, ded, net, sig, Date.now());
+    `).run(code, b.employee_code || '', b.employee_name, b.department || '', b.month_label || issued.toLocaleDateString('ar-SY-u-nu-latn', { month: 'long', year: 'numeric' }), basic, overload, allow, ded, net, sig, Date.now());
     c.json(201, { ok: true, payslip_code: code, net_salary: net, digital_signature: sig });
   });
 
@@ -343,7 +349,7 @@ export function registerEnterpriseSuiteRoutes(r, deps) {
     const row = db.prepare('SELECT * FROM student_fee_installments WHERE id = ?').get(id);
     if (!row) throw new HttpError(404, 'القسط غير موجود.');
     if (row.paid_at) throw new HttpError(409, 'هذا القسط مسدد مسبقاً.', 'already_paid');
-    const receipt = `RCP-${Math.floor(10000 + Math.random() * 90000)}`;
+    const receipt = docNo('RCP');
     const method = c.body?.payment_method || 'بطاقة الدفع الإلكتروني الجامعية';
     db.prepare(`
       UPDATE student_fee_installments
@@ -368,7 +374,7 @@ export function registerEnterpriseSuiteRoutes(r, deps) {
       b.target_audience || 'جميع الطلاب والعاملين',
       b.channels || 'Web Push + Telegram + WhatsApp + Email',
       b.priority || 'عاجل',
-      Number(b.delivery_count || 1250),
+      0, // الإشعار يُسجَّل فقط، ولا إرسال خارجي فعلي
       c.user?.display_name || 'إدارة الجامعة',
       Date.now()
     );
@@ -380,7 +386,7 @@ export function registerEnterpriseSuiteRoutes(r, deps) {
     needAny(c, 'grade:manage', 'attendance:manage');
     const b = c.body || {};
     const records = Array.isArray(b.records) ? b.records : [];
-    const code = `SYNC-OFF-${Math.floor(100 + Math.random() * 900)}`;
+    const code = docNo('SYNC-OFF');
     db.prepare(`
       INSERT INTO offline_sync_batches (batch_code, committee_name, hall_code, course_code, records_count, payload_json, synced_by, synced_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)

@@ -26,7 +26,6 @@
     const r = await fetch('/api/local-switch', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: b.dataset.devKey }) });
     const j = await r.json().catch(() => null);
     if (!r.ok) { b.disabled = false; window.alert((j && j.message) || 'تعذّر تبديل الحساب.'); return; }
-    try { sessionStorage.setItem('uni_sid', j.token); } catch { /* غير متاح */ }
     location.replace(`${location.pathname}${location.search}`);
   });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();

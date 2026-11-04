@@ -979,7 +979,7 @@ export function effective(db, u) {
     let strictSod = process.env.STRICT_ADMIN_SOD === '1';
     if (!strictSod && db && typeof db.prepare === 'function') {
       try {
-        const row = db.prepare("SELECT value FROM settings WHERE key = 'security.strict_admin_sod'").get();
+        const row = db.prepare("SELECT value FROM site_settings WHERE key = 'security.strict_admin_sod'").get();
         if (row && String(row.value) === '1') strictSod = true;
       } catch { /* ignore */ }
     }

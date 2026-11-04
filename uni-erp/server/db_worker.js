@@ -17,6 +17,7 @@ const poolConfig = workerData.poolConfig || {};
 const pool = new Pool({
   ...poolConfig,
   max: workerData.poolMax,
+  statement_timeout: workerData.statementTimeoutMs,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 10000,
 });
@@ -25,9 +26,17 @@ pool.on('error', (err) => {
   console.error('[DB Worker Pool Error]', err.message);
 });
 
-// الـ SAB: أول 4 bytes = حالة، ثم 4 bytes = طول البيانات، ثم البيانات
+// الـ SAB: 4 bytes = حالة، ثم 4 bytes = طول البيانات، ثم 4 bytes = رقم الرسالة التي يجيب عنها، ثم البيانات
 // الحالة: 0 = انتظار، 1 = نجاح (آخر دفعة)، 2 = بقيت دفعات، -1 = خطأ
-const HEADER_SIZE = 8; // 2 × int32
+const HEADER_SIZE = 12; // 3 × int32
+
+// الرقم يُكتب آخراً: به يعرف الرئيس أن الرد اكتمل
+function reply(sa, status, length, seq) {
+  Atomics.store(sa, 1, length);
+  Atomics.store(sa, 0, status);
+  Atomics.store(sa, 2, seq);
+  Atomics.notify(sa, 2);
+}
 
 // المعاملات: pool.query يوزّع كل استعلام على اتصال مختلف فلا يعمل BEGIN/COMMIT/ROLLBACK كوحدة واحدة.
 // نثبّت اتصالاً واحداً من BEGIN حتى COMMIT/ROLLBACK. الرئيس متزامن (Atomics.wait) والمعاملة تُنفَّذ كلها دون تداخل
@@ -52,39 +61,38 @@ async function runQuery(sql, values) {
 }
 
 // النتيجة الأكبر من الذاكرة المشتركة تُسلَّم دفعات: الرئيس يطلب التالية بعد نسخ كل دفعة
-const MAX_RESULT_BYTES = 512 * 1024 * 1024;
+const MAX_RESULT_BYTES = 128 * 1024 * 1024; // أقل من ذاكرة الحاوية، فالتحليل في الرئيس قد ينهي العملية
 let pending = null;
-function sendChunk(sa, dataBuf) {
+function sendChunk(sa, dataBuf, seq) {
   const part = pending.buf.subarray(pending.at, pending.at + dataBuf.length);
   part.copy(dataBuf);
   pending.at += part.length;
   const done = pending.at >= pending.buf.length;
   if (done) pending = null;
-  Atomics.store(sa, 1, part.length);
-  Atomics.store(sa, 0, done ? 1 : 2);
-  Atomics.notify(sa, 0);
+  reply(sa, done ? 1 : 2, part.length, seq);
 }
 
-parentPort.on('message', async ({ sab, sql, values, next }) => {
-  const sa = new Int32Array(sab, 0, 2);
+// الرئيس لا يرسل رسالة جديدة إلا بعد اكتمال السابقة أو انتهاء مهلتها، فاستعلام وصلت بعده رسالة أحدث قد تخلى عنه الرئيس
+let latestSeq = 0;
+parentPort.on('message', async ({ sab, sql, values, next, seq }) => {
+  latestSeq = seq;
+  const sa = new Int32Array(sab, 0, 3);
   const dataBuf = Buffer.from(sab, HEADER_SIZE);
-  if (next) { sendChunk(sa, dataBuf); return; }
+  if (next) { sendChunk(sa, dataBuf, seq); return; }
 
   try {
     const result = await runQuery(sql, values);
+    if (seq !== latestSeq) return;
     const json = JSON.stringify({ rows: result.rows, rowCount: result.rowCount });
     const encoded = Buffer.from(json, 'utf8');
 
     if (encoded.length > MAX_RESULT_BYTES) throw new Error(`Result too large: ${encoded.length} bytes`);
     pending = { buf: encoded, at: 0 };
-    sendChunk(sa, dataBuf);
-    return;
+    sendChunk(sa, dataBuf, seq);
   } catch (e) {
+    if (seq !== latestSeq) return;
     const errJson = Buffer.from(JSON.stringify({ error: e.message }), 'utf8');
     errJson.copy(dataBuf);
-    Atomics.store(sa, 1, errJson.length);
-    Atomics.store(sa, 0, -1);
+    reply(sa, -1, errJson.length, seq);
   }
-
-  Atomics.notify(sa, 0);
 });

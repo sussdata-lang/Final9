@@ -25,7 +25,8 @@ export async function verifyPassword(password, stored) {
   return crypto.timingSafeEqual(key, Buffer.from(hash, 'base64'));
 }
 
-export function validatePasswordPolicy(pw, minLen = 10) {
+export function validatePasswordPolicy(pw, configuredMin = 10) {
+  const minLen = Math.max(8, Number(configuredMin) || 10);
   if (typeof pw !== 'string' || pw.length < minLen) return `كلمة المرور يجب ألا تقل عن ${minLen} أحرف.`;
   if (!/[A-Za-z]/.test(pw) || !/[0-9]/.test(pw)) return 'كلمة المرور يجب أن تحوي أحرفاً وأرقاماً.';
   return null;
@@ -117,15 +118,18 @@ export function verifySessionFingerprint(req, storedFingerprint) {
 // ============================================================
 const TIERED_RULES = [
   { pattern: /^\/api\/auth\//,     max: 120, windowMs: 60_000, key: 'auth',    methods: null },
-  { pattern: /^\/api\/imports\//,  max: 30,  windowMs: 60_000, key: 'import',  methods: null },
+  { pattern: /^\/api\/import(-engine)?\//,  max: 300,  windowMs: 60_000, key: 'import',  methods: null },
   { pattern: /^\/api\/finance\//,  max: 200, windowMs: 60_000, key: 'finance', methods: ['POST','PUT','DELETE','PATCH'] },
   { pattern: /^\/api\//,           max: 600, windowMs: 60_000, key: 'api',     methods: null },
 ];
+const TRUSTED_IPS = new Set(String(process.env.WAF_TRUSTED_IPS || '').split(',').map((s) => s.trim()).filter(Boolean));
+export const isTrustedIp = (ip) => TRUSTED_IPS.has(String(ip));
 const tieredBuckets = new Map(); // `rule:ip` → [{time}]
 export const resetTieredRateLimit = () => tieredBuckets.clear();
 
 export function checkTieredRateLimit(req) {
   const ip = req.ip || req.socket?.remoteAddress || '0.0.0.0';
+  if (isTrustedIp(ip)) return { limited: false };
   const now = Date.now();
   for (const rule of TIERED_RULES) {
     if (!rule.pattern.test(req.url)) continue;

@@ -7,7 +7,7 @@
                                    │                             │
                           ترويسات أمنية، حدود الحجم،       قواعد العمل (rules، requests، documents)
                           جلسات، RBAC                           │
-                                                          SQLite (db.js) + data/uploads
+                                                          PostgreSQL (db.js) + data/uploads
                                                           audit_log (سلسلة بصمات)
 ```
 

@@ -1,3 +1,4 @@
+import { docNo, academicYear } from '../lib/doc_no.js';
 import { groupsOfStudent, listGroups, groupSize } from './student_groups.js';
 import { HttpError } from '../http.js';
 import { log } from '../lib/logger.js';
@@ -210,17 +211,13 @@ export async function registerV12Modules(r, deps) {
     if (!isStudent(c)) requireV12Perm(c, ...LMS_READ);
     const canManage = hasV12Perm(c, LMS_MANAGE);
     const seesAllLoans = canManage || hasV12Perm(c, ['lms_lib:view', 'holds:manage']);
-    const rows = db.prepare('SELECT * FROM lms_lectures ORDER BY week_no ASC, id DESC').all().filter((l) => !isStudent(c) || l.published);
+    const rows = db.prepare(`SELECT * FROM lms_lectures ${isStudent(c) ? 'WHERE published <> 0' : ''} ORDER BY week_no ASC, id DESC`).all();
     const lectureFiles = filesFor(db, rows.map((l) => l.id));
     const lectures = rows.map((l) => ({ ...l, files: lectureFiles.get(l.id) ?? [] }));
     const quizzes = db.prepare('SELECT * FROM lms_quizzes ORDER BY id DESC').all();
     const books = db.prepare('SELECT * FROM library_books ORDER BY id DESC').all();
-    const loans = db.prepare(`
-      SELECT l.*, b.title AS book_title, b.isbn
-      FROM library_loans l
-      JOIN library_books b ON b.id = l.book_id
-      ORDER BY l.id DESC
-    `).all().filter((l) => seesAllLoans || (isStudent(c) && l.borrower_no === c.user.student_no));
+    const loanSql = (where) => `SELECT l.*, b.title AS book_title, b.isbn FROM library_loans l JOIN library_books b ON b.id = l.book_id ${where} ORDER BY l.id DESC`;
+    const loans = seesAllLoans ? db.prepare(loanSql('')).all() : isStudent(c) && c.user.student_no ? db.prepare(loanSql('WHERE l.borrower_no = ?')).all(c.user.student_no) : [];
     c.json(200, {
       stats: {
         lecturesCount: lectures.length,
@@ -399,7 +396,7 @@ export async function registerV12Modules(r, deps) {
     const b = c.body ?? {};
     const title = clean(b.title, 200);
     if (!title) throw new HttpError(400, 'عنوان البحث العلمي مطلوب.');
-    const code = clean(b.code || `RES-2026-${Math.floor(10 + Math.random() * 89)}`, 30);
+    const code = clean(b.code || docNo(`RES-${new Date().getFullYear()}`), 30);
     const res = db.prepare(`
       INSERT INTO research_projects (code, title, principal_investigator, faculty_name, domain, budget, journal_name, impact_factor, citations_count, status, published_at, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -587,10 +584,10 @@ export async function registerV12Modules(r, deps) {
     const target = Number(b.target_value) || 0;
     const actual = Number(b.actual_value) || 0;
     const status = actual >= target ? 'متحقق' : actual >= target * 0.85 ? 'قيد التحسين' : 'حرِج';
-    const code = clean(b.code || `KPI-${Math.floor(100 + Math.random() * 899)}`, 30);
+    const code = clean(b.code || docNo('KPI'), 30);
     const res = db.prepare(`
       INSERT INTO qa_kpis (code, title, standard_domain, target_value, actual_value, unit, status, academic_year, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, '2026/2027', ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, '${academicYear()}', ?)
     `).run(code, title, clean(b.standard_domain || 'الجودة الأكاديمية', 80), target, actual, clean(b.unit || '%', 20), status, Date.now());
     audit(db, c.user, 'إضافة مؤشر جودة KPI', code, c.ip);
     c.json(201, { id: Number(res.lastInsertRowid) });
@@ -610,7 +607,7 @@ export async function registerV12Modules(r, deps) {
       need(b.course_code, 'رمز المقرر', 30),
       clean(b.course_name || 'مقرر جامعي', 100),
       clean(b.instructor_name || 'عضو هيئة تدريس', 100),
-      clean(b.semester || 'الفصل الأول 2026/2027', 50),
+      clean(b.semester || `الفصل الأول ${academicYear()}`, 50),
       Number(b.responses_count) || 0,
       cScore,
       tScore,
@@ -684,7 +681,7 @@ export async function registerV12Modules(r, deps) {
       clean(b.course_name, 100),
       clean(b.program_name, 100),
       clean(b.exam_type || 'نهائي', 30),
-      clean(b.exam_date || '2026-11-22', 20),
+      clean(b.exam_date || new Date().toISOString().slice(0, 10), 20),
       clean(b.start_time || '09:00', 10),
       clean(b.end_time || '11:00', 10),
       clean(b.hall_name || 'المدرج A2', 60),
@@ -766,7 +763,7 @@ export async function registerV12Modules(r, deps) {
       db.prepare('UPDATE dorm_rooms SET occupied = LEAST(capacity, occupied + 1) WHERE id = ?').run(roomId);
       return db.prepare(`
         INSERT INTO dorm_allocations (room_id, student_name, student_no, faculty_name, check_in_date, academic_year, payment_status, status)
-        VALUES (?, ?, ?, ?, ?, '2026/2027', ?, 'ساكن')
+        VALUES (?, ?, ?, ?, ?, '${academicYear()}', ?, 'ساكن')
       `).run(
         roomId,
         clean(b.student_name, 100),
@@ -785,7 +782,7 @@ export async function registerV12Modules(r, deps) {
     const b = c.body ?? {};
     const res = db.prepare(`
       INSERT INTO scholarships (student_name, student_no, program_name, scholarship_type, discount_percent, amount_covered, academic_year, status, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, '2026/2027', 'مفعّلة', ?)
+      VALUES (?, ?, ?, ?, ?, ?, '${academicYear()}', 'مفعّلة', ?)
     `).run(
       clean(b.student_name, 100),
       clean(b.student_no, 40),
@@ -827,9 +824,9 @@ export async function registerV12Modules(r, deps) {
 
   r.add('POST', '/api/expansions/biometrics/sync', (c) => {
     requireV12Perm(c, 'hr:manage', 'staffatt:manage');
-    db.prepare('UPDATE hr_biometric_devices SET last_sync_at = ?').run(Date.now());
-    audit(db, c.user, 'مزامنة فورية لأجهزة البصمة البيومترية', 'BIO-ALL', c.ip);
-    c.json(200, { synced: true, timestamp: Date.now() });
+    // لا اتصال فعلي بالأجهزة بعد، فلا يُسجَّل وقت مزامنة لم تحدث
+    audit(db, c.user, 'طلب مزامنة أجهزة البصمة (غير مفعّلة)', 'BIO-ALL', c.ip);
+    c.json(200, { synced: false, timestamp: Date.now(), message: 'لم تُجرَ مزامنة: الربط الفعلي بأجهزة البصمة غير مفعّل بعد.' });
   });
 
   // ==================== المرحلة 3: البنية التحتية والتوسع (Scalability & DevOps) ====================

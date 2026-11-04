@@ -197,7 +197,7 @@
         </div>
         <div style="display:flex;gap:6px;align-items:flex-start">
           ${d.status === 'approved' ? `<a class="btn pri sm" href="/api/corr/${d.id}/pdf" download>📥 تنزيل الكتاب الموقَّع PDF</a>` : ''}
-          <button class="btn sm" onclick="window.print()">🖨️ طباعة</button>
+          <button class="btn sm no-print" data-act="print">🖨️ طباعة</button>
           <button class="btn sm" data-act="crclose">✕ إغلاق المعاينة</button>
         </div>
       </div>

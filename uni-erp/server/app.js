@@ -16,8 +16,11 @@ import { ensureForms } from './services/forms/index.js';
 import { ready as financeReady } from './services/finance/core.js';
 import { hashPassword } from './security.js';
 import { createHeavyPool } from './heavy.js';
+import { startLoopWatch } from './http.js';
+import { demoModeBlocked } from './services/dev_accounts.js';
 
 export async function createApp(overrides = {}) {
+  if (overrides.dbPath !== ':memory:' && demoModeBlocked()) throw new Error('رُفض التشغيل: DEMO_MODE=1 لا يعمل مع NODE_ENV=production لأنه يعيد كلمة مرور كل الحسابات. أزل DEMO_MODE من متغيرات البيئة.');
   const cfg = loadConfig(overrides);
   configureLogger({ dir: cfg.dbPath === ':memory:' ? null : cfg.logDir, level: cfg.logLevel });
   const db = await openDb(cfg.dbPath);
@@ -25,11 +28,11 @@ export async function createApp(overrides = {}) {
   // شرط التهيئة: إذا كانت قاعدة البيانات الافتراضية أو في الذاكرة
   if (!overrides.dbPath || overrides.dbPath === ':memory:') {
     const pw = seedPassword();
-    // وضع العرض يعيد كلمة مرور admin وauditor1 عند كل تشغيل ويفعّل حسابات الهيكل غير المستخدمة، فلا يعمل إلا بطلب صريح (DEMO_MODE=1) أو في قاعدة الذاكرة للاختبار
+    // وضع العرض يعيد كلمة مرور كل الحسابات، ومنها الطلاب، عند كل تشغيل ويفعّل المعطل منها، فلا يعمل إلا بطلب صريح (DEMO_MODE=1) أو في قاعدة الذاكرة للاختبار، ويُرفض مع NODE_ENV=production
     const demo = overrides.dbPath === ':memory:' || process.env.DEMO_MODE === '1';
     if (demo) {
       if (overrides.dbPath !== ':memory:') {
-        console.warn('تحذير أمني: DEMO_MODE=1 يعيد كلمة مرور admin وauditor1 عند كل تشغيل، ويفعّل حسابات الهيكل غير المستخدمة، ويتيح تبديل الحساب محلياً. لا تستخدمه مع بيانات حقيقية.');
+        console.warn('تحذير أمني: DEMO_MODE=1 يعيد كلمة مرور كل الحسابات، ومنها الطلاب، عند كل تشغيل، ويفعّل الحسابات المعطلة ويفك أقفالها، ويتيح تبديل الحساب محلياً. لا تستخدمه مع بيانات حقيقية.');
         if (!hasConfiguredSeedPassword()) console.warn(`SEED_PASSWORD غير مضبوط؛ كلمة مرور هذا التشغيل: ${pw}`);
       }
       await ensureCoreAccounts({ db, cfg }, pw);
@@ -86,14 +89,19 @@ export async function createApp(overrides = {}) {
       console.error('Relational link audit note:', relErr);
     }
   }
+  if (process.env.NODE_ENV === 'production') {
+    if (!cfg.backupPassphrase) console.warn('تحذير أمني: BACKUP_PASSPHRASE غير مضبوط، فالنسخ الاحتياطية تُحفظ بلا تشفير وفيها البيانات ومفتاح التوقيع.');
+    if (!cfg.backupPutUrl) console.warn('تحذير: BACKUP_PUT_URL غير مضبوط، فالنسخ الاحتياطية على قرص الخادم نفسه فقط.');
+  }
   const limiter = new RateLimiter();
   const heavy = createHeavyPool({ db, cfg });
   const router = await buildRouter({ db, cfg, limiter, heavy });
   const server = http.createServer(makeHandler({ cfg, router, getUser: (tok) => sessionUser(db, tok) }));
-  server.headersTimeout = 15_000; server.requestTimeout = 30_000;
+  server.headersTimeout = 15_000; server.requestTimeout = 600_000;
   // تنظيف الجلسات المنتهية كل ساعة
   const timer = setInterval(() => db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now()), 3600_000);
   timer.unref();
   const stopBackups = startBackupScheduler({ db, cfg });
-  return { server, db, cfg, limiter, router, close: async () => { clearInterval(timer); stopBackups(); await drainCertificates(db); await drainPush(); await heavy.close(); await new Promise((res) => server.close(() => { db.close(); res(); })); await closeLogger(); } };
+  const stopLoopWatch = startLoopWatch();
+  return { server, db, cfg, limiter, router, close: async () => { clearInterval(timer); stopBackups(); stopLoopWatch(); await drainCertificates(db); await drainPush(); await heavy.close(); await new Promise((res) => server.close(() => { db.close(); res(); })); await closeLogger(); } };
 }

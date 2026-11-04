@@ -197,6 +197,9 @@ test('GET /api/finance/reports/balance-sheet returns assets and liabilities', as
   const { status, body } = await req('GET', '/api/finance/reports/balance-sheet', null, adminCookie);
   assert.equal(status, 200, JSON.stringify(body));
   assert.ok('assets' in body && 'liabilities' in body && 'equity' in body);
+  // الواجهة تقرأ هذا الشكل تحديداً (finance.js)
+  for (const s of [body.assets, body.liabilities, body.equity]) { assert.ok(Array.isArray(s.rows)); assert.equal(typeof s.total, 'number'); }
+  assert.equal(typeof body.equity.surplus, 'number');
 });
 
 // ── 6. رسوم الطلاب ─────────────────────────────────────────────────────────────

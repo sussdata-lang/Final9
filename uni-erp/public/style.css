@@ -705,7 +705,7 @@ body.sx-on{padding:0}
 .grid-tbl tr.off td{opacity:.55}.nowrap{white-space:nowrap}.grid-tbl td{vertical-align:middle}
 .pager{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px}.pg-ctl{display:flex;align-items:center;gap:10px;font-size:13px}
 .gt-sum{grid-template-columns:repeat(4,1fr)}@media(max-width:600px){.gt-sum{grid-template-columns:repeat(2,1fr)}}
-.modal-back{position:fixed;inset:0;background:rgba(3,30,26,.55);display:grid;place-items:center;padding:16px;z-index:60;overflow:auto}
+.modal-back,.modal-bg{position:fixed;inset:0;background:rgba(3,30,26,.55);display:grid;place-items:center;padding:16px;z-index:60;overflow:auto}
 .modal{background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--gold);border-radius:14px;width:min(640px,100%);max-height:calc(100vh - 32px);overflow:auto;padding:18px 20px;box-shadow:0 24px 60px rgba(0,0,0,.35)}
 .modal h2{margin:0 0 12px}.modal .actions{margin-top:14px}
 .okbox{background:var(--ok-soft);color:var(--ok);border-radius:10px;padding:10px 12px;margin-top:12px;font-weight:600}
@@ -750,6 +750,10 @@ body.sx-on{padding:0}
   body.print-doc .no-print,body.print-doc .no-print *{display:none!important}
   body.print-doc .overlay{position:static;background:none;padding:0;overflow:visible;display:block}
   body.print-doc .sheet{width:auto}
+  body.print-area *:not(:has(.print-target)):not(.print-target):not(.print-target *){display:none!important}
+  body.print-area .modal-bg,body.print-area .modal-back{position:static;background:none;padding:0;overflow:visible;display:block}
+  body.print-area .print-target{width:auto;max-width:none!important;max-height:none;overflow:visible;border:0;box-shadow:none}
+  body.print-area .print-target .no-print,body.print-area .print-target .row-end,body.print-area .print-target .actions{display:none!important}
 }
 .overlay{z-index:70}
 

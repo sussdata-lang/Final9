@@ -4,9 +4,15 @@
  * SQL Injection / XSS / Path Traversal / Prototype Pollution / Scanner Bots
  */
 
+import { SECURITY_HEADERS } from './http.js';
+import { isTrustedIp } from './security.js';
+
 // ===== أنماط الهجمات =====
 const SQL_INJECTION = [
-  /(\b(union|select|insert|update|delete|drop|create|alter|exec|execute|xp_|sp_)\b.*\b(from|into|table|where|set)\b)/i,
+  // جملة عادية فيها select وfrom لا تكفي: يلزم رمز من رموز SQL
+  /^(?=[\s\S]*['"`;()=*])[\s\S]*(\b(union|select|insert|update|delete|drop|create|alter|exec|execute|xp_|sp_)\b.*\b(from|into|table|where|set)\b)/i,
+  /\bunion\s+(all\s+)?select\b/i,
+  /\bdrop\s+table\b/i,
   /('|"|`)\s*(or|and)\s*('|"|`|\d|[a-z])/i,
   /\b(or|and)\s+\d+\s*=\s*\d+/i,
   /--\s*$/m,
@@ -172,6 +178,8 @@ export function wafMiddleware(_cfg) {
       ? String(req.headers['x-forwarded-for']).split(',').map((s) => s.trim()).filter(Boolean)
       : [];
     const ip = req.ip || (xff.length ? xff[xff.length - 1] : null) || req.socket?.remoteAddress || '0.0.0.0';
+    // عناوين الجامعة الموثوقة (WAF_TRUSTED_IPS): لا يوقف مستخدم واحد خلف NAT الجميع، وفحص الجسم يبقى يعمل
+    const trusted = isTrustedIp(ip);
 
     // تتبع عدد الطلبات
     const _rec = getIpRecord(ip);
@@ -179,10 +187,10 @@ export function wafMiddleware(_cfg) {
     _rec.lastSeen = Date.now();
 
     // 1. فحص الحظر
-    if (isIpBanned(ip)) {
+    if (!trusted && isIpBanned(ip)) {
       const rec = getIpRecord(ip);
       res.setHeader('Retry-After', String(Math.ceil((rec.banUntil - Date.now()) / 1000)));
-      res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8', ...SECURITY_HEADERS });
       return res.end(JSON.stringify({ error: 'تم حظر عنوان IP مؤقتاً بسبب نشاط مشبوه.', code: 'ip_banned', until: rec.banUntil }));
     }
 
@@ -190,8 +198,8 @@ export function wafMiddleware(_cfg) {
     const ua = req.headers['user-agent'] || '';
     for (const pattern of SCANNER_AGENTS) {
       if (pattern.test(ua)) {
-        addThreatScore(ip, 25, 'scanner_agent', req.url);
-        res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+        if (!trusted) addThreatScore(ip, 25, 'scanner_agent', req.url);
+        res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8', ...SECURITY_HEADERS });
         return res.end(JSON.stringify({ error: 'مرفوض.', code: 'scanner_blocked' }));
       }
     }
@@ -201,8 +209,8 @@ export function wafMiddleware(_cfg) {
     try { decodedUrl = decodeURIComponent(decodedUrl); } catch { /* URL مكسور */ }
     const urlHit = scanValue(decodedUrl, 'url');
     if (urlHit) {
-      addThreatScore(ip, 10, urlHit.type, req.url);
-      res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+      if (!trusted) addThreatScore(ip, 10, urlHit.type, req.url);
+      res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8', ...SECURITY_HEADERS });
       return res.end(JSON.stringify({ error: 'طلب مرفوض.', code: urlHit.type }));
     }
 
@@ -212,8 +220,8 @@ export function wafMiddleware(_cfg) {
       for (const [k, v] of qs.searchParams) {
         const hit = scanValue(k, 'query.key') || scanValue(v, `query.${k}`);
         if (hit) {
-          addThreatScore(ip, 10, hit.type, req.url);
-          res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+          if (!trusted) addThreatScore(ip, 10, hit.type, req.url);
+          res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8', ...SECURITY_HEADERS });
           return res.end(JSON.stringify({ error: 'معامل مرفوض.', code: hit.type }));
         }
       }

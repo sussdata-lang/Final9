@@ -173,7 +173,8 @@ export function getInvalidatedNamespacesForTable(table) {
     case 'org_units':
     case 'unit_links':
       return ['org_units', 'identity', 'desk', 'analytics'];
-    case 'site_settings':
+    case 'site_settings':   // شاشات الطالب وفصل المهام تُحسب من الإعدادات ضمن الهوية
+      return ['settings', 'analytics', 'identity'];
     case 'infra_settings':
     case 'hr_alert_settings':
       return ['settings', 'analytics'];

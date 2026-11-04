@@ -1,3 +1,4 @@
+import { monitorEventLoopDelay } from 'node:perf_hooks';
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
@@ -25,7 +26,7 @@ export function invalidateStaticRamCache() {
 
 // ترويسات أمنية: لا سكربتات إلا من الموقع نفسه، ولا تضمين في إطارات، ولا تخمين لأنواع الملفات
 export const SECURITY_HEADERS = {
-  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' https:; frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com; frame-ancestors 'self' https://*.google.com https://*.run.app http://localhost:*; base-uri 'none'; form-action 'self'",
+  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' https:; frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com; frame-ancestors 'self'; base-uri 'none'; form-action 'self'",
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'no-referrer',
   'Cross-Origin-Opener-Policy': 'same-origin',
@@ -103,20 +104,34 @@ async function readRaw(req, limit) {
 
 async function readBody(req, limit) {
   const chunks = []; let size = 0;
-  for await (const c of req) {
-    size += c.length;
-    if (size > limit) throw new HttpError(413, 'حجم الطلب أكبر من المسموح.', 'too_large');
-    chunks.push(c);
-  }
+  const slow = setTimeout(() => req.destroy(), 30_000); slow.unref();
+  try {
+    for await (const c of req) {
+      size += c.length;
+      if (size > limit) throw new HttpError(413, 'حجم الطلب أكبر من المسموح.', 'too_large');
+      chunks.push(c);
+    }
+  } finally { clearTimeout(slow); }
   if (!size) return {};
   if (!/^application\/json/i.test(req.headers['content-type'] || '')) throw new HttpError(415, 'يُقبل JSON فقط.', 'bad_content_type');
   try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); }
   catch { throw new HttpError(400, 'JSON غير صالح.', 'bad_json'); }
 }
 
+const ASYNC_COMPRESS_CHARS = 256 * 1024;
 export function sendJson(res, status, obj, headers = {}, req = null) {
   const bodyStr = JSON.stringify(obj);
   const acceptEncoding = req && req.headers ? String(req.headers['accept-encoding'] || '') : '';
+  if (bodyStr.length > ASYNC_COMPRESS_CHARS && /\bbr\b/.test(acceptEncoding)) {
+    const raw = Buffer.from(bodyStr, 'utf8');
+    zlib.brotliCompress(raw, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 3 } }, (err, br) => {
+      const common = { 'Content-Type': 'application/json; charset=utf-8', 'Vary': 'Accept-Encoding', 'Cache-Control': 'no-store', ...SECURITY_HEADERS, ...headers };
+      if (err) { res.writeHead(status, { ...common, 'Content-Length': raw.length }); return res.end(raw); }
+      res.writeHead(status, { ...common, 'Content-Encoding': 'br', 'Content-Length': br.length });
+      res.end(br);
+    });
+    return;
+  }
   if (bodyStr.length > 1536) {
     if (/\bbr\b/.test(acceptEncoding)) {
       const br = zlib.brotliCompressSync(Buffer.from(bodyStr, 'utf8'), { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 3 } });
@@ -167,14 +182,15 @@ function serveStatic(cfg, pathname, req, res) {
 
   // ملفات الخطوط والأيقونات الثابتة: تخزين طويل، بينما ملفات JS/CSS تتحقق عبر ETag لضمان ظهور التحديثات فور إعادة النشر
   const isImmutableFont = /\.(ttf|woff2)$/.test(ext);
+  const versioned = /\.(js|css)$/.test(ext) && /[?&]v=/.test(req.url || '');
   const cacheControl = isImmutableFont
     ? 'public, max-age=86400, stale-while-revalidate=3600'
-    : 'no-cache, must-revalidate';
+    : versioned ? 'public, max-age=86400' : 'no-cache, must-revalidate';
 
   const staticSecHeaders = rel.startsWith('/archify/')
     ? {
         ...SECURITY_HEADERS,
-        'Content-Security-Policy': "default-src 'self' data: blob:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; frame-ancestors 'self' https://*.google.com https://*.run.app http://localhost:*",
+        'Content-Security-Policy': "default-src 'self' data: blob:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; frame-ancestors 'self'",
       }
     : SECURITY_HEADERS;
 
@@ -221,10 +237,28 @@ const httpTelemetry = {
   recentLatenciesMs: [],
 };
 
+// تأخر حلقة الأحداث والذاكرة: كل دقيقة، ويُسجَّل التوقف الطويل لمقارنته بأوقات الشكاوى
+const loopDelay = monitorEventLoopDelay({ resolution: 20 });
+let lastLoop = { p50Ms: 0, p99Ms: 0, maxMs: 0 };
+const LOOP_STALL_WARN_MS = 1000;
+export function startLoopWatch() {
+  loopDelay.enable();
+  const t = setInterval(() => {
+    const ms = (v) => Math.round(v / 1e6);
+    lastLoop = { p50Ms: ms(loopDelay.percentile(50)), p99Ms: ms(loopDelay.percentile(99)), maxMs: ms(loopDelay.max) };
+    loopDelay.reset();
+    if (lastLoop.maxMs >= LOOP_STALL_WARN_MS) log.warn(`event loop stall: max ${lastLoop.maxMs}ms, p99 ${lastLoop.p99Ms}ms, rss ${Math.round(process.memoryUsage().rss / 1048576)}MB`);
+  }, 60_000);
+  t.unref();
+  return () => { clearInterval(t); loopDelay.disable(); };
+}
+
 export function getHttpTelemetry() {
   const arr = httpTelemetry.recentLatenciesMs.slice().sort((a, b) => a - b);
   const pick = (p) => (arr.length ? Math.round(arr[Math.min(arr.length - 1, Math.floor(arr.length * p))] * 100) / 100 : 0.4);
   return {
+    eventLoop: lastLoop,
+    rssMb: Math.round(process.memoryUsage().rss / 1048576),
     totalRequests: httpTelemetry.totalRequests,
     totalWriteRequests: httpTelemetry.totalWriteRequests,
     staticCachedFiles: staticRamCache.size,
@@ -274,6 +308,8 @@ export function makeHandler({ cfg, router, getUser }) {
 
       if (!url.pathname.startsWith('/api/')) {
         if (req.method !== 'GET' && req.method !== 'HEAD') throw new HttpError(405, 'الطريقة غير مسموحة.');
+        // الخرائط المعمارية للموظفين فقط
+        if (url.pathname.startsWith('/archify/')) { const viewer = getUser(parseCookies(req.headers.cookie).sid); if (!viewer || viewer.role === 'student') throw new HttpError(404, 'غير موجود.', 'not_found'); }
         if (serveStatic(cfg, url.pathname, req, res)) return;
         throw new HttpError(404, 'غير موجود.', 'not_found');
       }

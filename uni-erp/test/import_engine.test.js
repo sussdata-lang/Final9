@@ -220,6 +220,7 @@ test('الآباء في الملف نفسه يُرتَّبون، والدورا�
 });
 
 test('كل نوع مرجعي: القالب يُنزَّل ويُستورد، والتحديث لا يكرر، والتراجع يعمل', async () => {
+  setInterval(resetTieredRateLimit, 1000).unref();   // حد مسارات الاستيراد صار يعمل، والحلقة تتجاوزه آلياً
   app.limiter.check = () => true;   // الحلقة تتجاوز حد الطلبات عمداً؛ الحد مختبر في مساره
   // بيانات تعتمد عليها الأنواع الأخرى
   app.db.prepare("INSERT INTO courses (program_id, level, semester, name, code) SELECT id, 1, 1, 'مقرر أ', 'COURSE-A' FROM programs ORDER BY id LIMIT 1").run();

@@ -589,7 +589,7 @@
 
   function showModal(html) {
     const m = document.getElementById('proc-modal');
-    if (m) m.innerHTML = `<div class="modal-bg" data-act="proc-close-modal"><div class="modal" onclick="event.stopPropagation()" style="max-width:700px">${html}</div></div>`;
+    if (m) m.innerHTML = `<div class="modal-bg" data-act="proc-close-modal"><div class="modal" style="max-width:700px">${html}</div></div>`;
   }
   const closeModal = () => { const m = document.getElementById('proc-modal'); if (m) m.innerHTML = ''; };
   const refresh = async () => { const el = document.getElementById('ua-view-mount'); if (el) await mount(el); };
@@ -643,7 +643,7 @@
         P.supQuery = document.getElementById('ps-filter-q')?.value.trim() || '';
         await refresh();
       }
-      else if (act === 'proc-close-modal') closeModal();
+      else if (act === 'proc-close-modal') { if (b.classList.contains('modal-bg') && e.target.closest('.modal')) return; closeModal(); }
 
       else if (act === 'proc-replenish-low') {
         const lowItems = P.ov?.lowStockItems || [];
@@ -877,7 +877,7 @@
             ${(o.lines || []).map((l) => `<tr><td>${esc(l.itemName || '—')}</td><td>${esc(l.description)}</td><td>${num(l.qty)}</td><td>${money(l.unitCost)}</td><td><b>${money(l.lineTotal)}</b></td></tr>`).join('')}
           </tbody><tfoot><tr><th colspan="4">القيمة الإجمالية لأمر التوريد</th><th>${money(o.totalAmount)}</th></tr></tfoot></table>
           <div class="row-end" style="margin-top:12px">
-            <button class="btn" onclick="window.print()">🖨️ طباعة أمر التوريد</button>
+            <button class="btn no-print" data-act="print">🖨️ طباعة أمر التوريد</button>
             <button class="btn pri" data-act="proc-close-modal">إغلاق</button>
           </div>`);
       }

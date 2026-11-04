@@ -3,8 +3,8 @@ WORKDIR /app
 # pg_dump/pg_restore مطلوبان للنسخ الاحتياطي (BACKUP_AUTO)
 RUN apk add --no-cache postgresql-client su-exec
 # الاعتمادية الوحيدة: pg (عميل PostgreSQL). تُثبَّت قبل نسخ الشيفرة لتستفيد من كاش الطبقات
-COPY package.json ./
-RUN npm install --omit=dev --no-audit --no-fund && npm cache clean --force
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 COPY --chown=node:node . .
 # ضغط مسبق (Brotli مستوى 11 + Gzip) للملفات الثابتة: يقلّل حجم النقل نحو 75% ويلغي كلفة الضغط عند أول طلب
 RUN node scripts/precompress.js

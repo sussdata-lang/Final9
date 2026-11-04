@@ -445,7 +445,7 @@
     const r = F.reportSub || 'tb';
     const tb = F.tb || { rows: [], totalDebit: 0, totalCredit: 0, balanced: true };
     const is = F.is || { revenues: [], expenses: [], totalRevenue: 0, totalExpense: 0, netIncome: 0 };
-    const bs = F.bs || { assets: [], liabilities: [], equity: [], totalAssets: 0, totalLiabilities: 0, totalEquity: 0, retainedEarnings: 0 };
+    const bs = F.bs || { assets: { rows: [], total: 0 }, liabilities: { rows: [], total: 0 }, equity: { rows: [], surplus: 0, total: 0 }, balanced: true, difference: 0 };
     const cb = F.cb || { accounts: [], grandTotal: 0 };
     const cc = F.cc || { rows: [] };
     return `
@@ -464,7 +464,7 @@
           </div>
           <div style="display:flex;gap:6px">
             <a class="btn sm" href="/api/finance/reports/trial-balance.xlsx" target="_blank">📥 تصدير Excel</a>
-            <button class="btn sm" onclick="window.print()">🖨️ طباعة التقرير</button>
+            <button class="btn sm no-print" data-act="print" data-print-next>🖨️ طباعة التقرير</button>
           </div>
         </div>
       </div>
@@ -512,22 +512,22 @@
         <div class="card">
           <div class="spread" style="margin-bottom:10px">
             <h3 style="margin:0">🏛️ الميزانية العمومية (قائمة المركز المالي - Balance Sheet)</h3>
-            <span class="badge ${bs.balanced ? 'b-ok' : 'b-warn'}">معادلة الميزانية: الأصول = الخصوم + حقوق الملكية</span>
+            <span class="badge ${bs.balanced ? 'b-ok' : 'b-warn'}">${bs.balanced ? 'معادلة الميزانية: الأصول = الخصوم + حقوق الملكية' : `الميزانية غير متوازنة، الفارق: ${money(bs.difference)}`}</span>
           </div>
           <div class="grid2">
             <div>
               <h4 style="color:#0284c7">الأصول (الموجودات)</h4>
               <table class="tbl"><thead><tr><th>الرمز</th><th>الحساب</th><th>الرصيد</th></tr></thead><tbody>
-                ${bs.assets.map((x) => `<tr><td><code>${esc(x.code)}</code></td><td>${esc(x.name)}</td><td><b>${money(x.amount)}</b></td></tr>`).join('')}
-              </tbody><tfoot><tr><th colspan="2">إجمالي الأصول</th><th>${money(bs.totalAssets)}</th></tr></tfoot></table>
+                ${bs.assets.rows.map((x) => `<tr><td><code>${esc(x.code)}</code></td><td>${esc(x.name)}</td><td><b>${money(x.amount)}</b></td></tr>`).join('')}
+              </tbody><tfoot><tr><th colspan="2">إجمالي الأصول</th><th>${money(bs.assets.total)}</th></tr></tfoot></table>
             </div>
             <div>
               <h4 style="color:#d97706">الخصوم وحقوق الملكية (المطاليب)</h4>
               <table class="tbl"><thead><tr><th>الرمز</th><th>الحساب</th><th>الرصيد</th></tr></thead><tbody>
-                ${bs.liabilities.map((x) => `<tr><td><code>${esc(x.code)}</code></td><td>${esc(x.name)} (خصوم)</td><td><b>${money(x.amount)}</b></td></tr>`).join('')}
-                ${bs.equity.map((x) => `<tr><td><code>${esc(x.code)}</code></td><td>${esc(x.name)} (ملكية)</td><td><b>${money(x.amount)}</b></td></tr>`).join('')}
-                <tr><td><code>—</code></td><td>الأرباح المحتجزة / فائض الفترة</td><td><b>${money(bs.retainedEarnings)}</b></td></tr>
-              </tbody><tfoot><tr><th colspan="2">إجمالي الخصوم وحقوق الملكية</th><th>${money(bs.totalLiabilities + bs.totalEquity)}</th></tr></tfoot></table>
+                ${bs.liabilities.rows.map((x) => `<tr><td><code>${esc(x.code)}</code></td><td>${esc(x.name)} (خصوم)</td><td><b>${money(x.amount)}</b></td></tr>`).join('')}
+                ${bs.equity.rows.map((x) => `<tr><td><code>${esc(x.code)}</code></td><td>${esc(x.name)} (ملكية)</td><td><b>${money(x.amount)}</b></td></tr>`).join('')}
+                <tr><td><code>—</code></td><td>الأرباح المحتجزة / فائض الفترة</td><td><b>${money(bs.equity.surplus)}</b></td></tr>
+              </tbody><tfoot><tr><th colspan="2">إجمالي الخصوم وحقوق الملكية</th><th>${money(bs.liabilities.total + bs.equity.total)}</th></tr></tfoot></table>
             </div>
           </div>
         </div>
@@ -692,7 +692,7 @@
 
   function showModal(html) {
     const m = document.getElementById('fin-modal');
-    if (m) m.innerHTML = `<div class="modal-bg" data-act="fin-close-modal"><div class="modal" onclick="event.stopPropagation()" style="max-width:740px">${html}</div></div>`;
+    if (m) m.innerHTML = `<div class="modal-bg" data-act="fin-close-modal"><div class="modal" style="max-width:740px">${html}</div></div>`;
   }
   const closeModal = () => { const m = document.getElementById('fin-modal'); if (m) m.innerHTML = ''; };
   const refresh = async () => { const el = document.getElementById('ua-view-mount'); if (el) await mount(el); };
@@ -730,7 +730,7 @@
       else if (act === 'fin-coa-type') { F.coaTypeFilter = b.dataset.type || ''; await refresh(); }
       else if (act === 'fin-coa-search') { F.coaQuery = document.getElementById('fcoa-q')?.value.trim() || ''; await refresh(); }
       else if (act === 'fin-je-filter') { F.jeStatusFilter = b.dataset.st || ''; await refresh(); }
-      else if (act === 'fin-close-modal') closeModal();
+      else if (act === 'fin-close-modal') { if (b.classList.contains('modal-bg') && e.target.closest('.modal')) return; closeModal(); }
 
       else if (act === 'fin-open-gl') {
         const accId = Number(b.dataset.id);
@@ -875,7 +875,7 @@
           <table class="tbl"><thead><tr><th>رمز الحساب</th><th>اسم الحساب</th><th>مدين</th><th>دائن</th><th>البيان</th></tr></thead><tbody>
             ${j.lines.map((l) => `<tr><td><code>${esc(l.accountCode)}</code></td><td>${esc(l.accountName)}</td><td>${money(l.debit)}</td><td>${money(l.credit)}</td><td>${esc(l.memo || '')}</td></tr>`).join('')}
           </tbody><tfoot><tr><th colspan="2">الإجمالي المتوازن</th><th>${money(j.totalDebit)}</th><th>${money(j.totalCredit)}</th><th></th></tr></tfoot></table>
-          <div class="row-end" style="margin-top:12px"><button class="btn" onclick="window.print()">🖨️ طباعة سند القيد</button><button class="btn pri" data-act="fin-close-modal">إغلاق</button></div>`);
+          <div class="row-end" style="margin-top:12px"><button class="btn no-print" data-act="print">🖨️ طباعة سند القيد</button><button class="btn pri" data-act="fin-close-modal">إغلاق</button></div>`);
       }
       else if (act === 'fin-post-je') { await api('POST', `/api/finance/journal/${b.dataset.id}/post`, {}); toast('تم ترحيل القيد إلى الأستاذ العام'); await refresh(); }
       else if (act === 'fin-rev-je') { await api('POST', `/api/finance/journal/${b.dataset.id}/reverse`, {}); toast('تم إنشاء وترحيل قيد عكسي'); await refresh(); }

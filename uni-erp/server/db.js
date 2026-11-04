@@ -117,17 +117,23 @@ export function registerMutationListener(fn) {
 // Sync Query via Worker + SharedArrayBuffer
 // ==============================
 export const DB_POOL_MAX = 20;
-const SAB_SIZE = 8 + 8 * 1024 * 1024; // header(8) + data(8MB)
-const HEADER_INTS = 2; // [status, dataLen]
+const HEADER_INTS = 3; // [status, dataLen, replySeq]
+const HEADER_BYTES = HEADER_INTS * 4;
+const SAB_SIZE = HEADER_BYTES + 8 * 1024 * 1024; // header + data(8MB)
+const DB_WAIT_MS = 30000;
+// تلغي القاعدة الاستعلام قبل أن يكفّ الرئيس عن انتظاره، فلا يبقى تعديل يكتمل بعد أن أُبلغ المستخدم بفشله
+const DB_STATEMENT_TIMEOUT_MS = 25000;
 
-class SyncExecutor {
-  constructor(poolConfig) {
+export class SyncExecutor {
+  constructor(poolConfig, { waitMs = DB_WAIT_MS, statementTimeoutMs = DB_STATEMENT_TIMEOUT_MS } = {}) {
     this.poolConfig = poolConfig;
+    this.waitMs = waitMs;
+    this.seq = 0;
     this.sab = new SharedArrayBuffer(SAB_SIZE);
     this.sa = new Int32Array(this.sab, 0, HEADER_INTS);
 
     this.worker = new Worker(WORKER_PATH, {
-      workerData: { poolConfig, poolMax: DB_POOL_MAX },
+      workerData: { poolConfig, poolMax: DB_POOL_MAX, statementTimeoutMs },
     });
     // لا يُبقي العاملُ العمليةَ حيّة: من لا يستدعي db.close() (سكربتات واختبارات) يجب أن تنتهي عمليته طبيعياً
     this.worker.unref();
@@ -137,30 +143,32 @@ class SyncExecutor {
     });
   }
 
-  query(sql, values = []) {
-    // إعادة تعيين حالة SAB
-    Atomics.store(this.sa, 0, 0);
-    Atomics.store(this.sa, 1, 0);
-
-    // إرسال الطلب للـ worker
-    this.worker.postMessage({ sab: this.sab, sql, values });
-
-    // انتظار النتيجة (blocking — يعمل فقط خارج الـ main async event loop)
-    const result = Atomics.wait(this.sa, 0, 0, 30000); // timeout 30s
-    if (result === 'timed-out') {
-      throw new Error(`[DB] Query timed out: ${sql.slice(0, 100)}`);
+  // كل رسالة للعامل تحمل رقماً، ولا يُقبل إلا الرد الذي يحمل رقمها: رد استعلام انتهت مهلته قد يصل أثناء انتظار الاستعلام التالي
+  send(msg, sql) {
+    this.seq = (this.seq % 0x7fffffff) + 1;
+    const seq = this.seq;
+    this.worker.postMessage({ ...msg, sab: this.sab, seq });
+    const deadline = Date.now() + this.waitMs;
+    for (;;) {
+      const got = Atomics.load(this.sa, 2);
+      if (got === seq) return;
+      const left = deadline - Date.now();
+      if (left <= 0) throw new Error(`[DB] Query timed out: ${sql.slice(0, 100)}`);
+      Atomics.wait(this.sa, 2, got, left); // blocking — يعمل فقط خارج الـ main async event loop
     }
+  }
+
+  query(sql, values = []) {
+    this.send({ sql, values }, sql);
 
     let status = Atomics.load(this.sa, 0);
-    const chunk = () => Buffer.from(this.sab, 8, Atomics.load(this.sa, 1));
+    const chunk = () => Buffer.from(this.sab, HEADER_BYTES, Atomics.load(this.sa, 1));
     let bytes = chunk();
     if (status === 2) {
       // نتيجة كبيرة: تُجمع دفعاتها بايتات قبل فك الترميز، فالدفعة قد تقطع حرفاً عربياً. تُنسخ لأن الذاكرة المشتركة يُعاد استعمالها
       const parts = [Buffer.from(bytes)];
       while (status === 2) {
-        Atomics.store(this.sa, 0, 0);
-        this.worker.postMessage({ sab: this.sab, next: true });
-        if (Atomics.wait(this.sa, 0, 0, 30000) === 'timed-out') throw new Error(`[DB] Query timed out: ${sql.slice(0, 100)}`);
+        this.send({ next: true }, sql);
         status = Atomics.load(this.sa, 0);
         parts.push(Buffer.from(chunk()));
       }
@@ -523,7 +531,10 @@ function resolvePgPoolConfig(connectionStringOrPath) {
   if (cs && (cs.startsWith('postgres://') || cs.startsWith('postgresql://'))) {
     const ssl = cs.includes('sslmode=require') ||
       cs.includes('amazonaws.com') || cs.includes('railway.app') || cs.includes('render.com');
-    return { connectionString: cs, ssl: ssl ? { rejectUnauthorized: false } : false };
+    if (!ssl) return { connectionString: cs, ssl: false };
+    // التحقق من شهادة القاعدة عند توفرها: DB_SSL_CA مسار شهادة الجهة، أو DB_SSL_VERIFY=1 لشهادة موثوقة عامة
+    const ca = process.env.DB_SSL_CA ? fs.readFileSync(process.env.DB_SSL_CA, 'utf8') : undefined;
+    return { connectionString: cs, ssl: { rejectUnauthorized: !!ca || process.env.DB_SSL_VERIFY === '1', ...(ca ? { ca } : {}) } };
   }
   if (process.env.SQL_HOST) {
     return {

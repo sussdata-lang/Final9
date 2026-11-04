@@ -96,6 +96,10 @@ export function deleteEmployee(db, actor, id, ip) {
   if (!e) throw new HttpError(404, 'الموظف غير موجود.', 'not_found');
   const dependent = db.prepare('SELECT COUNT(*) c FROM hr_salaries WHERE employee_id = ?').get(Number(id)).c;
   if (dependent) throw new HttpError(400, 'لا يمكن حذف موظف له سجلات راتب', 'validation');
+  // هذه الجداول تُحذف متتالية مع الموظف، وفيها أساس الرواتب والسلف: يُنهى عمله (terminated) بدل حذفه
+  for (const t of ['hr_monthly_attendance', 'hr_absences', 'hr_advances']) {
+    if (db.prepare(`SELECT 1 AS x FROM ${t} WHERE employee_id = ? LIMIT 1`).get(Number(id))) throw new HttpError(400, 'لا يمكن حذف موظف له سجلات دوام أو غياب أو سلف. غيّر حالته إلى منتهي الخدمة.', 'validation');
+  }
   db.prepare('DELETE FROM hr_leaves WHERE employee_id = ?').run(Number(id));
   db.prepare('DELETE FROM hr_contracts WHERE employee_id = ?').run(Number(id));
   db.prepare('DELETE FROM hr_employees WHERE id = ?').run(Number(id));

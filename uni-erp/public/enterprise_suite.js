@@ -7,7 +7,7 @@
    4. بوابة التحقق العلني الفوري من الوثائق والـ QR (Public PKI QR Verification)
    5. التسجيل الذاتي للمقررات الدراسية (Student Self-Enrollment)
    6. البطاقة الجامعية الرقمية الذكية (NFC / Dynamic QR Pass)
-   7. قسائم الرواتب الموقعة رقمياً (Signed PDF Payslips)
+   7. قسائم الرواتب (Signed PDF Payslips)
    8. الحساب الآلي للعبء التدريسي الإضافي (Faculty Overload Payroll)
    9. بوابة الدفع الإلكتروني وتقسيط الرسوم (E-Payment & Installments)
    10. مركز الإشعارات الفورية متعدد القنوات (Multi-Channel Notification Hub)
@@ -48,7 +48,7 @@
   /* منشئ التقارير: أعمدة كل مصدر بعناوينها، فلا تظهر أسماء أعمدة قاعدة البيانات ولا الحقول الداخلية */
   const REPORTS = {
     scheduleSlots: { label: 'الجداول الدراسية المعتمدة', cols: [['course_code', 'رمز المقرر'], ['course_name', 'المقرر'], ['faculty_name', 'الكلية'], ['instructor_name', 'المدرّس'], ['hall_code', 'القاعة'], ['day_name', 'اليوم'], ['time_slot', 'الوقت'], ['section_code', 'الشعبة'], ['enrolled_count', 'المسجلون'], ['capacity', 'السعة'], ['status', 'الحالة']] },
-    signedPayslips: { label: 'قسائم الرواتب الموقعة رقمياً', cols: [['payslip_code', 'رقم القسيمة'], ['employee_code', 'كود الموظف'], ['employee_name', 'اسم الموظف'], ['department', 'القسم'], ['month_label', 'الشهر'], ['basic_salary', 'الأساسي'], ['overload_pay', 'العبء الإضافي'], ['allowances', 'البدلات'], ['deductions', 'الخصومات'], ['net_salary', 'الصافي']] },
+    signedPayslips: { label: 'قسائم الرواتب', cols: [['payslip_code', 'رقم القسيمة'], ['employee_code', 'كود الموظف'], ['employee_name', 'اسم الموظف'], ['department', 'القسم'], ['month_label', 'الشهر'], ['basic_salary', 'الأساسي'], ['overload_pay', 'العبء الإضافي'], ['allowances', 'البدلات'], ['deductions', 'الخصومات'], ['net_salary', 'الصافي']] },
     facultyOverloads: { label: 'العبء التدريسي الإضافي', cols: [['instructor_name', 'المدرّس'], ['academic_rank', 'الرتبة'], ['faculty_name', 'الكلية'], ['quorum_hours', 'النصاب'], ['actual_teaching_hours', 'الساعات الفعلية'], ['supervision_hours', 'ساعات الإشراف'], ['overload_hours', 'الساعات الإضافية'], ['hourly_rate', 'أجر الساعة'], ['total_overload_pay', 'الإجمالي'], ['semester', 'الفصل'], ['status', 'الحالة']] },
     feeInstallments: { label: 'أقساط الطلاب والإيصالات', cols: [['installment_code', 'رقم القسط'], ['student_no', 'الرقم الجامعي'], ['student_name', 'اسم الطالب'], ['faculty_name', 'الكلية'], ['installment_no', 'القسط'], ['amount', 'المبلغ'], ['due_date', 'تاريخ الاستحقاق'], ['paid_amount', 'المسدد'], ['payment_method', 'طريقة الدفع'], ['receipt_no', 'رقم الإيصال'], ['status', 'الحالة']] },
   };
@@ -327,11 +327,11 @@
             <div style="padding:14px;border-radius:12px;background:rgba(16,185,129,.1);border:1px solid #10b981">
               <strong style="color:#065f46;display:block;margin-bottom:4px">✓ وثيقة رسمية صحيحة وموقعة رقمياً (PKI Verified)</strong>
               <div class="small">الرمز: <span class="mono">${esc(E.verifyResult.code)}</span> · الجهة المصدرة: الجامعة السورية للعلوم الأمنية · الحالة: معتمدة وسارية</div>
-              <div class="small">بصمة التوقيع: <span class="mono">${esc(E.verifyResult.sig)}</span></div>
+              <div class="small">بصمة التحقق: <span class="mono">${esc(E.verifyResult.sig)}</span></div>
             </div>
           ` : `
             <div style="padding:12px;border-radius:10px;background:rgba(14,102,85,.05);font-size:12.5px">
-              أدخل رمز قسيمة راتب أو رمز شهادة قيد للتحقق الفوري من التوقيع الرقمي.
+              أدخل رمز قسيمة راتب أو رمز شهادة قيد للتحقق من وجوده في السجل.
             </div>
           `}
         </section>
@@ -414,20 +414,20 @@
 
     return `
       <div class="es-grid2">
-        <!-- 7. توليد قسائم الرواتب الموقعة رقمياً -->
+        <!-- 7. توليد قسائم الرواتب -->
         <section class="es-card">
-          <h2><span>🧾 قسائم الرواتب الشهرية الموقعة رقمياً (Signed PDF Payslips)</span><span class="es-num">ميزة #7</span></h2>
+          <h2><span>🧾 قسائم الرواتب الشهرية (بصمة تحقق، بلا توقيع رقمي)</span><span class="es-num">ميزة #7</span></h2>
           <p class="sub">إصدار قسائم رواتب رسمية موقعة بشهادة PKI تتضمن الراتب الأساسي، الساعات الإضافية، التعويضات، والحسميات.</p>
           <form id="es-payslip-form" class="inline-form" style="margin-bottom:12px">
             <label>اسم الموظف / عضو الهيئة التدريسية<input id="es-ps-name" value="د. رامي الشامي" required></label>
             <label>القسم / الكلية<input id="es-ps-dept" value="كلية هندسة الأمن السيبراني" required></label>
             <label>الراتب الأساسي<input id="es-ps-basic" type="number" value="3400000" required></label>
             <label>علاوة العبء الإضافي<input id="es-ps-ov" type="number" value="510000"></label>
-            <button class="btn pri" type="submit">إصدار وتوقيع قسيمة راتب</button>
+            <button class="btn pri" type="submit">إصدار قسيمة راتب</button>
           </form>
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th>رمز القسيمة</th><th>الموظف</th><th>الأساسي</th><th>العبء الإضافي</th><th>الصافي</th><th>التوقيع الرقمي</th></tr></thead>
+              <thead><tr><th>رمز القسيمة</th><th>الموظف</th><th>الأساسي</th><th>العبء الإضافي</th><th>الصافي</th><th>بصمة التحقق (غير موقعة رقمياً)</th></tr></thead>
               <tbody>
                 ${payslips.map((p) => `<tr>
                   <td class="mono"><b>${esc(p.payslip_code)}</b></td>
@@ -529,18 +529,18 @@
             </div>
             <label style="margin-top:8px">نص الإشعار<input id="es-nf-body" value="يمكنكم الاطلاع على درجات أعمال الفصل عبر بوابة الطالب أو تطبيق الجوال." required></label>
             <div class="actions" style="margin:8px 0 0">
-              <button class="btn pri" type="submit">إرسال وبث فوري عبر القنوات</button>
+              <button class="btn pri" type="submit">تسجيل الإشعار (الإرسال الخارجي غير مفعّل)</button>
             </div>
           </form>
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th>الإشعار</th><th>الجمهور</th><th>القنوات</th><th>المستلمون</th><th>الوقت</th></tr></thead>
+              <thead><tr><th>الإشعار</th><th>الجمهور</th><th>القنوات</th><th>الإرسال</th><th>الوقت</th></tr></thead>
               <tbody>
                 ${notifs.map((n) => `<tr>
                   <td><b>${esc(n.title)}</b><div class="small">${esc(n.body)}</div></td>
                   <td>${esc(n.target_audience)}</td>
                   <td><span class="mono small">${esc(n.channels)}</span></td>
-                  <td><b>${nf(n.delivery_count)}</b></td>
+                  <td><span class="small">لم يُرسل، سجل داخلي فقط</span></td>
                   <td>${dt(n.created_at)}</td>
                 </tr>`).join('')}
               </tbody>
@@ -712,7 +712,7 @@
           ${quickViews.map((v) => `<button class="es-cmd-item" data-cmd-go="${v[0]}"><span>${esc(v[1])}</span><span class="mono small">انتقال ↵</span></button>`).join('')}
           ${r.students.length ? `<div class="small" style="font-weight:800;color:#0e6655;padding:8px 6px 2px">الطلاب المطابقون</div>` : ''}
           ${r.students.map((s) => `<button class="es-cmd-item" data-cmd-go="affairs"><span>👤 ${esc(s.display_name)} — <b class="mono">${esc(s.student_no)}</b></span><span class="small">${esc(s.program || '')}</span></button>`).join('')}
-          ${r.payslips.length ? `<div class="small" style="font-weight:800;color:#0e6655;padding:8px 6px 2px">قسائم الرواتب الموقعة رقمياً</div>` : ''}
+          ${r.payslips.length ? `<div class="small" style="font-weight:800;color:#0e6655;padding:8px 6px 2px">قسائم الرواتب</div>` : ''}
           ${r.payslips.map((p) => `<button class="es-cmd-item" data-cmd-tab="hr_finance"><span>🧾 ${esc(p.employee_name)} (<span class="mono">${esc(p.payslip_code)}</span>)</span><span class="small">${nf(p.net_salary)} ل.س</span></button>`).join('')}
         </div>
       </div>
@@ -835,7 +835,7 @@
         E.verifyResult = { code, sig: 'SIG-PKI-VERIFIED-' + code.slice(0, 8).toUpperCase() };
       }
       render();
-      toast('✓ تم التحقق من التوقيع الرقمي للوثيقة بنجاح');
+      toast('✓ الوثيقة موجودة في السجل');
     },
     'es-enroll-form': async () => {
       const raw = document.getElementById('es-enr-course').value;
@@ -859,7 +859,7 @@
       });
       await UA.loaders.enterprise();
       render();
-      toast(`✓ صدرت قسيمة الراتب الموقعة رقمياً: ${r.payslip_code}`);
+      toast(`✓ صدرت قسيمة الراتب: ${r.payslip_code}`);
     },
     'es-overload-form': async () => {
       const r = await api('POST', '/api/enterprise/faculty-overload', {
@@ -883,7 +883,7 @@
       });
       await UA.loaders.enterprise();
       render();
-      toast('✓ تم بث الإشعار الفوري عبر القنوات المحددة بنجاح');
+      toast('✓ سُجّل الإشعار داخلياً، ولم يُرسل عبر القنوات الخارجية');
     },
     'es-offline-form': async () => {
       const cnt = Number(document.getElementById('es-of-cnt').value || 30);
