@@ -11,10 +11,11 @@ import { buildRouter } from './routes.js';
 import { sessionUser } from './services/auth.js';
 
 import { ensureCoreAccounts, seedPassword, hasConfiguredSeedPassword } from './services/bootstrap.js';
-import { ensureStructure, STRUCTURE } from './services/structure.js';
+import { ensureStructure, STRUCTURE, FACULTY_ROLE } from './services/structure.js';
 import { ensureForms } from './services/forms/index.js';
 import { ready as financeReady } from './services/finance/core.js';
 import { hashPassword } from './security.js';
+import { createHeavyPool } from './heavy.js';
 
 export async function createApp(overrides = {}) {
   const cfg = loadConfig(overrides);
@@ -47,6 +48,7 @@ export async function createApp(overrides = {}) {
       db.prepare('UPDATE roles SET permissions_json = ? WHERE key = ? AND label = ?')
         .run(JSON.stringify(n.perms), 'head_' + n.code, n.label);
     }
+    db.prepare('UPDATE roles SET permissions_json = ? WHERE key = ? AND label = ?').run(JSON.stringify(FACULTY_ROLE.perms), FACULTY_ROLE.key, FACULTY_ROLE.label);
     if (demo) {
     const hash = await hashPassword(pw, cfg.scryptN);
     // ضمان وجود حساب موظف شؤون طلاب وحساب طالب تجريبي بدون إلزام تغيير كلمة المرور للتجربة السلسة
@@ -85,12 +87,13 @@ export async function createApp(overrides = {}) {
     }
   }
   const limiter = new RateLimiter();
-  const router = await buildRouter({ db, cfg, limiter });
+  const heavy = createHeavyPool({ db, cfg });
+  const router = await buildRouter({ db, cfg, limiter, heavy });
   const server = http.createServer(makeHandler({ cfg, router, getUser: (tok) => sessionUser(db, tok) }));
   server.headersTimeout = 15_000; server.requestTimeout = 30_000;
   // تنظيف الجلسات المنتهية كل ساعة
   const timer = setInterval(() => db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now()), 3600_000);
   timer.unref();
   const stopBackups = startBackupScheduler({ db, cfg });
-  return { server, db, cfg, limiter, router, close: async () => { clearInterval(timer); stopBackups(); await drainCertificates(db); await drainPush(); await new Promise((res) => server.close(() => { db.close(); res(); })); await closeLogger(); } };
+  return { server, db, cfg, limiter, router, close: async () => { clearInterval(timer); stopBackups(); await drainCertificates(db); await drainPush(); await heavy.close(); await new Promise((res) => server.close(() => { db.close(); res(); })); await closeLogger(); } };
 }

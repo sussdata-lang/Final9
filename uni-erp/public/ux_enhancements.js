@@ -221,72 +221,6 @@
   })();
 
   // ════════════════════════════════════════════════════════════
-  // § 3. Live Action Badges
-  // شارات العدّ التنبيهية الحية
-  // ════════════════════════════════════════════════════════════
-  const LiveBadges = (() => {
-    const endpoints = {};   // لا مسارات عدّ في الخادم بعد؛ كانت تفشل بـ404 عند كل تحميل
-    const counts = {};
-
-    async function fetchCount(tab) {
-      const url = endpoints[tab];
-      if (!url) return 0;
-      try {
-        const r = await fetch(url);
-        if (!r.ok) return 0;
-        const d = await r.json();
-        return d.count ?? d.pending ?? 0;
-      } catch { return 0; }
-    }
-
-    function updateBadge(tab, count) {
-      counts[tab] = count;
-      // شارة في .tab الرئيسية
-      $$(`.tab[data-tab="${tab}"] .live-badge, .tab[data-section="${tab}"] .live-badge`).forEach(b => {
-        b.textContent = count;
-        b.hidden = count <= 0;
-      });
-      // شارة في ws-tabs-bar
-      $$(`[data-badge-key^="${tab}"]`).forEach(b => {
-        b.textContent = count;
-        b.hidden = count <= 0;
-      });
-    }
-
-    function injectBadgeSlots() {
-      $$(`.tab[data-tab], .tab[data-section]`).forEach(tab => {
-        const tabId = tab.dataset.tab || tab.dataset.section;
-        if (tab.querySelector('.live-badge') || !endpoints[tabId]) return;
-        const badge = document.createElement('span');
-        badge.className = 'live-badge badge-n';
-        badge.setAttribute('aria-label', 'عدد المعلقة');
-        badge.hidden = true;
-        tab.appendChild(badge);
-      });
-    }
-
-    async function refresh() {
-      injectBadgeSlots();
-      for (const tab of Object.keys(endpoints)) {
-        const count = await fetchCount(tab);
-        updateBadge(tab, count);
-      }
-    }
-
-    function start() {
-      // تنفيذ أولي بعد تحميل الصفحة
-      setTimeout(refresh, 2000);
-      // تحديث كل دقيقتين
-      setInterval(refresh, 120_000);
-      // إعادة حقن الشارات عند تغيير DOM
-      const obs = new MutationObserver(() => injectBadgeSlots());
-      obs.observe(document.body, { childList: true, subtree: true });
-    }
-
-    return { start, refresh, updateBadge };
-  })();
-
-  // ════════════════════════════════════════════════════════════
   // § 4. Ctrl+K Command Palette
   // نافذة الأوامر والبحث الشامل
   // ════════════════════════════════════════════════════════════
@@ -672,14 +606,10 @@
     // تثبيت العناصر التي تحتاج DOM
     CommandPalette.mount();
 
-    // بدء شارات التنبيه بعد تحميل التطبيق
-    LiveBadges.start();
-
     // كشف الحزمة على window للتكامل
     window.UA = window.UA || {};
     window.UA.ux = {
       commandPalette: CommandPalette,
-      liveBadges:     LiveBadges,
       sidebar:        SidebarCtrl,
     };
 

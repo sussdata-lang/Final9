@@ -12,7 +12,8 @@
   const cfDef = () => ({ q: '', faculty: '', program: '', level: '', semester: '', status: '', sort: 'faculty', dir: 'asc', page: 1, size: 25 });
   const gtDef = () => ({ q: '', faculty: '', level: '', semester: '', year: '', status: '', workflow: '', sort: 'enteredAt', dir: 'desc', page: 1, size: 25, data: null, err: '' });
   A.cf = cfDef(); A.gt = gtDef();
-  UA.reset = () => { Object.assign(A, { tab: 'courses', courses: [], modal: null, news: [], cmps: [], csel: null, nedit: null }); A.cf = cfDef(); A.gt = gtDef(); };
+  const prevReset = UA.reset;
+  UA.reset = () => { if (prevReset) prevReset(); Object.assign(A, { tab: 'courses', courses: [], modal: null, news: [], cmps: [], csel: null, nedit: null }); A.cf = cfDef(); A.gt = gtDef(); };
 
   const bar = (tabs, cur, act) => `<div class="sub-tabs no-print" role="tablist">${tabs.map((t) => `<button class="chip" role="tab" data-act="${act}" data-t="${t[0]}" aria-pressed="${cur === t[0]}">${t[1]}</button>`).join('')}</div>`;
   const prog = (id) => A.programs.find((p) => String(p.id) === String(id));

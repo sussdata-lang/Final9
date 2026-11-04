@@ -12,6 +12,11 @@ export function invalidateAuditTailCache(db) {
 
 // إضافة سجل: كل صف يضم بصمة الصف السابق، فأي حذف أو تعديل لاحق يكسر السلسلة.
 export function audit(db, actor, action, ref = '', ip = null) {
+  // خيط العمليات الثقيلة لا يكتب في السلسلة مباشرة: كاتبان متزامنان يكسران تسلسل البصمات (انظر heavy.js)
+  if (db.auditSink) {
+    db.auditSink.push({ actor: actor ? { id: actor.id, label: actor.label, roleKey: actor.roleKey, role: actor.role } : null, action, ref: String(ref), ip });
+    return;
+  }
   let prev = tailHashCache.get(db);
   if (!prev) {
     const last = db.prepare('SELECT hash FROM audit_log ORDER BY id DESC LIMIT 1').get();

@@ -49,14 +49,25 @@ function readInput(db, b, cur = null) {
   };
 }
 
-const SEL = `SELECT m.*, u.name unit_name, (SELECT COUNT(*) FROM courses c WHERE c.member_id = m.id) courses,
+const SEL = `SELECT m.*, u.name unit_name, (SELECT a.username FROM users a WHERE a.id = m.user_id) account, (SELECT COUNT(*) FROM courses c WHERE c.member_id = m.id) courses,
   (SELECT COALESCE(SUM(c.hours), 0) FROM courses c WHERE c.member_id = m.id AND c.active = 1) hours,
   (SELECT COUNT(*) FROM courses c WHERE c.member_id = m.id AND c.active = 1) active_courses
   FROM faculty_members m LEFT JOIN org_units u ON u.id = m.unit_id`;
 const view = (r) => ({ id: r.id, name: r.name, rank: r.rank, unitId: r.unit_id, unit: r.unit_name ?? '', specialty: r.specialty ?? '',
   email: r.email ?? '', phone: r.phone ?? '', officeHours: r.office_hours ?? '', officeLocation: r.office_location ?? '',
   status: r.status, statusLabel: STATUS[r.status] ?? r.status, hireDate: r.hire_date, notes: r.notes ?? '', createdAt: r.created_at,
-  courses: r.courses, hours: r.hours, activeCourses: r.active_courses });
+  courses: r.courses, hours: r.hours, activeCourses: r.active_courses, account: r.account ?? '' });
+
+// حساب الدخول: به يعرف النظام مقررات عضو الهيئة فيعتمد علاماتها
+function linkAccount(db, memberId, b) {
+  if (b?.account === undefined) return;
+  const name = String(b.account ?? '').trim();
+  if (!name) { db.prepare('UPDATE faculty_members SET user_id = NULL WHERE id = ?').run(memberId); return; }
+  const u = db.prepare("SELECT id FROM users WHERE username = ? COLLATE NOCASE AND role <> 'student'").get(name);
+  if (!u) throw bad('لا يوجد حساب موظف بهذا الاسم.', 'account');
+  if (db.prepare('SELECT 1 AS x FROM faculty_members WHERE user_id = ? AND id <> ?').get(u.id, memberId)) throw new HttpError(409, 'هذا الحساب مرتبط بعضو آخر.', 'conflict', 'account');
+  db.prepare('UPDATE faculty_members SET user_id = ? WHERE id = ?').run(u.id, memberId);
+}
 
 export function options(db) {
   try {
@@ -90,6 +101,7 @@ export function createFaculty({ db }, actor, b, ip) {
   return tx(db, () => {
     const id = Number(db.prepare(`INSERT INTO faculty_members (name, rank, unit_id, specialty, email, phone, office_hours, office_location, status, hire_date, notes, created_at)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).run(d.name, d.rank, d.unitId, d.specialty, d.email, d.phone, d.officeHours, d.officeLocation, d.status, d.hireDate, d.notes, Date.now()).lastInsertRowid);
+    linkAccount(db, id, b);
     audit(db, actor, 'إضافة عضو هيئة تدريس', d.name, ip);
     return { member: view(one(db, id)) };
   });
@@ -102,6 +114,7 @@ export function updateFaculty({ db }, actor, id, b, ip) {
   return tx(db, () => {
     db.prepare('UPDATE faculty_members SET name = ?, rank = ?, unit_id = ?, specialty = ?, email = ?, phone = ?, office_hours = ?, office_location = ?, status = ?, hire_date = ?, notes = ? WHERE id = ?')
       .run(d.name, d.rank, d.unitId, d.specialty, d.email, d.phone, d.officeHours, d.officeLocation, d.status, d.hireDate, d.notes, cur.id);
+    linkAccount(db, cur.id, b);
     audit(db, actor, 'تعديل عضو هيئة تدريس', d.name, ip);
     return { member: view(one(db, cur.id)) };
   });

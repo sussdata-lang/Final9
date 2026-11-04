@@ -15,6 +15,19 @@ export function setWorkflow({ db }, actor, on, ip) {
   return { enabled: !!on };
 }
 export const canApprove = (actor) => !!actor?.can?.('grade:approve');
+// المقرر مسند إلى عضو هيئة مرتبط بهذا الحساب
+const ownsCourse = (db, actor, courseId) => !!courseId && !!db.prepare('SELECT 1 AS x FROM courses c JOIN faculty_members m ON m.id = c.member_id WHERE c.id = ? AND m.user_id = ?').get(Number(courseId), Number(actor?.id));
+const canApproveGrade = (db, actor, g) => canApprove(actor) || (!!actor?.can?.('grade:approve_own') && ownsCourse(db, actor, g.course_id));
+
+// مقررات عضو الهيئة وما أرسله قسم الامتحانات منها (المسودات لا تصله)
+export function myCourseGrades({ db }, actor) {
+  const courses = db.prepare('SELECT c.id, c.name, c.code FROM courses c JOIN faculty_members m ON m.id = c.member_id WHERE m.user_id = ? ORDER BY c.name').all(Number(actor.id));
+  const rows = db.prepare(`SELECT g.id, g.course_id, g.mark, g.theory_mark, g.practical_mark, g.workflow_status, u.student_no, u.display_name
+    FROM grades g JOIN users u ON u.id = g.student_id
+    WHERE g.workflow_status IN ('reviewed', 'approved') AND g.course_id IN (SELECT c.id FROM courses c JOIN faculty_members m ON m.id = c.member_id WHERE m.user_id = ?)
+    ORDER BY g.workflow_status DESC, u.student_no`).all(Number(actor.id));
+  return { courses: courses.map((c) => ({ ...c, rows: rows.filter((r) => r.course_id === c.id).map((r) => ({ id: r.id, studentNo: r.student_no, studentName: r.display_name, theory: r.theory_mark, practical: r.practical_mark, total: r.mark, status: r.workflow_status, statusLabel: r.workflow_status === 'reviewed' ? 'بانتظار اعتمادك' : STAGE_LABEL[r.workflow_status] })) })) };
+}
 export function needJustification(j, decisionNo) {
   const t = String(j ?? '').replace(/\s+/g, ' ').trim();
   if (t.length < 5 || t.length > 300) throw new HttpError(400, 'اكتب تبريراً (5 إلى 300 حرف) لتعديل علامة معتمدة.', 'validation', 'justification');
@@ -48,8 +61,15 @@ export function transitionGrades({ db }, actor, b, ip) {
       const from = g.workflow_status;
       if (from === stage) { skipped.push({ id, reason: 'في هذه المرحلة أصلاً' }); continue; }
       const forward = STAGES.indexOf(stage) === STAGES.indexOf(from) + 1;
+      // عضو الهيئة لا يدخل العلامات: يعتمد ما أُرسل لمقرراته أو يعيده بسبب، ولا يعيد فتح المعتمدة
+      const ownerOnly = !actor?.can?.('grade:manage');
+      if (ownerOnly) {
+        if (!actor?.can?.('grade:approve_own') || !ownsCourse(db, actor, g.course_id)) throw new HttpError(403, 'هذا المقرر غير مسند إليك.', 'forbidden');
+        if (from !== 'reviewed' || (stage !== 'approved' && stage !== 'draft')) throw new HttpError(403, 'يعتمد المدرّس العلامات المرسلة من قسم الامتحانات أو يعيدها فقط.', 'forbidden');
+        if (stage === 'draft') needJustification(just, b?.decisionNo);
+      }
       if (stage === 'approved') {
-        if (!canApprove(actor)) throw new HttpError(403, 'لا تملك صلاحية اعتماد العلامات.', 'forbidden');
+        if (!canApproveGrade(db, actor, g)) throw new HttpError(403, 'لا تملك صلاحية اعتماد العلامات.', 'forbidden');
         if (!forward) { skipped.push({ id, reason: 'يجب مراجعتها أولاً' }); continue; }
         if ((g.entered_by && Number(g.entered_by) === Number(actor?.id)) || (g.reviewed_by && Number(g.reviewed_by) === Number(actor?.id))) {
           throw new HttpError(403, 'خرق سياسة فصل المهام (SoD): لا يجوز لمدخل العلامة أو مراجعها أن يكون هو نفسه المعتمد النهائي.', 'sod_violation');
@@ -63,7 +83,7 @@ export function transitionGrades({ db }, actor, b, ip) {
       if (stage === 'approved') db.prepare("UPDATE grades SET workflow_status = 'approved', approved_by = ?, approved_at = ? WHERE id = ?").run(actor.id, now, id);
       else if (stage === 'reviewed') db.prepare("UPDATE grades SET workflow_status = 'reviewed', reviewed_by = ?, reviewed_at = ?, approved_by = NULL, approved_at = NULL WHERE id = ?").run(actor.id, now, id);
       else db.prepare("UPDATE grades SET workflow_status = 'draft', reviewed_by = NULL, reviewed_at = NULL, approved_by = NULL, approved_at = NULL WHERE id = ?").run(id);
-      logChange(db, actor, g, `${STAGE_LABEL[from]} ← ${STAGE_LABEL[stage]}`, { status: stage }, from === 'approved' ? just : null);
+      logChange(db, actor, g, `${STAGE_LABEL[from]} ← ${STAGE_LABEL[stage]}`, { status: stage }, from === 'approved' || ownerOnly ? just : null);
       updated.push(id);
       if (stage === 'approved') approvedNow.push({ studentId: g.student_id, course: g.course });
     }

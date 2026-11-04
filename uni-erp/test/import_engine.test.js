@@ -1,3 +1,4 @@
+import { verifyAuditChain } from '../server/audit.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -122,6 +123,7 @@ test('الصلاحيات: 403 بلا صلاحية، ورمز مستخدم آخر
   assert.equal(r.status, 200);
   assert.equal((await commit('proc_suppliers', r.json.stagingToken, otherProc)).status, 410, 'رمز مستخدم آخر');
   assert.equal((await commit('proc_suppliers', r.json.stagingToken, procUser)).status, 200);
+  assert.equal(verifyAuditChain(app.db).ok, true, 'الاستيراد في خيط مستقل لا يكسر سلسلة التدقيق');
   const cat = (await call('GET', '/api/import-engine/catalog', { cookie: procUser })).json;
   assert.ok(cat.kinds.length > 0 && cat.kinds.every((k) => k.group === 'procurement'));
   assert.equal(cat.canUndo, false);

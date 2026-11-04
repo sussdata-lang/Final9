@@ -1367,7 +1367,6 @@
                   <option value="critical" ${filterStatus === 'critical' ? 'selected' : ''}>الحرجة فقط (${critCount})</option>
                   <option value="resolved" ${filterStatus === 'resolved' ? 'selected' : ''}>تم حلها (${resolvedCount})</option>
                 </select>
-                <button class="btn sm" id="btn-restore-any" style="background:#0E6655;color:#fff;" title="استعادة الحالة السابقة لملف من النسخة الاحتياطية">🔄 استعادة الحالة السابقة</button>
                 <button class="btn sm" id="btn-sim-inc" title="محاكاة بلاغ خطأ من الاستوديو">🧪 تجربة إرسال بلاغ</button>
                 <button class="btn sm pri" id="btn-ref-inc">🔄 تحديث</button>
               </div>
@@ -1424,7 +1423,6 @@
                         </td>
                         <td style="white-space:nowrap;">
                           <button class="btn sm btn-view-inc" data-id="${inc.id}" style="margin-inline-end:4px;">🔍 التفاصيل</button>
-                          ${inc.file_path ? `<button class="btn sm btn-restore-file" data-filepath="${esc(inc.file_path)}" style="background:#0E6655;color:#fff;margin-inline-end:4px;" title="استعادة الحالة السابقة للملف من النسخة الاحتياطية">🔄 استعادة الحالة</button>` : ''}
                           ${!isResolved ? `<button class="btn sm pri btn-res-inc" data-id="${inc.id}">✓ حل</button>` : ''}
                           <button class="btn sm bad btn-del-inc" data-id="${inc.id}">✕</button>
                         </td>
@@ -1449,45 +1447,6 @@
         };
 
         box.querySelector('#btn-ref-inc').onclick = () => render();
-
-        box.querySelector('#btn-restore-any').onclick = () => {
-          openModal('استعادة الحالة السابقة لملف من النسخة الاحتياطية', `
-            <div style="font-size:13px;line-height:1.6;margin-bottom:10px;">اختر الملف المطلوب استعادته إلى الإصدار السابق المخزن في أحدث نسخة احتياطية للسيستم:</div>
-            <label>اختر الملف المصدري:
-              <select name="filePath" class="form-control" style="width:100%;padding:8px;border-radius:6px;margin-top:4px;">
-                <option value="public/payroll.js">public/payroll.js — منظومة شؤون الموظفين والرواتب</option>
-                <option value="server/services/hr_integrated.js">server/services/hr_integrated.js — خدمات شؤون الموظفين</option>
-                <option value="public/v12_views.js">public/v12_views.js — شاشات الوحدات التفاعلية</option>
-                <option value="public/shell.js">public/shell.js — الهيكل العام والقائمة الجانبية</option>
-                <option value="public/app.js">public/app.js — النواة الأمامية</option>
-              </select>
-            </label>
-            <label style="display:block;margin-top:10px;">سبب أو ملاحظات الاستعادة:
-              <input type="text" name="reason" value="استعادة يدوية من أحدث أرشيف نسخ احتياطي في DevOps" style="width:100%;padding:8px;border-radius:6px;margin-top:4px;" />
-            </label>
-          `, async (data) => {
-            if (!data.filePath) return;
-            await api('POST', '/api/studio/restore-file', { filePath: data.filePath, reason: data.reason });
-            notify(`تمت استعادة الملف ${data.filePath} بنجاح إلى النسخة السابقة من الأرشيف!`);
-            render();
-          });
-        };
-
-        box.querySelectorAll('.btn-restore-file').forEach((btn) => {
-          btn.onclick = async () => {
-            const filePath = btn.dataset.filepath;
-            if (!confirm(`هل أنت متأكد من رغبتك في استعادة الملف (${filePath}) إلى إصدار سابق من ملفات النسخ الاحتياطي المخزنة في النظام؟`)) return;
-            try {
-              btn.disabled = true;
-              await api('POST', '/api/studio/restore-file', { filePath, reason: 'استعادة سريعة من سجل أخطاء DevOps' });
-              notify(`تمت استعادة الملف ${filePath} بنجاح من النسخة الاحتياطية!`);
-              render();
-            } catch (err) {
-              alert('فشل استعادة الحالة السابقة: ' + (err.message || err));
-              btn.disabled = false;
-            }
-          };
-        });
 
         box.querySelector('#btn-sim-inc').onclick = async () => {
           const simCode = `SIM-DEV-${Date.now().toString().slice(-5)}`;

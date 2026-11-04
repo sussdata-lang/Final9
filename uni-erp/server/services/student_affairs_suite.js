@@ -1058,15 +1058,16 @@ export function updateDeskQueueStatus({ db }, actor, ticketId, status, ip) {
    4. تسجيل مسارات API (Routes Registration)
    ============================================================================ */
 
+export function suiteOverviewFor(deps, actor, query) {
+  if (actor?.role === 'student') return studentOverview(getStudentAffairsSuiteOverview(deps, { ...query, studentId: actor.id }), actor.id);
+  return getStudentAffairsSuiteOverview(deps, query);
+}
+
 export function registerStudentAffairsSuiteRoutes(r, deps) {
-  r.add('GET', '/api/student-affairs-suite/overview', (c) => {
-    const q = { ...c.query };
-    if (c.user?.role === 'student') {
-      q.studentId = c.user.id;
-      return c.json(200, studentOverview(getStudentAffairsSuiteOverview(deps, q), c.user.id));
-    }
-    requireSuitePerm(c.user, ...SUITE_READ);
-    c.json(200, getStudentAffairsSuiteOverview(deps, q));
+  // يقرأ كل الطلاب، فيعمل خارج الخيط الرئيسي حتى لا يعلّق بقية المستخدمين
+  r.add('GET', '/api/student-affairs-suite/overview', async (c) => {
+    if (c.user?.role !== 'student') requireSuitePerm(c.user, ...SUITE_READ);
+    c.json(200, await deps.heavy.run('suiteOverview', c, [c.query]));
   });
 
   r.add('POST', '/api/student-affairs-suite/admissions/applicant', (c) => {

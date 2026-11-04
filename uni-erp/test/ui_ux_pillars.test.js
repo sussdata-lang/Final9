@@ -67,7 +67,7 @@ test('3. ملف style.css يحتوي على تنسيقات التبويبات ا
 test('4. إصلاح التنقلات والتصميم: تنظيف وسوم HTML في القائمة الجانبية ومنع التكرار وحلقات setTimeout في الديوان وشؤون الموظفين', async () => {
   const [shellRes, uxRes] = await Promise.all([
     fetch(base + '/shell.js'),
-    fetch(base + '/ux_restructure.js'),
+    fetch(base + '/ux_corr.js'),
   ]);
   const shellJs = await shellRes.text();
   const uxJs = await uxRes.text();

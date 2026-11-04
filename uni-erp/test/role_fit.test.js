@@ -72,4 +72,32 @@ test('طلب الشراء: مقدّمه يرى طلباته فقط ولا يرى
   for (const u of ['/api/procurement/suppliers', '/api/procurement/orders', '/api/procurement/overview']) assert.equal((await call('GET', u, { cookie: a })).status, 403, u);
   assert.equal((await call('GET', '/api/procurement/items', { cookie: a })).status, 200);
   assert.equal((await call('POST', '/api/auth/login', { body: { username: 'keeper', password: '__STUDIO_ROLE_SWITCH__' } })).status, 401);
+
+  // عضو الهيئة يعتمد علامات مقرره فقط، بعد إرسالها من قسم الامتحانات
+  const staffUser = (u, perms) => add(u, perms).lastInsertRowid;
+  const fac1 = Number(staffUser('fac_one', ['grade:approve_own'])), fac2 = Number(staffUser('fac_two', ['grade:approve_own']));
+  staffUser('exam_clerk', ['grade:manage']);
+  const stuId = Number(app.db.prepare("INSERT INTO users (username, display_name, password_hash, role, student_no, created_at) VALUES ('fit-stu', 'طالب', ?, 'student', 'FIT-1', ?)").run(hash, Date.now()).lastInsertRowid);
+  const member = (name, uid) => Number(app.db.prepare("INSERT INTO faculty_members (name, rank, status, user_id, created_at) VALUES (?, 'مدرس', 'active', ?, ?)").run(name, uid, Date.now()).lastInsertRowid);
+  const m1 = member('العضو الأول', fac1), m2 = member('العضو الثاني', fac2);
+  const prog = app.db.prepare('SELECT id FROM programs ORDER BY id LIMIT 1').get().id;
+  const courseOf = (name, mid) => Number(app.db.prepare('INSERT INTO courses (program_id, level, semester, name, code, member_id) VALUES (?, 1, 1, ?, ?, ?)').run(prog, name, name, mid).lastInsertRowid);
+  const c1 = courseOf('FIT-A', m1), c2 = courseOf('FIT-B', m2);
+  const gradeIn = (cid, status) => Number(app.db.prepare("INSERT INTO grades (student_id, term, course, hours, mark, course_id, workflow_status) VALUES (?, 'ف', 'مقرر', 3, 70, ?, ?)").run(stuId, cid, status).lastInsertRowid);
+  const draft = gradeIn(c1, 'reviewed');
+  const f1 = await login('fac_one'), f2 = await login('fac_two'), clerk = await login('exam_clerk');
+  const flow = (cookie, ids, stage, justification) => call('POST', '/api/grades/workflow', { cookie, body: { gradeIds: ids, stage, justification } });
+  assert.equal((await call('GET', '/api/faculty/my-grades', { cookie: f1 })).json.courses[0].rows.length, 1);
+  assert.equal((await call('GET', '/api/faculty/my-grades', { cookie: f2 })).json.courses[0].rows.length, 0, 'لا يرى علامات غيره');
+  assert.equal((await call('GET', '/api/faculty/my-grades', { cookie: clerk })).status, 403);
+  assert.equal((await flow(f2, [draft], 'approved')).status, 403, 'مقرر غيره');
+  assert.equal((await flow(f1, [draft], 'draft')).status, 400, 'الإعادة تحتاج سبباً');
+  assert.equal((await flow(f1, [draft], 'draft', 'علامة العملي غير مطابقة')).json.updated, 1);
+  assert.equal((await call('GET', '/api/faculty/my-grades', { cookie: f1 })).json.courses[0].rows.length, 0, 'المعادة لا تظهر له');
+  assert.equal((await flow(f1, [draft], 'reviewed')).status, 403, 'لا يرسل بدل قسم الامتحانات');
+  assert.equal((await flow(clerk, [draft], 'reviewed')).json.updated, 1);
+  assert.equal((await flow(clerk, [draft], 'approved')).status, 403, 'قسم الامتحانات لا يعتمد بلا صلاحية');
+  assert.equal((await flow(f1, [draft], 'approved')).json.updated, 1);
+  assert.equal(app.db.prepare('SELECT workflow_status s FROM grades WHERE id = ?').get(draft).s, 'approved');
+  assert.equal((await flow(f1, [draft], 'draft', 'إعادة فتح معتمدة')).status, 403, 'لا يعيد فتح المعتمدة');
 });

@@ -141,7 +141,7 @@ Object.assign(window.UA, {
       v.push(['affairs', can('student:read') || can('student:register') || can('sa_admissions:view') || can('sa_advising:view') || can('sa_scholarships:view') ? tr('شؤون الطلاب') : can('request:read_all') ? tr('الطلبات') : tr('الطلبات المحالة لقسمي')]);
     }
     // 2) الأكاديمي والامتحانات (تضم المقررات والعلامات وإنشاء فحص الامتحان PDF وميزات التطوير الأكاديمي)
-    if (can('course:manage') || can('grade:manage') || can('grade:approve') || can('faculty:manage')) v.push(['academics', tr('المواد والعلامات والامتحانات')]);
+    if (can('course:manage') || can('grade:manage') || can('grade:approve') || can('grade:approve_own') || can('faculty:manage')) v.push(['academics', tr('المواد والعلامات والامتحانات')]);
     if (can('attendance:manage')) v.push(['attendance', tr('سجل القاعات')]);
     v.push(['expansions', tr('الامتحانات والسكن والتقييم')]);
     // 2-ب) الوحدات المتقدمة (5.12–5.15)
@@ -585,17 +585,16 @@ Object.assign(window.UA, {
     if (!S.me && S.view !== 'verify') {
       app.innerHTML = loginView() + siteFoot();
       if (UA.i18n) UA.i18n.translateDom(app);
-      notifyParent();
       restoreScrollAndFocus(snap);
       return;
     }
     if (S.me && S.me.mustChange) {
       app.innerHTML = mustChangeView();
       if (UA.i18n) UA.i18n.translateDom(app);
-      notifyParent();
       restoreScrollAndFocus(snap);
       return;
     }
+    if (S.me && !viewReady(S.view)) { ensureView(S.view).then(render, (e) => toast(e.message)); return; }
     const v = S.view === 'verify' ? verifyView : (UA.views[S.view] || BUILTIN[S.view] || (() => ''));
     if (typeof v === 'function' && v.length >= 1 && UA.views[S.view]) {
       const shellOpts = S.me && S.me.role === 'student'
@@ -605,32 +604,42 @@ Object.assign(window.UA, {
       const mount = app.querySelector('#ua-view-mount') || app;
       UA.views[S.view](mount, S.me);
       if (UA.i18n) UA.i18n.translateDom(app);
-      notifyParent();
       restoreScrollAndFocus(snap);
       return;
     }
     if (S.me && S.me.role === 'student') {
       app.innerHTML = UA.studentShell();
       if (UA.i18n) UA.i18n.translateDom(app);
-      notifyParent();
       restoreScrollAndFocus(snap);
       return;
     }
     app.innerHTML = UA.shell ? UA.shell(v()) : header() + '<main>' + v() + '</main></div>' + siteFoot();
     if (UA.i18n) UA.i18n.translateDom(app);
-    notifyParent();
     restoreScrollAndFocus(snap);
   }
-  function notifyParent() {
-    try {
-      if (window.parent && window.parent !== window) {
-        window.parent.postMessage({ type: 'UNI_ERP_STATE', user: S.me ? { username: S.me.username, name: S.me.name, role: S.me.role } : null, view: S.view }, '*');
-      }
-    } catch { /* ignore */ }
+  /* ---------- ملفات الأقسام الكبيرة تُحمَّل عند فتحها ---------- */
+  const LAZY = { finance: ['finance.js'], procurement: ['procurement.js'], access: ['access.js'], guidelines: ['guidelines.js'], lms: ['v12_views.js'], research: ['v12_views.js'], alumni: ['v12_views.js'], qa: ['v12_views.js'], expansions: ['v12_views.js'], ai: ['v12_views.js'], audit: ['v12_views.js'] };
+  const ASSET_V = (document.currentScript && document.currentScript.src.split('?')[1]) || '';
+  const scripts = new Map();
+  function loadScript(file) {
+    if (!scripts.has(file)) {
+      scripts.set(file, new Promise((resolve, reject) => {
+        const el = document.createElement('script');
+        el.src = `/${file}?${ASSET_V}`; el.async = false;
+        el.onload = () => { el.dataset.done = '1'; resolve(); };
+        el.onerror = () => { scripts.delete(file); reject(new Error('تعذّر تحميل القسم؛ تحقق من الاتصال وأعد المحاولة.')); };
+        document.head.appendChild(el);
+      }));
+    }
+    return scripts.get(file);
   }
+  const lazyFiles = (view) => (S.me && S.me.role === 'student' && view === 'guidelines' ? [] : LAZY[view] || []);
+  const ensureView = (view) => Promise.all(lazyFiles(view).map(loadScript));
+  const viewReady = (view) => lazyFiles(view).every((f) => document.querySelector(`script[src^="/${f}?"][data-done]`));
   async function loadFor(view) {
     if (!S.me) return;
     try {
+      await ensureView(view);
       if (UA.loaders[view]) await UA.loaders[view]();
       else if (view === 'affairs') {
         const [r, st] = await Promise.all([
@@ -868,77 +877,5 @@ Object.assign(window.UA, {
   // التبديل التلقائي بين عرض الحاسوب والجوال عند تغيّر عرض النافذة (تدوير الجهاز أو تغيير حجم النافذة)
   try { UA.mq.addEventListener('change', () => { if (S.me) { $('#layer').innerHTML = ''; render(); } }); } catch { /* متصفح قديم */ }
 
-  // جسر التحكم المباشر من الشريط العلوي (تبديل الأدوار وفتح الوحدات بنقرة واحدة)
-  window.addEventListener('message', async (ev) => {
-    const msg = ev && ev.data;
-    if (!msg || typeof msg !== 'object') return;
-    if (msg.type === 'UNI_ERP_LOGIN') {
-      if (ev.origin !== location.origin) return;   // لا يُقبل تسجيل دخول من صفحة أخرى
-      try {
-        $('#layer').innerHTML = '';
-        const r = await api('POST', '/api/auth/login', {
-          username: msg.username,
-          password: msg.password || '',
-        });
-        S.me = r.user; S.err = '';
-        S.services = (await api('GET', '/api/services')).services;
-        const targetView = msg.view || viewsFor(r.user.role)[0][0];
-        await go(targetView);
-        toast('تم تسجيل الدخول بحساب: ' + r.user.name);
-      } catch (err) {
-        toast(err.message || 'تعذّر تسجيل الدخول');
-      }
-    } else if (msg.type === 'UNI_ERP_NAV' && msg.view) {
-      if (!S.me) return;
-      $('#layer').innerHTML = '';
-      await go(msg.view);
-      if (msg.tab && msg.view === 'overview' && UA.actions.maindashtab) {
-        await UA.actions.maindashtab(null, { t: msg.tab });
-      }
-      if (msg.tab && msg.view === 'guidelines' && UA.actions.guidetab) {
-        await UA.actions.guidetab(null, { t: msg.tab });
-      }
-      if (msg.tab && msg.view === 'payroll') {
-        if (msg.tab === 'enterprise_hr' || msg.tab === 'att_leaves' || msg.tab === 'biometrics' || msg.tab === 'appraisals') {
-          if (UA.actions.hrunified) await UA.actions.hrunified(null, { t: msg.tab });
-        } else if (UA.actions.hrtab) {
-          await UA.actions.hrtab(null, { t: msg.tab });
-        }
-      }
-      if (msg.tab && msg.view === 'enterprise' && UA.actions.estab) {
-        await UA.actions.estab(null, { t: msg.tab });
-      }
-      if (msg.tab && msg.view === 'affairs') {
-        S.stTab = msg.tab;
-        if (UA.loadStudentAffairsSuite) await UA.loadStudentAffairsSuite();
-        render();
-      }
-      if (msg.tab && msg.view === 'access' && UA.actions.xtab) {
-        await UA.actions.xtab(null, { t: msg.tab });
-      }
-    } else if (msg.type === 'UNI_ERP_LANG' && msg.lang) {
-      try {
-        localStorage.setItem('uni_erp_studio_lang', msg.lang);
-        if (window.UA && window.UA.i18n && window.UA.i18n.syncLang) {
-          window.UA.i18n.syncLang(msg.lang, { notifyParent: false, source: 'studio_postmessage' });
-        } else if (window.UA && window.UA.i18n) {
-          window.UA.i18n.setLang(msg.lang);
-        }
-        document.documentElement.lang = msg.lang;
-        document.documentElement.dir = msg.lang === 'en' ? 'ltr' : 'rtl';
-        const appEl = document.getElementById('app');
-        if (appEl) {
-          appEl.dir = msg.lang === 'en' ? 'ltr' : 'rtl';
-          appEl.lang = msg.lang;
-        }
-        render();
-        if (window.UA && window.UA.i18n) {
-          window.UA.i18n.translateDom(appEl || document.body);
-        }
-      } catch (err) {}
-    }
-  });
-
-
-  Object.assign(UA, { spill, relatedRequests, header, siteFoot, upload, mediaHtml, viewsFor, S, api, esc, fmt, dur, $, val, toast, render, guard, go, loadFor, can, pill, steps, detailsText, events, docHtml, verifyView, readFile, afterLogin, ROLE_LABEL });
+  Object.assign(UA, { ensureView, spill, relatedRequests, header, siteFoot, upload, mediaHtml, viewsFor, S, api, esc, fmt, dur, $, val, toast, render, guard, go, loadFor, can, pill, steps, detailsText, events, docHtml, verifyView, readFile, afterLogin, ROLE_LABEL });
 })();

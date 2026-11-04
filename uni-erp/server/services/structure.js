@@ -28,6 +28,9 @@ const DEPT_EXTRA = {
   sa_care: ['alumni_career:view'], of_alumni: ['alumni_career:view'],
   discipline: ['sa_discipline:view'], of_grievance: ['sa_discipline:view'], legal: ['sa_discipline:view'],
 };
+// دور عضو الهيئة التدريسية: يعتمد علامات مقرراته فقط ولا يدخلها، ولا يطّلع على سجل الطلاب كاملاً
+export const FACULTY_ROLE = { key: 'faculty_member', label: 'عضو هيئة تدريسية', description: 'يعتمد سجل علامات مقرراته المسندة إليه بعد إرساله من قسم الامتحانات، ويدير قاعاته ومحتواه التعليمي.',
+  perms: ['grade:approve_own', 'attendance:manage', 'lms_lib:view', 'lms_lib:write', 'research_grad:view', 'corr:use', 'staffatt:self', INTERNAL, 'procurement:request'] };
 export const STRUCTURE = [
   // ---- الإدارات الست عشرة ----
   { code: 'affairs', name: 'شؤون الطلاب', kind: 'department', parent: U, module: 'وحدة شؤون الطلاب والخدمات', label: 'مدير شؤون الطلاب',
@@ -156,6 +159,10 @@ export async function ensureStructure({ db, cfg }, { activate = false, password 
           out.accounts++; if (activate) out.activated++;
         }
       }
+    }
+    if (!db.prepare('SELECT 1 FROM roles WHERE key = ?').get(FACULTY_ROLE.key)) {
+      db.prepare('INSERT INTO roles (key, label, description, permissions_json, created_at) VALUES (?,?,?,?,?)').run(FACULTY_ROLE.key, FACULTY_ROLE.label, FACULTY_ROLE.description, JSON.stringify(FACULTY_ROLE.perms), Date.now());
+      out.roles++;
     }
     for (const [a, b, two] of LINKS) {
       const from = ids.get(a), to = ids.get(b);

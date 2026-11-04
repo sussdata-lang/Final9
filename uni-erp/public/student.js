@@ -9,7 +9,9 @@
 
   const T = { all: null, profile: null, news: null, courses: null, grades: null, reqs: null, cmps: null, loading: {},
     guide: { level: null, sem: '' }, gr: { level: null, sem: '', open: {} }, openReq: {}, wz: null, error: '' };
-  UA.reset = () => Object.assign(T, { all: null, profile: null, news: null, courses: null, grades: null, reqs: null, cmps: null, loading: {}, guide: { level: null, sem: '' }, gr: { level: null, sem: '', open: {} }, openReq: {}, wz: null });
+  const prevReset = UA.reset;
+  UA.reset = () => { if (prevReset) prevReset(); resetStudent(); };
+  const resetStudent = () => Object.assign(T, { all: null, profile: null, news: null, courses: null, grades: null, reqs: null, cmps: null, loading: {}, guide: { level: null, sem: '' }, gr: { level: null, sem: '', open: {} }, openReq: {}, wz: null });
 
   /* ---------- أيقونات ---------- */
   // الأيقونات من المجموعة الموحّدة بهوية الجامعة (public/icons.js)
@@ -26,63 +28,6 @@
   const curLevel = () => (T.profile ? T.profile.level : 1);
   const levelChips = (act, cur) => `<div class="m-chips" role="tablist">${Array.from({ length: years() }, (_, i) => i + 1).map((n) => `<button class="m-chip" role="tab" data-act="${act}" data-l="${n}" aria-selected="${cur === n}">السنة ${LV[n - 1] || n}</button>`).join('')}</div>`;
   const semSelect = (id, cur) => `<div class="m-sort"><span>ترتيب حسب</span><select data-chg="${id}" aria-label="الفصل الدراسي"><option value=""${cur === '' ? ' selected' : ''}>الفصلين معاً</option><option value="1"${cur === '1' ? ' selected' : ''}>الفصل الأول</option><option value="2"${cur === '2' ? ' selected' : ''}>الفصل الثاني</option></select></div>`;
-
-  /* ---------- الصفحات ---------- */
-  function homePage() {
-    const h = new Date().getHours(), hello = h < 12 ? 'صباح الخير' : 'مساء الخير';
-    const news = T.news ? (T.news.length ? `<div class="m-car" tabindex="0" aria-label="أبرز الأخبار">${T.news.slice(0, 8).map((n) => `<button class="m-news-c" data-act="newsopen" data-id="${n.id}"><span class="d">${esc(day(n.publishedAt))}</span><b>${esc(n.title)}</b></button>`).join('')}</div>` : '<div class="m-empty small-e">لا أخبار حالياً.</div>') : '<div class="m-car">' + sk(1) + '</div>';
-    const order = { excellence_year: 1, campus_life: 2, transcript: 3, attendance: 4, excuse: 5 };
-    const svcs = S.services.filter((s) => order[s.code]).sort((a, b) => order[a.code] - order[b.code]);
-    const more = S.services.length > svcs.length ? '<button class="m-svc wide" data-act="wzstart" data-k=""><span class="ic">☰</span><b>جميع المعاملات والنماذج</b></button>' : '';
-    const cards = svcs.map((s, i) => `<button class="m-svc${svcs.length % 2 && i === 0 ? ' wide' : ''}" data-act="wzstart" data-k="${esc(s.code)}"><span class="ic">${svcIcon(s.code)}</span><b>${esc(s.label)}</b></button>`).join('') + more;
-    return `<header class="m-hello"><button class="m-avatar" data-act="drawer" aria-label="الملف الشخصي"><span>${esc(S.me.name[0])}</span></button><div><small>${hello}</small><b>${esc(S.me.name)}</b></div></header>
-      <section><div class="m-sec"><h2>أبرز الأخبار</h2><button class="link" data-act="snav" data-v="news">عرض الكل</button></div>${news}</section>
-      <section><div class="m-sec"><h2>المعاملات</h2></div><div class="m-svcs">${cards}</div></section>`;
-  }
-  function guidePage() {
-    const lv = T.guide.level || curLevel();
-    let body;
-    if (T.loading.guide || !T.courses) body = sk(6);
-    else if (!T.courses.length) body = empty('لا توجد مقررات مسجَّلة لهذه السنة بعد', 'تُضاف المقررات من قسم شؤون الطلاب.');
-    else body = T.courses.map((c) => `<article class="m-card"><b>${esc(c.name)} - ${SEM_LABEL[c.semester]}</b><small>${esc(c.instructor || 'المدرّس غير محدد')}</small></article>`).join('');
-    return pageHead('دليل المواد') + confBanner() + levelChips('glvl', lv) + semSelect('gsem', T.guide.sem) + `<div class="m-list">${body}</div>`;
-  }
-  function gradeCard(g) {
-    const open = T.gr.open[g.id], badge = g.passed ? `<span class="m-badge ok">${IC.check}ناجح</span>` : `<span class="m-badge bad">${IC.cross}راسب</span>`;
-    const marks = (x) => `<div class="m-marks">${x.theory !== null ? `<span>علامة الامتحان النظري <b>${x.theory}</b></span>` : ''}${x.practical !== null ? `<span>علامة الامتحان العملي <b>${x.practical}</b></span>` : ''}<span>العلامة الكلية <b>${x.total}</b></span></div>`;
-    const prev = g.previous.length ? `<button class="m-prev" data-act="gprev" data-id="${g.id}" aria-expanded="${!!open}"><span>عرض العلامات السابقة</span>${IC.back}</button>` : '';
-    const prevList = open ? g.previous.map((p) => `<div class="m-prevrow"><small>${esc(p.academicYear || '')}</small>${marks(p)}</div>`).join('') : '';
-    return `<article class="m-card g">${badge}<b>${esc(g.course)} - ${SEM_LABEL[g.semester] || ''}</b>${g.instructor ? `<small>${esc(g.instructor)}</small>` : ''}<hr>${marks(g)}${prev}${prevList}</article>`;
-  }
-  function gradesPage() {
-    const lv = T.gr.level || curLevel();
-    let body;
-    if (T.loading.grades || !T.grades) body = sk(4);
-    else {
-      let list = T.grades.grades; if (T.gr.sem) list = list.filter((g) => String(g.semester) === T.gr.sem);
-      const sm = T.grades.summary;
-      const sum = sm.count ? `<div class="m-sum"><div><b>${sm.count}</b><small>مقرراً</small></div><div class="ok"><b>${sm.passed}</b><small>ناجح</small></div><div class="bad"><b>${sm.failed}</b><small>راسب</small></div><div><b>${sm.average ?? '—'}</b><small>المعدل</small></div></div>` : '';
-      body = sum + (list.length ? list.map(gradeCard).join('') : empty('لا توجد علامات لهذه السنة بعد', 'تظهر العلامات هنا فور اعتمادها من شؤون الطلاب.'));
-    }
-    return pageHead('علاماتي') + levelChips('grlvl', lv) + semSelect('grsem', T.gr.sem) + `<div class="m-list">${body}</div>`;
-  }
-  function newsPage() {
-    const body = !T.news ? sk(5) : (T.news.length ? T.news.map((n) => `<button class="m-news-r" data-act="newsopen" data-id="${n.id}"><span class="t"><small>${esc(day(n.publishedAt))}${n.pinned ? ' · ' + UA.icon('pin', 14) + ' مثبّت' : ''}</small><b>${esc(n.title)}</b><span class="ex">${esc(n.body.length > 90 ? n.body.slice(0, 90) + '…' : n.body)}</span></span>${(n.media.find((m) => m.kind === 'image') || {}).src ? `<img class="th" src="${esc(n.media.find((m) => m.kind === 'image').src)}" alt="" loading="lazy">` : (n.media.length ? '<span class="th vid-ic" aria-hidden="true">▶</span>' : '')}</button>`).join('') : empty('لا أخبار حالياً'));
-    return pageHead('التعميمات والأخبار') + `<div class="m-list">${body}</div>`;
-  }
-  function reqCard(r) {
-    const open = T.openReq[r.id], st = UA.pill(r);
-    const det = open ? `<div class="m-det"><div class="hint">${esc(UA.detailsText(r))}</div>${UA.steps(r)}${r.status === 'rejected' ? `<div class="reason">سبب الرفض: ${esc(r.rejectReason)}</div>` : ''}
-      ${r.document ? `<div class="actions"><button class="btn pri sm" data-act="doc" data-c="${esc(r.document.code)}">عرض الوثيقة</button><button class="btn sm" data-act="docpdf" data-c="${esc(r.document.code)}">حفظ كملف PDF</button><span class="hint" style="align-self:center">رمز التحقق: <span class="mono">${esc(r.document.code)}</span></span></div>` : ''}${UA.events(r)}</div>` : '';
-    return `<article class="m-card r"><button class="m-reqh" data-act="reqtoggle" data-id="${r.id}" aria-expanded="${!!open}"><span><b>${esc(r.service.label)}</b><small>${esc(r.no)} · ${fmt(r.createdAt)}</small></span>${st}</button>${det}</article>`;
-  }
-  function txPage() {
-    let body;
-    if (!T.reqs) body = sk(4);
-    else if (!T.reqs.length) body = `<div class="m-empty big"><b>لا يوجد معاملات سابقة لك</b><p>إذا كنت ترغب في الحصول على معاملة جديدة وبسهولة مطلقة، ما عليك إلا أن تبدأ بإنشاء واحدة الآن</p><button class="m-btn" data-act="wzstart">إنشاء معاملة جديدة ${IC.plus}</button></div>`;
-    else body = T.reqs.map(reqCard).join('');
-    return pageHead('المعاملات', `<button class="btn pri sm m-newtx" data-act="wzstart">${IC.plus}<span>إنشاء معاملة جديدة</span></button>`) + `<div class="m-list">${body}</div><button class="m-fab" data-act="wzstart" aria-label="إنشاء معاملة جديدة">${IC.plus}</button>`;
-  }
 
   /* ---------- صفحات الحاسوب بالتصميم الجديد (الهيكل من shell.js) ---------- */
   const sx = () => UA.sx;
@@ -193,16 +138,10 @@
 
   /* ---------- الهيكل العام ---------- */
   UA.studentShell = function () {
-    const nav = UA.viewsFor ? UA.viewsFor('student') : [['home', 'الرئيسية'], ['guide', 'دليل المواد'], ['grades', 'علاماتي'], ['news', 'الأخبار'], ['tx', 'معاملاتي']];
-    let page;
-    if (S.view === 'verify') page = `<div class="m-verify"><button class="m-back" data-act="snav" data-v="home" aria-label="رجوع">${IC.back}<span>رجوع</span></button>${UA.verifyView()}</div>`;
-    else page = ({ home: homePage, guide: guidePage, grades: gradesPage, news: newsPage, tx: txPage }[S.view] || homePage)();
     const act = S.view === 'verify' ? 'home' : S.view;
-    {                                           // الهيكل الجديد لكل المقاسات: قائمة جانبية (منزلقة على الجوال) + شريط علوي
-      const pageD = S.view === 'verify' ? `<div class="sx-verify">${UA.verifyView()}</div>` : ({ home: homeD, guide: guideD, grades: gradesD, news: newsD, tx: txD, guidelines: guidelinesD }[S.view] || homeD)();
-      return desktopShell(pageD, act);
-    }
-    return `<div class="m-app"><main class="m-main">${page}</main><nav class="m-nav" aria-label="التنقل الرئيسي">${nav.map(([k, l]) => `<button data-act="snav" data-v="${k}" aria-current="${act === k ? 'page' : 'false'}">${IC[{ home: 'home', guide: 'guide', grades: 'grades', news: 'news', tx: 'tx' }[k]]}<span>${l}</span></button>`).join('')}</nav></div>`;
+    // قائمة جانبية (منزلقة على الجوال) + شريط علوي
+    const pageD = S.view === 'verify' ? `<div class="sx-verify">${UA.verifyView()}</div>` : ({ home: homeD, guide: guideD, grades: gradesD, news: newsD, tx: txD, guidelines: guidelinesD }[S.view] || homeD)();
+    return desktopShell(pageD, act);
   };
 
   /* ---------- تحميل البيانات ---------- */

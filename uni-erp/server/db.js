@@ -586,6 +586,8 @@ async function runMigrations(poolConfig) {
       )
     `);
 
+    // أُعيدت تسمية ترحيل كان يتشارك الرقم 029: ما طُبّق باسمه القديم لا يُعاد تنفيذه، والترتيب لم يتغير
+    await pool.query("UPDATE schema_migrations SET name = '029b_student_affairs_suite.sql' WHERE name = '029_student_affairs_suite.sql'");
     const { rows: done } = await pool.query('SELECT name FROM schema_migrations');
     const doneSet = new Set(done.map((r) => r.name));
 
@@ -693,6 +695,13 @@ function describePgTarget(poolConfig) {
     }
   } catch { return { host: '', port: '', database: '' }; }
   return { host: poolConfig.host || '', port: poolConfig.port || '5432', database: poolConfig.database || '' };
+}
+
+// اتصال إضافي بقاعدة جاهزة (بلا ترحيلات) لخيوط العمليات الثقيلة
+export function connectDb(url) {
+  const db = new DbWrapper(new SyncExecutor(resolvePgPoolConfig(url)));
+  db.pgUrl = url;
+  return db;
 }
 
 export async function openDb(connectionStringOrPath) {

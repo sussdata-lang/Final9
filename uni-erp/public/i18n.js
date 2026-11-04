@@ -42,6 +42,9 @@
       window.history.replaceState(null, '', url.pathname + url.search);
     } catch (e) {}
 
+    // القاموس لا يُحمَّل بالعربية، فالتحويل إلى الإنجليزية يعيد تحميل الصفحة
+    if (isEn && !window.UA_DICT_EN) { window.location.reload(); return l; }
+
     // 3. تطبيق سمات الاتجاه واللغة على عناصر الجذر
     applyLang(l);
     if (prevLang === 'en' && l === 'ar' && opts.reloadOnArabic !== false) { window.location.reload(); return l; }
@@ -53,16 +56,6 @@
           new CustomEvent(LANG_EVENT_NAME, {
             detail: { lang: l, dir, prevLang, source: opts.source || 'erp_i18n' },
           })
-        );
-      } catch (e) {}
-    }
-
-    // 5. إشعار النافذة الحاضنة (الاستوديو) فوراً إن وُجدت
-    if (opts.notifyParent !== false && window.parent && window.parent !== window) {
-      try {
-        window.parent.postMessage(
-          { type: 'STUDIO_LANG_CHANGED', lang: l, dir },
-          '*'
         );
       } catch (e) {}
     }

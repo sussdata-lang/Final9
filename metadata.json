@@ -1,6 +1,0 @@
-{
-  "name": "Argon CodeStudio - منصة تطوير وتكويد المواقع بالذكاء الاصطناعي",
-  "description": "استوديو تطوير وتكويد متكامل لبناء وتعديل وتصميم مواقع الويب التفاعلية مع معاينة حية ومحرر كود متقدم ومساعد برمجيات ذكي لتوليد الأكواد والتطوير الفوري.",
-  "requestFramePermissions": ["camera"],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

@@ -43,7 +43,7 @@ import { qrSvg } from './qr.js';
 import { overview, createRole, updateRole, deleteRole, createUnit, updateUnit, deleteUnit, createLink, deleteLink, linkedTargets, matrixXlsx } from './services/access.js';
 import { registrationOptions, registerStudent, listStudents, listStudentsTable, getStudent, updateStudent, resetStudentPassword, myProfile, updateOwnContact, listPrograms, addProgram, toggleProgram, listFaculties, addFaculty, toggleFaculty, updateFaculty, deleteFaculty, updateProgram, deleteProgram, deleteStudent } from './services/students.js';
 import { listCourses, listGradesTable, createCourse, toggleCourse, updateCourse, deleteCourse, myGrades, gradesFor, enterGrade, deleteGrade, listNews, createNews, updateNews, deleteNews, createComplaint, listComplaints, respondComplaint, deleteComplaint } from './services/academics.js';
-import { transitionGrades, gradeHistory, workflowOn, setWorkflow } from './services/workflow.js';
+import { transitionGrades, gradeHistory, workflowOn, setWorkflow, myCourseGrades } from './services/workflow.js';
 import { getSlots, setSlots, detectScheduleConflicts, DAYS } from './services/schedule.js';
 import { getUnifiedStudentRecord } from './services/record360.js';
 import { expandFields, requesterKind, createRequest, listRequests, getRequest, decide, forwardRequest, stats, readAttachment } from './services/requests.js';
@@ -100,7 +100,7 @@ export async function buildRouter(deps) {
 
   // ---- تطبيق الطالب: المواد والعلامات والأخبار والشكاوى ----
   r.add('GET', '/api/courses', (c) => {
-    if (!['course:read_own', 'course:manage', 'grade:manage', 'grade:approve'].some((p) => c.user.can(p))) throw new HttpError(403, 'لا تملك صلاحية هذا الإجراء.', 'forbidden');
+    if (!['course:read_own', 'course:manage', 'grade:manage', 'grade:approve', 'grade:approve_own'].some((p) => c.user.can(p))) throw new HttpError(403, 'لا تملك صلاحية هذا الإجراء.', 'forbidden');
     c.json(200, listCourses(deps, c.user, c.query));
   });
   r.add('POST', '/api/courses', (c) => { need(c, 'course:manage'); c.json(201, createCourse(deps, c.user, c.body, c.ip)); });
@@ -120,8 +120,10 @@ export async function buildRouter(deps) {
   });
   r.add('DELETE', '/api/students/:id/grades/:gid', (c) => { need(c, 'grade:manage'); c.json(200, deleteGrade(deps, c.user, c.params.id, c.params.gid, c.ip, c.query.justification)); });
   // ---- مراحل اعتماد العلامات، جدول المحاضرات، السجل الموحّد ----
+  r.add('GET', '/api/faculty/my-grades', (c) => { need(c, 'grade:approve_own'); c.json(200, myCourseGrades(deps, c.user)); });
   r.add('POST', '/api/grades/workflow', (c) => {
-    need(c, 'grade:manage'); const out = transitionGrades(deps, c.user, c.body, c.ip);
+    if (!c.user.can('grade:approve_own')) need(c, 'grade:manage');   // صلاحية المقرر نفسه تُفحص داخل transitionGrades
+    const out = transitionGrades(deps, c.user, c.body, c.ip);
     for (const a of out.approvedNow) notifyGrade(deps, a.studentId, a.course);
     c.json(200, { updated: out.updated, skipped: out.skipped, stage: out.stage });
   });
@@ -199,7 +201,7 @@ export async function buildRouter(deps) {
   r.add('PUT', '/api/students/:id', (c) => { need(c, 'student:update'); c.json(200, { student: updateStudent(deps, c.user, c.params.id, c.body, c.ip) }); });
   r.add('DELETE', '/api/students/:id', (c) => { need(c, 'student:delete'); deleteStudent(deps, c.user, c.params.id, c.ip); c.json(200, { ok: true }); });
   r.add('POST', '/api/students/:id/reset-password', async (c) => { need(c, 'student:reset_password'); c.json(200, await resetStudentPassword(deps, c.user, c.params.id, c.ip)); });
-  r.add('GET', '/api/programs', (c) => { need(c, 'student:read'); c.json(200, cacheGetOrSet(db, 'catalog', 'programs:list', () => ({ programs: listPrograms(db) }), 120_000)); });
+  r.add('GET', '/api/programs', (c) => { if (!c.user.can('grade:approve_own')) need(c, 'student:read'); c.json(200, cacheGetOrSet(db, 'catalog', 'programs:list', () => ({ programs: listPrograms(db) }), 120_000)); });
   // ---- سجل نشاط البطاقة الجامعية الرقمية (NFC / Barcode Activity & Gate Pass Logs) ----
   r.add('GET', '/api/students/:id/card-activity', (c) => {
     need(c, 'student:read');
@@ -242,16 +244,16 @@ export async function buildRouter(deps) {
   // الاستيراد الجدولي: كل نوع يفرض صلاحيته داخل المحرك
   r.add('GET', '/api/import-engine/catalog', (c) => c.json(200, importCatalog(c.user)));
   r.add('GET', '/api/import-engine/batches', (c) => c.json(200, listBatches(deps, c.user)));
-  r.add('POST', '/api/import-engine/batches/:id/undo', (c) => c.json(200, undoBatch(deps, c.user, c.params.id, c.ip)));
+  r.add('POST', '/api/import-engine/batches/:id/undo', async (c) => c.json(200, await deps.heavy.run('undoBatch', c, [c.params.id, c.ip], { writes: true })));
   r.add('POST', '/api/import-engine/cancel', (c) => c.json(200, cancelImport(deps, c.user, c.body?.stagingToken)));
-  r.add('POST', '/api/import-engine/:kind/check', (c) => c.json(200, checkImport(deps, c.user, c.params.kind, c.body ?? {}, c.ip)), { maxBody: 15 * 1024 * 1024 });
-  r.add('POST', '/api/import-engine/:kind/commit', (c) => c.json(200, commitImport(deps, c.user, c.params.kind, c.body ?? {}, c.ip)));
+  r.add('POST', '/api/import-engine/:kind/check', async (c) => c.json(200, await deps.heavy.run('checkImport', c, [c.params.kind, c.body ?? {}, c.ip])), { maxBody: 15 * 1024 * 1024 });
+  r.add('POST', '/api/import-engine/:kind/commit', async (c) => c.json(200, await deps.heavy.run('commitImport', c, [c.params.kind, c.body ?? {}, c.ip], { writes: true })));
   r.add('GET', '/api/import-engine/:kind/template', (c) => {
     const t = importTemplate(deps, c.user, c.params.kind, c.query.format === 'csv' ? 'csv' : 'xlsx');
     c.res.writeHead(200, { 'Content-Type': t.type, 'Content-Disposition': `attachment; filename="${t.filename}"`, 'Cache-Control': 'no-store' });
     c.res.end(t.body);
   });
-  r.add('POST', '/api/import/:kind', async (c) => { const k = c.params.kind; need(c, IMPORT_PERM[k] ?? 'role:manage'); c.json(200, await stagedImport(deps, c.user, k, c.body ?? {}, c.ip)); }, { maxBody: 15 * 1024 * 1024 });
+  r.add('POST', '/api/import/:kind', async (c) => { const k = c.params.kind; need(c, IMPORT_PERM[k] ?? 'role:manage'); c.json(200, await deps.heavy.run('stagedImport', c, [k, c.body ?? {}, c.ip], { writes: true })); }, { maxBody: 15 * 1024 * 1024 });
   const XL = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   // تصدير البطاقات دفعة واحدة وجدول استلامها
   r.add('GET', '/api/cards/options', (c) => { need(c, 'student:read'); c.json(200, cardOptions(db)); });
@@ -263,8 +265,8 @@ export async function buildRouter(deps) {
   r.add('POST', '/api/cards/handovers/:id/receive', (c) => { need(c, 'student:update'); c.json(200, markCardReceived(deps, c.user, c.params.id, c.body, c.ip)); });
   r.add('POST', '/api/cards/handovers/:id/undo', (c) => { need(c, 'student:update'); c.json(200, undoCardReceived(deps, c.user, c.params.id, c.ip)); });
   r.add('GET', '/api/services/:code/template.xlsx', (c) => { sendRaw(c.res, 200, { 'Content-Type': XL, 'Content-Disposition': `attachment; filename="form-${String(c.params.code).replace(/[^a-z0-9_]/gi, '')}.xlsx"` }, buildTemplate(db, c.params.code)); });
-  r.add('GET', '/api/requests/export.xlsx', (c) => { sendRaw(c.res, 200, { 'Content-Type': XL, 'Content-Disposition': 'attachment; filename="requests.xlsx"' }, exportRequests(deps, c.user, { ...c.query, ip: c.ip })); });
-  r.add('POST', '/api/services/:code/import', (c) => { need(c, 'request:import'); c.json(200, stagedRequestsImport(deps, c.user, c.params.code, c.body ?? {}, c.ip)); }, { maxBody: 8 * 1024 * 1024 });
+  r.add('GET', '/api/requests/export.xlsx', async (c) => { const file = await deps.heavy.run('exportRequests', c, [{ ...c.query, ip: c.ip }]); sendRaw(c.res, 200, { 'Content-Type': XL, 'Content-Disposition': 'attachment; filename="requests.xlsx"' }, file); });
+  r.add('POST', '/api/services/:code/import', async (c) => { need(c, 'request:import'); c.json(200, await deps.heavy.run('stagedRequestsImport', c, [c.params.code, c.body ?? {}, c.ip], { writes: true })); }, { maxBody: 8 * 1024 * 1024 });
   // ---- حضور الموظفين والإجازات ----
   r.add('POST', '/api/hr/attendance/punch', (c) => { need(c, 'staffatt:self'); c.json(200, punch(deps, c.user)); });
   r.add('GET', '/api/hr/settings', (c) => { need(c, 'staffatt:manage'); c.json(200, { settings: getHrSettings(db) }); });
@@ -381,11 +383,12 @@ export async function buildRouter(deps) {
     sendRaw(c.res, 200, { 'Content-Type': a.mime, 'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(a.name)}` }, a.buf);
   });
   // ---- لوحة الإحصاءات والتصدير ----
-  r.add('GET', '/api/analytics', (c) => { need(c, 'stats:read'); c.json(200, { options: filterOptions(db), ...analytics(db, c.query, new Date()) }); });
+  r.add('GET', '/api/analytics', async (c) => { need(c, 'stats:read'); c.json(200, await deps.heavy.run('analytics', c, [c.query])); });
   const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-  r.add('GET', '/api/analytics/export.xlsx', (c) => {
+  r.add('GET', '/api/analytics/export.xlsx', async (c) => {
     need(c, 'stats:read');
-    sendRaw(c.res, 200, { 'Content-Type': XLSX_MIME, 'Content-Disposition': 'attachment; filename="statistics-report.xlsx"' }, buildReportXlsx(db, c.query));
+    const file = await deps.heavy.run('analyticsXlsx', c, [c.query]);
+    sendRaw(c.res, 200, { 'Content-Type': XLSX_MIME, 'Content-Disposition': 'attachment; filename="statistics-report.xlsx"' }, file);
   });
   r.add('POST', '/api/analytics/export.docx', (c) => {
     need(c, 'stats:read');
@@ -395,10 +398,10 @@ export async function buildRouter(deps) {
 
   // ---- تصدير البيانات (طلاب، مواد، علامات...) ----
   r.add('GET', '/api/export/options', (c) => { need(c, 'data:export'); c.json(200, exportOptions(db)); });
-  r.add('GET', '/api/export/preview', (c) => { need(c, 'data:export'); c.json(200, exportPreview(db, String(c.query.dataset ?? ''), c.query)); });
-  r.add('GET', '/api/export/file', (c) => {
+  r.add('GET', '/api/export/preview', async (c) => { need(c, 'data:export'); c.json(200, await deps.heavy.run('exportPreview', c, [String(c.query.dataset ?? ''), c.query])); });
+  r.add('GET', '/api/export/file', async (c) => {
     need(c, 'data:export');
-    const out = renderExport(db, { dataset: String(c.query.dataset ?? ''), format: String(c.query.format ?? ''), layout: c.query.layout }, c.query);
+    const out = await deps.heavy.run('exportFile', c, [{ dataset: String(c.query.dataset ?? ''), format: String(c.query.format ?? ''), layout: c.query.layout }, c.query]);
     audit(db, c.user, `تصدير بيانات (${c.query.dataset}، ${c.query.format}، ${out.total} صفاً)`, out.name.slice(0, 80), c.ip);
     sendRaw(c.res, 200, { 'Content-Type': out.mime, 'Content-Disposition': `attachment; filename="${out.name}"` }, out.buf);
   });

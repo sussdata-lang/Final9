@@ -45,6 +45,7 @@ export const PERMISSION_CATALOG = [
       { key: 'course:manage', label: 'كتابة وتعديل دليل المواد والمتطلبات السابقة والجداول', op: 'edit', module: 'academics' },
       { key: 'grade:manage', label: 'إدخال العلامات وتعديلها قبل الاعتماد', op: 'write', module: 'academics' },
       { key: 'grade:approve', label: 'اعتماد العلامات وقفلها (وتعديل المعتمد بتبرير)', op: 'approve', module: 'academics' },
+      { key: 'grade:approve_own', label: 'اعتماد علامات المقررات المسندة إليه فقط، بعد إرسالها من قسم الامتحانات', op: 'approve', module: 'academics' },
       { key: 'attendance:manage', label: 'تسجيل وإدارة سجل دخول وخروج القاعات (مسح الباركود)', op: 'write', module: 'academics' },
       { key: 'faculty:manage', label: 'إدارة ملفات أعضاء هيئة التدريس والعبء التدريسي', op: 'edit', module: 'academics' },
     ],
@@ -878,7 +879,7 @@ export function computeAllowedViews(effectivePerms = [], explicitAllowedViews = 
 
   const out = ['overview', 'guidelines'];
   if (has('request:read_all', 'request:read_unit', 'student:read', 'student:register', 'sa_admissions:view', 'sa_advising:view', 'sa_scholarships:view')) out.push('affairs');
-  if (has('academic:read', 'course:manage', 'grade:manage', 'grade:approve', 'faculty:manage')) out.push('academics');
+  if (has('academic:read', 'course:manage', 'grade:manage', 'grade:approve', 'grade:approve_own', 'faculty:manage')) out.push('academics');
   if (has('attendance:manage')) out.push('attendance');
   if (has('exams_housing:view', 'exams_housing:write', 'exams_housing:edit', 'exams_housing:approve', 'academic:read')) out.push('expansions');
   if (has('lms_lib:view', 'lms_lib:write', 'lms_lib:edit', 'lms_lib:approve', 'academic:read', 'course:manage')) out.push('lms');

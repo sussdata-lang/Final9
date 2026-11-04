@@ -7,6 +7,8 @@ import vm from 'node:vm';
 
 const pub = path.join(import.meta.dirname, '..', 'public');
 const scripts = [...fs.readFileSync(path.join(pub, 'index.html'), 'utf8').matchAll(/<script src="\/([\w.-]+\.js)\?v=[^"]+"/g)].map((m) => m[1]);
+// ملفات الأقسام التي تُحمَّل عند فتحها (LAZY في app.js)
+const lazy = [...new Set([...fs.readFileSync(path.join(pub, 'app.js'), 'utf8').match(/const LAZY = \{[^\n]*/)[0].matchAll(/'([\w.-]+\.js)'/g)].map((m) => m[1]))];
 
 // كائن يقبل أي قراءة أو استدعاء، فيكفي لتمثيل المتصفح أثناء التحميل
 const stub = () => new Proxy(function () {}, {
@@ -18,6 +20,7 @@ const stub = () => new Proxy(function () {}, {
 
 test('سكربتات الواجهة تُحمَّل كلها دون خطأ، وشاشة «أعمالي» معرَّفة', () => {
   assert.ok(scripts.includes('workspace.js') && scripts.length > 20);
+  assert.ok(lazy.includes('finance.js') && lazy.includes('v12_views.js'));
   const win = stub();
   win.UA = undefined;
   const ctx = vm.createContext(new Proxy({ window: win, console, Object, Array, Map, Set, WeakSet, Date, JSON, Math, Number, String, Boolean, RegExp, Promise, Error, Symbol, Intl, encodeURIComponent, decodeURIComponent, parseInt, parseFloat, isNaN, setTimeout: () => 0, clearTimeout: () => {}, setInterval: () => 0, clearInterval: () => {} }, {
@@ -26,7 +29,7 @@ test('سكربتات الواجهة تُحمَّل كلها دون خطأ، وش
   }));
   ctx.window = win;
   const failed = [];
-  for (const f of scripts) {
+  for (const f of [...scripts, ...lazy]) {
     try { vm.runInContext(fs.readFileSync(path.join(pub, f), 'utf8'), ctx, { filename: f }); }
     catch (e) { failed.push(`${f}: ${e.message}`); }
   }

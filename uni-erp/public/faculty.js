@@ -68,6 +68,7 @@
         <div class="two"><label>الساعات المكتبية<input id="fm-office" maxlength="200" value="${v('officeHours')}" placeholder="مثال: الأحد والثلاثاء 10:00 – 12:00"></label>
           <label>مكتب الاستقبال<input id="fm-loc" maxlength="60" value="${v('officeLocation')}" placeholder="مثال: مبنى 2 — مكتب 214"></label></div>
         <div class="two"><label>تاريخ التعيين<input id="fm-hire" type="date" value="${hire}"></label>
+          <label>حساب الدخول (لاعتماد علامات مقرراته)<input id="fm-account" maxlength="60" dir="ltr" value="${v('account')}" placeholder="اسم المستخدم"></label>
           <label>الحالة<select id="fm-status">${opts(Object.entries(o.statuses), m && m.status, 'active')}</select></label></div>
         <label>ملاحظات<textarea id="fm-notes" rows="2" maxlength="300">${v('notes')}</textarea></label>
         <div class="actions"><button class="btn pri" type="submit">${m ? 'حفظ التعديل' : 'إضافة العضو'}</button><button class="btn" type="button" data-act="fmclose">إلغاء</button></div>
@@ -158,7 +159,7 @@
       if (name.length < 2) { toast('الاسم يجب أن يكون حرفين على الأقل'); return; }
       const body = { name, rank, unitId: val('fm-unit') ? Number(val('fm-unit')) : null,
         specialty: val('fm-spec'), email: val('fm-mail'), phone: val('fm-phone'), officeHours: val('fm-office'),
-        officeLocation: val('fm-loc'), hireDate: hire ? Date.parse(hire + 'T00:00:00') : null, status: val('fm-status') || 'active', notes: val('fm-notes') };
+        officeLocation: val('fm-loc'), account: document.getElementById('fm-account').value, hireDate: hire ? Date.parse(hire + 'T00:00:00') : null, status: val('fm-status') || 'active', notes: val('fm-notes') };
       const edit = F.modal && F.modal.edit;
       if (edit) await api('PUT', '/api/faculty/' + edit, body); else await api('POST', '/api/faculty', body);
       F.modal = null; await loadMembers(); UA.render(); toast(edit ? 'حُفظ التعديل — تم بنجاح ✅' : 'أُضيف العضو إلى هيئة التدريس بنجاح ✅');
