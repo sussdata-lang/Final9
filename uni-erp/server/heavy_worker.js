@@ -5,9 +5,13 @@ import { flushAllCaches } from './cache.js';
 import { sessionUser, invalidateSessionCache } from './services/auth.js';
 import { checkImport, commitImport, undoBatch } from './services/import_engine.js';
 import { stagedImport, stagedRequestsImport } from './services/import_staged.js';
-import { suiteOverviewFor } from './services/student_affairs_suite.js';
+import { suiteOverviewFor, executeAdmissionsSorting } from './services/student_affairs_suite.js';
+import { createCardBatch, cardBatchXlsx } from './services/cards.js';
+import { transitionGrades } from './services/workflow.js';
+import { verifyBackup } from './services/backup.js';
+import { verifyAuditChain } from './audit.js';
 import { analytics, filterOptions } from './services/analytics.js';
-import { buildReportXlsx } from './services/reports.js';
+import { buildReportXlsx, buildReportDocx } from './services/reports.js';
 import { exportRequests } from './services/requestsxl.js';
 import { preview as exportPreview, renderExport } from './services/dataexport.js';
 import { runLiveBenchmark } from './services/live_benchmark.js';
@@ -27,6 +31,13 @@ const JOBS = {
   exportRequests: (actor, q) => exportRequests(deps, actor, q),
   exportPreview: (_actor, dataset, q) => exportPreview(db, dataset, q),
   exportFile: (_actor, opts, q) => renderExport(db, opts, q),
+  analyticsDocx: (_actor, body) => buildReportDocx(db, body),
+  admissionsSort: (actor, ip) => executeAdmissionsSorting(deps, actor, ip),
+  createCardBatch: (actor, body, ip) => createCardBatch(deps, actor, body, ip),
+  cardBatchXlsx: (_actor, id) => cardBatchXlsx(deps, id),
+  gradeWorkflow: (actor, body, ip) => transitionGrades(deps, actor, body, ip),
+  verifyBackup: (actor, name, ip) => verifyBackup(deps, actor, name, ip),
+  verifyAudit: () => verifyAuditChain(db),
   liveBenchmark: (actor, opts) => runLiveBenchmark(deps, actor, opts),
 };
 

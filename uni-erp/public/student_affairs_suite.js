@@ -34,6 +34,18 @@
 
   UA.loadStudentAffairsSuite = loadSuiteData;
 
+  // حقل الطالب: يبحث في القاعدة عند الكتابة (منتقي الطلاب الموحد) بدل قائمة بكل الطلاب
+  const studentField = (id, label, student) => `<label>${label}<input id="${id}" data-student-picker value="${esc(student ? student.studentNo : '')}" placeholder="اكتب اسم الطالب أو رقمه الجامعي" autocomplete="off"></label>`;
+  async function studentIdOf(id) {
+    const v = val(id).trim();
+    const fail = () => Object.assign(new Error('اختر طالباً واحداً من الاقتراحات باسمه أو رقمه الجامعي.'), { status: 400 });
+    if (!v) throw fail();
+    const list = (await api('GET', `/api/students?limit=5&q=${encodeURIComponent(v)}`)).students;
+    const s = list.find((x) => x.studentNo === v) || (list.length === 1 ? list[0] : null);
+    if (!s) throw fail();
+    return s.id;
+  }
+
   // ربط مقررين في الخطة، وتظليل ما يتطلبه المقرر وما يفتحه عند الضغط عليه
   UA.forms['sa-link-form'] = async () => {
     await api('POST', '/api/student-affairs-suite/prerequisites', {
@@ -239,7 +251,7 @@
           </div>
 
           <div class="inline-form" style="margin-bottom:14px;background:rgba(53,108,138,0.06);padding:12px;border-radius:10px">
-            <label>الطالب المحول<select id="sa-eq-student">${students.map((s) => `<option value="${s.id}"${s.id === SA.selectedStudentId ? ' selected' : ''}>${esc(s.name)} (${esc(s.studentNo)})</option>`).join('')}</select></label>
+            ${studentField('sa-eq-student', 'الطالب المحول', d.targetStudent)}
             <label>الجامعة المصدر<input id="sa-eq-uni" placeholder="مثال: جامعة دمشق — كلية الحقوق" value="جامعة دمشق"></label>
             <label>رمز المقرر الخارجي<input id="sa-eq-code" dir="ltr" placeholder="LAW204" value="CS202-DU"></label>
             <label>اسم المقرر الخارجي<input id="sa-eq-name" placeholder="مثال: أمن نظم التشغيل"></label>
@@ -324,9 +336,7 @@
             </div>
             <div style="display:flex;align-items:center;gap:8px">
               <label style="margin:0;font-weight:bold">استعراض خطة الطالب:
-                <select id="sa-tree-student" data-chg="sa-tree-student" style="min-width:230px">
-                  ${students.map((s) => `<option value="${s.id}"${s.id === (d.targetStudent && d.targetStudent.id) ? ' selected' : ''}>${esc(s.name)} — ${esc(s.studentNo)} (${esc(s.programName || '')})</option>`).join('')}
-                </select>
+                <input id="sa-tree-student" data-student-picker style="min-width:230px" value="${esc(d.targetStudent ? d.targetStudent.studentNo : '')}" placeholder="اسم الطالب أو رقمه الجامعي" autocomplete="off">
               </label>
             </div>
           </div>
@@ -387,7 +397,7 @@
           ${
             atRisk.length
               ? `<div class="reason" style="margin-bottom:14px;background:rgba(217,119,6,0.1);border-color:#D97706;color:inherit">
-                  <b>⚠️ رصد آلي من سجل العلامات (${atRisk.length} طلاب بحاجة لمتابعة إرشادية):</b>
+                  <b>⚠️ رصد آلي من سجل العلامات (${d.advising.atRiskTotal ?? atRisk.length} طالباً بحاجة لمتابعة إرشادية${(d.advising.atRiskTotal ?? 0) > atRisk.length ? `؛ يُعرض أضعف ${atRisk.length}` : ''}):</b>
                   <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">
                     ${atRisk.map((r) => `<span class="pill p-review">${esc(r.name)} (${esc(r.studentNo)}) · المعدل: ${r.gpa ?? '—'}% · راسب: ${r.failedCount}</span>`).join('')}
                   </div>
@@ -396,7 +406,7 @@
           }
 
           <div class="inline-form" style="margin-bottom:14px;background:rgba(217,119,6,0.06);padding:12px;border-radius:10px">
-            <label>الطالب<select id="sa-adv-student">${students.map((s) => `<option value="${s.id}">${esc(s.name)} (${esc(s.studentNo)})</option>`).join('')}</select></label>
+            ${studentField('sa-adv-student', 'الطالب')}
             <label>سبب الإنذار المبكر<select id="sa-adv-type">
               <option value="gpa_low">انخفاض المعدل التراكمي (GPA &lt; 60%)</option>
               <option value="absence_high">تجاوز نسبة الغياب المسموحة (&gt; 15%)</option>
@@ -480,7 +490,7 @@
           <p class="hint" style="margin-top:0">يُحدِّث هذا المحرك حالة الطالب وبرنامجه في جدول <span class="mono">student_profiles</span> تلقائياً ويحتسب الأثر الأكاديمي والمالي للقرار.</p>
 
           <div class="inline-form" style="margin-bottom:14px;background:rgba(124,58,237,0.06);padding:12px;border-radius:10px">
-            <label>الطالب<select id="sa-mov-student">${students.map((s) => `<option value="${s.id}">${esc(s.name)} (${esc(s.studentNo)}) — الحالة الحالية: ${esc(statusAr[s.status] || s.status)}</option>`).join('')}</select></label>
+            ${studentField('sa-mov-student', 'الطالب')}
             <label>نوع حركة القيد<select id="sa-mov-type">
               <option value="postponement">تأجيل فصل دراسي (يحوّل القيد إلى موقوف مؤقتاً)</option>
               <option value="suspension">إيقاف قيد نظامي</option>
@@ -534,7 +544,7 @@
           <p class="hint" style="margin-top:0">أي عقوبة انضباطية نشطة تُدرج تلقائياً في جدول الموانع (<span class="mono">student_holds</span>) وتحجب إصدار الوثائق لحين تسويتها أو انتهاء مدتها.</p>
 
           <div class="inline-form" style="margin-bottom:14px;background:rgba(179,38,30,0.06);padding:12px;border-radius:10px">
-            <label>الطالب<select id="sa-disc-student">${students.map((s) => `<option value="${s.id}">${esc(s.name)} (${esc(s.studentNo)})</option>`).join('')}</select></label>
+            ${studentField('sa-disc-student', 'الطالب')}
             <label>رقم قرار لجنة الانضباط<input id="sa-disc-dec" dir="ltr" value="DISC-2026-34"></label>
             <label>تصنيف المخالفة<select id="sa-disc-cat">
               <option value="exam_misconduct">مخالفة تعليمات امتحانية</option>
@@ -615,7 +625,7 @@
           </div>
 
           <div class="inline-form" style="margin-bottom:14px;background:rgba(213,182,93,0.12);border:1px solid rgba(213,182,93,0.4);padding:12px;border-radius:10px">
-            <label>الطالب المستفيد<select id="sa-sch-student">${students.map((s) => `<option value="${s.id}">${esc(s.name)} (${esc(s.studentNo)})</option>`).join('')}</select></label>
+            ${studentField('sa-sch-student', 'الطالب المستفيد')}
             <label>نوع المنحة / الإعفاء<select id="sa-sch-type">
               <option value="merit_top">منحة التفوق الأكاديمي (حسب المعدل GPA)</option>
               <option value="martyrs_kin">منحة أبناء الشهداء (إعفاء 100%)</option>
@@ -700,7 +710,7 @@
         </div>
 
         <div class="inline-form" style="margin-bottom:14px;background:rgba(14,102,85,0.06);padding:12px;border-radius:10px">
-          <label>الطالب<select id="sa-q-student">${students.map((s) => `<option value="${s.id}">${esc(s.name)} (${esc(s.studentNo)})</option>`).join('')}</select></label>
+          ${studentField('sa-q-student', 'الطالب')}
           <label>ربط بمعاملة حالية (اختياري)<select id="sa-q-req">
             <option value="">— مراجعة عامة / استلام وثيقة —</option>
             ${reqs.map((r) => `<option value="${r.id}">${esc(r.no)} — ${esc(r.service.label)} (${esc(r.student ? r.student.name : '')})</option>`).join('')}
@@ -854,7 +864,7 @@
       toast(`تم تثبيت القبول وتسجيل الطالب بالرقم الجامعي: ${r.student.studentNo}`);
     },
     'sa-add-eq': async () => {
-      const sid = Number(val('sa-eq-student'));
+      const sid = await studentIdOf('sa-eq-student');
       SA.selectedStudentId = sid;
       await api('POST', '/api/student-affairs-suite/equivalence', {
         studentId: sid,
@@ -877,7 +887,7 @@
     },
     'sa-add-advising': async () => {
       await api('POST', '/api/student-affairs-suite/advising', {
-        studentId: Number(val('sa-adv-student')),
+        studentId: await studentIdOf('sa-adv-student'),
         warningType: val('sa-adv-type'),
         severity: val('sa-adv-sev'),
         advisorName: val('sa-adv-advisor'),
@@ -895,7 +905,7 @@
     },
     'sa-exec-movement': async () => {
       const r = await api('POST', '/api/student-affairs-suite/lifecycle', {
-        studentId: Number(val('sa-mov-student')),
+        studentId: await studentIdOf('sa-mov-student'),
         movementType: val('sa-mov-type'),
         toProgramId: Number(val('sa-mov-prog')),
         decisionNo: val('sa-mov-dec'),
@@ -907,7 +917,7 @@
     },
     'sa-add-disc': async () => {
       const r = await api('POST', '/api/student-affairs-suite/disciplinary', {
-        studentId: Number(val('sa-disc-student')),
+        studentId: await studentIdOf('sa-disc-student'),
         decisionNo: val('sa-disc-dec'),
         violationCategory: val('sa-disc-cat'),
         penaltyLevel: val('sa-disc-pen'),
@@ -926,7 +936,7 @@
     },
     'sa-grant-sch': async () => {
       const r = await api('POST', '/api/student-affairs-suite/scholarships', {
-        studentId: Number(val('sa-sch-student')),
+        studentId: await studentIdOf('sa-sch-student'),
         scholarshipType: val('sa-sch-type'),
         baseTuition: Number(val('sa-sch-tuition')),
         gpa: Number(val('sa-sch-gpa')),
@@ -938,7 +948,7 @@
     },
     'sa-book-ticket': async () => {
       const r = await api('POST', '/api/student-affairs-suite/queue/book', {
-        studentId: Number(val('sa-q-student')),
+        studentId: await studentIdOf('sa-q-student'),
         requestId: val('sa-q-req') ? Number(val('sa-q-req')) : null,
         servicePurpose: val('sa-q-purpose'),
         appointmentDate: val('sa-q-date'),
@@ -971,9 +981,11 @@
   document.addEventListener('change', async (e) => {
     const t = e.target;
     if (t && t.id === 'sa-tree-student') {
-      SA.selectedStudentId = Number(t.value);
-      await loadSuiteData(SA.selectedStudentId);
-      UA.render();
+      try {
+        SA.selectedStudentId = await studentIdOf('sa-tree-student');
+        await loadSuiteData(SA.selectedStudentId);
+        UA.render();
+      } catch (err) { if (!err.status) throw err; toast(err.message); }
     }
   });
 })();

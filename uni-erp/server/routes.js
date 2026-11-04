@@ -121,9 +121,9 @@ export async function buildRouter(deps) {
   r.add('DELETE', '/api/students/:id/grades/:gid', (c) => { need(c, 'grade:manage'); c.json(200, deleteGrade(deps, c.user, c.params.id, c.params.gid, c.ip, c.query.justification)); });
   // ---- مراحل اعتماد العلامات، جدول المحاضرات، السجل الموحّد ----
   r.add('GET', '/api/faculty/my-grades', (c) => { need(c, 'grade:approve_own'); c.json(200, myCourseGrades(deps, c.user)); });
-  r.add('POST', '/api/grades/workflow', (c) => {
+  r.add('POST', '/api/grades/workflow', async (c) => {
     if (!c.user.can('grade:approve_own')) need(c, 'grade:manage');   // صلاحية المقرر نفسه تُفحص داخل transitionGrades
-    const out = transitionGrades(deps, c.user, c.body, c.ip);
+    const out = await deps.heavy.run('gradeWorkflow', c, [c.body, c.ip], { writes: true });
     for (const a of out.approvedNow) notifyGrade(deps, a.studentId, a.course);
     c.json(200, { updated: out.updated, skipped: out.skipped, stage: out.stage });
   });
@@ -176,7 +176,7 @@ export async function buildRouter(deps) {
     const size = fs.statSync(f).size;
     sendStream(c.res, 200, { 'Content-Type': 'application/octet-stream', 'Content-Length': size, 'Content-Disposition': `attachment; filename="${c.params.name}"` }, fs.createReadStream(f));
   });
-  r.add('POST', '/api/admin/backups/:name/verify', (c) => { need(c, 'backup:manage'); c.json(200, verifyBackup(deps, c.user, c.params.name, c.ip)); });
+  r.add('POST', '/api/admin/backups/:name/verify', async (c) => { need(c, 'backup:manage'); c.json(200, await deps.heavy.run('verifyBackup', c, [c.params.name, c.ip], { writes: true })); });
   r.add('DELETE', '/api/admin/backups/:name', (c) => { need(c, 'backup:manage'); deleteBackup(deps, c.user, c.params.name, c.ip); c.json(200, { ok: true }); });
   r.add('GET', '/api/students-table', (c) => { need(c, 'student:read'); c.json(200, listStudentsTable(deps, c.query)); });
   r.add('GET', '/api/students/:id/files', (c) => { need(c, 'student:read'); getStudent(deps, c.params.id); c.json(200, { files: listStudentFiles(db, c.params.id) }); });
@@ -259,9 +259,9 @@ export async function buildRouter(deps) {
   r.add('GET', '/api/cards/options', (c) => { need(c, 'student:read'); c.json(200, cardOptions(db)); });
   r.add('GET', '/api/cards/students', (c) => { need(c, 'student:read'); c.json(200, cardStudents(deps, c.query)); });
   r.add('GET', '/api/cards/batches', (c) => { need(c, 'student:read'); c.json(200, { batches: listCardBatches(deps) }); });
-  r.add('POST', '/api/cards/batches', (c) => { need(c, 'student:update'); c.json(201, createCardBatch(deps, c.user, c.body, c.ip)); });
+  r.add('POST', '/api/cards/batches', async (c) => { need(c, 'student:update'); c.json(201, await deps.heavy.run('createCardBatch', c, [c.body, c.ip], { writes: true })); });
   r.add('GET', '/api/cards/batches/:id', (c) => { need(c, 'student:read'); c.json(200, cardBatchDetail(deps, c.params.id)); });
-  r.add('GET', '/api/cards/batches/:id/export.xlsx', (c) => { need(c, 'student:read'); sendRaw(c.res, 200, { 'Content-Type': XL, 'Content-Disposition': 'attachment; filename="card-handover.xlsx"' }, cardBatchXlsx(deps, c.params.id)); });
+  r.add('GET', '/api/cards/batches/:id/export.xlsx', async (c) => { need(c, 'student:read'); const file = await deps.heavy.run('cardBatchXlsx', c, [c.params.id]); sendRaw(c.res, 200, { 'Content-Type': XL, 'Content-Disposition': 'attachment; filename="card-handover.xlsx"' }, file); });
   r.add('POST', '/api/cards/handovers/:id/receive', (c) => { need(c, 'student:update'); c.json(200, markCardReceived(deps, c.user, c.params.id, c.body, c.ip)); });
   r.add('POST', '/api/cards/handovers/:id/undo', (c) => { need(c, 'student:update'); c.json(200, undoCardReceived(deps, c.user, c.params.id, c.ip)); });
   r.add('GET', '/api/services/:code/template.xlsx', (c) => { sendRaw(c.res, 200, { 'Content-Type': XL, 'Content-Disposition': `attachment; filename="form-${String(c.params.code).replace(/[^a-z0-9_]/gi, '')}.xlsx"` }, buildTemplate(db, c.params.code)); });
@@ -390,9 +390,10 @@ export async function buildRouter(deps) {
     const file = await deps.heavy.run('analyticsXlsx', c, [c.query]);
     sendRaw(c.res, 200, { 'Content-Type': XLSX_MIME, 'Content-Disposition': 'attachment; filename="statistics-report.xlsx"' }, file);
   });
-  r.add('POST', '/api/analytics/export.docx', (c) => {
+  r.add('POST', '/api/analytics/export.docx', async (c) => {
     need(c, 'stats:read');
-    sendRaw(c.res, 200, { 'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'Content-Disposition': 'attachment; filename="statistics-report.docx"' }, buildReportDocx(db, c.body));
+    const file = await deps.heavy.run('analyticsDocx', c, [c.body]);
+    sendRaw(c.res, 200, { 'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'Content-Disposition': 'attachment; filename="statistics-report.docx"' }, file);
   }, { maxBody: 14 * 1024 * 1024 });
   r.add('GET', '/api/stats', (c) => { need(c, 'stats:read'); c.json(200, { stats: stats(deps) }); });
 
@@ -462,7 +463,7 @@ export async function buildRouter(deps) {
     c.json(200, { entries: db.prepare('SELECT id, at, actor_label AS actor, role, action, ref, ip FROM audit_log ORDER BY id DESC LIMIT ?').all(limit) });
   });
   r.add('GET', '/api/admin/logs', (c) => { need(c, 'audit:read'); c.json(200, { entries: recentLogs({ level: c.query.level, limit: c.query.limit }) }); });
-  r.add('GET', '/api/audit/verify', (c) => { need(c, 'audit:read'); c.json(200, verifyAuditChain(db)); });
+  r.add('GET', '/api/audit/verify', async (c) => { need(c, 'audit:read'); c.json(200, await deps.heavy.run('verifyAudit', c)); });
 
   // ---- الإدارة ----
   r.add('GET', '/api/admin/users', (c) => { need(c, 'user:manage'); c.json(200, { users: listStaff(db) }); });

@@ -325,18 +325,17 @@ export function getStudentAffairsSuiteOverview(deps, query = {}) {
       enrolledCount: p.activeStudents,
     }));
 
-  const students = db
-    .prepare(`
-      SELECT u.id, u.display_name AS name, u.student_no AS studentNo,
+  // الحقول المختلفة تبحث عن الطالب عند الكتابة، فلا تُرسل قائمة كل الطلاب مع كل فتح للقسم
+  const STUDENT_SQL = `SELECT u.id, u.display_name AS name, u.student_no AS studentNo,
              sp.program_id AS programId, sp.study_level AS level, sp.status,
              p.name AS programName, p.faculty
       FROM users u
       JOIN student_profiles sp ON sp.user_id = u.id
       LEFT JOIN programs p ON p.id = sp.program_id
-      WHERE u.role = 'student'
-      ORDER BY u.id
-    `)
-    .all();
+      WHERE u.role = 'student'`;
+  const targetStudent = (Number(query.studentId) ? db.prepare(`${STUDENT_SQL} AND u.id = ?`).get(Number(query.studentId)) : null)
+    ?? db.prepare(`${STUDENT_SQL} ORDER BY u.id LIMIT 1`).get() ?? null;
+  const students = targetStudent ? [targetStudent] : [];
 
   const courses = db
     .prepare('SELECT id, program_id AS programId, name, code, hours, level, semester, instructor FROM courses WHERE active = 1 ORDER BY level, semester, id')
@@ -371,8 +370,7 @@ export function getStudentAffairsSuiteOverview(deps, query = {}) {
     `)
     .all();
 
-  const targetStudentId = Number(query.studentId) || students[0]?.id || 0;
-  const targetStudent = students.find((s) => s.id === targetStudentId) || students[0] || null;
+  const targetStudentId = targetStudent?.id ?? 0;
   const studentEquivalences = equivalences.filter((e) => e.student_id === targetStudentId);
   const equivalenceSummary = calculateTransferEquivalenceSummary(studentEquivalences, (targetStudent ? 132 : 132));
 
@@ -407,23 +405,24 @@ export function getStudentAffairsSuiteOverview(deps, query = {}) {
     .all();
 
   // رصد تلقائي للطلاب المعرضين للإنذار من جدول العلامات الفعلي
-  const autoDetectedAtRisk = students
-    .map((st) => {
-      const gRows = db
-        .prepare("SELECT mark, hours FROM grades WHERE student_id = ? AND workflow_status = 'approved'")
-        .all(st.id);
-      const hrs = gRows.reduce((s, x) => s + (x.hours || 3), 0);
-      const weighted = gRows.reduce((s, x) => s + (x.hours || 3) * x.mark, 0);
-      const gpa = hrs ? Math.round((weighted / hrs) * 10) / 10 : null;
-      const failedCount = gRows.filter((x) => x.mark < 60).length;
-      return {
-        ...st,
-        gpa,
-        failedCount,
-        isAtRisk: (gpa !== null && gpa < 65) || failedCount >= 1,
-      };
+  // استعلام واحد بدل استعلام لكل طالب؛ ويُعرض الأضعف أولاً مع العدد الكلي
+  const atRiskAll = db
+    .prepare(`
+      SELECT u.id, u.display_name AS name, u.student_no AS studentNo, g.hrs, g.weighted, g.failed
+      FROM (SELECT student_id, SUM(COALESCE(hours, 3)) AS hrs, SUM(COALESCE(hours, 3) * mark) AS weighted, SUM(CASE WHEN mark < 60 THEN 1 ELSE 0 END) AS failed
+            FROM grades WHERE workflow_status = 'approved' GROUP BY student_id) g
+      JOIN users u ON u.id = g.student_id
+      JOIN student_profiles sp ON sp.user_id = u.id
+      WHERE u.role = 'student'
+    `)
+    .all()
+    .map((r) => {
+      const hrs = Number(r.hrs), gpa = hrs ? Math.round((Number(r.weighted) / hrs) * 10) / 10 : null, failedCount = Number(r.failed);
+      return { id: r.id, name: r.name, studentNo: r.studentNo, gpa, failedCount, isAtRisk: (gpa !== null && gpa < 65) || failedCount >= 1 };
     })
-    .filter((x) => x.isAtRisk);
+    .filter((x) => x.isAtRisk)
+    .sort((a, b) => (a.gpa ?? 0) - (b.gpa ?? 0));
+  const autoDetectedAtRisk = atRiskAll.slice(0, 100);
 
   // 3. حركات القيد والانضباط المسلكي (مدمجة مع student_holds و student_profiles)
   const lifecycleMovements = db
@@ -505,6 +504,7 @@ export function getStudentAffairsSuiteOverview(deps, query = {}) {
       degreeTree,
       warnings: advisingWarnings,
       autoDetectedAtRisk,
+      atRiskTotal: atRiskAll.length,
     },
     lifecycle: {
       movements: lifecycleMovements,
@@ -572,7 +572,7 @@ function studentOverview(data, studentId) {
     students: own(data.students, 'id'),
     targetStudent: Number(data.targetStudent?.id) === Number(studentId) ? data.targetStudent : null,
     admissions: { applicants: [], equivalences: own(data.admissions.equivalences), equivalenceSummary: data.admissions.equivalenceSummary },
-    advising: { degreeTree: data.advising.degreeTree, warnings: own(data.advising.warnings), autoDetectedAtRisk: [] },
+    advising: { degreeTree: data.advising.degreeTree, warnings: own(data.advising.warnings), autoDetectedAtRisk: [], atRiskTotal: 0 },
     lifecycle: { ...data.lifecycle, movements: own(data.lifecycle.movements), disciplinaryRecords: own(data.lifecycle.disciplinaryRecords, 'studentId') },
     scholarships: { list: own(data.scholarships.list) },
     deskQueue: { appointments: own(data.deskQueue.appointments) },
@@ -1074,8 +1074,8 @@ export function registerStudentAffairsSuiteRoutes(r, deps) {
     c.json(201, addAdmissionApplicant(deps, c.user, c.body, c.ip));
   });
 
-  r.add('POST', '/api/student-affairs-suite/admissions/run-sort', (c) => {
-    c.json(200, executeAdmissionsSorting(deps, c.user, c.ip));
+  r.add('POST', '/api/student-affairs-suite/admissions/run-sort', async (c) => {
+    c.json(200, await deps.heavy.run('admissionsSort', c, [c.ip], { writes: true }));
   });
 
   r.add('POST', '/api/student-affairs-suite/admissions/enroll/:id', async (c) => {

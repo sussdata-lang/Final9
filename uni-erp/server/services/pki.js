@@ -40,8 +40,12 @@ export function loadIdentity(cfg) {
   if (text && !text.includes('-----BEGIN')) text = Buffer.from(text, 'base64').toString('utf8');
   let source = 'env';
   if (!text) {
-    const dir = path.join(path.dirname(cfg.dbPath), 'pki'), file = path.join(dir, 'signing.pem'); source = 'generated';
+    // مع PostgreSQL يكون dbPath رابطاً: dirname منه مسار مزيف يحوي كلمة المرور، ويفشل على Windows
+    const isUri = /^postgres(ql)?:\/\//i.test(String(cfg.dbPath));
+    const dir = path.join(cfg.dataDir || (isUri ? path.resolve('data') : path.dirname(cfg.dbPath)), 'pki'), file = path.join(dir, 'signing.pem'); source = 'generated';
+    const legacy = isUri ? path.join(path.dirname(cfg.dbPath), 'pki', 'signing.pem') : null;
     if (fs.existsSync(file)) text = fs.readFileSync(file, 'utf8');
+    else if (legacy && fs.existsSync(legacy)) text = fs.readFileSync(legacy, 'utf8');
     else {
       // أسماء لاتينية في الشهادة لأن بعض أدوات التحقق لا تعرض UTF-8 العربي في حقل الموضوع
       const g = generateSelfSigned({ cn: 'SUSS Student Records Signing', org: 'Syrian University for Security Sciences' });

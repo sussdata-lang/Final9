@@ -77,14 +77,27 @@ export function visibleTo(user, r) {
   return false;
 }
 
-export function requestView(db, r, { withStudent = false } = {}) {
+// يجلب مرفقات صفوف كثيرة ووثائقها وأحداثها وأصحابها دفعة واحدة، بدل أربعة استعلامات لكل صف
+function listContext(db, rows) {
+  const groupBy = (list, key = 'request_id') => { const m = new Map(); for (const x of list) { const k = Number(x[key]); if (!m.has(k)) m.set(k, []); m.get(k).push(x); } return m; };
+  const ids = rows.map((r) => r.id), marks = ids.map(() => '?').join(',');
+  const owners = [...new Set(rows.map((r) => Number(r.student_id)))], ownerMarks = owners.map(() => '?').join(',');
+  return {
+    atts: groupBy(db.prepare(`SELECT request_id, id, orig_name, size, mime, slot_label FROM attachments WHERE request_id IN (${marks}) ORDER BY id`).all(...ids)),
+    docs: groupBy(db.prepare(`SELECT request_id, code, issued_at FROM documents WHERE request_id IN (${marks})`).all(...ids)),
+    events: groupBy(db.prepare(`SELECT request_id, at, actor_label AS actor, text FROM request_events WHERE request_id IN (${marks}) ORDER BY id`).all(...ids)),
+    users: new Map(db.prepare(`SELECT id, display_name, student_no, role, unit_id FROM users WHERE id IN (${ownerMarks})`).all(...owners).map((u) => [Number(u.id), u])),
+  };
+}
+
+export function requestView(db, r, { withStudent = false, ctx = null } = {}) {
   const cachedSvc = getCachedServiceByCode(db, r.service_code);
   const svc = cachedSvc
     ? { code: cachedSvc.code, label: cachedSvc.label, sla_hours: cachedSvc.sla_hours }
     : db.prepare('SELECT code, label, sla_hours FROM service_types WHERE code = ?').get(r.service_code);
-  const atts = db.prepare('SELECT id, orig_name, size, mime, slot_label FROM attachments WHERE request_id = ? ORDER BY id').all(r.id).map((a) => ({ id: a.id, name: a.orig_name, size: a.size, slot: a.slot_label }));
+  const atts = (ctx ? ctx.atts.get(Number(r.id)) ?? [] : db.prepare('SELECT id, orig_name, size, mime, slot_label FROM attachments WHERE request_id = ? ORDER BY id').all(r.id)).map((a) => ({ id: a.id, name: a.orig_name, size: a.size, slot: a.slot_label }));
   const att = atts[0];
-  const doc = db.prepare('SELECT code, issued_at FROM documents WHERE request_id = ?').get(r.id);
+  const doc = ctx ? ctx.docs.get(Number(r.id))?.[0] : db.prepare('SELECT code, issued_at FROM documents WHERE request_id = ?').get(r.id);
   const cachedUnit = r.assigned_unit_id ? getCachedUnitById(db, r.assigned_unit_id) : null;
   const v = {
     id: r.id, no: r.no, service: svc, details: Object.fromEntries(Object.entries(JSON.parse(r.details_json)).filter(([k]) => !k.endsWith('__id'))), status: r.status,
@@ -92,14 +105,14 @@ export function requestView(db, r, { withStudent = false } = {}) {
     attachment: att ? { id: att.id, name: att.name, size: att.size } : null, attachments: atts,
     document: doc ? { code: doc.code, issuedAt: doc.issued_at } : null,
     unit: cachedUnit ? { id: cachedUnit.id, name: cachedUnit.name } : null,
-    events: db.prepare('SELECT at, actor_label AS actor, text FROM request_events WHERE request_id = ? ORDER BY id').all(r.id),
+    events: ctx ? (ctx.events.get(Number(r.id)) ?? []).map((e) => ({ at: e.at, actor: e.actor, text: e.text })) : db.prepare('SELECT at, actor_label AS actor, text FROM request_events WHERE request_id = ? ORDER BY id').all(r.id),
   };
   if (withStudent) {
     const cachedStaff = getCachedStaffUsersMap(db).get(Number(r.student_id));
     if (cachedStaff) {
       v.student = { id: cachedStaff.id, name: cachedStaff.display_name, studentNo: null, kind: 'staff', unit: cachedStaff.unit_name ?? null };
     } else {
-      const s = db.prepare('SELECT id, display_name, student_no, role, unit_id FROM users WHERE id = ?').get(r.student_id);
+      const s = ctx ? ctx.users.get(Number(r.student_id)) : db.prepare('SELECT id, display_name, student_no, role, unit_id FROM users WHERE id = ?').get(r.student_id);
       if (s) {
         const sUnit = s.unit_id ? getCachedUnitById(db, s.unit_id) : null;
         v.student = { id: s.id, name: s.display_name, studentNo: s.student_no, kind: s.role === 'student' ? 'student' : 'staff', unit: sUnit?.name ?? null };
@@ -201,7 +214,9 @@ export function listRequests({ db }, user, query) {
   }
   if (['review', 'approved', 'rejected'].includes(query.status)) { where.push('status = ?'); args.push(query.status); }
   const rows = db.prepare(`SELECT * FROM requests ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY created_at DESC LIMIT 200`).all(...args);
-  return rows.map((r) => requestView(db, r, { withStudent: !own }));
+  if (!rows.length) return [];
+  const ctx = listContext(db, rows);
+  return rows.map((r) => requestView(db, r, { withStudent: !own, ctx }));
 }
 
 export function getRequest({ db }, user, id) {

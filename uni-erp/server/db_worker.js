@@ -26,7 +26,7 @@ pool.on('error', (err) => {
 });
 
 // الـ SAB: أول 4 bytes = حالة، ثم 4 bytes = طول البيانات، ثم البيانات
-// الحالة: 0 = انتظار، 1 = نجاح، -1 = خطأ
+// الحالة: 0 = انتظار، 1 = نجاح (آخر دفعة)، 2 = بقيت دفعات، -1 = خطأ
 const HEADER_SIZE = 8; // 2 × int32
 
 // المعاملات: pool.query يوزّع كل استعلام على اتصال مختلف فلا يعمل BEGIN/COMMIT/ROLLBACK كوحدة واحدة.
@@ -51,26 +51,34 @@ async function runQuery(sql, values) {
   return (txClient || pool).query(sql, values);
 }
 
-parentPort.on('message', async ({ sab, sql, values }) => {
+// النتيجة الأكبر من الذاكرة المشتركة تُسلَّم دفعات: الرئيس يطلب التالية بعد نسخ كل دفعة
+const MAX_RESULT_BYTES = 512 * 1024 * 1024;
+let pending = null;
+function sendChunk(sa, dataBuf) {
+  const part = pending.buf.subarray(pending.at, pending.at + dataBuf.length);
+  part.copy(dataBuf);
+  pending.at += part.length;
+  const done = pending.at >= pending.buf.length;
+  if (done) pending = null;
+  Atomics.store(sa, 1, part.length);
+  Atomics.store(sa, 0, done ? 1 : 2);
+  Atomics.notify(sa, 0);
+}
+
+parentPort.on('message', async ({ sab, sql, values, next }) => {
   const sa = new Int32Array(sab, 0, 2);
   const dataBuf = Buffer.from(sab, HEADER_SIZE);
+  if (next) { sendChunk(sa, dataBuf); return; }
 
   try {
     const result = await runQuery(sql, values);
     const json = JSON.stringify({ rows: result.rows, rowCount: result.rowCount });
     const encoded = Buffer.from(json, 'utf8');
 
-    if (encoded.length > dataBuf.length) {
-      // بيانات أكبر من الـ buffer — نرسل خطأ
-      const errJson = Buffer.from(JSON.stringify({ error: `Result too large: ${encoded.length} bytes` }), 'utf8');
-      errJson.copy(dataBuf);
-      Atomics.store(sa, 1, errJson.length);
-      Atomics.store(sa, 0, -1);
-    } else {
-      encoded.copy(dataBuf);
-      Atomics.store(sa, 1, encoded.length);
-      Atomics.store(sa, 0, 1);
-    }
+    if (encoded.length > MAX_RESULT_BYTES) throw new Error(`Result too large: ${encoded.length} bytes`);
+    pending = { buf: encoded, at: 0 };
+    sendChunk(sa, dataBuf);
+    return;
   } catch (e) {
     const errJson = Buffer.from(JSON.stringify({ error: e.message }), 'utf8');
     errJson.copy(dataBuf);

@@ -151,10 +151,22 @@ class SyncExecutor {
       throw new Error(`[DB] Query timed out: ${sql.slice(0, 100)}`);
     }
 
-    const status = Atomics.load(this.sa, 0);
-    const dataLen = Atomics.load(this.sa, 1);
-    const dataBuf = Buffer.from(this.sab, 8, dataLen);
-    const parsed = JSON.parse(dataBuf.toString('utf8'));
+    let status = Atomics.load(this.sa, 0);
+    const chunk = () => Buffer.from(this.sab, 8, Atomics.load(this.sa, 1));
+    let bytes = chunk();
+    if (status === 2) {
+      // نتيجة كبيرة: تُجمع دفعاتها بايتات قبل فك الترميز، فالدفعة قد تقطع حرفاً عربياً. تُنسخ لأن الذاكرة المشتركة يُعاد استعمالها
+      const parts = [Buffer.from(bytes)];
+      while (status === 2) {
+        Atomics.store(this.sa, 0, 0);
+        this.worker.postMessage({ sab: this.sab, next: true });
+        if (Atomics.wait(this.sa, 0, 0, 30000) === 'timed-out') throw new Error(`[DB] Query timed out: ${sql.slice(0, 100)}`);
+        status = Atomics.load(this.sa, 0);
+        parts.push(Buffer.from(chunk()));
+      }
+      bytes = Buffer.concat(parts);
+    }
+    const parsed = JSON.parse(bytes.toString('utf8'));
 
     if (status === -1) {
       throw new Error(`[DB] PostgreSQL error: ${parsed.error}\nSQL: ${sql.slice(0, 200)}`);
