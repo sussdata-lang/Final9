@@ -308,7 +308,7 @@
                       <td>${q.total_marks} درجة</td>
                       <td>${fmt(q.attempts_count)} طالب</td>
                       <td><b>${q.avg_score}</b> / ${q.total_marks}</td>
-                      <td><button class="btn sm pri btn-try-quiz" data-id="${q.source}:${q.id}" ${UA.S?.me?.role === 'student' && !q.open ? 'disabled' : ''}>${UA.S?.me?.role === 'student' ? 'تقديم الاختبار' : 'معاينة الاختبار'}</button></td>
+                      <td><button class="btn sm pri btn-try-quiz" data-id="${q.id}" ${UA.S?.me?.role === 'student' && !q.open ? 'disabled' : ''}>${UA.S?.me?.role === 'student' ? 'تقديم الاختبار' : 'معاينة الاختبار'}</button></td>
                     </tr>
                   `).join('')}
                 </tbody>
@@ -332,12 +332,12 @@
         });
         box.querySelectorAll('.btn-try-quiz').forEach((btn) => {
           btn.onclick = () => {
-            const q = d.quizzes.find((x) => `${x.source}:${x.id}` === btn.dataset.id);
+            const q = d.quizzes.find((x) => String(x.id) === btn.dataset.id);
             if (!q) return;
             if (UA.S?.me?.role === 'student') {
               openModal(q.title, q.questions.map((it, i) => `<fieldset style="grid-column:1/-1;border:1px solid var(--line,#dce3dd);border-radius:8px;padding:10px"><legend style="font-weight:700">س${i + 1}: ${esc(it.q)}</legend>${(it.options || []).map((o, k) => `<label style="display:block"><input type="radio" name="q_${i}" value="${k}"> ${esc(o)}</label>`).join('')}</fieldset>`).join(''), async (data) => {
                 const answers = q.questions.map((_, i) => (data[`q_${i}`] === undefined ? null : Number(data[`q_${i}`])));
-                const r = await api('POST', q.source === 'lms' ? `/api/lms/quizzes/${q.id}/submit` : `/api/enterprise/quizzes/${q.id}/submit`, { answers });
+                const r = await api('POST', `/api/lms/quizzes/${q.id}/submit`, { answers });
                 notify(`النتيجة: ${r.score} من ${r.totalMarks} (${r.correctCount} من ${r.questionsCount} إجابات صحيحة)`);
                 render();
               });

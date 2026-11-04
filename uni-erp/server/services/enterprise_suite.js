@@ -1,5 +1,8 @@
 import { docNo, academicYear } from '../lib/doc_no.js';
 import { listQuizzes, withoutAnswers, submitQuiz } from './quizzes.js';
+import { createCharge, createPayment } from './finance/fees.js';
+import { ready as financeReady } from './finance/core.js';
+import { tx } from '../db.js';
 import crypto from 'node:crypto';
 import { HttpError } from '../http.js';
 import { audit } from '../audit.js';
@@ -91,7 +94,7 @@ function executiveKpisFrom(db) {
 export function buildEnterpriseSuiteOverview(db) {
   const scheduleSlots = db.prepare('SELECT * FROM smart_schedule_slots ORDER BY id DESC').all();
   const quizzes = listQuizzes(db);
-  const quizSubmissions = db.prepare('SELECT * FROM online_quiz_submissions ORDER BY submitted_at DESC LIMIT 30').all();
+  const quizSubmissions = db.prepare('SELECT * FROM lms_quiz_submissions ORDER BY submitted_at DESC LIMIT 30').all();
   const selfEnrollments = db.prepare('SELECT * FROM student_self_enrollments ORDER BY registered_at DESC').all();
   const facultyOverloads = db.prepare('SELECT * FROM faculty_overload_records ORDER BY id DESC').all();
   const signedPayslips = db.prepare('SELECT * FROM hr_signed_payslips ORDER BY issued_at DESC').all();
@@ -179,10 +182,6 @@ export function registerEnterpriseSuiteRoutes(r, deps) {
   });
 
   // 2. تقديم اختبار إلكتروني وتصحيح فوري آلي (Online Quiz Auto-Grading)
-  r.add('POST', '/api/enterprise/quizzes/:id/submit', (c) => {
-    c.json(200, submitQuiz(db, c.user, 'online', c.params.id, c.body?.answers));
-  });
-
   // 3. محاكي المعدل التراكمي (GPA Simulator)
   r.add('POST', '/api/enterprise/gpa-simulate', (c) => {
     const b = c.body || {};
@@ -326,15 +325,24 @@ export function registerEnterpriseSuiteRoutes(r, deps) {
     const row = db.prepare('SELECT * FROM student_fee_installments WHERE id = ?').get(id);
     if (!row) throw new HttpError(404, 'القسط غير موجود.');
     if (row.paid_at) throw new HttpError(409, 'هذا القسط مسدد مسبقاً.', 'already_paid');
-    const receipt = docNo('RCP');
-    const method = c.body?.payment_method || 'بطاقة الدفع الإلكتروني الجامعية';
-    db.prepare(`
-      UPDATE student_fee_installments
-      SET paid_amount = amount, payment_method = ?, receipt_no = ?, status = 'مسدد بالكامل', paid_at = ?
-      WHERE id = ?
-    `).run(method, receipt, Date.now(), id);
+    // مصدر الرصيد واحد هو دفتر المالية: القسط يُسجَّل استحقاقاً ثم دفعة، فيظهر في /api/me/fees وفي القيود
+    const stu = db.prepare("SELECT id FROM users WHERE student_no = ? AND role = 'student'").get(row.student_no);
+    if (!stu) throw new HttpError(409, 'لا يوجد حساب طالب بهذا الرقم الجامعي، فلا يمكن ترحيل السداد إلى المالية.', 'no_student_account');
+    financeReady(db);
+    const feeType = db.prepare("SELECT id FROM fin_fee_types WHERE active = 1 AND kind = 'fee' ORDER BY id LIMIT 1").get();
+    if (!feeType && !row.fin_charge_id) throw new HttpError(409, 'عرّف نوع رسم في المالية أولاً.', 'no_fee_type');
+    const due = Number(row.amount), remaining = due - Number(row.paid_amount || 0);
+    const method = /مصرف|بنك|bank/i.test(String(c.body?.payment_method ?? '')) ? 'bank' : 'cash';
+    const { receipt, paidAt } = tx(db, () => {
+      const charge = row.fin_charge_id ? null : createCharge(deps, c.user, { studentId: stu.id, feeTypeId: feeType.id, amount: due, dueDay: String(row.due_date).slice(0, 10), note: `قسط ${row.installment_code}` }, c.ip);
+      const pay = createPayment(deps, c.user, { studentId: stu.id, amount: remaining, method, note: `قسط ${row.installment_code}` }, c.ip);
+      const at = Date.now();
+      db.prepare(`UPDATE student_fee_installments SET paid_amount = amount, payment_method = ?, receipt_no = ?, status = 'مسدد بالكامل', paid_at = ?, fin_charge_id = COALESCE(fin_charge_id, ?), fin_payment_id = ? WHERE id = ?`)
+        .run(c.body?.payment_method || (method === 'bank' ? 'مصرف' : 'نقدي'), pay.receiptNo, at, charge?.id ?? null, pay.payment.id, id);
+      return { receipt: pay.receiptNo, paidAt: at };
+    });
     audit(db, c.user, 'تسجيل سداد قسط', `${row.installment_code} · ${receipt}`, c.ip);
-    c.json(200, { ok: true, receipt_no: receipt, paid_at: Date.now() });
+    c.json(200, { ok: true, receipt_no: receipt, paid_at: paidAt });
   });
 
   // 7. إرسال إشعار فوري متعدد القنوات (Web Push / Telegram / WhatsApp / Email)

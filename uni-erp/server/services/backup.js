@@ -83,13 +83,15 @@ export async function createBackup({ db, cfg }, { reason = 'auto', actor = null,
     const pgUrl = db?.pgUrl ?? cfg.pgUrl ?? (isPgUri(cfg.dbPath) ? cfg.dbPath : process.env.DATABASE_URL);
     if (!pgUrl) throw new HttpError(500, 'رابط PostgreSQL غير معروف: لا يمكن نسخ قاعدة البيانات.', 'backup_failed');
     await pgDump(pgUrl, tmp);
-    const skip = (full, e) => full === dir || inside(full, dir) || e.name.startsWith('.tmp-');
+    // النسخة غير المشفرة لا تحمل مفتاح التوقيع ولا الشهادة، فمن يصل إليها لا يستطيع توقيع وثائق صحيحة
+    const noSecrets = !cfg.backupPassphrase;
+    const skip = (full, e) => full === dir || inside(full, dir) || e.name.startsWith('.tmp-') || (noSecrets && (e.name === 'secret.key' || e.name === 'pki'));
     const extra = walk(dataDir, 'data', skip);
     if (!inside(cfg.uploadDir, dataDir) && cfg.uploadDir !== dataDir) extra.push(...walk(cfg.uploadDir, 'uploads', () => false));
     const name = `backup-${stamp}${reason === 'auto' ? '' : '-' + reason.replace(/[^a-z]/g, '')}.zip${cfg.backupPassphrase ? '.enc' : ''}`;
     const file = path.join(dir, name);
-    const manifest = { app: 'uni-erp', format: 1, createdAt: now.toISOString(), reason, note: 'استعد بـ: node scripts/restore.js <الملف> — والخادم متوقف.' };
-    const built = await assembleInWorker({ dumpPath: tmp, extra, signingKey: cfg.signingKey ?? '', manifest, passphrase: cfg.backupPassphrase || null, outPath: file });
+    const manifest = { app: 'uni-erp', format: 1, createdAt: now.toISOString(), reason, signingMaterial: !noSecrets, note: 'استعد بـ: node scripts/restore.js <الملف> — والخادم متوقف.' };
+    const built = await assembleInWorker({ dumpPath: tmp, extra, signingKey: noSecrets ? '' : cfg.signingKey ?? '', manifest, passphrase: cfg.backupPassphrase || null, outPath: file });
     const res = { name, size: built.size, createdAt: now.getTime(), encrypted: !!cfg.backupPassphrase, files: built.files, uploaded: null, error: null };
     if (cfg.backupPutUrl) res.uploaded = await upload(cfg, name, await fs.promises.readFile(file)).catch((e) => { res.error = `تعذّر الرفع الخارجي: ${e.message}`; return false; });
     prune(cfg);

@@ -79,7 +79,7 @@ test('مسارات حزمة المؤسسة والأداء تفرض الصلاح�
   const inst = app.db.prepare("INSERT INTO student_fee_installments (installment_code, student_no, student_name, faculty_name, installment_no, amount, due_date) VALUES ('INST-T', 'STU-2', 'x', 'y', 1, 100, '2026-12-01')").run();
   const instId = Number(inst.lastInsertRowid);
   app.db.prepare("INSERT INTO hr_signed_payslips (payslip_code, employee_code, employee_name, department, month_label, basic_salary, overload_pay, allowances, deductions, net_salary, digital_signature, issued_at) VALUES ('PAY-T', 'E-1', 'x', 'y', 'شهر', 1, 0, 0, 0, 1, 'SIG', ?)").run(Date.now());
-  app.db.prepare("INSERT INTO online_quizzes (course_code, course_name, title, instructor_name, duration_min, total_marks, questions_json, status, created_at) VALUES ('C', 'C', 'ق', 'م', 10, 10, ?, 'نشط', ?)").run(JSON.stringify([{ q: 'س', options: ['أ', 'ب'], answer: 1 }]), Date.now());
+  app.db.prepare("INSERT INTO lms_quizzes (course_code, course_name, title, instructor_name, duration_min, total_marks, questions_json, published, created_at) VALUES ('C', 'C', 'ق', 'م', 10, 10, ?, 1, ?)").run(JSON.stringify([{ q: 'س', options: ['أ', 'ب'], ans: 1 }]), Date.now());
   const ov = (await c.call('GET', '/api/enterprise/overview', { cookie: stu })).json;
   assert.equal(ov.signedPayslips.length, 0);
   assert.equal(ov.facultyOverloads.length, 0);
@@ -142,7 +142,7 @@ test('مسارات الوحدات الموسعة وشؤون الطلاب وال�
   const STUDENT_WRITES = new Set([
     'PUT /api/me/profile', 'POST /api/complaints', 'POST /api/requests', 'POST /api/push/subscribe', 'POST /api/push/unsubscribe', 'POST /api/push/test',
     'POST /api/alumni/applications', 'POST /api/expansions/appeals', 'POST /api/expansions/office-bookings', 'POST /api/ai/advisor/ask',
-    'POST /api/enterprise/quizzes/1/submit', 'POST /api/lms/quizzes/1/submit', 'POST /api/enterprise/gpa-simulate', 'POST /api/enterprise/self-enroll', 'POST /api/student-affairs-suite/queue/book',
+    'POST /api/lms/quizzes/1/submit', 'POST /api/enterprise/gpa-simulate', 'POST /api/enterprise/self-enroll', 'POST /api/student-affairs-suite/queue/book',
     // الإلغاء يمس ملفات المستخدم نفسه فقط، والمعرّف هنا ليس نوع استيراد؛ رفض الأنواع الفعلية في import_engine.test.js
     'POST /api/import-engine/cancel', 'POST /api/import-engine/1/check', 'POST /api/import-engine/1/commit',
   ]);

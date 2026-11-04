@@ -344,6 +344,7 @@ export function makeHandler({ cfg, router, getUser }) {
       await route.handler(ctx);
     } catch (e) {
       if (e instanceof HttpError) return sendJson(res, e.status, { error: e.code, message: e.message, ...(e.field ? { field: e.field } : {}) }, {}, req);
+      if (/fk_\w+_student/.test(String(e?.message))) return sendJson(res, 400, { error: 'validation', message: 'الرقم الجامعي غير موجود في النظام.', field: 'student_no' }, {}, req);
       log.error(`${req.method} ${String(req.url).split('?')[0]}`, e);
       sendJson(res, 500, { error: 'internal', message: 'خطأ داخلي في الخادم.' }, {}, req);
     } finally {

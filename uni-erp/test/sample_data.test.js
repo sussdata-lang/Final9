@@ -11,7 +11,7 @@ const PW = 'Str0ng-Test-Pass!';
 const SAMPLE_TABLES = ['lms_lectures', 'lms_quizzes', 'library_books', 'library_loans', 'research_projects', 'postgrad_theses', 'alumni_records', 'career_jobs', 'career_applications',
   'qa_kpis', 'qa_surveys', 'qa_accreditations', 'exam_schedules', 'grade_appeals', 'office_hour_bookings', 'faculty_promotions', 'dorm_rooms', 'dorm_allocations', 'scholarships', 'student_activities',
   'hr_appraisals', 'hr_trainings', 'hr_biometric_devices', 'infra_settings', 'ai_early_warnings', 'ai_triage_logs', 'devops_incident_reports', 'sa_card_activity_logs', 'smart_schedule_slots',
-  'online_quizzes', 'online_quiz_submissions', 'student_self_enrollments', 'faculty_overload_records', 'hr_signed_payslips', 'student_fee_installments', 'multi_channel_notifications', 'encrypted_snapshots',
+  'lms_quiz_submissions', 'student_self_enrollments', 'faculty_overload_records', 'hr_signed_payslips', 'student_fee_installments', 'multi_channel_notifications', 'encrypted_snapshots',
   'offline_sync_batches', 'sa_applicants', 'sa_credit_equivalences', 'sa_advising_warnings', 'sa_lifecycle_movements', 'sa_disciplinary_details', 'sa_scholarships', 'sa_desk_appointments', 'sa_course_prerequisites', 'courses', 'grades'];
 const READ_SCREENS = ['/api/enterprise/overview', '/api/student-affairs-suite/overview', '/api/devops/overview', '/api/hr-pro/overview', '/api/lms/overview', '/api/expansions/overview', '/api/student-life/overview', '/api/ai/overview', '/api/research/overview', '/api/alumni/overview', '/api/qa/overview', '/api/analytics', '/api/stats'];
 
@@ -69,7 +69,8 @@ test('الترحيل يحذف الصفوف المزروعة بعينها فقط:
   const realGrade = Number(grade.run(studentId, usedCourse, now, now + 5000).lastInsertRowid);
 
   const dir = path.dirname(fileURLToPath(import.meta.url));
-  const sql = fs.readFileSync(path.join(dir, '../server/migrations/041_remove_sample_data.sql'), 'utf8');
+  // الترحيل 053 دمج جدولي الاختبارات، فيُعاد تشغيل 041 بأسماء اليوم
+  const sql = fs.readFileSync(path.join(dir, '../server/migrations/041_remove_sample_data.sql'), 'utf8').replace(/DELETE FROM online_quizzes[^;]*;/, '').replaceAll('online_quiz_submissions', 'lms_quiz_submissions');
   for (const statement of sql.split('\n').filter((l) => !l.trim().startsWith('--')).join('\n').split(';').map((s) => s.trim()).filter(Boolean)) db.prepare(statement).run();
 
   const has = (table, where, ...args) => !!db.prepare(`SELECT 1 AS x FROM ${table} WHERE ${where}`).get(...args);

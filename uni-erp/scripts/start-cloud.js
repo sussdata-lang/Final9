@@ -8,7 +8,14 @@ import { fileURLToPath } from 'node:url';
 const run = (file) => spawnSync(process.execPath, ['--disable-warning=ExperimentalWarning', fileURLToPath(new URL(file, import.meta.url))], { stdio: 'inherit' });
 const seed = run('./seed.js');
 if (seed.status !== 0) { console.error('فشلت تهيئة البيانات الأولية.'); process.exit(seed.status ?? 1); }
-if (process.env.RESET_ACCOUNTS === '1') {
+// إبطال ما انكشف (REVOKE_PASSWORD وROTATE_SIGNING_KEY)، ثم يُعاد ضبط الحساب الأساسي إن أُبطلت كلمته
+let resetCore = false;
+if (process.env.REVOKE_PASSWORD || process.env.ROTATE_SIGNING_KEY) {
+  const sec = run('./secure-credentials.js');
+  if (sec.status === 10) resetCore = true;
+  else if (sec.status !== 0) { console.error('فشل إبطال بيانات الدخول المكشوفة.'); process.exit(sec.status ?? 1); }
+}
+if (process.env.RESET_ACCOUNTS === '1' || resetCore) {
   console.log('RESET_ACCOUNTS=1: إعادة ضبط الحسابين الأساسيين…');
   const r = run('./accounts.js');
   if (r.status !== 0) { console.error('فشلت إعادة ضبط الحسابات.'); process.exit(r.status ?? 1); }

@@ -15,6 +15,8 @@ import { createApp } from '../server/app.js';
 import { hashPassword } from '../server/security.js';
 import { deleteEmployee } from '../server/services/hr.js';
 import { idleExpired } from '../server/services/auth.js';
+import { revokePassword, rotateSigningMaterial } from '../server/services/credentials.js';
+import { verifyPassword } from '../server/security.js';
 
 const actorWith = (...perms) => ({ id: 1, role: 'staff', can: (p) => perms.includes(p) });
 
@@ -61,13 +63,13 @@ test('مع التطبيق: الاختبار والبصمة والإشعار وا
   const call = (cookie, m, u, body) => fetch(base + u, { method: m, headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), Origin: base, ...(cookie ? { Cookie: cookie } : {}) }, body: body ? JSON.stringify(body) : undefined });
   try {
     await t.test('الاختبار الإلكتروني: محاولة واحدة، ولا تقديم لاختبار مغلق', async () => {
-      const qs = JSON.stringify([{ q: 'س', options: ['أ', 'ب'], answer: 0 }]);
-      const open = Number(db.prepare("INSERT INTO online_quizzes (course_code, course_name, title, instructor_name, questions_json, status, created_at) VALUES ('R1', 'R', 'T', 'I', ?, 'نشط', ?)").run(qs, Date.now()).lastInsertRowid);
-      const closed = Number(db.prepare("INSERT INTO online_quizzes (course_code, course_name, title, instructor_name, questions_json, status, created_at) VALUES ('R2', 'R', 'T', 'I', ?, 'مغلق', ?)").run(qs, Date.now()).lastInsertRowid);
+      const qs = JSON.stringify([{ q: 'س', options: ['أ', 'ب'], ans: 0 }]);
+      const open = Number(db.prepare("INSERT INTO lms_quizzes (course_code, course_name, title, instructor_name, questions_json, published, created_at) VALUES ('R1', 'R', 'T', 'I', ?, 1, ?)").run(qs, Date.now()).lastInsertRowid);
+      const closed = Number(db.prepare("INSERT INTO lms_quizzes (course_code, course_name, title, instructor_name, questions_json, published, created_at) VALUES ('R2', 'R', 'T', 'I', ?, 0, ?)").run(qs, Date.now()).lastInsertRowid);
       const st = await login('risk_st');
-      assert.equal((await call(st, 'POST', `/api/enterprise/quizzes/${open}/submit`, { answers: [0] })).status, 200);
-      assert.equal((await call(st, 'POST', `/api/enterprise/quizzes/${open}/submit`, { answers: [1] })).status, 409);
-      assert.equal((await call(st, 'POST', `/api/enterprise/quizzes/${closed}/submit`, { answers: [0] })).status, 409);
+      assert.equal((await call(st, 'POST', `/api/lms/quizzes/${open}/submit`, { answers: [0] })).status, 200);
+      assert.equal((await call(st, 'POST', `/api/lms/quizzes/${open}/submit`, { answers: [1] })).status, 409);
+      assert.equal((await call(st, 'POST', `/api/lms/quizzes/${closed}/submit`, { answers: [0] })).status, 409);
     });
 
     const admin = await login('admin', process.env.SEED_PASSWORD || (await seedPw()));
@@ -149,5 +151,52 @@ test('موظف له سلفة لا يُحذف، فسجلاته أساس الرو�
     app.db.prepare(`INSERT INTO hr_advances (employee_id, ${advCols.join(', ')}) VALUES (?, ${advCols.map(() => '?').join(', ')})`).run(id, ...advCols.map((c) => (c === 'advance_code' ? 'RISK-A1' : /_at$|amount|installment|month/.test(c) ? 1 : 'x')));
     assert.throws(() => deleteEmployee(app.db, null, id, '::1'), (e) => e.status === 400);
     assert.ok(app.db.prepare('SELECT id FROM hr_employees WHERE id = ?').get(id));
+  } finally { await app.close(); }
+});
+
+test('إبطال الكلمة المكشوفة يشمل من يستعملها فقط، ولا يسمح بها بعده', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'uni-erp-rev-'));
+  const app = await createApp({ dbPath: ':memory:', uploadDir: path.join(dir, 'up'), logDir: path.join(dir, 'logs'), dataDir: dir, scryptN: 1024, port: 0, backupAuto: false });
+  try {
+    const OLD = 'Leaked#Pass12345', KEEP = 'Other#Pass12345';
+    const add = async (u, pw) => Number(app.db.prepare("INSERT INTO users (username, display_name, password_hash, role, active, must_change_password, created_at) VALUES (?, ?, ?, 'staff', 1, 0, ?)").run(u, u, await hashPassword(pw, 1024), Date.now()).lastInsertRowid);
+    const leaked = await add('rev_leak', OLD), kept = await add('rev_keep', KEEP);
+    app.db.prepare('INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)').run('rev-session', leaked, Date.now(), Date.now() + 1000);
+    const r = await revokePassword(app.db, OLD, 1024);
+    assert.ok(r.revoked >= 1);
+    const row = (id) => app.db.prepare('SELECT password_hash, must_change_password FROM users WHERE id = ?').get(id);
+    assert.equal(await verifyPassword(OLD, row(leaked).password_hash), false);
+    assert.equal(Number(row(leaked).must_change_password), 1);
+    assert.equal(Number(app.db.prepare('SELECT COUNT(*) c FROM sessions WHERE user_id = ?').get(leaked).c), 0);
+    assert.equal(await verifyPassword(KEEP, row(kept).password_hash), true, 'الحساب الآخر لا يُمس');
+    assert.equal(Number(row(kept).must_change_password), 0);
+  } finally { await app.close(); }
+});
+
+test('تبديل المفتاح مرة لكل اسم، ويحذف النسخ غير المشفرة، والنسخة غير المشفرة لا تحمل المفتاح', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'uni-erp-key-'));
+  const dbFile = path.join(dir, 'x.db');
+  const app = await createApp({ dbPath: ':memory:', uploadDir: path.join(dir, 'up'), logDir: path.join(dir, 'logs'), dataDir: dir, backupDir: path.join(dir, 'backups'), scryptN: 1024, port: 0, backupAuto: false });
+  try {
+    const cfg = { ...app.cfg, dbPath: dbFile, backupDir: path.join(dir, 'backups'), dataDir: dir, backupPassphrase: null };
+    fs.mkdirSync(path.join(dir, 'pki'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'pki', 'signing.pem'), 'OLD-PEM');
+    fs.writeFileSync(path.join(dir, 'secret.key'), 'OLD-KEY');
+    const plain = await createBackup({ db: app.db, cfg }, { reason: 'manual' });
+    assert.equal(plain.encrypted, false);
+    const zip = readZip(fs.readFileSync(path.join(cfg.backupDir, plain.name)), { maxTotal: 1 << 30, maxEntries: 1000 });
+    for (const name of zip.keys()) assert.doesNotMatch(name, /signing-key|secret\.key|pki/, name);
+    assert.equal(JSON.parse(zip.get('manifest.json').toString()).signingMaterial, false);
+    fs.writeFileSync(path.join(cfg.backupDir, 'backup-20260101-000000.zip.enc'), 'keep');
+
+    const first = rotateSigningMaterial({ db: app.db, cfg }, 'test-1');
+    assert.equal(first.backupsRemoved, 1);
+    const key = fs.readFileSync(path.join(dir, 'secret.key'), 'utf8');
+    assert.notEqual(key, 'OLD-KEY');
+    assert.equal(fs.existsSync(path.join(dir, 'pki', 'signing.pem')), false);
+    assert.ok(fs.existsSync(path.join(cfg.backupDir, 'backup-20260101-000000.zip.enc')), 'المشفرة تبقى');
+    assert.equal(rotateSigningMaterial({ db: app.db, cfg }, 'test-1').skipped, true);
+    assert.equal(fs.readFileSync(path.join(dir, 'secret.key'), 'utf8'), key, 'بقاء المتغير لا يبدل المفتاح');
+    assert.equal(rotateSigningMaterial({ db: app.db, cfg }, 'test-2').skipped, false);
   } finally { await app.close(); }
 });

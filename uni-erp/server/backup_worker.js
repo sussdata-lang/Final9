@@ -13,7 +13,7 @@ const { dumpPath, extra, signingKey, manifest, passphrase, outPath } = workerDat
 const dbBuf = fs.readFileSync(dumpPath);
 const files = [{ name: 'database/database.dump', data: dbBuf }];
 for (const f of extra) files.push({ name: f.name, data: fs.readFileSync(f.full) });
-files.push({ name: 'signing-key.txt', data: signingKey });
+if (signingKey) files.push({ name: 'signing-key.txt', data: signingKey });
 const full = { ...manifest, dbSha256: crypto.createHash('sha256').update(dbBuf).digest('hex'), dbBytes: dbBuf.length, files: files.length };
 files.unshift({ name: 'manifest.json', data: JSON.stringify(full, null, 2) });
 

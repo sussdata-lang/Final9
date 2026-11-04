@@ -73,6 +73,7 @@ test('السكن والساعات المكتبية في شؤون الطلاب، 
   staff('house_h', ['sa_housing:view', 'sa_housing:manage']);
   const exam = await login('exam_h'), house = await login('house_h');
   const room = Number(app.db.prepare("INSERT INTO dorm_rooms (building_name, room_no, capacity, occupied) VALUES ('مبنى', '1', 3, 0)").run().lastInsertRowid);
+  student('DEC-H');
   const alloc = { student_name: 'ط', student_no: 'DEC-H', room_id: room };
   const office = { faculty_name: 'د', student_name: 'ط', student_no: 'DEC-H', topic: 'ت' };
 
@@ -91,7 +92,6 @@ test('السكن والساعات المكتبية في شؤون الطلاب، 
   assert.ok(!(await me(exam)).includes('student_life'));
   assert.ok((await me(house)).includes('student_life'));
 
-  student('DEC-H');
   const stu = await login('DEC-H');
   const mine = (await call('GET', '/api/student-life/overview', { cookie: stu })).json;
   assert.equal(mine.dormAllocations.length, 1, 'الطالب يرى سكنه');

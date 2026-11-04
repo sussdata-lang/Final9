@@ -22,6 +22,12 @@ function loadDotEnv(file) {
   return out;
 }
 
+export function signingKeyFile(cfg) {
+  const isPgUri = /^postgres(ql)?:\/\//i.test(String(cfg.dbPath || ''));
+  const keyDir = (isPgUri || cfg.dbPath === ':memory:') ? DEFAULT_DATA_DIR : path.dirname(cfg.dbPath);
+  return path.join(keyDir, 'secret.key');
+}
+
 export function loadConfig(overrides = {}) {
   const env = { ...loadDotEnv(path.join(ROOT, '.env')), ...process.env };
   const abs = (p) => (path.isAbsolute(p) ? p : path.resolve(ROOT, p));
@@ -71,9 +77,7 @@ export function loadConfig(overrides = {}) {
   if (!cfg.signingKey) {
     // مفتاح التوقيع: يُولَّد مرة واحدة ويُحفظ بصلاحيات مقيّدة (0o700 للمجلد و0o600 للملف).
     // فحص استباقي لمنع تسريب سلسلة اتصال PostgreSQL (DATABASE_URL) إلى مسار الملفات المحلي.
-    const isPgUri = /^postgres(ql)?:\/\//i.test(String(cfg.dbPath || ''));
-    const keyDir = (isPgUri || cfg.dbPath === ':memory:') ? DEFAULT_DATA_DIR : path.dirname(cfg.dbPath);
-    const keyFile = path.join(keyDir, 'secret.key');
+    const keyFile = signingKeyFile(cfg);
     fs.mkdirSync(path.dirname(keyFile), { recursive: true, mode: 0o700 });
     try { fs.chmodSync(path.dirname(keyFile), 0o700); } catch { /* ignore */ }
     if (!fs.existsSync(keyFile)) fs.writeFileSync(keyFile, crypto.randomBytes(32).toString('hex'), { mode: 0o600 });

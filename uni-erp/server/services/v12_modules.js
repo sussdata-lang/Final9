@@ -230,8 +230,8 @@ export async function registerV12Modules(r, deps) {
       lectures,
       // الإجابة الصحيحة لا تصل إلا لمن يدير المحتوى
       quizzes: quizzes.map((q) => { if (!canManage) return withoutAnswers(q); const { questions_json, ...rest } = q; return rest; }),
-      quizSubmissions: canManage ? db.prepare('SELECT * FROM online_quiz_submissions ORDER BY submitted_at DESC LIMIT 30').all()
-        : isStudent(c) && c.user.student_no ? db.prepare('SELECT * FROM online_quiz_submissions WHERE student_no = ? ORDER BY submitted_at DESC LIMIT 30').all(c.user.student_no) : [],
+      quizSubmissions: canManage ? db.prepare('SELECT * FROM lms_quiz_submissions ORDER BY submitted_at DESC LIMIT 30').all()
+        : isStudent(c) && c.user.student_no ? db.prepare('SELECT * FROM lms_quiz_submissions WHERE student_no = ? ORDER BY submitted_at DESC LIMIT 30').all(c.user.student_no) : [],
       books,
       loans,
     });
@@ -307,7 +307,7 @@ export async function registerV12Modules(r, deps) {
     c.json(201, { id: Number(res.lastInsertRowid) });
   });
 
-  r.add('POST', '/api/lms/quizzes/:id/submit', (c) => { c.json(200, submitQuiz(db, c.user, 'lms', c.params.id, c.body?.answers)); });
+  r.add('POST', '/api/lms/quizzes/:id/submit', (c) => { c.json(200, submitQuiz(db, c.user, c.params.id, c.body?.answers)); });
 
   r.add('POST', '/api/lms/books', (c) => {
     requireV12Perm(c, 'holds:manage', 'lms_lib:write', 'lms_lib:edit', 'course:manage');
