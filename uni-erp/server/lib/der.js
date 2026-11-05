@@ -7,7 +7,6 @@ const lenBytes = (n) => {
 export const tlv = (tag, ...parts) => { const body = Buffer.concat(parts.map((p) => (Buffer.isBuffer(p) ? p : Buffer.from(p)))); return Buffer.concat([Buffer.from([tag]), lenBytes(body.length), body]); };
 export const seq = (...p) => tlv(0x30, ...p);
 export const set = (...p) => tlv(0x31, ...p);
-export const sortedSet = (...p) => tlv(0x31, ...[...p].sort(Buffer.compare));            // DER: عناصر SET OF مرتَّبة
 export const ctx = (n, ...p) => tlv(0xa0 | n, ...p);                                     // [n] EXPLICIT/IMPLICIT constructed
 export const octet = (b) => tlv(0x04, b);
 export const nul = () => Buffer.from([0x05, 0x00]);

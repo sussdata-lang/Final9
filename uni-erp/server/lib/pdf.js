@@ -24,7 +24,7 @@ const BASENAME = { regular: 'DejaVuSans', bold: 'DejaVuSans-Bold', 'cairo-regula
 let FAM = 'dejavu';
 const logical = (font, size) => (font === 'bold' && size >= 17 && FAMS[FAM].title ? 'title' : font);
 const phys = (font, size) => FAMS[FAM][logical(font, size)];
-export const SIG_BYTES = 12288;                                           // سعة توقيع CMS (12 كيلوبايت) تتسع لشهادة وسلسلة وختم زمني
+const SIG_BYTES = 12288;                                           // سعة توقيع CMS (12 كيلوبايت) تتسع لشهادة وسلسلة وختم زمني
 
 const f2 = (n) => (Math.round(n * 100) / 100).toString();
 const hex16 = (n) => n.toString(16).padStart(4, '0');

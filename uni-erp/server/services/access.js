@@ -1,4 +1,5 @@
 import { tx } from '../db.js';
+import { bad } from '../validate.js';
 import { audit } from '../audit.js';
 import { HttpError } from '../http.js';
 import {
@@ -25,7 +26,6 @@ import {
   getRolesSnapshot,
 } from '../cache.js';
 
-const bad = (m) => new HttpError(400, m, 'validation');
 const clean = (v, min, max, what) => {
   const s = String(v ?? '').replace(/\s+/g, ' ').trim();
   if (s.length < min || s.length > max || /[\u0000-\u001f<>]/.test(s)) throw bad(`«${what}» يجب أن يكون بين ${min} و${max} حرفاً بلا رموز غير مسموحة.`);
@@ -44,7 +44,7 @@ function parsePerms(actor, list) {
   return set;
 }
 
-export function listRoles(db) {
+function listRoles(db) {
   return cacheGetOrSet(db, 'identity', 'roles:list_full', () => {
     // استعلام تجميعي واحد لحساب المستخدمين الفعالين لكل دور بدلاً من 40+ استعلام منفصل
     const roleCounts = new Map();
@@ -79,6 +79,60 @@ export function listRoles(db) {
       };
     });
     return [...builtin, ...custom];
+  });
+}
+
+function listUnits(db) {
+  return cacheGetOrSet(db, 'org_units', 'units:list_full', () => {
+    const snap = getOrgUnitsSnapshot(db);
+    // جلب كافة مستخدمي الوحدات والطلبات قيد المراجعة باستعلامين مجمّعين بدلاً من 3 استعلامات لكل وحدة (توفير 100+ استعلام)
+    const headsByUnit = new Map();
+    const activeUsersByUnit = new Map();
+    for (const u of db.prepare('SELECT id, unit_id, username, display_name AS name, active, job_title AS jobTitle FROM users WHERE unit_id IS NOT NULL AND role <> \'student\' ORDER BY id').all()) {
+      const uid = Number(u.unit_id);
+      if (!headsByUnit.has(uid)) headsByUnit.set(uid, []);
+      headsByUnit.get(uid).push({
+        id: u.id,
+        username: u.username,
+        name: u.name,
+        jobTitle: u.jobTitle || '',
+        active: !!u.active,
+      });
+      if (u.active) {
+        activeUsersByUnit.set(uid, (activeUsersByUnit.get(uid) || 0) + 1);
+      }
+    }
+
+    const pendingByUnit = new Map();
+    for (const r of db.prepare("SELECT assigned_unit_id, COUNT(*) AS n FROM requests WHERE assigned_unit_id IS NOT NULL AND status = 'review' GROUP BY assigned_unit_id").all()) {
+      pendingByUnit.set(Number(r.assigned_unit_id), r.n);
+    }
+
+    const units = snap.units.map((u) => {
+      const defaultModuleAccess = safeJsonParse(u.default_module_access_json, {});
+      const defaultPermissions = safeJsonParse(u.default_permissions_json, []);
+      const allowedViews = safeJsonParse(u.allowed_views_json, []);
+      const mergedPerms = [...new Set([...defaultPermissions, ...resolveModulePermissions(defaultModuleAccess)])];
+      return {
+        id: u.id,
+        name: u.name,
+        kind: u.kind,
+        parentId: u.parent_id,
+        active: !!u.active,
+        code: u.code,
+        description: u.description || '',
+        module: u.module,
+        defaultPermissions: mergedPerms,
+        defaultModuleAccess,
+        allowedViews,
+        effectiveDefaultPermissionsCount: mergedPerms.length,
+        heads: headsByUnit.get(u.id) || [],
+        users: activeUsersByUnit.get(u.id) || 0,
+        pending: pendingByUnit.get(u.id) || 0,
+      };
+    });
+    const links = snap.links.map((l) => ({ id: l.id, from: l.from_unit, to: l.to_unit, twoWay: !!l.two_way }));
+    return { units, links };
   });
 }
 
@@ -160,63 +214,7 @@ export function linkedTargets(db, unitId) {
   return getCachedLinkedTargets(db, unitId);
 }
 
-export function unitTree(db, id) {
-  return getCachedUnitTree(db, id);
-}
 
-export function listUnits(db) {
-  return cacheGetOrSet(db, 'org_units', 'units:list_full', () => {
-    const snap = getOrgUnitsSnapshot(db);
-    // جلب كافة مستخدمي الوحدات والطلبات قيد المراجعة باستعلامين مجمّعين بدلاً من 3 استعلامات لكل وحدة (توفير 100+ استعلام)
-    const headsByUnit = new Map();
-    const activeUsersByUnit = new Map();
-    for (const u of db.prepare('SELECT id, unit_id, username, display_name AS name, active, job_title AS jobTitle FROM users WHERE unit_id IS NOT NULL AND role <> \'student\' ORDER BY id').all()) {
-      const uid = Number(u.unit_id);
-      if (!headsByUnit.has(uid)) headsByUnit.set(uid, []);
-      headsByUnit.get(uid).push({
-        id: u.id,
-        username: u.username,
-        name: u.name,
-        jobTitle: u.jobTitle || '',
-        active: !!u.active,
-      });
-      if (u.active) {
-        activeUsersByUnit.set(uid, (activeUsersByUnit.get(uid) || 0) + 1);
-      }
-    }
-
-    const pendingByUnit = new Map();
-    for (const r of db.prepare("SELECT assigned_unit_id, COUNT(*) AS n FROM requests WHERE assigned_unit_id IS NOT NULL AND status = 'review' GROUP BY assigned_unit_id").all()) {
-      pendingByUnit.set(Number(r.assigned_unit_id), r.n);
-    }
-
-    const units = snap.units.map((u) => {
-      const defaultModuleAccess = safeJsonParse(u.default_module_access_json, {});
-      const defaultPermissions = safeJsonParse(u.default_permissions_json, []);
-      const allowedViews = safeJsonParse(u.allowed_views_json, []);
-      const mergedPerms = [...new Set([...defaultPermissions, ...resolveModulePermissions(defaultModuleAccess)])];
-      return {
-        id: u.id,
-        name: u.name,
-        kind: u.kind,
-        parentId: u.parent_id,
-        active: !!u.active,
-        code: u.code,
-        description: u.description || '',
-        module: u.module,
-        defaultPermissions: mergedPerms,
-        defaultModuleAccess,
-        allowedViews,
-        effectiveDefaultPermissionsCount: mergedPerms.length,
-        heads: headsByUnit.get(u.id) || [],
-        users: activeUsersByUnit.get(u.id) || 0,
-        pending: pendingByUnit.get(u.id) || 0,
-      };
-    });
-    const links = snap.links.map((l) => ({ id: l.id, from: l.from_unit, to: l.to_unit, twoWay: !!l.two_way }));
-    return { units, links };
-  });
-}
 
 const unitRow = (db, id) => { const u = db.prepare('SELECT * FROM org_units WHERE id = ?').get(Number(id)); if (!u) throw new HttpError(404, 'الوحدة غير موجودة.', 'not_found'); return u; };
 

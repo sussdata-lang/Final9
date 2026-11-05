@@ -58,11 +58,11 @@ export function buildTemplate(db, code) {
 }
 
 // تصدير الطلبات ضمن صلاحية المستخدم؛ عند تحديد خدمة تصير حقولها أعمدة
-export function exportRequests(deps, user, q = {}) {
+export async function exportRequests(deps, user, q = {}) {
   const { db } = deps;
   if (scopeOf(user) !== 'own' && !user.can('data:export')) throw new HttpError(403, 'لا تملك صلاحية تصدير الطلبات.', 'forbidden');
   const svc = q.service ? getService(db, String(q.service)) : null;
-  let rows = listRequests(deps, user, { status: q.status }).filter((r) => (!svc || r.service?.code === svc.code));
+  let rows = (await listRequests(deps, user, { status: q.status })).filter((r) => (!svc || r.service?.code === svc.code));
   const unit = q.unit ? String(q.unit) : null;
   if (unit) { const u = db.prepare('SELECT id FROM org_units WHERE code = ?').get(unit); rows = rows.filter((r) => r.unit?.id === u?.id); }
   const from = q.from ? Date.parse(q.from) : null, to = q.to ? Date.parse(q.to) + 86400000 : null;

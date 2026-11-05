@@ -1,12 +1,12 @@
 // تنبيهات الجوال (Web Push, RFC 8030/8291/8292): أخبار جديدة، علامات جديدة، ردود على الطلبات والشكاوى.
 // بلا اعتماديات: التشفير aes128gcm وتوقيع VAPID (ES256) بـ node:crypto. يعمل على Android وسطح المكتب، وعلى iOS بعد «إضافة إلى الشاشة الرئيسية».
+import { bad } from '../validate.js';
 import { log } from '../lib/logger.js';
 import crypto from 'node:crypto';
 import { HttpError } from '../http.js';
 
 const b64u = (b) => Buffer.from(b).toString('base64url');
 const fromB64u = (s) => Buffer.from(String(s), 'base64url');
-const bad = (m) => new HttpError(400, m, 'validation');
 
 /* ---------- مفاتيح VAPID: من البيئة أو تُولَّد مرة وتُحفظ في site_settings ---------- */
 export function vapidKeys({ db, cfg }) {
@@ -24,7 +24,7 @@ export function vapidKeys({ db, cfg }) {
 }
 const privObj = (priv) => crypto.createPrivateKey({ key: fromB64u(priv), format: 'der', type: 'pkcs8' });
 
-export function vapidJwt(priv, audience, subject, now = Date.now()) {
+function vapidJwt(priv, audience, subject, now = Date.now()) {
   const head = b64u(JSON.stringify({ typ: 'JWT', alg: 'ES256' })), body = b64u(JSON.stringify({ aud: audience, exp: Math.floor(now / 1000) + 12 * 3600, sub: subject }));
   const sig = crypto.sign('sha256', Buffer.from(`${head}.${body}`), { key: privObj(priv), dsaEncoding: 'ieee-p1363' });
   return `${head}.${body}.${b64u(sig)}`;

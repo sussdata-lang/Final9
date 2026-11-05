@@ -766,7 +766,8 @@
                   <td>${qStatusBadge[a.queue_status] || esc(a.queue_status)}</td>
                   <td style="white-space:nowrap">
                     ${
-                      a.queue_status === 'waiting'
+                      !['sa_scholarships:write', 'sa_scholarships:approve', 'request:decide', 'student:update'].some((p) => UA.can(p)) ? ''
+                        : a.queue_status === 'waiting'
                         ? `<button class="btn sm pri" data-act="sa-q-status" data-id="${a.id}" data-st="serving">🔔 نداء للنافذة</button>`
                         : ''
                     }

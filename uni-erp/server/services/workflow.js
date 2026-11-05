@@ -5,7 +5,7 @@ import { audit } from '../audit.js';
 import { HttpError } from '../http.js';
 
 export const STAGES = ['draft', 'reviewed', 'approved'];
-export const STAGE_LABEL = { draft: 'مدخلة', reviewed: 'مراجَعة', approved: 'معتمدة' };
+const STAGE_LABEL = { draft: 'مدخلة', reviewed: 'مراجَعة', approved: 'معتمدة' };
 
 export const workflowOn = (db) => (db.prepare("SELECT value FROM site_settings WHERE key = 'grades_workflow'").get()?.value ?? 'on') !== 'off';
 export const initialStatus = (db) => (workflowOn(db) ? 'draft' : 'approved');
@@ -18,7 +18,7 @@ export const canApprove = (actor) => !!actor?.can?.('grade:approve');
 // المقرر مسند إلى عضو هيئة مرتبط بهذا الحساب
 const ownsCourse = (db, actor, courseId) => !!courseId && !!db.prepare('SELECT 1 AS x FROM courses c JOIN faculty_members m ON m.id = c.member_id WHERE c.id = ? AND m.user_id = ?').get(Number(courseId), Number(actor?.id));
 // حساب عضو الهيئة المسند إليه المقرر، إن وُجد
-export const courseApprover = (db, courseId) => (courseId ? db.prepare('SELECT m.user_id AS uid FROM courses c JOIN faculty_members m ON m.id = c.member_id WHERE c.id = ?').get(Number(courseId))?.uid ?? null : null);
+const courseApprover = (db, courseId) => (courseId ? db.prepare('SELECT m.user_id AS uid FROM courses c JOIN faculty_members m ON m.id = c.member_id WHERE c.id = ?').get(Number(courseId))?.uid ?? null : null);
 // مقرر له عضو هيئة مرتبط بحساب: لا يعتمده غيره. وما لا عضو له يعتمده حامل grade:approve
 const canApproveGrade = (db, actor, g) => {
   const owner = courseApprover(db, g.course_id);

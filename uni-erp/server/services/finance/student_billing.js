@@ -4,7 +4,7 @@ import { createCharge, createPayment, listCharges, listFeeTypes, listPayments, v
 
 const minor = (v) => Math.round(Number(v) * 100);
 
-export function listStudentInvoices(deps, q = {}) {
+function listStudentInvoices(deps, q = {}) {
   const { db } = deps; ready(db);
   const filter = q.studentId ? { studentId: q.studentId } : q.studentIds ? { studentIds: q.studentIds } : {};
   const all = listCharges(deps, filter);

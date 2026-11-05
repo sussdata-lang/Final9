@@ -147,6 +147,15 @@ export async function registerFinance(r, deps, { writeXlsx }) {
     C.ready(db); db.prepare('UPDATE fin_cost_centers SET active=? WHERE id=?').run(b?.active !== false ? 1 : 0, Number(c.params.id)); return { ok: true };
   }));
 
+  r.add('DELETE', '/api/finance/cost-centers/:id', fin('finance:setup', (c) => {
+    C.ready(db);
+    const id = Number(c.params.id);
+    if (!db.prepare('SELECT 1 FROM fin_cost_centers WHERE id=?').get(id)) throw C.bad('مركز الكلفة غير موجود.', 404, 'not_found');
+    if (db.prepare('SELECT 1 FROM fin_lines WHERE cost_center_id=? LIMIT 1').get(id)) throw C.bad('مركز الكلفة مستخدم في قيود؛ يمكنك تعطيله بدل حذفه.', 409, 'conflict');
+    db.prepare('DELETE FROM fin_cost_centers WHERE id=?').run(id);
+    return { ok: true };
+  }));
+
   /* ---- العملات ---- */
   r.add('GET', '/api/finance/currencies', fin('finance:read', () => {
     C.ready(db); return { currencies: db.prepare('SELECT * FROM fin_currencies ORDER BY is_base DESC, code').all() };

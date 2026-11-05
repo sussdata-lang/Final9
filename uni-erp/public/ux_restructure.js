@@ -198,6 +198,9 @@
           <p class="small">الحد الأدنى ${(S.limits || {}).passwordMin || 10} أحرف، وتحوي حروفاً وأرقاماً.</p>
           <div class="actions"><button class="btn pri" type="submit">تغيير كلمة المرور</button></div>
         </form>
+        <h2 style="margin-top:18px">التحقق بخطوتين</h2>
+        <p class="small">${m.mfaEnabled ? 'مفعّل على هذا الحساب.' : 'غير مفعّل. يضيف رمزًا من هاتفك عند كل دخول.'}</p>
+        <div class="actions">${m.mfaEnabled ? '<button class="btn" type="button" data-act="mfaoff">تعطيل</button>' : '<button class="btn pri" type="button" data-act="mfastart">تفعيل</button>'}</div>
       </section>
       <section class="card">
         <h2>بيانات الحساب والتفضيلات</h2>
@@ -343,14 +346,6 @@
     const rawPayroll = origPayrollView ? (origPayrollView() || '') : '';
     const cleanPayroll = rawPayroll.replace(/<div class="sub-tabs[^"]*"[^>]*>[\s\S]*?<\/div>/, '');
     return topBar + cleanPayroll;
-  };
-
-  /* ==========================================================================
-     4. دمج اللجنة التأديبية مع سجل اللجان الانضباطية والمخالفات المسلكية
-     ========================================================================== */
-  UA.renderUnifiedDisciplinaryBlock = () => {
-    const suiteHtml = UA.studentAffairsSuite ? UA.studentAffairsSuite.renderTab('lifecycle') : '';
-    return `<div style="margin-top:18px">${suiteHtml}</div>`;
   };
 
   /* ==========================================================================

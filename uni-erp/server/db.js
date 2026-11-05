@@ -20,6 +20,9 @@ import { invalidateCacheForSql, flushAllCaches } from './cache.js';
 import { invalidateAuditTailCache } from './audit.js';
 
 const { Pool } = pg;
+// النوعان نفسهما في العامل: أرقام لا نصوص
+pg.types.setTypeParser(20, (v) => Number(v));
+pg.types.setTypeParser(1700, (v) => parseFloat(v));
 
 // ==============================
 // مسار migrations
@@ -104,6 +107,24 @@ export function getDbPerfStats(_db) {
   };
 }
 
+// زمن كل استعلام مجمّعًا بنصه دون قيمه: يكشف الأبطأ دون أي امتداد في القاعدة
+const queryTimes = new Map();
+const QUERY_TIMES_MAX = 2000;
+function noteQuery(sql, ms) {
+  const key = sql.replace(/\s+/g, ' ').trim().slice(0, 240);
+  let q = queryTimes.get(key);
+  if (!q) {
+    if (queryTimes.size >= QUERY_TIMES_MAX) queryTimes.clear();
+    q = { sql: key, count: 0, totalMs: 0, maxMs: 0 };
+    queryTimes.set(key, q);
+  }
+  q.count++; q.totalMs += ms; if (ms > q.maxMs) q.maxMs = ms;
+}
+export function slowestQueries(limit = 20) {
+  return [...queryTimes.values()].sort((a, b) => b.totalMs - a.totalMs).slice(0, limit)
+    .map((q) => ({ sql: q.sql, count: q.count, totalMs: Math.round(q.totalMs), avgMs: Math.round((q.totalMs / q.count) * 10) / 10, maxMs: Math.round(q.maxMs) }));
+}
+
 // ==============================
 // Mutation listeners
 // ==============================
@@ -159,7 +180,9 @@ export class SyncExecutor {
   }
 
   query(sql, values = []) {
+    const started = performance.now();
     this.send({ sql, values }, sql);
+    noteQuery(sql, performance.now() - started);
 
     let status = Atomics.load(this.sa, 0);
     const chunk = () => Buffer.from(this.sab, HEADER_BYTES, Atomics.load(this.sa, 1));
@@ -252,6 +275,25 @@ class Statement {
     dbPerfStats.totalReads++;
     const rows = this.executor.query(this.pgSql, toPostgresValues(this._bind(args)));
     return rows.map((r) => convertRow(r, this._alias));
+  }
+
+  // قراءة لا توقف الخيط الرئيسي. لا تُستعمل داخل tx: لها اتصال منفصل لا يرى ما لم يُحفظ بعد
+  async _readAsync(args) {
+    const started = performance.now();
+    try {
+      const r = await this.dbRef.readPool().query(this.pgSql, toPostgresValues(this._bind(args)));
+      return r.rows;
+    } catch (e) { throw new Error(`[DB] PostgreSQL error: ${e.message}\nSQL: ${this.pgSql.slice(0, 200)}`); }
+    finally { noteQuery(this.pgSql, performance.now() - started); }
+  }
+  async getAsync(...args) {
+    dbPerfStats.totalReads++;
+    const rows = await this._readAsync(args);
+    return rows.length ? convertRow(rows[0], this._alias) : undefined;
+  }
+  async allAsync(...args) {
+    dbPerfStats.totalReads++;
+    return (await this._readAsync(args)).map((r) => convertRow(r, this._alias));
   }
 
   run(...args) {
@@ -433,7 +475,16 @@ class DbWrapper {
     }
   }
 
+  readPool() {
+    if (!this._readPool) {
+      this._readPool = new Pool({ ...this._exec.poolConfig, max: Number(process.env.DB_READ_POOL_MAX || 10), statement_timeout: DB_STATEMENT_TIMEOUT_MS, idleTimeoutMillis: 30000, connectionTimeoutMillis: 10000 });
+      this._readPool.on('error', (e) => console.error('[DB Read Pool Error]', e.message));
+    }
+    return this._readPool;
+  }
+
   close() {
+    if (this._readPool) { this._readPool.end().catch(() => {}); this._readPool = null; }
     if (!this._closed) {
       this._closed = true;
       this._exec.terminate();

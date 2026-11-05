@@ -75,7 +75,7 @@ function getIpRecord(ip) {
   return ipRegistry.get(ip);
 }
 
-export function addThreatScore(ip, points, reason, path) {
+function addThreatScore(ip, points, reason, path) {
   const rec = getIpRecord(ip);
   const elapsed = Date.now() - rec.lastSeen;
   if (elapsed > SCORE_DECAY_MS) {
@@ -99,7 +99,7 @@ export function addThreatScore(ip, points, reason, path) {
   return { banned: false };
 }
 
-export function isIpBanned(ip) {
+function isIpBanned(ip) {
   const rec = ipRegistry.get(ip);
   if (!rec) return false;
   return rec.banUntil > Date.now();
@@ -317,12 +317,6 @@ export function applySharedBan(ip, until) {
   if (!until) rec.score = 0;
 }
 
-export function testWafPattern(payload) {
-  const results = {};
-  results.url = scanValue(payload, 'url');
-  results.body = deepScan(typeof payload === 'string' ? { input: payload } : payload, 'body');
-  return results;
-}
 
 // تنظيف دوري للسجلات القديمة
 setInterval(() => {

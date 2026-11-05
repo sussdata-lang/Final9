@@ -1,10 +1,51 @@
 import { registerHousingRoutes } from './services/housing.js';
 import { IDEMPOTENT_ROUTES, withIdempotency } from './services/idempotency.js';
+import { withLock } from './services/numbering.js';
+import { startSetup, confirmSetup, disableMfa, resetUserMfa } from './services/mfa.js';
+import { stageFiles, removeStaged } from './services/staging.js';
+
+// أبطأ الاستعلامات على مستوى القاعدة كلها، إن فعّل مدير القاعدة pg_stat_statements
+function readPgStatements(db) {
+  try {
+    const rows = db.prepare('SELECT query, calls, ROUND(total_exec_time)::bigint AS "totalMs", ROUND(mean_exec_time::numeric, 1) AS "avgMs" FROM pg_stat_statements WHERE dbid = (SELECT oid FROM pg_database WHERE datname = current_database()) ORDER BY total_exec_time DESC LIMIT 20').all();
+    return { enabled: true, rows: rows.map((r) => ({ ...r, query: String(r.query).replace(/\s+/g, ' ').slice(0, 240) })) };
+  } catch { return { enabled: false, rows: [] }; }
+}
+
+// عمليات «افحص ثم اكتب» على السجل نفسه: تُسلسل عبر كل عمليات الخادم
+const byId = (name) => (c) => `${name}:${c.params.id}`;
+const ROUTE_LOCKS = {
+  'POST /api/enterprise/self-enroll': (c) => `enroll:${c.user?.id}`,
+  'POST /api/requests/:id/approve': byId('request'), 'POST /api/requests/:id/reject': byId('request'), 'POST /api/requests/:id/forward': byId('request'),
+  'POST /api/lms/quizzes/:id/start': (c) => `quiz:${c.params.id}:${c.user?.id}`, 'POST /api/lms/quizzes/:id/submit': (c) => `quiz:${c.params.id}:${c.user?.id}`,
+  'POST /api/housing/allocations': () => 'housing', 'POST /api/housing/handouts': () => 'housing',
+  'POST /api/corr/:id/send': byId('corr'), 'POST /api/corr/:id/approve': byId('corr'), 'POST /api/corr/:id/reject': byId('corr'), 'POST /api/corr/:id/cancel': byId('corr'),
+  'POST /api/finance/invoices/:id/pay': () => 'billing', 'POST /api/finance/invoices/:id/issue': () => 'billing', 'POST /api/finance/invoices/:id/cancel': () => 'billing',
+  'POST /api/finance/student-invoices/:id/pay': () => 'billing', 'POST /api/finance/payments': () => 'billing', 'POST /api/finance/charges/:id/void': () => 'billing', 'POST /api/finance/payments/:id/void': () => 'billing', 'POST /api/finance/discounts': () => 'billing',
+  'POST /api/finance/journal/:id/post': byId('entry'), 'POST /api/finance/journal/:id/reverse': byId('entry'), 'POST /api/finance/payroll-entry': () => 'payroll',
+  'POST /api/enterprise/installments/:id/pay': byId('installment'),
+  'POST /api/lms/loans': () => 'library', 'POST /api/lms/loans/:id/return': () => 'library',
+  'POST /api/expansions/appeals/:id/decide': byId('appeal'),
+  'POST /api/attendance/scan': (c) => `hall:${c.body?.code ?? c.body?.studentNo ?? ''}`,
+  'POST /api/procurement/receipts': () => 'stock', 'POST /api/procurement/issues': () => 'stock', 'POST /api/procurement/items/:id/adjust': () => 'stock',
+};
+// الرد يُرسل بعد إنهاء المعاملة، فلا يقرأ العميل بيانات لم تُحفظ بعد
+function lockedHandler(db, keyOf, handler) {
+  return (c) => {
+    const send = c.json, held = [];
+    c.json = (...a) => { held.push(a); };
+    let out;
+    try { out = withLock(db, keyOf(c), () => handler(c)); }
+    finally { c.json = send; }
+    for (const a of held) send.apply(c, a);
+    return out;
+  };
+}
 import { log } from './lib/logger.js';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
-import { Router, HttpError, sendRaw, sendStream, getHttpTelemetry, getWafStats, unbanIp, SECURITY_HEADERS as SEC } from './http.js';
-import { tx, getDbPerfStats, DB_POOL_MAX } from './db.js';
+import { Router, HttpError, sendRaw, sendStream, getHttpTelemetry, slowestRoutes, getWafStats, unbanIp, SECURITY_HEADERS as SEC } from './http.js';
+import { tx, getDbPerfStats, slowestQueries, DB_POOL_MAX } from './db.js';
 import { getCacheTelemetry, getServicesSnapshot, getCachedUnitByCode, getOrgUnitsSnapshot, cacheGetOrSet } from './cache.js';
 import { registerFinance } from './services/finance/routes.js';
 import { registerProcurement } from './services/procurement/routes.js';
@@ -63,13 +104,13 @@ export async function buildRouter(deps) {
   const r = new Router();
   // حساب نطاقه كلية لا يصل إلى طالب من خارجها في أي مسار على ملف الطالب
   const addRoute = r.add.bind(r);
-  r.add = (method, pattern, rawHandler, opts, handler = IDEMPOTENT_ROUTES.has(`${method} ${pattern}`) ? withIdempotency(db, rawHandler) : rawHandler) => addRoute(method, pattern, pattern.startsWith('/api/students/:id') ? (c) => { assertStudentInScope(deps, c.user, c.params.id); return handler(c); } : handler, opts);
+  r.add = (method, pattern, rawHandler, opts, inner = ROUTE_LOCKS[`${method} ${pattern}`] ? lockedHandler(db, ROUTE_LOCKS[`${method} ${pattern}`], rawHandler) : rawHandler, handler = IDEMPOTENT_ROUTES.has(`${method} ${pattern}`) ? withIdempotency(db, inner) : inner) => addRoute(method, pattern, pattern.startsWith('/api/students/:id') ? (c) => { assertStudentInScope(deps, c.user, c.params.id); return handler(c); } : handler, opts);
   const cookie = (token, maxAge) => `sid=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${cfg.cookieSecure ? '; Secure' : ''}`;
 
   // ---- الهوية ----
   r.add('POST', '/api/auth/login', async (c) => {
-    const out = await login(deps, { username: c.body.username, password: c.body.password, ip: c.ip, ua: c.req.headers['user-agent'] });
-    c.json(200, { user: out.user, token: out.token }, { 'Set-Cookie': cookie(out.token, out.maxAge) });
+    const out = await login(deps, { username: c.body.username, password: c.body.password, code: c.body.code, ip: c.ip, ua: c.req.headers['user-agent'] });
+    c.json(200, { user: out.user }, { 'Set-Cookie': cookie(out.token, out.maxAge) });
   }, { auth: false });
   registerStudentGroupRoutes(r, deps);
   registerHousingRoutes(r, deps, { need, needAny });
@@ -82,9 +123,13 @@ export async function buildRouter(deps) {
       onlyLocal(c);
       const { username, password } = await prepareDevAccount(deps, c.body?.key);
       const out = await login(deps, { username, password, ip: c.ip, ua: c.req.headers['user-agent'] });
-      c.json(200, { user: out.user, token: out.token }, { 'Set-Cookie': cookie(out.token, out.maxAge) });
+      c.json(200, { user: out.user }, { 'Set-Cookie': cookie(out.token, out.maxAge) });
     }, { auth: false });
   }
+  r.add('POST', '/api/auth/mfa/setup', (c) => c.json(200, startSetup(deps, c.user)), { allowMustChange: true });
+  r.add('POST', '/api/auth/mfa/confirm', (c) => c.json(200, confirmSetup(deps, c.user, c.body?.code, c.ip)), { allowMustChange: true });
+  r.add('POST', '/api/auth/mfa/disable', async (c) => c.json(200, await disableMfa(deps, c.user, c.body, c.ip)));
+  r.add('POST', '/api/admin/users/:id/mfa-reset', (c) => { need(c, 'user:manage'); c.json(200, resetUserMfa(deps, c.user, c.params.id, c.ip)); });
   r.add('POST', '/api/auth/logout', (c) => { logout(deps, c.cookies.sid, c.user, c.ip); c.json(200, { ok: true }, { 'Set-Cookie': cookie('', 0) }); }, { allowMustChange: true });
   r.add('POST', '/api/auth/change-password', async (c) => { await changePassword(deps, c.user, c.cookies.sid, c.body, c.ip); c.json(200, { ok: true }); }, { allowMustChange: true });
   // بلا جلسة يعيد user:null بحالة 200 (لا ضجيج 401 في المتصفح عند أول فتح)
@@ -99,7 +144,7 @@ export async function buildRouter(deps) {
   r.add('GET', '/api/admin/general', (c) => { need(c, 'settings:manage'); c.json(200, listSettings(db)); });
   r.add('PUT', '/api/admin/general', (c) => { need(c, 'settings:manage'); c.json(200, saveSettings(deps, c.user, c.body, c.ip)); });
   r.add('POST', '/api/admin/general/reset', (c) => { need(c, 'settings:manage'); c.json(200, resetSettings(deps, c.user, c.body, c.ip)); });
-  r.add('GET', '/api/me/desk', (c) => { if (c.user.role === 'student') throw new HttpError(403, 'خاص بالعاملين.', 'forbidden'); c.json(200, { desk: deskSummary(deps, c.user) }); });
+  r.add('GET', '/api/me/desk', async (c) => { if (c.user.role === 'student') throw new HttpError(403, 'خاص بالعاملين.', 'forbidden'); c.json(200, { desk: await deskSummary(deps, c.user) }); });
   r.add('GET', '/api/me/profile', (c) => { need(c, 'profile:read_own'); c.json(200, { profile: myProfile(deps, c.user) }); });
 
   r.add('PUT', '/api/me/profile', (c) => { need(c, 'profile:update_own'); c.json(200, { profile: updateOwnContact(deps, c.user, c.body, c.ip) }); });
@@ -144,7 +189,7 @@ export async function buildRouter(deps) {
     c.json(200, detectScheduleConflicts(db, c.params.id));
   });
   r.add('GET', '/api/students/:id/unified-record', (c) => { need(c, 'student:read'); c.json(200, getUnifiedStudentRecord(deps, c.params.id)); });
-  r.add('GET', '/api/news', (c) => c.json(200, { news: listNews(deps) }));
+  r.add('GET', '/api/news', async (c) => c.json(200, { news: await listNews(deps) }));
   r.add('POST', '/api/news', (c) => { need(c, 'news:manage'); const out = createNews(deps, c.user, c.body, c.ip); notifyNews(deps, String(c.body?.title ?? 'خبر جديد')); c.json(201, out); });
   r.add('PUT', '/api/news/:id', (c) => { need(c, 'news:manage'); c.json(200, updateNews(deps, c.user, c.params.id, c.body, c.ip)); });
   r.add('DELETE', '/api/news/:id', (c) => { need(c, 'news:manage'); deleteNews(deps, c.user, c.params.id, c.ip); c.json(200, { ok: true }); });
@@ -298,10 +343,10 @@ export async function buildRouter(deps) {
   r.add('GET', '/api/corr/notifications', (c) => { corr(c); c.json(200, listNotifs(deps, c.user)); });
   r.add('POST', '/api/corr/notifications/read', (c) => { corr(c); c.json(200, readNotifs(deps, c.user, c.body)); });
   r.add('GET', '/api/corr/files/:id', async (c) => { corr(c); const a = await readCorrFile(deps, c.user, c.params.id); sendRaw(c.res, 200, { 'Content-Type': a.mime, 'Content-Disposition': `${c.query.inline === '1' ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(a.name)}` }, a.buf); });
-  r.add('GET', '/api/corr', (c) => { corr(c); c.json(200, { docs: listDocs(deps, c.user, c.query) }); });
-  r.add('POST', '/api/corr', (c) => { need(c, 'corr:use'); c.json(201, { doc: createDoc(deps, c.user, c.body, c.ip) }); }, { maxBody: 11 * 1024 * 1024 });
+  r.add('GET', '/api/corr', async (c) => { corr(c); c.json(200, { docs: await listDocs(deps, c.user, c.query) }); });
+  r.add('POST', '/api/corr', async (c) => { need(c, 'corr:use'); const staged = await stageFiles(deps.cfg, c.body?.files); try { c.json(201, { doc: createDoc(deps, c.user, c.body, c.ip) }); } finally { await removeStaged(staged); } }, { maxBody: 11 * 1024 * 1024 });
   r.add('GET', '/api/corr/:id', (c) => { corr(c); c.json(200, { doc: getDoc(deps, c.user, c.params.id) }); });
-  r.add('PUT', '/api/corr/:id', (c) => { need(c, 'corr:use'); c.json(200, { doc: updateDoc(deps, c.user, c.params.id, c.body, c.ip) }); }, { maxBody: 11 * 1024 * 1024 });
+  r.add('PUT', '/api/corr/:id', async (c) => { need(c, 'corr:use'); const staged = await stageFiles(deps.cfg, c.body?.files); try { c.json(200, { doc: updateDoc(deps, c.user, c.params.id, c.body, c.ip) }); } finally { await removeStaged(staged); } }, { maxBody: 11 * 1024 * 1024 });
   r.add('GET', '/api/corr/:id/pdf', (c) => { corr(c); const o = corrPdf(deps, c.user, c.params.id); sendRaw(c.res, 200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${o.filename}"` }, o.pdf); });
   r.add('POST', '/api/corr/:id/send', (c) => { need(c, 'corr:use'); c.json(200, { doc: sendDoc(deps, c.user, c.params.id, c.ip) }); });
   r.add('POST', '/api/corr/:id/approve', (c) => { need(c, 'corr:use'); c.json(200, { doc: decideDoc(deps, c.user, c.params.id, 'approve', c.body?.note, c.ip) }); });
@@ -356,10 +401,10 @@ export async function buildRouter(deps) {
       }),
     });
   });
-  r.add('POST', '/api/requests', (c) => { need(c, requesterKind(c.user) === 'student' ? 'request:create' : 'request:create_internal'); c.json(201, { request: createRequest(deps, c.user, c.body, c.ip) }); }, { maxBody: 11 * 1024 * 1024 });
-  r.add('GET', '/api/requests', (c) => {
+  r.add('POST', '/api/requests', async (c) => { need(c, requesterKind(c.user) === 'student' ? 'request:create' : 'request:create_internal'); const staged = await stageFiles(deps.cfg, c.body?.attachments ?? c.body?.attachment); try { c.json(201, { request: withLock(db, `newreq:${c.user.id}:${c.body?.service}`, () => createRequest(deps, c.user, c.body, c.ip)) }); } finally { await removeStaged(staged); } }, { maxBody: 11 * 1024 * 1024 });
+  r.add('GET', '/api/requests', async (c) => {
     if (!c.user.can('request:read_own') && !c.user.can('request:read_all') && !c.user.can('request:read_unit') && !c.user.can('request:create_internal')) throw new HttpError(403, 'لا تملك صلاحية هذا الإجراء.', 'forbidden');
-    c.json(200, { requests: listRequests(deps, c.user, c.query) });
+    c.json(200, { requests: await listRequests(deps, c.user, c.query) });
   });
   r.add('GET', '/api/requests/:id', (c) => c.json(200, { request: getRequest(deps, c.user, c.params.id) }));
   r.add('POST', '/api/requests/:id/approve', (c) => { need(c, 'request:decide'); const out = decide(deps, c.user, c.params.id, 'approve', null, c.ip); notifyRequest(deps, c.params.id); c.json(200, { request: out }); });
@@ -389,7 +434,7 @@ export async function buildRouter(deps) {
     const file = await deps.heavy.run('analyticsDocx', c, [c.body]);
     sendRaw(c.res, 200, { 'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'Content-Disposition': 'attachment; filename="statistics-report.docx"' }, file);
   }, { maxBody: 14 * 1024 * 1024 });
-  r.add('GET', '/api/stats', (c) => { need(c, 'stats:read'); c.json(200, { stats: stats(deps) }); });
+  r.add('GET', '/api/stats', async (c) => { need(c, 'stats:read'); c.json(200, { stats: await stats(deps) }); });
 
   // ---- تصدير البيانات (طلاب، مواد، علامات...) ----
   r.add('GET', '/api/export/options', (c) => { need(c, 'data:export'); c.json(200, exportOptions(db)); });
@@ -562,6 +607,10 @@ export async function buildRouter(deps) {
       sessionStats,
       httpStats,
       cacheTelemetry,
+      slowQueries: slowestQueries(20),
+      slowRoutes: slowestRoutes(20),
+      pgStatements: readPgStatements(db),
+      uptimeSec: Math.round(process.uptime()),
       timestamp: Date.now(),
     });
   });

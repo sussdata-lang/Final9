@@ -1,27 +1,30 @@
 // الاختبارات الإلكترونية: إعداد من شؤون الطلاب، واعتماد من عضو الهيئة، ونشر في موعده، وتصحيح آلي مع تصحيح يدوي للأسئلة النظرية.
+import { bad } from '../validate.js';
 import { HttpError } from '../http.js';
 import { audit } from '../audit.js';
 import { tx } from '../db.js';
 
 const clean = (v, max = 300) => String(v ?? '').trim().slice(0, max);
-const bad = (m) => new HttpError(400, m, 'validation');
 const parseJson = (s, d) => { try { return JSON.parse(s || ''); } catch { return d; } };
 
 // الأسئلة المنظمة هي المرجع، والاختبارات القديمة أو المستوردة بصيغة JSON تُقرأ بالشكل نفسه
-export function questionsOf(db, quiz) {
-  const rows = db.prepare('SELECT * FROM lms_quiz_questions WHERE quiz_id = ? ORDER BY position, id').all(quiz.id);
+function questionsOf(db, quiz, batch = null) {
+  const rows = batch ? batch.get(quiz.id) ?? [] : db.prepare('SELECT * FROM lms_quiz_questions WHERE quiz_id = ? ORDER BY position, id').all(quiz.id);
   if (rows.length) return rows.map((r) => ({ id: r.id, type: r.type, q: r.text, options: parseJson(r.options_json, []), correct: parseJson(r.correct_json, []), marks: Number(r.marks) }));
   const legacy = parseJson(quiz.questions_json, []);
   const each = legacy.length ? Number(quiz.total_marks) / legacy.length : 0;
   return legacy.map((x, i) => ({ id: `j${i}`, type: 'single', q: x.q, options: x.options ?? [], correct: [Number(x.ans)], marks: each }));
 }
 
-export const isOpen = (q, now = Date.now()) => q.status === 'approved' && !!q.published && (!q.publish_at || Number(q.publish_at) <= now) && (!q.close_at || now < Number(q.close_at));
+const isOpen = (q, now = Date.now()) => q.status === 'approved' && !!q.published && (!q.publish_at || Number(q.publish_at) <= now) && (!q.close_at || now < Number(q.close_at));
 
 export function listQuizzes(db) {
   const stats = new Map(db.prepare('SELECT quiz_id, COUNT(*) AS n, AVG(score) AS avg, SUM(needs_grading) AS pending FROM lms_quiz_submissions GROUP BY quiz_id').all().map((s) => [s.quiz_id, s]));
-  return db.prepare('SELECT * FROM lms_quizzes ORDER BY created_at DESC, id DESC').all().map((q) => {
-    const st = stats.get(q.id), questions = questionsOf(db, q);
+  const quizzes = db.prepare('SELECT * FROM lms_quizzes ORDER BY created_at DESC, id DESC LIMIT 300').all();
+  const batch = new Map();
+  if (quizzes.length) for (const r of db.prepare(`SELECT * FROM lms_quiz_questions WHERE quiz_id IN (${quizzes.map(() => '?').join(',')}) ORDER BY position, id`).all(...quizzes.map((q) => q.id))) { if (!batch.has(r.quiz_id)) batch.set(r.quiz_id, []); batch.get(r.quiz_id).push(r); }
+  return quizzes.map((q) => {
+    const st = stats.get(q.id), questions = questionsOf(db, q, batch);
     return {
       ...q, open: isOpen(q), questions,
       attempts_count: st ? Number(st.n) : Number(q.attempts_count ?? 0),

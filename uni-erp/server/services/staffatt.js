@@ -5,8 +5,7 @@ import { audit } from '../audit.js';
 import { HttpError } from '../http.js';
 import { writeXlsx } from '../lib/xlsx.js';
 
-export const DEFAULT_ENTITLEMENT = 30;                 // القيمة الابتدائية؛ تُعدَّل من إعدادات الحضور والإجازات
-export const WEEKENDS = { 'fri,sat': [5, 6], fri: [5], 'sat,sun': [6, 0] };
+const WEEKENDS = { 'fri,sat': [5, 6], fri: [5], 'sat,sun': [6, 0] };
 const WEEKEND_LABEL = { 'fri,sat': 'الجمعة والسبت', fri: 'الجمعة فقط', 'sat,sun': 'السبت والأحد' };
 const TZ = 'Asia/Damascus', FMT = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' });
 const bad = (m) => new HttpError(400, m, 'validation');

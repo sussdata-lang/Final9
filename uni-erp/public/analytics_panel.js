@@ -12,9 +12,7 @@
   const short = (s, n = 16) => { s = String(s ?? ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
 
   async function get(url) {
-    const headers = {};
-    try { const sid = sessionStorage.getItem('uni_sid'); if (sid) headers['X-Session-Token'] = sid; } catch { /* ignore */ }
-    const res = await fetch(url, { credentials: 'same-origin', headers });
+    const res = await fetch(url, { credentials: 'same-origin' });
     if (!res.ok) throw new Error(res.status === 401 ? 'انتهت الجلسة، سجّل الدخول من جديد.' : res.status === 403 ? 'لا تملك صلاحية عرض هذه البيانات.' : 'تعذّر جلب البيانات (' + res.status + ')');
     return res.json();
   }

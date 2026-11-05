@@ -4,6 +4,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { tx } from '../db.js';
 import { nextNumber } from './numbering.js';
+import { readUpload, saveUpload } from './staging.js';
 import { audit } from '../audit.js';
 import { sha256 } from '../security.js';
 import { HttpError } from '../http.js';
@@ -39,25 +40,27 @@ export function canSee(user, db, d) {
 const ccIds = (db, id) => db.prepare('SELECT user_id FROM corr_cc WHERE doc_id = ?').all(id).map((r) => r.user_id);
 
 // دور المعتمد الحالي: متوازٍ ← كل من لم يبتّ؛ تسلسلي ← أول من لم يبتّ فقط
-export function pendingApprovers(db, d) {
+function pendingApprovers(db, d) {
   if (d.status !== 'pending') return [];
   const rows = db.prepare("SELECT * FROM corr_approvers WHERE doc_id = ? AND state = 'pending' ORDER BY seq").all(d.id);
   return d.mode === 'parallel' ? rows : rows.slice(0, 1);
 }
 
-export function docView(db, d, user) {
+// pre: بيانات مجمّعة لقائمة كاملة، فلا يُستعلم عن كل مستند على حدة
+export function docView(db, d, user, pre = null) {
   const staffMap = getCachedStaffUsersMap(db);
-  const rawApprovers = db.prepare('SELECT user_id id, seq, state, at, note FROM corr_approvers WHERE doc_id = ? ORDER BY seq').all(d.id);
+  const rawApprovers = pre ? pre.approvers.get(d.id) ?? [] : db.prepare('SELECT user_id id, seq, state, at, note FROM corr_approvers WHERE doc_id = ? ORDER BY seq').all(d.id);
   const approvers = rawApprovers.map((a) => {
     const su = staffMap.get(Number(a.id)) || db.prepare('SELECT u.display_name display_name, o.name unit_name FROM users u LEFT JOIN org_units o ON o.id = u.unit_id WHERE u.id = ?').get(a.id);
     return { ...a, name: su?.display_name ?? null, unit: su?.unit_name ?? null };
   });
-  const turn = new Set(pendingApprovers(db, d).map((a) => a.user_id));
+  const waiting = d.status === 'pending' ? rawApprovers.filter((a) => a.state === 'pending') : [];
+  const turn = new Set((d.mode === 'parallel' ? waiting : waiting.slice(0, 1)).map((a) => a.id));
   const cCached = staffMap.get(Number(d.creator_id));
   const c = cCached
     ? { name: cCached.display_name, unit: cCached.unit_name }
     : db.prepare('SELECT u.display_name name, o.name unit FROM users u LEFT JOIN org_units o ON o.id = u.unit_id WHERE u.id = ?').get(d.creator_id);
-  const rawCc = db.prepare('SELECT user_id id FROM corr_cc WHERE doc_id = ?').all(d.id);
+  const rawCc = pre ? pre.cc.get(d.id) ?? [] : db.prepare('SELECT user_id id FROM corr_cc WHERE doc_id = ?').all(d.id);
   const cc = rawCc.map((r) => {
     const su = staffMap.get(Number(r.id)) || db.prepare('SELECT u.display_name display_name, o.name unit_name FROM users u LEFT JOIN org_units o ON o.id = u.unit_id WHERE u.id = ?').get(r.id);
     return { id: r.id, name: su?.display_name ?? '', unit: su?.unit_name ?? null };
@@ -67,8 +70,8 @@ export function docView(db, d, user) {
     createdAt: d.created_at, sentAt: d.sent_at, decidedAt: d.decided_at, creator: { id: d.creator_id, name: c?.name, unit: c?.unit ?? null },
     approvers: approvers.map((a) => ({ ...a, turn: turn.has(a.id) })),
     cc,
-    files: db.prepare('SELECT id, orig_name name, size, mime FROM corr_files WHERE doc_id = ? ORDER BY id').all(d.id),
-    events: db.prepare('SELECT at, kind, actor_label actor, text FROM corr_events WHERE doc_id = ? ORDER BY id').all(d.id),
+    files: pre ? pre.files.get(d.id) ?? [] : db.prepare('SELECT id, orig_name name, size, mime FROM corr_files WHERE doc_id = ? ORDER BY id').all(d.id),
+    events: pre ? [] : db.prepare('SELECT at, kind, actor_label actor, text FROM corr_events WHERE doc_id = ? ORDER BY id').all(d.id),
     mine: { creator: d.creator_id === user.id, approver: approvers.some((a) => a.id === user.id), cc: rawCc.some((x) => x.id === user.id), myTurn: turn.has(user.id) },
   };
 }
@@ -79,12 +82,12 @@ function readFiles(db, cfg, raw) {
   if (!Array.isArray(raw) || raw.length > MAX_FILES) throw bad(`المرفقات: حتى ${MAX_FILES}.`);
   let total = 0;
   return raw.map((a) => {
-    if (!a || typeof a.data !== 'string' || typeof a.name !== 'string') throw bad('مرفق غير صالح.');
-    const buf = Buffer.from(a.data, 'base64');
-    if (!buf.length || buf.length > MAX_ONE) throw new HttpError(413, `حجم المرفق الواحد يجب ألا يتجاوز ${MAX_ONE / 1048576} ميغابايت.`, 'too_large');
-    total += buf.length; if (total > MAX_TOTAL) throw new HttpError(413, `مجموع المرفقات يجب ألا يتجاوز ${MAX_TOTAL / 1048576} ميغابايت.`, 'too_large');
-    const mime = detectMime(buf); if (!mime) throw new HttpError(415, 'المرفقات المسموحة: PDF أو PNG أو JPG.', 'bad_type');
-    return { buf, mime, name: path.basename(a.name).replace(/[^\p{L}\p{N}._ -]/gu, '_').slice(0, 100) || 'file' };
+    if (!a || (typeof a.data !== 'string' && !a.staged) || typeof a.name !== 'string') throw bad('مرفق غير صالح.');
+    const file = readUpload(a);
+    if (!file.size || file.size > MAX_ONE) throw new HttpError(413, `حجم المرفق الواحد يجب ألا يتجاوز ${MAX_ONE / 1048576} ميغابايت.`, 'too_large');
+    total += file.size; if (total > MAX_TOTAL) throw new HttpError(413, `مجموع المرفقات يجب ألا يتجاوز ${MAX_TOTAL / 1048576} ميغابايت.`, 'too_large');
+    const mime = detectMime(file.head); if (!mime) throw new HttpError(415, 'المرفقات المسموحة: PDF أو PNG أو JPG.', 'bad_type');
+    return { ...file, mime, name: path.basename(a.name).replace(/[^\p{L}\p{N}._ -]/gu, '_').slice(0, 100) || 'file' };
   });
 }
 
@@ -136,8 +139,8 @@ export function createDoc(deps, user, input, ip) {
       if (files.length) fs.mkdirSync(cfg.uploadDir, { recursive: true });
       for (const f of files) {
         const name = crypto.randomBytes(16).toString('hex'), p = path.join(cfg.uploadDir, name);
-        fs.writeFileSync(p, f.buf, { mode: 0o600 }); stored.push(p);
-        db.prepare('INSERT INTO corr_files (doc_id, orig_name, stored_name, mime, size, sha256) VALUES (?,?,?,?,?,?)').run(n, f.name, name, f.mime, f.buf.length, sha256(f.buf));
+        saveUpload(f, p); stored.push(p);
+        db.prepare('INSERT INTO corr_files (doc_id, orig_name, stored_name, mime, size, sha256) VALUES (?,?,?,?,?,?)').run(n, f.name, name, f.mime, f.size, f.sha);
       }
       ev(db, n, 'new', user, 'أُنشئ المستند');
       audit(db, user, `إنشاء مراسلة: ${v.title}`, no, ip);
@@ -177,8 +180,8 @@ export function updateDoc(deps, user, id, input, ip) {
       if (files.length) fs.mkdirSync(cfg.uploadDir, { recursive: true });
       for (const f of files) {
         const name = crypto.randomBytes(16).toString('hex'), p = path.join(cfg.uploadDir, name);
-        fs.writeFileSync(p, f.buf, { mode: 0o600 }); stored.push(p);
-        db.prepare('INSERT INTO corr_files (doc_id, orig_name, stored_name, mime, size, sha256) VALUES (?,?,?,?,?,?)').run(d.id, f.name, name, f.mime, f.buf.length, sha256(f.buf));
+        saveUpload(f, p); stored.push(p);
+        db.prepare('INSERT INTO corr_files (doc_id, orig_name, stored_name, mime, size, sha256) VALUES (?,?,?,?,?,?)').run(d.id, f.name, name, f.mime, f.size, f.sha);
       }
       ev(db, d.id, 'edit', user, 'عُدّلت المسودة');
       audit(db, user, `تعديل مسودة مراسلة: ${v.title}`, d.no, ip);
@@ -199,7 +202,7 @@ export function sendDoc(deps, user, id, ip) {
 
 export function getDoc({ db }, user, id) { return docView(db, load(db, user, id), user); }
 
-export function listDocs({ db }, user, q) {
+export async function listDocs({ db }, user, q) {
   const box = q.box === 'out' ? 'out' : q.box === 'all' ? 'all' : 'in';
   if (box === 'all' && !user.can('corr:read_all')) throw new HttpError(403, 'لا تملك صلاحية هذا الإجراء.', 'forbidden');
   const where = [], args = [];
@@ -207,8 +210,17 @@ export function listDocs({ db }, user, q) {
   else if (box === 'out') { where.push('d.creator_id = ?'); args.push(user.id); }
   else where.push("d.status != 'draft'");
   if (['draft', 'pending', 'approved', 'rejected', 'cancelled'].includes(q.status)) { where.push('d.status = ?'); args.push(q.status); }
-  const rows = db.prepare(`SELECT d.* FROM corr_docs d WHERE ${where.join(' AND ')} ORDER BY d.created_at DESC, d.id DESC LIMIT 200`).all(...args);
-  return rows.map((d) => { const v = docView(db, d, user); return { ...v, body: undefined, events: undefined }; });
+  const rows = await db.prepare(`SELECT d.* FROM corr_docs d WHERE ${where.join(' AND ')} ORDER BY d.created_at DESC, d.id DESC LIMIT 200`).allAsync(...args);
+  if (!rows.length) return [];
+  const ids = rows.map((d) => d.id), marks = ids.map(() => '?').join(',');
+  const group = (list) => { const m = new Map(); for (const { doc_id: k, ...r } of list) { if (!m.has(k)) m.set(k, []); m.get(k).push(r); } return m; };
+  const [approvers, cc, files] = await Promise.all([
+    db.prepare(`SELECT doc_id, user_id id, seq, state, at, note FROM corr_approvers WHERE doc_id IN (${marks}) ORDER BY seq`).allAsync(...ids),
+    db.prepare(`SELECT doc_id, user_id id FROM corr_cc WHERE doc_id IN (${marks})`).allAsync(...ids),
+    db.prepare(`SELECT doc_id, id, orig_name name, size, mime FROM corr_files WHERE doc_id IN (${marks}) ORDER BY id`).allAsync(...ids),
+  ]);
+  const pre = { approvers: group(approvers), cc: group(cc), files: group(files) };
+  return rows.map((d) => { const v = docView(db, d, user, pre); return { ...v, body: undefined, events: undefined }; });
 }
 
 export function decideDoc(deps, user, id, action, noteText, ip) {

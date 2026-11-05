@@ -45,7 +45,7 @@
     const target = el.dataset.studentName && document.getElementById(el.dataset.studentName);
     if (target) return target;
     let b = el.parentElement && el.parentElement.querySelector('.sp-name');
-    if (!b) { b = document.createElement('small'); b.className = 'sp-name'; b.style.cssText = 'display:block;margin-top:3px;color:var(--muted,#64748b);font-weight:600'; el.insertAdjacentElement('afterend', b); }
+    if (!b) { b = document.createElement('small'); b.className = 'sp-name'; el.insertAdjacentElement('afterend', b); }
     return b;
   }
   const setName = (el, text) => { const b = nameBox(el); if ('value' in b && b.tagName === 'INPUT') b.value = text; else b.textContent = text ? '👤 ' + text : ''; };
@@ -54,6 +54,7 @@
     if (el.getAttribute('list') !== DL_ID) el.setAttribute('list', DL_ID);
     el.setAttribute('autocomplete', 'off');
     el.dataset.spBound = '1';
+    if (!el.dataset.studentName) nameBox(el);
   }
 
   document.addEventListener('focusin', (e) => {

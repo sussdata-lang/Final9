@@ -5,8 +5,8 @@
 //  - وثائق قديمة بلا سنة/فصل: تُستنتج السنة من العام الدراسي، وإلا تُجمع بالعام الدراسي نفسه.
 export const PASS = 60;
 const LV = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة'];
-export const levelName = (n) => `السنة ${LV[n - 1] || n}`;
-export const SEMESTER = { 1: 'الفصل الأول', 2: 'الفصل الثاني' };
+const levelName = (n) => `السنة ${LV[n - 1] || n}`;
+const SEMESTER = { 1: 'الفصل الأول', 2: 'الفصل الثاني' };
 export const STATUS = { active: 'مقيَّد', suspended: 'موقوف القيد', withdrawn: 'منسحب', transferred: 'محوَّل', graduated: 'متخرج' };
 export const ratingOf = (m) => (m === null || m === undefined ? null : m >= 90 ? 'ممتاز' : m >= 80 ? 'جيد جداً' : m >= 70 ? 'جيد' : m >= PASS ? 'مقبول' : 'راسب');
 const r1 = (n) => Math.round(n * 10) / 10;

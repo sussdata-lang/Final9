@@ -60,7 +60,7 @@
   A.sadate = async () => { const v = document.getElementById('sa-date').value; if (v) B.date = v; await load(); UA.render(); };
   A.sapunch = async () => { if (B.busy) return; B.busy = true; try { const r = await api('POST', '/api/hr/attendance/punch', {}); await load(); toast(r.action === 'in' ? 'سُجّل الدخول' : 'سُجّل الانصراف'); } finally { B.busy = false; } UA.render(); };
   A.saent = async (el, d) => {
-    const v = window.prompt('الاستحقاق السنوي بالأيام:', d.d); if (v === null) return;
+    const v = await askText('الاستحقاق السنوي', { label: 'عدد الأيام', type: 'number', min: 0, max: 365, value: d.d }); if (v === null) return;
     try { await api('PUT', '/api/hr/leave/entitlement', { userId: Number(d.id), year: Number(d.y), days: Number(v) }); await load(); UA.render(); toast('حُدّث الاستحقاق'); } catch (e) { if (!e.status) throw e; toast(e.message); }
   };
 })();

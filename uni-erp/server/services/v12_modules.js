@@ -1,4 +1,7 @@
+import crypto from 'node:crypto';
 import { docNo, academicYear } from '../lib/doc_no.js';
+import { isoDay } from '../validate.js';
+import { punch } from './staffatt.js';
 import { listQuizzes, withoutAnswers, submitQuiz, startQuiz, createQuiz, updateQuiz, deleteQuiz, requestQuizApproval, decideQuiz, listSubmissions, gradeSubmission } from './quizzes.js';
 import { groupsOfStudent, listGroups, groupSize } from './student_groups.js';
 import { HttpError } from '../http.js';
@@ -331,12 +334,12 @@ export async function registerV12Modules(r, deps) {
     `).run(
       need(b.isbn, 'ISBN', 30),
       title,
-      clean(b.author || 'مؤلف أكاديمي', 100),
-      clean(b.category || 'العلوم الأمنية', 60),
+      clean(b.author, 100),
+      clean(b.category, 60),
       Number(b.publish_year) || 2026,
       copies,
       copies,
-      clean(b.shelf_code || 'A-10', 20),
+      clean(b.shelf_code, 20),
       Date.now()
     );
     audit(db, c.user, 'إضافة كتاب للمكتبة الرقمية', title, c.ip);
@@ -417,9 +420,9 @@ export async function registerV12Modules(r, deps) {
       title,
       clean(b.principal_investigator || c.user.display_name, 100),
       clean(b.faculty_name, 100),
-      clean(b.domain || 'الأمن السيبراني', 100),
+      clean(b.domain, 100),
       Number(b.budget) || 0,
-      clean(b.journal_name || 'مجلة الجامعة للبحوث العلمية', 150),
+      clean(b.journal_name, 150),
       Number(b.impact_factor) || 0,
       Number(b.citations_count) || 0,
       clean(b.status || 'active', 20),
@@ -441,8 +444,8 @@ export async function registerV12Modules(r, deps) {
     `).run(
       need(b.student_no, 'الرقم الجامعي', 30),
       clean(b.student_name, 100),
-      clean(b.degree || 'ماجستير', 30),
-      clean(b.program_name || 'الأمن السيبراني والتحقيق الرقمي', 100),
+      need(b.degree, 'الدرجة العلمية', 30),
+      need(b.program_name, 'البرنامج', 100),
       title,
       clean(b.supervisor_name, 100),
       clean(b.co_supervisor, 100),
@@ -496,7 +499,7 @@ export async function registerV12Modules(r, deps) {
     const studentNo = clean(b.student_no, 40);
     const fullName = clean(b.full_name, 100);
     if (!studentNo || !fullName) throw new HttpError(400, 'الرقم الجامعي واسم الخريج مطلوبان.');
-    const vcode = `GRAD-${b.grad_year || 2026}-${studentNo.replace(/[^A-Z0-9]/gi, '')}`;
+    const vcode = `GRAD-${b.grad_year || new Date().getFullYear()}-${studentNo.replace(/[^A-Z0-9]/gi, '')}`;
     const res = db.prepare(`
       INSERT INTO alumni_records (student_no, full_name, faculty_name, program_name, grad_year, gpa, honor_rank, current_employer, job_title, email, phone, verified_code, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -507,7 +510,7 @@ export async function registerV12Modules(r, deps) {
       clean(b.program_name, 100),
       Number(b.grad_year) || 2026,
       Number(b.gpa) || 0,
-      clean(b.honor_rank || 'جيد جداً', 40),
+      clean(b.honor_rank, 40),
       clean(b.current_employer, 120),
       clean(b.job_title, 100),
       clean(b.email, 100),
@@ -530,12 +533,12 @@ export async function registerV12Modules(r, deps) {
     `).run(
       title,
       clean(b.company_name, 120),
-      clean(b.sector || 'الأمن السيبراني والتقنية', 80),
-      clean(b.location || 'دمشق', 60),
-      clean(b.job_type || 'دوام كامل', 40),
-      clean(b.salary_range || 'حسب الكفاءة', 80),
+      clean(b.sector, 80),
+      clean(b.location, 60),
+      clean(b.job_type, 40),
+      clean(b.salary_range, 80),
       clean(b.requirements, 300),
-      clean(b.deadline || '2026-12-31', 20),
+      isoDay(b.deadline, 'آخر موعد للتقديم'),
       Date.now()
     );
     audit(db, c.user, 'نشر فرصة توظيف للخريجين', title, c.ip);
@@ -600,7 +603,7 @@ export async function registerV12Modules(r, deps) {
     const res = db.prepare(`
       INSERT INTO qa_kpis (code, title, standard_domain, target_value, actual_value, unit, status, academic_year, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, '${academicYear()}', ?)
-    `).run(code, title, clean(b.standard_domain || 'الجودة الأكاديمية', 80), target, actual, clean(b.unit || '%', 20), status, Date.now());
+    `).run(code, title, clean(b.standard_domain, 80), target, actual, clean(b.unit || '%', 20), status, Date.now());
     audit(db, c.user, 'إضافة مؤشر جودة KPI', code, c.ip);
     c.json(201, { id: Number(res.lastInsertRowid) });
   });
@@ -617,8 +620,8 @@ export async function registerV12Modules(r, deps) {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       need(b.course_code, 'رمز المقرر', 30),
-      clean(b.course_name || 'مقرر جامعي', 100),
-      clean(b.instructor_name || 'عضو هيئة تدريس', 100),
+      need(b.course_name, 'المقرر', 100),
+      need(b.instructor_name, 'المدرّس', 100),
       clean(b.semester || `الفصل الأول ${academicYear()}`, 50),
       Number(b.responses_count) || 0,
       cScore,
@@ -752,7 +755,7 @@ export async function registerV12Modules(r, deps) {
       clean(b.hall_name || '', 60),
       Number(b.capacity) || 0,
       groupCount ?? (Number(b.enrolled_count) || 0),
-      clean(b.proctor_name || 'لجنة المراقبة المركزية', 100),
+      clean(b.proctor_name, 100),
       groupId,
       Date.now()
     );
@@ -812,8 +815,8 @@ export async function registerV12Modules(r, deps) {
       clean(b.faculty_name, 100),
       clean(b.student_name, 100),
       clean(b.student_no, 40),
-      clean(b.slot_day || 'الإثنين', 30),
-      clean(b.slot_time || '10:00 - 10:30', 30),
+      need(b.slot_day, 'يوم الساعة المكتبية', 30),
+      need(b.slot_time, 'وقت الساعة المكتبية', 30),
       clean(b.topic, 200),
       Date.now()
     );
@@ -833,12 +836,12 @@ export async function registerV12Modules(r, deps) {
     `).run(
       need(b.employee_name, 'اسم الموظف', 100),
       clean(b.department, 100),
-      clean(b.period_label || 'التقييم السنوي 2026', 60),
+      need(b.period_label, 'فترة التقييم', 60),
       p1,
       p2,
       p3,
       overall,
-      clean(b.recommendation || 'علاوة دورية', 80),
+      clean(b.recommendation, 80),
       clean(c.user.display_name, 80),
       Date.now()
     );
@@ -848,10 +851,25 @@ export async function registerV12Modules(r, deps) {
 
   r.add('POST', '/api/expansions/biometrics/sync', (c) => {
     requireV12Perm(c, 'hr:manage', 'staffatt:manage');
-    // لا اتصال فعلي بالأجهزة بعد، فلا يُسجَّل وقت مزامنة لم تحدث
-    audit(db, c.user, 'طلب مزامنة أجهزة البصمة (غير مفعّلة)', 'BIO-ALL', c.ip);
-    c.json(200, { synced: false, timestamp: Date.now(), message: 'لم تُجرَ مزامنة: الربط الفعلي بأجهزة البصمة غير مفعّل بعد.' });
+    // الأجهزة ترسل البصمات إلى المسار أدناه؛ هذا الزر يعرض ما وصل فعلًا
+    const last = db.prepare("SELECT MAX(at) AS at, COUNT(*) AS n FROM audit_log WHERE action = 'بصمة من جهاز'").get();
+    const configured = Boolean(process.env.BIOMETRIC_DEVICE_TOKEN);
+    c.json(200, { synced: Boolean(configured && last?.at), timestamp: last?.at ? Number(last.at) : null, received: Number(last?.n ?? 0),
+      message: !configured ? 'الربط غير مفعّل: اضبط BIOMETRIC_DEVICE_TOKEN ووجّه الأجهزة إلى مسار استقبال البصمات.' : last?.at ? `وصلت ${last.n} بصمة من الأجهزة.` : 'الربط مفعّل، ولم تصل بصمات بعد.' });
   });
+  // استقبال بصمة من جهاز: رمز الجهاز بدل جلسة مستخدم
+  r.add('POST', '/api/hr/attendance/device-punch', (c) => {
+    const expected = process.env.BIOMETRIC_DEVICE_TOKEN || '';
+    const given = String(c.req.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
+    const same = expected.length >= 16 && given.length === expected.length && crypto.timingSafeEqual(Buffer.from(given), Buffer.from(expected));
+    if (!same) throw new HttpError(401, 'رمز الجهاز غير صالح.', 'unauthorized');
+    const username = need(c.body?.username, 'اسم حساب الموظف', 80);
+    const user = db.prepare("SELECT id, username, display_name, role FROM users WHERE username = ? AND role <> 'student' AND active = 1").get(username);
+    if (!user) throw new HttpError(404, 'لا يوجد موظف بهذا الحساب.', 'not_found');
+    const out = punch(deps, user);
+    audit(db, user, 'بصمة من جهاز', need(c.body?.device, 'رمز الجهاز', 40), c.ip);
+    c.json(200, { action: out.action });
+  }, { auth: false });
 
   // ==================== المرحلة 3: البنية التحتية والتوسع (Scalability & DevOps) ====================
   r.add('GET', '/api/devops/overview', (c) => {

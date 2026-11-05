@@ -135,7 +135,7 @@ const SORTS = { enteredAt: 'l.entered_at', exitedAt: 'l.exited_at', studentNo: '
 const dayMs = (s, tz, end) => { if (!/^\d{4}-\d{2}-\d{2}$/.test(String(s ?? ''))) return null; const t = Date.parse(s + 'T00:00:00Z'); return Number.isNaN(t) ? null : t + tz * 60000 + (end ? 86400000 - 1 : 0); };
 const likeEsc = (s) => '%' + s.replace(/[\\%_]/g, '\\$&') + '%';
 
-export function filterSql(q = {}) {
+function filterSql(q = {}) {
   const w = [], a = [], tzMin = Number.isFinite(Number(q.tz)) && Math.abs(Number(q.tz)) <= 840 ? Number(q.tz) : -180;      // تعويض المنطقة الزمنية (دقائق، getTimezoneOffset)
   const term = String(q.q ?? '').replace(/\s+/g, ' ').trim().slice(0, 60);
   if (term) { const l = likeEsc(term), L = likeEsc(term.toUpperCase()); w.push(`(u.student_no LIKE ? ESCAPE '\\' OR (sp.first_name || ' ' || sp.father_name || ' ' || sp.last_name) LIKE ? ESCAPE '\\' OR l.subject LIKE ? ESCAPE '\\' OR l.hall LIKE ? ESCAPE '\\')`); a.push(L, l, l, l); }
@@ -161,7 +161,7 @@ export function listLogs({ db }, q) {
   const rows = db.prepare(`${SEL} ${W} ORDER BY ${col.split(', ').map((c) => `${c} ${dir}`).join(', ')}, l.id DESC LIMIT ? OFFSET ?`).all(...a, size, (page - 1) * size);
   return { total: sum.n, page, pages, size, summary: { count: sum.n, students: sum.s, open: sum.o ?? 0, avgMinutes: sum.d === null ? null : Math.round(sum.d) }, rows: rows.map(view), options: logOptions(db) };
 }
-export function logOptions(db) {
+function logOptions(db) {
   return { kinds: KINDS, halls: db.prepare('SELECT DISTINCT hall FROM hall_logs ORDER BY hall').all().map((r) => r.hall),
     courses: db.prepare('SELECT c.id, c.name, c.code, c.level, c.semester, g.faculty FROM courses c JOIN programs g ON g.id = c.program_id WHERE c.active = 1 ORDER BY g.faculty, c.level, c.semester, c.name').all(),
     faculties: db.prepare('SELECT id, name FROM faculties ORDER BY id').all() };

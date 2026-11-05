@@ -143,8 +143,8 @@ export function applyAppealMark(db, actor, g, newMark, justification) {
 }
 
 /* ---------------- الأخبار ---------------- */
-export function listNews({ db }, limit = getSetting(db, 'display.news_limit')) {
-  const rows = db.prepare('SELECT id, title, body, pinned, published_at FROM news ORDER BY pinned DESC, published_at DESC, id DESC LIMIT ?').all(limit);
+export async function listNews({ db }, limit = getSetting(db, 'display.news_limit')) {
+  const rows = await db.prepare('SELECT id, title, body, pinned, published_at FROM news ORDER BY pinned DESC, published_at DESC, id DESC LIMIT ?').allAsync(limit);
   const media = mediaFor(db, rows.map((n) => n.id));
   return rows.map((n) => ({ id: n.id, title: n.title, body: n.body, pinned: !!n.pinned, publishedAt: n.published_at, media: media.get(n.id) ?? [] }));
 }

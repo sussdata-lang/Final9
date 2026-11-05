@@ -1,8 +1,9 @@
 /* صفحة «وحدات النظام»: الفهرس الكامل للوحدات السبع عشرة في وثيقة «نظام ERP جامعي متكامل»
    (القسم 5.1–5.17) مع حالة تنفيذ كل وحدة في هذه النسخة، وروابط مباشرة إلى الصفحات المنفّذة
    التي يملك الدور الحالي الصلاحية لفتحها. الحالة تُحدَّث يدوياً عند إضافة وحدة جديدة. */
-(function () {
-  const UA = window.UA;
+import { html, mountPoint, Raw } from './ui/core.js';
+
+const UA = window.UA;
   // [الحالة، نص الشارة]
   const ST = { done: ['مُنفَّذ', 'p-approved'], part: ['جزئي', 'p-review'], todo: ['غير مبني', 'p-mut'] };
   // go: روابط الوصول إلى ما هو منفّذ — [العرض، الطابع (اختياري)]؛ تظهر فقط إن كان العرض ضمن قائمة الصلاحيات
@@ -26,35 +27,39 @@
     { id: '5.17', name: 'ذكاء الأعمال والذكاء الاصطناعي الجامعي (BI & AI)', desc: 'لوحات ومؤشرات حية وتحليلات وتقارير Excel/PDF، ونظام الإنذار المبكر بالتعثر الأكاديمي والمرشد الأكاديمي الذكي.', st: 'done', go: [['dashboard', 'الإحصاءات', ''], ['ai', 'الذكاء الاصطناعي الجامعي', ''], ['exchange', 'الاستيراد والتصدير', '']] },
   ];
 
-  UA.views.units = function () {
-    const { esc, viewsFor, S } = UA;
-    const { ico, statCard, nf } = UA.sx;
-    const views = new Set(viewsFor(S.me.role).map((v) => v[0]));
-    const cnt = { done: 0, part: 0, todo: 0 };
-    UNITS.forEach((u) => { cnt[u.st]++; });
-    const link = ([v, label, tab]) => views.has(v)
-      ? (tab ? `<button class="sx-link" data-sx="sub" data-v="${v}" data-t="${tab}">${esc(label)} ${ico('arrow', 15)}</button>`
-             : `<button class="sx-link" data-act="view" data-v="${v}">${esc(label)} ${ico('arrow', 15)}</button>`)
-      : '';
-    const rows = UNITS.map((u) => {
-      const links = u.go.map(link).filter(Boolean).join(' ');
-      return `<tr data-unit="${u.id}">
-        <td data-l="الرمز"><span class="mono">${u.id}</span></td>
-        <td data-l="الوحدة"><strong>${esc(u.name)}</strong></td>
-        <td class="sx-muted" data-l="النطاق">${esc(u.desc)}</td>
-        <td data-l="الحالة"><span class="pill ${ST[u.st][1]}">${ST[u.st][0]}</span></td>
-        <td class="sx-acts" data-l="الوصول">${links || '<span class="sx-muted">—</span>'}</td>
-      </tr>`;
-    }).join('');
-    return `<section class="sx-hero"><div><span class="sx-eyebrow">وثيقة المقترح · القسم 5</span><h1>وحدات نظام ERP الجامعي</h1>
-        <p>الوحدات السبع عشرة التي يرتكي عليها النظام، بحالة تنفيذ كل وحدة في هذه النسخة وروابط مباشرة إلى ما هو متاح لصلاحيتك.</p></div></section>
-      <section class="sx-stats" aria-label="حالة تنفيذ الوحدات">
-        ${statCard('إجمالي الوحدات', nf.format(UNITS.length), 'حسب وثيقة المقترح (5.1–5.17)', 'layers', 'blue')}
-        ${statCard('وحدات مُنفَّذة', nf.format(cnt.done), 'جاهزة للاستعمال الآن', 'check', 'mint')}
-        ${statCard('تنفيذ جزئي', nf.format(cnt.part), 'وظائف أساسية وباقي متبقٍ', 'clock', 'sand')}
-        ${statCard('غير مبنية', nf.format(cnt.todo), 'مخططة لمراحل لاحقة', 'file', 'lav')}
-      </section>
-      <article class="sx-panel" style="margin-top:16px"><div class="sx-ph"><div><h2>فهرس الوحدات</h2><p>الحالة تُقاس بما هو منفَّذ فعلياً في الموقع الآن</p></div></div>
-        <div class="sx-tscroll"><table class="sx-table rsp"><thead><tr><th>الرمز</th><th>الوحدة</th><th>النطاق</th><th>الحالة</th><th>الوصول</th></tr></thead><tbody>${rows}</tbody></table></div></article>`;
-  };
-})();
+function UnitLink({ go: [v, label, tab] }) {
+  const inner = html`${label} <${Raw} markup=${UA.sx.ico('arrow', 15)} />`;
+  return tab
+    ? html`<button class="sx-link" data-sx="sub" data-v=${v} data-t=${tab}>${inner}</button>`
+    : html`<button class="sx-link" data-act="view" data-v=${v}>${inner}</button>`;
+}
+
+function UnitRow({ u, views }) {
+  const links = u.go.filter(([v]) => views.has(v));
+  return html`<tr data-unit=${u.id}>
+    <td data-l="الرمز"><span class="mono">${u.id}</span></td>
+    <td data-l="الوحدة"><strong>${u.name}</strong></td>
+    <td class="sx-muted" data-l="النطاق">${u.desc}</td>
+    <td data-l="الحالة"><span class=${`pill ${ST[u.st][1]}`}>${ST[u.st][0]}</span></td>
+    <td class="sx-acts" data-l="الوصول">${links.length ? links.map((g) => html`<${UnitLink} go=${g} /> `) : html`<span class="sx-muted">—</span>`}</td>
+  </tr>`;
+}
+
+function UnitsScreen() {
+  const { statCard, nf } = UA.sx;
+  const views = new Set(UA.viewsFor(UA.S.me.role).map((v) => v[0]));
+  const cnt = { done: 0, part: 0, todo: 0 };
+  UNITS.forEach((u) => { cnt[u.st]++; });
+  const stats = statCard('إجمالي الوحدات', nf.format(UNITS.length), 'حسب وثيقة المقترح (5.1–5.17)', 'layers', 'blue')
+    + statCard('وحدات مُنفَّذة', nf.format(cnt.done), 'جاهزة للاستعمال الآن', 'check', 'mint')
+    + statCard('تنفيذ جزئي', nf.format(cnt.part), 'وظائف أساسية وباقي متبقٍ', 'clock', 'sand')
+    + statCard('غير مبنية', nf.format(cnt.todo), 'مخططة لمراحل لاحقة', 'file', 'lav');
+  return html`<section class="sx-hero"><div><span class="sx-eyebrow">وثيقة المقترح · القسم 5</span><h1>وحدات نظام ERP الجامعي</h1>
+      <p>الوحدات السبع عشرة التي يرتكز عليها النظام، بحالة تنفيذ كل وحدة في هذه النسخة وروابط مباشرة إلى ما هو متاح لصلاحيتك.</p></div></section>
+    <section class="sx-stats" aria-label="حالة تنفيذ الوحدات" dangerouslySetInnerHTML=${{ __html: stats }} />
+    <article class="sx-panel" style="margin-top:16px"><div class="sx-ph"><div><h2>فهرس الوحدات</h2><p>الحالة تُقاس بما هو منفَّذ فعلياً في الموقع الآن</p></div></div>
+      <div class="sx-tscroll"><table class="sx-table rsp"><thead><tr><th>الرمز</th><th>الوحدة</th><th>النطاق</th><th>الحالة</th><th>الوصول</th></tr></thead>
+        <tbody>${UNITS.map((u) => html`<${UnitRow} key=${u.id} u=${u} views=${views} />`)}</tbody></table></div></article>`;
+}
+
+UA.views.units = () => mountPoint('units', () => html`<${UnitsScreen} />`);

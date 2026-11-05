@@ -60,7 +60,7 @@ Object.assign(window.UA, {
       let j = null; try { j = await res.json(); } catch { /* ليس JSON */ }
       // وصل الرد: تُنسى العملية بعد مهلة الضغطة المزدوجة، أو فورًا إن رُفضت
       if (moneyId) { if (res.ok) setTimeout(() => moneyKeys.delete(moneyId), 5000); else moneyKeys.delete(moneyId); }
-      if (res.ok && url === '/api/auth/login' && j && j.token) {
+      if (res.ok && url === '/api/auth/login') {
         clearApiCache();
       }
       if (res.ok && url === '/api/auth/logout') {
@@ -112,7 +112,7 @@ Object.assign(window.UA, {
 
   /* ---------- الحالة ---------- */
   const S = { uni: 'الجامعة السورية للعلوم الأمنية', me: null, services: [], view: null, requests: [], stats: null, sel: null, filter: 'all', rej: null, svc: null, files: {},
-    vtext: '', vres: null, adminTab: 'holds', admin: {}, audit: null, chain: null, err: '',
+    vtext: '', vres: null, adminTab: 'general', admin: {}, audit: null, chain: null, err: '',
     reg: null, stTab: 'requests', stList: { q: '', program: '', status: '', students: [], total: 0 }, stSel: null, stEdit: null, cred: null, fieldErr: null, profile: null, programs: [] };
   const can = (p) => !!S.me && S.me.permissions.includes(p);
   const ROLE_LABEL = { student: 'طالب', staff: 'موظف', admin: 'مدير النظام', auditor: 'مدقق' };
@@ -203,13 +203,6 @@ Object.assign(window.UA, {
     return parts.join(' · ');
   }
   const events = (r) => '<ul class="events">' + r.events.map((e) => `<li>${fmt(e.at)} · ${esc(e.actor)}: ${esc(e.text)}</li>`).join('') + '</ul>';
-  function reqCard(r) {
-    return `<article class="req"><div class="req-h"><b>${esc(r.service.label)}</b>${pill(r)}</div>
-      <div class="no">${esc(r.no)} · ${fmt(r.createdAt)}</div><div class="hint">${esc(detailsText(r))}</div>${steps(r)}
-      ${r.status === 'rejected' ? `<div class="reason">سبب الرفض: ${esc(r.rejectReason)}</div>` : ''}
-      ${r.document ? `<div class="actions" style="margin:0"><button class="btn pri sm" data-act="doc" data-c="${esc(r.document.code)}">عرض الوثيقة</button><span class="hint" style="align-self:center">رمز التحقق: <span class="mono">${esc(r.document.code)}</span></span></div>` : ''}
-      ${events(r)}</article>`;
-  }
 
   /* ---------- الشاشات ---------- */
   function loginView() {
@@ -306,15 +299,16 @@ Object.assign(window.UA, {
     } else if (r.status === 'review' && canDecide) {
       act = `<div class="actions"><button class="btn ok" data-act="approve" data-id="${r.id}">اعتماد وإصدار الوثيقة</button><button class="btn bad" data-act="rejform" data-id="${r.id}">رفض</button></div>` +
         (S.rej === r.id ? `<div class="form" style="margin-top:12px"><label>سبب الرفض (يظهر للطالب)<textarea id="rej-text" rows="2" maxlength="300"></textarea></label><div class="actions" style="margin:0"><button class="btn bad" data-act="reject" data-id="${r.id}">تأكيد الرفض</button></div></div>` : '');
-    } else if (r.document) act = `<div class="actions"><button class="btn pri" data-act="doc" data-c="${esc(r.document.code)}">عرض الوثيقة</button></div>`;
+    } else if (r.document) act = `<div class="actions"><button class="btn pri" data-act="doc" data-c="${esc(r.document.code)}">عرض الوثيقة</button><span class="hint" style="align-self:center">رمز التحقق: <span class="mono">${esc(r.document.code)}</span></span></div>`;
     if (r.status === 'review' && can('request:forward') && (S.targets || []).length) {
       const opts = S.targets.filter((t) => !r.unit || t.id !== r.unit.id);
       if (opts.length) act += `<div class="form fwd-box" style="margin-top:12px"><b>إحالة الطلب إلى وحدة مرتبطة</b><label>الوحدة<select id="fw-unit">${opts.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></label>
         <label>ملاحظة للجهة المستلمة (اختياري)<input id="fw-note" maxlength="300"></label><div class="actions" style="margin:0"><button class="btn" data-act="fwd" data-id="${r.id}">إحالة</button></div></div>`;
     }
-    else if (r.status === 'rejected') act = `<div class="reason" style="margin-top:8px">${esc(r.rejectReason)}</div>`;
+    else if (r.status === 'rejected') act = `<div class="reason" style="margin-top:8px">سبب الرفض: ${esc(r.rejectReason)}</div>`;
     const att = r.attachment ? `<dt>المرفق</dt><dd><a href="/api/attachments/${r.attachment.id}">${esc(r.attachment.name)}</a> <span class="small">(${Math.round(r.attachment.size / 1024)} ك.ب)</span></dd>` : '';
     return `<dl class="kv"><dt>الطلب</dt><dd>${esc(r.service.label)} <span class="no">${esc(r.no)}</span></dd><dt>الطالب</dt><dd>${esc(r.student.name)} · ${esc(r.student.studentNo)}${can('student:read') && r.student.id ? ` <button class="link" data-act="openstud" data-id="${r.student.id}">فتح ملف الطالب</button>` : ''}</dd><dt>التفاصيل</dt><dd>${esc(detailsText(r))}</dd><dt>الحالة</dt><dd>${pill(r)}</dd><dt>الجهة الحالية</dt><dd>${r.unit ? esc(r.unit.name) : '<span class="hint">غير محال</span>'}</dd>${r.decidedAt ? `<dt>زمن المعالجة</dt><dd>${dur(r.decidedAt - r.createdAt)}</dd>` : ''}${att}</dl>
+      <b style="display:block;margin-top:12px;font-size:14px">مراحل الطلب</b>${(UA.steps || steps)(r)}
       <b style="display:block;margin-top:12px;font-size:14px">الفحص الآلي</b><ul class="checks"><li class="${auto ? 'x' : ''}">${auto ? esc(r.rejectReason) : 'اجتاز كل القواعد المفعَّلة'}</li></ul>${act}<div style="margin-top:12px">${events(r)}</div>`;
   }
 
@@ -338,14 +332,6 @@ Object.assign(window.UA, {
     if (S.adminTab === 'verify') return bar + verifyView();
     if (S.adminTab === 'backup') return bar + UA.backupView();
     if (UA.adminCfg && UA.adminCfg.tabs.some((x) => x[0] === S.adminTab)) return bar + UA.adminCfg.view(S.adminTab);
-    if (S.adminTab === 'holds') {
-      const discSuite = UA.renderUnifiedDisciplinaryBlock ? UA.renderUnifiedDisciplinaryBlock() : '';
-      return bar + `<section class="card"><h2>اللجنة التأديبية وسجل اللجان الانضباطية والمخالفات المسلكية (مدمج)</h2><p class="hint" style="margin-top:0">تم دمج اللجنة التأديبية وحواجز الطلبات مع سجل اللجان الانضباطية والمخالفات المسلكية في واجهة موحدة.</p>
-        <div class="inline-form"><label>الرقم الجامعي<input id="h-no" placeholder="CSS-2026-0001" dir="ltr"></label>
-        <label>النوع<select id="h-type"><option value="disciplinary">تأديبية / مسلكية</option><option value="financial">مالية</option><option value="library">مكتبة وعهدة</option></select></label><label>ملاحظة / قرار اللجنة<input id="h-note" maxlength="200"></label><button class="btn pri" data-act="addhold">تسجيل العقوبة</button></div></section>
-        <section class="card" style="margin-top:16px"><h2>سجل العقوبات والحواجز الفورية على الطلاب</h2><div class="tbl-wrap"><table><thead><tr><th>الطالب</th><th>النوع</th><th>الملاحظة / القرار</th><th>الحالة</th><th></th></tr></thead><tbody>${(a.holds || []).map((h) => `<tr><td>${esc(h.student)} <span class="small">${esc(h.studentNo)}</span></td><td>${{ financial: 'مالية', disciplinary: 'تأديبية', library: 'مكتبة' }[h.holdType] || esc(h.holdType)}</td><td>${esc(h.note)}</td><td>${h.active ? '<span class="bad-t">قائمة</span>' : '<span class="ok-t">مسددة</span>'}</td><td style="white-space:nowrap">${h.active ? `<button class="btn sm" data-act="clearhold" data-id="${h.id}">تسوية</button> ` : ''}<button class="btn sm" data-act="edithold" data-id="${h.id}">تعديل</button> <button class="btn sm bad" data-act="delhold" data-id="${h.id}">حذف</button></td></tr>`).join('') || '<tr><td colspan="5" class="empty">لا عقوبات مسجلة.</td></tr>'}</tbody></table></div></section>
-        ${discSuite}`;
-    }
     if (S.adminTab === 'rules') {
       return bar + (UA.rulesAdminView ? UA.rulesAdminView(a.rules) : '');
     }
@@ -373,6 +359,15 @@ Object.assign(window.UA, {
       <div class="small">10 أحرف على الأقل، وتحوي حروفاً وأرقاماً.</div>
       <button class="btn pri" type="submit">حفظ ومتابعة</button><button class="btn sm" type="button" data-act="logout">خروج</button></form>`;
   }
+
+  // إعداد التحقق بخطوتين، للإلزام عند الدخول ومن «إعداداتي»
+  function mfaSetupView() {
+    const m = S.mfaFlow || {};
+    if (m.codes) return `<section class="login card"><h1>احفظ رموز الاسترداد</h1><p class="hint">كل رمز يصلح مرة واحدة إن فقدت هاتفك، ولن تظهر مرة أخرى.</p><div class="mono" dir="ltr" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:12px 0">${m.codes.map((c) => `<span>${esc(c)}</span>`).join('')}</div><button class="btn pri" type="button" data-act="mfadone">حفظتها، متابعة</button></section>`;
+    if (!m.qr) return `<section class="login card"><h1>التحقق بخطوتين</h1><p class="hint">هذا الحساب يتطلب رمزًا من تطبيق مصادقة على هاتفك، مثل Google Authenticator أو Microsoft Authenticator.</p><button class="btn pri" type="button" data-act="mfastart">بدء الإعداد</button> <button class="btn sm" type="button" data-act="logout">خروج</button></section>`;
+    return `<form class="login card" id="mfaform"><h1>امسح الرمز بالتطبيق</h1><div class="mfa-qr">${m.qr}</div><p class="small">أو أدخل هذا المفتاح يدويًا: <span class="mono" dir="ltr">${esc(m.secret)}</span></p>${S.err ? `<div class="err" role="alert">${esc(S.err)}</div>` : ''}<label>الرمز المكوّن من 6 أرقام<input id="mfa-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required dir="ltr"></label><button class="btn pri" type="submit">تأكيد</button></form>`;
+  }
+  UA.mfaSetupView = mfaSetupView;
 
   /* ---------- تسجيل الطلاب ---------- */
   const STATUS_CLS = { active: 'p-approved', suspended: 'p-review', withdrawn: 'p-rejected', transferred: 'p-rejected', graduated: 'p-review' };
@@ -600,6 +595,12 @@ Object.assign(window.UA, {
       restoreScrollAndFocus(snap);
       return;
     }
+    if (S.me && S.me.mfaSetup) {
+      app.innerHTML = mfaSetupView();
+      if (UA.i18n) UA.i18n.translateDom(app);
+      restoreScrollAndFocus(snap);
+      return;
+    }
     if (S.me && !viewReady(S.view)) { ensureView(S.view).then(render, (e) => toast(e.message)); return; }
     const v = S.view === 'verify' ? verifyView : (UA.views[S.view] || BUILTIN[S.view] || (() => ''));
     if (typeof v === 'function' && v.length >= 1 && UA.views[S.view]) {
@@ -624,7 +625,7 @@ Object.assign(window.UA, {
     restoreScrollAndFocus(snap);
   }
   /* ---------- ملفات الأقسام الكبيرة تُحمَّل عند فتحها ---------- */
-  const LAZY = { finance: ['finance.js'], procurement: ['procurement.js'], access: ['access.js'], guidelines: ['guidelines.js'], lms: ['v12_views.js', 'quiz_builder.js'], research: ['v12_views.js'], alumni: ['v12_views.js'], qa: ['v12_views.js'], expansions: ['v12_views.js'], student_life: ['v12_views.js', 'housing.js'], labtools: ['v12_views.js', 'quiz_builder.js', 'housing.js'], ai: ['v12_views.js'], audit: ['v12_views.js'] };
+  const LAZY = { exchange: ['import.js', 'export.js'], import: ['import.js'], export: ['export.js'], finance: ['finance.js'], procurement: ['procurement.js'], access: ['access.js'], guidelines: ['guidelines.js'], lms: ['v12_views.js', 'quiz_builder.js'], research: ['v12_views.js'], alumni: ['v12_views.js'], qa: ['v12_views.js'], expansions: ['v12_views.js'], student_life: ['v12_views.js', 'housing.js'], labtools: ['v12_views.js', 'quiz_builder.js', 'housing.js'], ai: ['v12_views.js'], audit: ['v12_views.js'] };
   const ASSET_V = (document.currentScript && document.currentScript.src.split('?')[1]) || '';
   const scripts = new Map();
   function loadScript(file) {
@@ -701,7 +702,10 @@ Object.assign(window.UA, {
   async function afterLogin(user) {
     S.me = user; S.err = '';
     if (user.mustChange) { render(); return; }
-    S.services = (await api('GET', '/api/services')).services;
+    // الطالب يبدأ بها؛ وغيره لا يحتاجها في أول رسم
+    const servicesReq = api('GET', '/api/services').then((r) => { S.services = r.services; });
+    S.services = S.services || [];
+    if (user.role === 'student') await servicesReq; else servicesReq.catch(() => {});
     await go(viewsFor(user.role)[0][0]);
   }
   async function doVerify(code) {
@@ -717,7 +721,23 @@ Object.assign(window.UA, {
     if (UA.forms[e.target.id]) { await guard(() => UA.forms[e.target.id](e.target)); return; }
     if (e.target.id === 'loginform') {
       await guard(async () => {
-        try { const r = await api('POST', '/api/auth/login', { username: val('lg-u'), password: val('lg-p') }); await afterLogin(r.user); }
+        const creds = { username: val('lg-u'), password: val('lg-p') };
+        try { const r = await api('POST', '/api/auth/login', creds); await afterLogin(r.user); }
+        catch (err) {
+          if (!err.status) throw err;
+          if (err.code !== 'mfa_required') { S.err = err.message; render(); return; }
+          // كلمة المرور صحيحة: يبقى رمز تطبيق المصادقة
+          for (;;) {
+            const code = await askText('التحقق بخطوتين', { label: 'الرمز من تطبيق المصادقة أو رمز استرداد', submit: 'دخول', dir: 'ltr' });
+            if (!code) return;
+            try { const r = await api('POST', '/api/auth/login', { ...creds, code }); await afterLogin(r.user); return; }
+            catch (e2) { if (!e2.status) throw e2; S.err = e2.message; if (e2.code !== 'mfa_invalid') { render(); return; } toast(e2.message); }
+          }
+        }
+      });
+    } else if (e.target.id === 'mfaform') {
+      await guard(async () => {
+        try { const r = await api('POST', '/api/auth/mfa/confirm', { code: val('mfa-code') }); S.err = ''; S.mfaFlow = { codes: r.recoveryCodes }; S.me.mfaEnabled = true; render(); }
         catch (err) { if (err.status) { S.err = err.message; render(); } else throw err; }
       });
     } else if (e.target.id === 'pwform') {
@@ -791,14 +811,23 @@ Object.assign(window.UA, {
       }
       else if (a === 'copy') { try { await navigator.clipboard.writeText(d.c); toast('تم نسخ الرمز'); } catch { toast('الرمز: ' + d.c); } }
       else if (a === 'atab') { S.adminTab = d.t; S.edit = null; if (d.t === 'general' && UA.general) await UA.general.load(); if (UA.adminCfg && UA.adminCfg.tabs.some((x) => x[0] === d.t)) await UA.adminCfg.load(d.t); render(); }
+      else if (a === 'mfastart') { S.mfaFlow = await api('POST', '/api/auth/mfa/setup', {}); S.err = ''; S.me.mfaSetup = true; render(); }
+      else if (a === 'mfadone') { S.mfaFlow = null; S.me.mfaSetup = false; await afterLogin(S.me); }
+      else if (a === 'mfaoff') {
+        const v = await askForm({ title: 'تعطيل التحقق بخطوتين', submit: 'تعطيل', fields: [{ name: 'password', label: 'كلمة المرور', type: 'password', required: true }, { name: 'code', label: 'الرمز من التطبيق', required: true, dir: 'ltr' }] });
+        if (v) { await api('POST', '/api/auth/mfa/disable', v); S.me.mfaEnabled = false; render(); toast('عُطّل التحقق بخطوتين'); }
+      }
       else if (a === 'addhold') { await api('POST', '/api/admin/holds', { studentNo: val('h-no'), holdType: val('h-type'), note: val('h-note') }); await loadFor('admin'); render(); toast('سُجّلت العقوبة'); }
       else if (a === 'clearhold') { await api('POST', `/api/admin/holds/${d.id}/clear`, {}); await loadFor('admin'); render(); toast('تمت التسوية'); }
       else if (a === 'rule') { await api('POST', `/api/admin/rules/${d.id}/toggle`, { enabled: d.on === '1' }); await loadFor('admin'); render(); }
       else if (a === 'edithold') {
         const h = S.admin.holds.find((x) => x.id === Number(d.id)); if (!h) return;
-        const note = prompt('ملاحظة العقوبة', h.note || ''); if (note === null) return;
-        const tp = prompt('نوع العقوبة: financial (مالية) / disciplinary (تأديبية) / library (مكتبة)', h.holdType); if (tp === null) return;
-        await api('PUT', `/api/admin/holds/${d.id}`, { note, holdType: tp.trim() }); await loadFor('admin'); render(); toast('حُفظ تعديل العقوبة');
+        const v = await askForm({ title: 'تعديل العقوبة', fields: [
+          { name: 'holdType', label: 'النوع', type: 'select', value: h.holdType, options: [{ value: 'disciplinary', label: 'تأديبية / مسلكية' }, { value: 'financial', label: 'مالية' }, { value: 'library', label: 'مكتبة' }] },
+          { name: 'note', label: 'الملاحظة', type: 'textarea', value: h.note || '' },
+        ] });
+        if (!v) return;
+        await api('PUT', `/api/admin/holds/${d.id}`, v); await loadFor('admin'); render(); toast('حُفظ تعديل العقوبة');
       }
       else if (a === 'delhold') { if (!confirm('حذف سجل هذه العقوبة نهائياً؟ (للتسوية دون حذف استخدم «تسوية»)')) return; await api('DELETE', `/api/admin/holds/${d.id}`); await loadFor('admin'); render(); toast('حُذفت العقوبة'); }
       else if (a === 'delrule') { if (!confirm('حذف هذه القاعدة نهائياً؟ لن يُطبَّق هذا الفحص على الطلبات بعد الآن (للإيقاف المؤقت استخدم «تعطيل»).')) return; await api('DELETE', `/api/admin/rules/${d.id}`); await loadFor('admin'); render(); toast('حُذفت القاعدة'); }
@@ -890,5 +919,5 @@ Object.assign(window.UA, {
   // التبديل التلقائي بين عرض الحاسوب والجوال عند تغيّر عرض النافذة (تدوير الجهاز أو تغيير حجم النافذة)
   try { UA.mq.addEventListener('change', () => { if (S.me) { $('#layer').innerHTML = ''; render(); } }); } catch { /* متصفح قديم */ }
 
-  Object.assign(UA, { ensureView, spill, relatedRequests, header, siteFoot, upload, mediaHtml, viewsFor, S, api, esc, fmt, dur, $, val, toast, render, guard, go, loadFor, can, pill, steps, detailsText, events, reqCard, docHtml, verifyView, readFile, afterLogin, ROLE_LABEL });
+  Object.assign(UA, { ensureView, spill, relatedRequests, header, siteFoot, upload, mediaHtml, viewsFor, S, api, esc, fmt, dur, $, val, toast, render, guard, go, loadFor, can, pill, steps, detailsText, events, docHtml, verifyView, readFile, afterLogin, ROLE_LABEL });
 })();

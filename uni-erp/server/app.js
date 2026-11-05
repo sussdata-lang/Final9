@@ -10,7 +10,7 @@ import { openDb } from './db.js';
 import { RateLimiter } from './security.js';
 import { makeHandler } from './http.js';
 import { buildRouter } from './routes.js';
-import { sessionUser } from './services/auth.js';
+import { sessionUserAsync } from './services/auth.js';
 
 import { ensureCoreAccounts, seedPassword, hasConfiguredSeedPassword } from './services/bootstrap.js';
 import { ensureStructure, STRUCTURE, FACULTY_ROLE } from './services/structure.js';
@@ -21,7 +21,8 @@ import { createHeavyPool } from './heavy.js';
 import { incomingDir, startLoopWatch } from './http.js';
 import { purgeAuditLog } from './audit.js';
 import { purgeIdempotencyKeys } from './services/idempotency.js';
-import { isClustered, publish, startBus } from './services/bus.js';
+import { isClustered, publish, startBus, startRateSync } from './services/bus.js';
+import { applyRateTotals, takeRateDeltas } from './security.js';
 import { flushSessionTouches, invalidateSessionCache } from './services/auth.js';
 import { applySharedBan, setWafBanListener } from './waf.js';
 import { registerMutationListener } from './db.js';
@@ -108,7 +109,7 @@ export async function createApp(overrides = {}) {
   const limiter = new RateLimiter();
   const heavy = createHeavyPool({ db, cfg });
   const router = await buildRouter({ db, cfg, limiter, heavy });
-  const server = http.createServer(makeHandler({ cfg, router, getUser: (tok) => sessionUser(db, tok) }));
+  const server = http.createServer(makeHandler({ cfg, router, getUser: (tok) => sessionUserAsync(db, tok) }));
   server.headersTimeout = 15_000; server.requestTimeout = 600_000;
   // تنظيف الجلسات المنتهية كل ساعة
   const timer = setInterval(() => db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now()), 3600_000);
@@ -131,7 +132,8 @@ export async function createApp(overrides = {}) {
     } });
     touchTimer = setInterval(() => { try { flushSessionTouches(db); } catch (e) { console.warn('session touch:', e.message); } }, 60_000);
     touchTimer.unref();
-    stopBus = () => { unlisten(); stopListening(); };
+    const stopRate = startRateSync({ url: db.pgUrl, take: takeRateDeltas, apply: applyRateTotals, purge: scheduler });
+    stopBus = () => { unlisten(); stopListening(); stopRate(); };
   }
   const stopLoopWatch = startLoopWatch();
   if (scheduler) {

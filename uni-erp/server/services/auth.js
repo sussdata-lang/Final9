@@ -8,13 +8,14 @@ import { cacheGetOrSet, getCachedUnitById, getCachedUnitTree, extractMutatedTabl
 import { registerMutationListener } from '../db.js';
 import { isClustered } from './bus.js';
 import { studentViewsOf } from './settings.js';
+import { mfaSetupRequired, verifyCode } from './mfa.js';
 
 // تجزئة وهمية تُستخدم عند غياب المستخدم كي يتساوى زمن الاستجابة (منع تعداد الحسابات)
 let dummyHash;
 
 export function publicUser(db, u) {
   if (!u) return null;
-  const cacheKey = `pubuser:${u.id}:${u.role}:${u.role_key || ''}:${u.unit_id || 0}:${u.access_mode || 'role'}:${u.must_change_password ? 1 : 0}`;
+  const cacheKey = `pubuser:${u.id}:${u.role}:${u.role_key || ''}:${u.unit_id || 0}:${u.access_mode || 'role'}:${u.must_change_password ? 1 : 0}:${u.mfa_enabled ? 1 : 0}`;
   return cacheGetOrSet(db, 'identity', cacheKey, () => {
     const unitRow = u.unit_id ? getCachedUnitById(db, u.unit_id) : null;
     const unit = unitRow ? { id: unitRow.id, name: unitRow.name } : null;
@@ -33,6 +34,8 @@ export function publicUser(db, u) {
       studentNo: u.student_no,
       program: u.program,
       mustChange: !!u.must_change_password,
+      mfaEnabled: !!u.mfa_enabled,
+      mfaSetup: mfaSetupRequired(db, u),
       accessMode: u.access_mode ?? 'role',
       dataScope: u.data_scope ?? 'unit',
       permissions: perms,
@@ -137,6 +140,7 @@ export function sessionUser(db, token) {
     ...row,
     label: `${row.display_name}`,
     roleKey: row.role_key ?? row.role,
+    mfa_setup_required: mfaSetupRequired(db, row),
     can: (p) => perms.has(p),
     unitIds: row.unit_id ? getCachedUnitTree(db, row.unit_id) : [],
   };
@@ -149,7 +153,44 @@ export function sessionUser(db, token) {
   return userObj;
 }
 
-export async function login({ db, cfg, limiter }, { username, password, ip, ua, req }) {
+// مثلها، لكن قراءة الجلسة عند غيابها من الذاكرة لا توقف الخيط الرئيسي
+export async function sessionUserAsync(db, token) {
+  if (!token) return null;
+  const now = Date.now();
+  if (idleExpired(db, token, now)) return null;
+  const cached = sessionLruCache.get(token);
+  if (cached && cached.db === db && cached.cacheExp > now && cached.user.expires_at > now) {
+    sessionCacheHits++;
+    sessionLruCache.delete(token);
+    sessionLruCache.set(token, cached);
+    return cached.user;
+  }
+
+  sessionCacheMisses++;
+  const row = await db.prepare(`SELECT u.*, s.expires_at, s.fingerprint FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?`).getAsync(sha256(token));
+  if (!row || row.expires_at < now || !row.active) {
+    sessionLruCache.delete(token);
+    return null;
+  }
+  const perms = new Set(effective(db, row));
+  const userObj = {
+    ...row,
+    label: `${row.display_name}`,
+    roleKey: row.role_key ?? row.role,
+    mfa_setup_required: mfaSetupRequired(db, row),
+    can: (p) => perms.has(p),
+    unitIds: row.unit_id ? getCachedUnitTree(db, row.unit_id) : [],
+  };
+
+  if (sessionLruCache.size >= MAX_SESSION_CACHE) {
+    const oldest = sessionLruCache.keys().next().value;
+    if (oldest !== undefined) sessionLruCache.delete(oldest);
+  }
+  sessionLruCache.set(token, { db, user: userObj, cacheExp: now + SESSION_CACHE_TTL_MS });
+  return userObj;
+}
+
+export async function login({ db, cfg, limiter }, { username, password, code, ip, ua, req }) {
   if (typeof username !== 'string' || typeof password !== 'string' || !username || !password) throw new HttpError(400, 'أدخل اسم المستخدم وكلمة المرور.', 'bad_request');
   // عنوان الجامعة الموثوق لا يوقف دخول الحرم صباحاً؛ حد الحساب الواحد يبقى
   if ((!isTrustedIp(ip) && !limiter.check(`login:${ip}`, 120, 60_000)) || !limiter.check(`login:${username.trim().toLowerCase()}`, 30, 60_000))
@@ -172,6 +213,15 @@ export async function login({ db, cfg, limiter }, { username, password, ip, ua, 
     log.warn(`login: رفض ${username.slice(0, 40)} — ${!u ? 'لا يوجد مستخدم بهذا الاسم' : !u.active ? 'الحساب معطّل' : 'كلمة المرور لا تطابق'}`);
     audit(db, null, 'دخول مرفوض', username, ip);
     throw new HttpError(401, 'اسم المستخدم أو كلمة المرور غير صحيحة.', 'bad_credentials');
+  }
+  if (u.mfa_enabled) {
+    if (!code) throw new HttpError(401, 'أدخل رمز التحقق من تطبيق المصادقة.', 'mfa_required');
+    if (!verifyCode({ db, cfg }, u, code)) {
+      const fails = u.failed_logins + 1;
+      db.prepare('UPDATE users SET failed_logins = ?, locked_until = ? WHERE id = ?').run(fails >= MAX_FAILS ? 0 : fails, fails >= MAX_FAILS ? Date.now() + LOCK_MS : u.locked_until, u.id);
+      audit(db, null, 'دخول مرفوض: رمز تحقق خاطئ', username, ip);
+      throw new HttpError(401, 'رمز التحقق غير صحيح.', 'mfa_invalid');
+    }
   }
   if (u.failed_logins || u.locked_until) db.prepare('UPDATE users SET failed_logins = 0, locked_until = 0 WHERE id = ?').run(u.id);
   const token = newToken(), now = Date.now();

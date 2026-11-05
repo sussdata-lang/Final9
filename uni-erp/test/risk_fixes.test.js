@@ -89,7 +89,7 @@ test('مع التطبيق: الاختبار والبصمة والإشعار وا
       assert.equal((await fetch(f, { headers: { Cookie: admin } })).status, 200);
     });
     await t.test('ملفات الواجهة ذات الإصدار تُخزَّن، وغيرها يُراجع', async () => {
-      assert.match((await fetch(base + '/app.js?v=1')).headers.get('cache-control'), /max-age=86400/);
+      assert.match((await fetch(base + '/app.js?v=1')).headers.get('cache-control'), /max-age=2592000/);
       assert.match((await fetch(base + '/app.js')).headers.get('cache-control'), /no-cache/);
     });
     await t.test('جملة عادية فيها select وfrom لا يرفضها جدار الحماية، والحقن يُرفض', async () => {

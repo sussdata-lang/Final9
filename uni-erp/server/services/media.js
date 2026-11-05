@@ -1,12 +1,12 @@
 // وسائط الأخبار: رفع مباشر (صور/فيديو، يُتحقق من نوعها من البايتات لا من الامتداد) أو رابط.
+import { bad } from '../validate.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { audit } from '../audit.js';
 import { HttpError } from '../http.js';
 
-export const LIMITS = { image: 5 * 1024 * 1024, video: 50 * 1024 * 1024, perNews: 8 };
-const bad = (m) => new HttpError(400, m, 'validation');
+const LIMITS = { image: 5 * 1024 * 1024, video: 50 * 1024 * 1024, perNews: 8 };
 
 // نوع الملف من توقيعه (magic bytes). لا SVG عمداً: قد يحمل سكربتاً.
 export function sniff(b) {
@@ -38,7 +38,7 @@ export function classifyUrl(raw) {
 const dirOf = (cfg) => path.join(cfg.uploadDir, 'news');
 const caption = (v) => { const s = String(v ?? '').replace(/\s+/g, ' ').trim(); if (s.length > 200 || /[<>]/.test(s)) throw bad('التعليق حتى 200 حرف بلا رموز غير مسموحة.'); return s || null; };
 
-export function mediaView(m) {
+function mediaView(m) {
   const base = { id: m.id, kind: m.kind, source: m.source, caption: m.caption };
   if (m.source === 'upload') return { ...base, src: `/api/media/${m.id}`, mime: m.mime };
   if (m.source === 'url') return { ...base, src: m.url };

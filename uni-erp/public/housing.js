@@ -40,7 +40,7 @@
     const d = H.data, q = H.q.trim();
     const list = d.allocations.filter((a) => !q || a.student_name.includes(q) || String(a.student_no).includes(q));
     return `${canManage() ? `<section class="card"><h2 style="margin-top:0">تسكين طالب</h2><form id="hs-alloc" class="inline-form" style="gap:10px;align-items:flex-end;flex-wrap:wrap">
-        <label style="flex:1;min-width:240px">اسم الطالب أو رقمه<input id="hs-a-student" data-student-picker required placeholder="ابحث واختر من القائمة"></label>
+        <label style="flex:1;min-width:240px">اسم الطالب أو رقمه<input id="hs-a-student" data-student-picker required placeholder="ابحث واختر من القائمة"><small class="sp-name"></small></label>
         <label style="min-width:240px">الغرفة<select id="hs-a-room" required data-no-other="1"><option value="">اختر الغرفة</option>${roomOptions()}</select></label>
         <label>تاريخ السكن<input id="hs-a-day" type="date" value="${today()}"></label>
         <button class="btn pri" type="submit">تسكين</button></form></section>` : ''}
@@ -56,7 +56,7 @@
     const list = d.handouts.filter((h) => !q || h.student_name.includes(q) || String(h.student_no).includes(q));
     return `${canManage() ? `<section class="card"><h2 style="margin-top:0">${e ? 'تعديل سجل المواد' : 'تسليم مواد لطالب'}</h2><form id="hs-hand" style="display:grid;gap:12px">
         <div class="inline-form" style="gap:10px;align-items:flex-end;flex-wrap:wrap">
-          <label style="flex:1;min-width:240px">اسم الطالب أو رقمه<input id="hs-h-student" data-student-picker required value="${esc(e?.student_no || '')}" placeholder="ابحث واختر من القائمة"></label>
+          <label style="flex:1;min-width:240px">اسم الطالب أو رقمه<input id="hs-h-student" data-student-picker required value="${esc(e?.student_no || '')}" placeholder="ابحث واختر من القائمة"><small class="sp-name"></small></label>
           <label>تاريخ التسليم<input id="hs-h-day" type="date" value="${esc(e?.handed_day || today())}"></label>
           <label>تاريخ الإرجاع (إن وُجد)<input id="hs-h-ret" type="date" value="${esc(e?.returned_day || '')}"></label>
         </div>
@@ -110,38 +110,50 @@
   }
   function onChange(e) { if (e.target.dataset?.hsf === 'building') { H.building = e.target.value; redraw(); } }
   function onInput(e) { if (e.target.id === 'hs-q') { H.q = e.target.value; const at = e.target.selectionStart; redraw(); const n = document.getElementById('hs-q'); if (n) { n.focus(); n.setSelectionRange(at, at); } } }
-  function onClick(e) {
+  async function onClick(e) {
     const b = e.target.closest('[data-hs]');
     if (!b) return;
-    const a = b.dataset.hs, id = Number(b.dataset.id), d = H.data, ask = (m, v = '') => window.prompt(m, v);
+    const a = b.dataset.hs, id = Number(b.dataset.id), d = H.data, GENDERS = ['ذكور', 'إناث'];
     if (a === 'filter') { H.building = b.dataset.b; redraw(); }
     else if (a === 'add-building') {
-      const name = ask('اسم المبنى'); if (!name) return;
-      const gender = ask('القسم: ذكور أو إناث', 'ذكور'); if (!gender) return;
-      const rooms = Number(ask('عدد الغرف', '50')) || 0, capacity = Number(ask('سعة الغرفة', '4')) || 4;
-      run(() => api('POST', '/api/housing/buildings', { name, gender, rooms, capacity }), 'أُضيف المبنى');
+      const v = await askForm({ title: 'إضافة مبنى', submit: 'إضافة المبنى', fields: [
+        { name: 'name', label: 'اسم المبنى', required: true },
+        { name: 'gender', label: 'القسم', type: 'select', options: GENDERS, value: 'ذكور' },
+        { name: 'rooms', label: 'عدد الغرف', type: 'number', min: 0, value: 50, required: true },
+        { name: 'capacity', label: 'سعة الغرفة', type: 'number', min: 1, value: 4, required: true },
+      ] });
+      if (v) run(() => api('POST', '/api/housing/buildings', v), 'أُضيف المبنى');
     } else if (a === 'edit-building') {
-      const x = d.buildings.find((v) => v.id === id), name = ask('اسم المبنى', x.name); if (!name) return;
-      const gender = ask('القسم: ذكور أو إناث', x.gender); if (!gender) return;
-      const addRooms = Number(ask('غرف إضافية (0 لا شيء)', '0')) || 0;
-      run(() => api('PUT', `/api/housing/buildings/${id}`, { name, gender, addRooms }), 'حُفظ');
+      const x = d.buildings.find((v) => v.id === id);
+      const v = await askForm({ title: 'تعديل المبنى', fields: [
+        { name: 'name', label: 'اسم المبنى', value: x.name, required: true },
+        { name: 'gender', label: 'القسم', type: 'select', options: GENDERS, value: x.gender },
+        { name: 'addRooms', label: 'غرف إضافية', type: 'number', min: 0, value: 0, required: true },
+      ] });
+      if (v) run(() => api('PUT', `/api/housing/buildings/${id}`, v), 'حُفظ');
     } else if (a === 'del-building') { if (window.confirm('حذف المبنى وغرفه؟')) run(() => api('DELETE', `/api/housing/buildings/${id}`), 'حُذف'); }
     else if (a === 'add-room' || a === 'edit-room') {
       const x = a === 'edit-room' ? d.rooms.find((v) => v.id === id) : null;
-      const building_name = x ? x.building_name : ask('المبنى', H.building || d.buildings[0]?.name || ''); if (!building_name) return;
-      const room_no = ask('رقم الغرفة', x?.room_no || ''); if (!room_no) return;
-      const capacity = Number(ask('السعة', x?.capacity || 4)), floor_no = Number(ask('الطابق', x?.floor_no || 1)), status = x ? ask('الحالة: متاحة أو مغلقة', x.status) : 'متاحة';
-      const payload = { building_name, room_no, capacity, floor_no, status, room_type: x?.room_type };
+      const v = await askForm({ title: x ? `تعديل الغرفة ${x.room_no}` : 'إضافة غرفة', fields: [
+        ...(x ? [] : [{ name: 'building_name', label: 'المبنى', type: 'select', options: d.buildings.map((n) => n.name), value: H.building || d.buildings[0]?.name, required: true }]),
+        { name: 'room_no', label: 'رقم الغرفة', value: x?.room_no ?? '', required: true },
+        { name: 'capacity', label: 'السعة', type: 'number', min: 1, value: x?.capacity ?? 4, required: true },
+        { name: 'floor_no', label: 'الطابق', type: 'number', value: x?.floor_no ?? 1, required: true },
+        ...(x ? [{ name: 'status', label: 'الحالة', type: 'select', options: ['متاحة', 'مغلقة'], value: x.status }] : []),
+      ] });
+      if (!v) return;
+      const payload = { building_name: x?.building_name, status: 'متاحة', room_type: x?.room_type, ...v };
       run(() => (x ? api('PUT', `/api/housing/rooms/${id}`, payload) : api('POST', '/api/housing/rooms', payload)), 'حُفظت الغرفة');
     } else if (a === 'del-room') { if (window.confirm('حذف الغرفة؟')) run(() => api('DELETE', `/api/housing/rooms/${id}`), 'حُذفت'); }
     else if (a === 'move') {
       const x = d.allocations.find((v) => v.id === id);
       const free = d.rooms.filter((r) => r.id !== x.room_id && r.residents < Number(r.capacity) && r.status !== 'مغلقة');
-      const label = ask(`رقم الغرفة الجديدة في «${x.building_name}»، أو اكتب: المبنى/الغرفة`, ''); if (!label) return;
-      const [bn, rn] = label.includes('/') ? label.split('/').map((s) => s.trim()) : [x.building_name, label.trim()];
-      const room = free.find((r) => r.building_name === bn && String(r.room_no) === rn);
-      if (!room) { toast('لا توجد غرفة متاحة بهذا الرقم.'); return; }
-      run(() => api('PUT', `/api/housing/allocations/${id}`, { room_id: room.id }), 'نُقل الطالب');
+      if (!free.length) { toast('لا توجد غرفة متاحة.'); return; }
+      free.sort((p, q) => (q.building_name === x.building_name) - (p.building_name === x.building_name));
+      const v = await askForm({ title: 'نقل الطالب إلى غرفة أخرى', submit: 'نقل الطالب', fields: [
+        { name: 'room_id', label: 'الغرفة الجديدة', type: 'select', required: true, options: free.map((r) => ({ value: r.id, label: `${r.building_name} / غرفة ${r.room_no} (${r.residents} من ${r.capacity})` })) },
+      ] });
+      if (v) run(() => api('PUT', `/api/housing/allocations/${id}`, { room_id: Number(v.room_id) }), 'نُقل الطالب');
     } else if (a === 'out') { if (window.confirm('إخلاء الطالب من السكن؟')) run(() => api('DELETE', `/api/housing/allocations/${id}`), 'أُخلي الطالب'); }
     else if (a === 'edit-hand') { H.editing = d.handouts.find((v) => v.id === id); redraw(); }
     else if (a === 'cancel-edit') { H.editing = null; redraw(); }
@@ -159,7 +171,6 @@
     ['office', 'حجوزات الساعات المكتبية والإرشاد', ['sa_housing:view', 'sa_housing:manage', 'faculty:manage']],
     ['library', 'المكتبة الرقمية والإعارة', ['lms_lib:view', 'lms_lib:write', 'lms_lib:edit', 'lms_lib:approve', 'course:manage', 'academic:read']],
     ['activities', 'الأندية والأنشطة الطلابية', ['sa_housing:view', 'sa_housing:manage']],
-    ['request_cards', 'بطاقات الطلبات', ['request:read_all', 'request:read_unit']],
   ];
   UA.views.labtools = async function (el) {
     const tabs = LAB_TABS.filter((t) => S.me?.role === 'admin' || t[2].some((p) => UA.can(p)));
@@ -171,11 +182,6 @@
     else if (H.labTab === 'library') await UA.views.lms(box, S.me, 'library');
     else if (H.labTab === 'office') await legacyLife(box, S.me, 'office');
     else if (H.labTab === 'activities') await legacyLife(box, S.me, 'dorms');
-    else if (H.labTab === 'request_cards') {
-      const [{ requests }, { services }] = await Promise.all([UA.api('GET', '/api/requests'), UA.api('GET', '/api/services')]);
-      S.services = services;
-      box.innerHTML = `<section class="card"><p class="hint" style="margin-top:0">عرض تجريبي لبطاقات الطلبات: الحالة والمراحل وسبب الرفض والوثيقة وسجل الأحداث. آخر 30 طلبًا ضمن صلاحيتك.</p>${requests.length ? requests.slice(0, 30).map(UA.reqCard).join('') : '<div class="empty">لا توجد طلبات بعد. ستظهر هنا بطاقة لكل طلب يُقدَّم.</div>'}</section>`;
-    }
   };
   UA.actions.labtab = async (el, d) => { H.labTab = d.t; UA.render(); };
 })();

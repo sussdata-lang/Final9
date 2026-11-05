@@ -69,6 +69,7 @@ export async function cardCertificates({ db, cfg }, actor, body, ip) {
   const pending = new Set(rows.filter((r) => Number(r.must_change_password)).map((r) => r.id));
   const out = [];
   let reissued = 0;
+  const certs = new Map(list.length ? (await db.prepare(`SELECT * FROM student_certs WHERE student_id IN (${list.map(() => '?').join(',')})`).allAsync(...list.map((x) => x.id))).map((c) => [c.student_id, c]) : []);
   for (const s of list) {
     let tempPassword = null;
     if (pending.has(s.id)) {
@@ -76,7 +77,7 @@ export async function cardCertificates({ db, cfg }, actor, body, ip) {
       db.prepare('UPDATE users SET password_hash = ?, must_change_password = 1 WHERE id = ?').run(await hashPassword(tempPassword, cfg.scryptN), s.id);
       reissued++;
     }
-    const ce = certFor(db, s.id), url = ce && `${publicBase(cfg)}/?verify=${ce.code}`;
+    const ce = certs.get(s.id), url = ce && `${publicBase(cfg)}/?verify=${ce.code}`;
     out.push({ ...s, tempPassword, cert: ce ? { ...certSummary(ce), payloadSha256: ce.payload_sha256, signer: ce.cert_subject, url, qrSvg: qrSvg(url) } : null });
   }
   audit(db, actor, 'طباعة شهادات تسجيل وإصدار كلمات مؤقتة', `${out.length} شهادة، ${reissued} كلمة جديدة`, ip);

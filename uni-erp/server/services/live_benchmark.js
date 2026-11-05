@@ -3,8 +3,8 @@
 import { tx } from '../db.js';
 
 const STAGES = [10, 25, 50];
-export const REQUESTS_PER_STAGE = 120;
-export const TOTAL_REQUESTS = STAGES.length * REQUESTS_PER_STAGE;
+const REQUESTS_PER_STAGE = 120;
+const TOTAL_REQUESTS = STAGES.length * REQUESTS_PER_STAGE;
 const PATHS = ['/api/me', '/api/requests', '/api/students-table?size=25', '/api/stats'];
 const WRITES = 50;
 const pct = (sorted, p) => (sorted.length ? Math.round(sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))] * 10) / 10 : null);
@@ -16,7 +16,7 @@ async function readStage(base, token, concurrency) {
     while (next < REQUESTS_PER_STAGE) {
       const path = PATHS[next++ % PATHS.length], t = performance.now();
       try {
-        const r = await fetch(base + path, { headers: { 'X-Session-Token': token }, signal: AbortSignal.timeout(30_000) });
+        const r = await fetch(base + path, { headers: { Cookie: `sid=${token}` }, signal: AbortSignal.timeout(30_000) });
         await r.arrayBuffer();
         if (r.ok) times.push(performance.now() - t); else errors++;
       } catch { errors++; }

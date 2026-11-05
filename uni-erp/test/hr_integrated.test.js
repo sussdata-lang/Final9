@@ -110,8 +110,7 @@ test('التكامل الشامل لواجهات /api/hr-pro/* ', async (t) => {
     body: JSON.stringify({ username: 'admin', password: 'Test-Only-Pass-1!' }),
   });
   assert.equal(loginRes.status, 200);
-  const { token } = await loginRes.json();
-  const headers = { 'Content-Type': 'application/json', 'X-Session-Token': token };
+  const headers = { 'Content-Type': 'application/json', Cookie: loginRes.headers.get('set-cookie').split(';')[0] };
 
   // 0) لا حد أدنى لعدد الموظفين: قاعدة جديدة فارغة تعمل دون أخطاء ودون بيانات تجريبية
   const ov0 = await (await fetch(`${base}/api/hr-pro/overview?refDate=2026-10-11`, { headers })).json();

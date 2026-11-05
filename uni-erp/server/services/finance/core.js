@@ -11,7 +11,7 @@ export const toMinor = (v) => { const n = typeof v === 'string' ? Number(v.repla
 export const fromMinor = (n) => Math.round(n) / 100;
 export const pad = (n, w = 5) => String(n).padStart(w, '0');
 export const TYPE_LABEL = { asset: 'أصول', liability: 'خصوم', equity: 'حقوق ملكية', revenue: 'إيرادات', expense: 'مصروفات' };
-export const ENTRY_LABEL = { JV: 'قيد يومية', RV: 'سند قبض', PV: 'سند صرف', OB: 'قيد افتتاحي', CL: 'قيد إقفال', FE: 'رسوم طلاب', PR: 'قيد رواتب' };
+const ENTRY_LABEL = { JV: 'قيد يومية', RV: 'سند قبض', PV: 'سند صرف', OB: 'قيد افتتاحي', CL: 'قيد إقفال', FE: 'رسوم طلاب', PR: 'قيد رواتب' };
 export const DEBIT_NATURE = new Set(['asset', 'expense']);
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 export const isDay = (s) => DAY.test(String(s)) && !Number.isNaN(Date.parse(s + 'T00:00:00Z')) && new Date(s + 'T00:00:00Z').toISOString().slice(0, 10) === s;
@@ -66,7 +66,7 @@ export function sysAccount(db, key) {
   if (!a) throw bad(`الحساب الوظيفي «${key}» غير معرَّف؛ عيّنه من دليل الحسابات.`, 409, 'conflict');
   return a;
 }
-export const baseCurrency = (db) => db.prepare('SELECT * FROM fin_currencies WHERE is_base = 1').get();
+const baseCurrency = (db) => db.prepare('SELECT * FROM fin_currencies WHERE is_base = 1').get();
 
 /* ---------- السنوات المالية ---------- */
 export const listYears = (db) => { ready(db); return db.prepare('SELECT id, name, start_day startDay, end_day endDay, status, closed_at closedAt FROM fin_years ORDER BY start_day DESC').all(); };
@@ -178,7 +178,7 @@ function writeLines(db, entryId, lines) {
   for (const l of lines) ins.run(entryId, l.n, l.accountId, l.debit, l.credit, l.currency, l.rate, l.fc, l.cc, l.party, l.stu, l.note);
 }
 const lineView = (l) => ({ id: l.id, lineNo: l.line_no, accountId: l.account_id, code: l.code, account: l.account, debit: fromMinor(l.debit), credit: fromMinor(l.credit), currency: l.currency, rate: l.rate, fcAmount: l.fc_amount === null ? null : fromMinor(l.fc_amount), costCenterId: l.cost_center_id, costCenter: l.cc_name ?? null, partyId: l.party_id, party: l.party_name ?? null, studentId: l.student_id, note: l.note });
-export function entryView(db, e) {
+function entryView(db, e) {
   const lines = db.prepare(`SELECT l.*, a.code, a.name account, c.name cc_name, p.name party_name FROM fin_lines l JOIN fin_accounts a ON a.id = l.account_id LEFT JOIN fin_cost_centers c ON c.id = l.cost_center_id LEFT JOIN fin_parties p ON p.id = l.party_id WHERE l.entry_id = ? ORDER BY l.line_no`).all(e.id).map(lineView);
   const u = (id) => (id ? db.prepare('SELECT display_name n FROM users WHERE id = ?').get(id)?.n ?? null : null);
   const y = db.prepare('SELECT name FROM fin_years WHERE id = ?').get(e.year_id);

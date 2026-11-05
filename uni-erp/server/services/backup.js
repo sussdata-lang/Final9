@@ -17,7 +17,7 @@ export const NAME_RE = /^backup-\d{8}-\d{6}(-[a-z]+)?\.zip(\.enc)?$/;
 const MAGIC = Buffer.from('UEB1');
 const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
 // مع PostgreSQL قد يكون cfg.dbPath رابطاً (postgres://user:pass@...) فلا يجوز أخذ dirname منه: يُنتج مساراً مزيفاً بكلمة المرور
-export const dataDirOf = (cfg) => cfg.dataDir || (/^postgres(ql)?:\/\//i.test(String(cfg.dbPath)) || cfg.dbPath === ':memory:' ? path.resolve('data') : path.dirname(cfg.dbPath));
+const dataDirOf = (cfg) => cfg.dataDir || (/^postgres(ql)?:\/\//i.test(String(cfg.dbPath)) || cfg.dbPath === ':memory:' ? path.resolve('data') : path.dirname(cfg.dbPath));
 
 /* ---------- PostgreSQL: pg_dump / pg_restore ---------- */
 const isPgUri = (s) => /^postgres(ql)?:\/\//i.test(String(s || ''));
@@ -30,7 +30,8 @@ function pgEnv(url) {
   const ssl = u.searchParams.get('sslmode'); if (ssl) env.PGSSLMODE = ssl;
   return env;
 }
-const pgFail = (what, e) => new HttpError(500, `${what}: ${String(e.stderr || e.message).trim().split('\n').slice(-3).join(' | ')}`, 'backup_failed');
+// غياب أداة النسخ عن الخادم ليس عطلًا داخليًا: رسالة تشرح ما يلزم
+const pgFail = (what, e) => /ENOENT/.test(String(e.message)) ? new HttpError(503, `${what}: أدوات PostgreSQL (pg_dump وpg_restore) غير مثبتة على هذا الخادم أو ليست في PATH.`, 'backup_unavailable') : new HttpError(500, `${what}: ${String(e.stderr || e.message).trim().split('\n').slice(-3).join(' | ')}`, 'backup_failed');
 const pgDump = (url, file) => new Promise((resolve, reject) => {
   execFile('pg_dump', ['--format=custom', '--no-owner', '--no-acl', `--file=${file}`], { env: pgEnv(url), timeout: 10 * 60_000, maxBuffer: 1 << 20 },
     (e, _o, stderr) => (e ? reject(pgFail('تعذّر نسخ قاعدة البيانات (pg_dump)', { stderr, message: e.message })) : resolve()));
@@ -148,7 +149,7 @@ export function verifyBackup({ db, cfg }, actor, name, ip) {
   return out;
 }
 const setStatus = (db, s) => db.prepare("INSERT INTO site_settings (key, value) VALUES ('last_backup', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(JSON.stringify(s));
-export const lastStatus = (db) => { try { return JSON.parse(db.prepare("SELECT value FROM site_settings WHERE key = 'last_backup'").get()?.value ?? 'null'); } catch { return null; } };
+const lastStatus = (db) => { try { return JSON.parse(db.prepare("SELECT value FROM site_settings WHERE key = 'last_backup'").get()?.value ?? 'null'); } catch { return null; } };
 export function backupInfo({ db, cfg }) {
   return { backups: listBackups(cfg), last: lastStatus(db), keep: Number(cfg.backupKeep ?? 14), encrypted: !!cfg.backupPassphrase, remote: !!cfg.backupPutUrl, auto: cfg.backupAuto !== false, hourUtc: Number(cfg.backupHour ?? 1),
     persistentHint: 'النسخ المحفوظة على الخادم نفسه لا تحمي من ضياع القرص: نزّل نسخة دورياً أو فعّل الرفع الخارجي (BACKUP_PUT_URL).' };

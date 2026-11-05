@@ -229,7 +229,8 @@
       bar.className = 'ux-desk-next';
       panel.querySelector('.inline-form')?.before(bar);
     }
-    const text = `<span><b>${waiting.length}</b> في الانتظار</span><button type="button" class="btn gold-btn" data-act="uxdesknext"${waiting.length ? '' : ' disabled'}>استدعاء التالي</button>`;
+    const canCall = ['sa_scholarships:write', 'sa_scholarships:approve', 'request:decide', 'student:update'].some((p) => UA.can(p));
+    const text = `<span><b>${waiting.length}</b> في الانتظار</span><button type="button" class="btn gold-btn" data-act="uxdesknext"${waiting.length && canCall ? '' : ' disabled'}>استدعاء التالي</button>`;
     if (bar.dataset.n !== String(waiting.length)) { bar.innerHTML = text; bar.dataset.n = waiting.length; }
   }
   UA.actions.uxdesknext = () => {

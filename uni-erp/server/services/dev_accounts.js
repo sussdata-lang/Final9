@@ -30,8 +30,15 @@ function available(db, t) {
   if (!u) return null;
   return t.create || db.prepare('SELECT 1 AS x FROM users WHERE username = ? AND active = 1').get(u) ? u : null;
 }
+// بقية حسابات الكادر: كل دور قابل للتجربة بالضغط، بلا كلمة مرور
+function allTypes(db) {
+  const fixed = new Set(TYPES.map((t) => t.username));
+  const staff = db.prepare("SELECT username, display_name FROM users WHERE role <> 'student' AND active = 1 ORDER BY id").all().filter((u) => !fixed.has(u.username));
+  return [...TYPES, ...staff.map((u) => ({ key: u.username, label: u.display_name, username: u.username }))];
+}
 export function devAccounts({ db }) {
-  return TYPES.flatMap((t) => { const username = available(db, t); return username ? [{ key: t.key, label: t.label, username }] : []; });
+  const active = new Set(db.prepare("SELECT username FROM users WHERE role <> 'student' AND active = 1").all().map((u) => u.username));
+  return allTypes(db).flatMap((t) => { const username = t.student ? firstStudent(db) : t.username; return username && (t.create || t.student || active.has(username)) ? [{ key: t.key, label: t.label, username }] : []; });
 }
 // عضو تجريبي مرتبط بالحساب ومقرر مسند إليه، ليظهر مسار اعتماد العلامات محلياً
 function linkFacultyMember(db, username, name) {
@@ -45,7 +52,7 @@ function linkFacultyMember(db, username, name) {
 }
 // يهيئ الحساب ويعيد اسم المستخدم وكلمة مرور العرض للدخول بمسار الدخول المعتاد
 export async function prepareDevAccount({ db, cfg }, key) {
-  const t = TYPES.find((x) => x.key === key), username = t && available(db, t);
+  const t = allTypes(db).find((x) => x.key === key), username = t && available(db, t);
   if (!username) throw new HttpError(404, 'هذا الحساب غير متاح في قاعدة التطوير.', 'not_found');
   const password = seedPassword();
   const hash = await hashPassword(password, cfg.scryptN);
@@ -53,7 +60,7 @@ export async function prepareDevAccount({ db, cfg }, key) {
   if (t.create && !db.prepare('SELECT 1 AS x FROM users WHERE username = ?').get(username)) {
     db.prepare("INSERT INTO users (username, display_name, password_hash, role, role_key, staff_kind, job_title, created_at) VALUES (?, ?, ?, 'staff', ?, ?, ?, ?)").run(username, t.create.name, hash, t.create.roleKey, t.create.kind, t.create.job, Date.now());
   } else {
-    db.prepare('UPDATE users SET password_hash = ?, must_change_password = 0, failed_logins = 0, locked_until = 0 WHERE username = ?').run(hash, username);
+    db.prepare('UPDATE users SET password_hash = ?, must_change_password = 0, failed_logins = 0, locked_until = 0, mfa_enabled = 0 WHERE username = ?').run(hash, username);
   }
   if (t.create) linkFacultyMember(db, username, t.create.name);
   return { username, password };

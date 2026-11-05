@@ -26,7 +26,7 @@
     academics: [['acadtab', 'my_grades', 'علامات موادي', ['grade:approve_own']], ['acadtab', 'courses', 'دليل المواد'], ['acadtab', 'grades', 'جدول العلامات', ['grade:manage', 'grade:approve', 'academic:read']], ['acadtab', 'gpa_sim', 'محاكي المعدل'], ['acadtab', 'members', 'أعضاء هيئة التدريس', ['faculty:manage']]],
     expansions: [['v12:expansions', 'exams', 'جداول الامتحانات والتظلمات', EXAMS_READ.concat('grade:manage', 'grade:approve', 'course:manage')], ['v12:expansions', 'faculty', 'الترقيات العلمية', ['faculty:manage', ...HR_ANY]]],
     student_life: [['hstab', 'rooms', 'المباني والغرف', HOUSING], ['hstab', 'residents', 'الطلاب في السكن', HOUSING], ['hstab', 'supplies', 'المواد والاحتياجات', HOUSING]],
-    labtools: [['labtab', 'admissions', 'القبول والمفاضلة والمعادلة', ['sa_admissions:view', 'sa_admissions:write', 'sa_admissions:approve', 'student:register']], ['labtab', 'office', 'حجوزات الساعات المكتبية والإرشاد', HOUSING.concat('faculty:manage')], ['labtab', 'library', 'المكتبة الرقمية والإعارة', LMS_READ], ['labtab', 'activities', 'الأندية والأنشطة الطلابية', HOUSING], ['labtab', 'request_cards', 'بطاقات الطلبات', ['request:read_all', 'request:read_unit']]],
+    labtools: [['labtab', 'admissions', 'القبول والمفاضلة والمعادلة', ['sa_admissions:view', 'sa_admissions:write', 'sa_admissions:approve', 'student:register']], ['labtab', 'office', 'حجوزات الساعات المكتبية والإرشاد', HOUSING.concat('faculty:manage')], ['labtab', 'library', 'المكتبة الرقمية والإعارة', LMS_READ], ['labtab', 'activities', 'الأندية والأنشطة الطلابية', HOUSING]],
     lms: [['v12:lms', 'lectures', 'المحاضرات والمحتوى الرقمي', LMS_READ], ['v12:lms', 'quizzes', 'بنك الأسئلة والاختبارات', LMS_READ.concat('sa_quiz:write', 'sa_quiz:approve')]],
     research: [['v12:research', 'projects', 'المشاريع والأبحاث', RESEARCH], ['v12:research', 'theses', 'رسائل الدراسات العليا', RESEARCH]],
     alumni: [['v12:alumni', 'alumni', 'سجل الخريجين', ALUMNI], ['v12:alumni', 'jobs', 'معرض الوظائف والتدريب', ALUMNI]],
@@ -123,11 +123,40 @@
   window.UA = window.UA || {};
   window.UA.gate = { REG, TABS, allowed, apply, firstTab };
 
+  // إجراءات يرفضها الخادم لمن لا يملك صلاحيتها: تُخفى بدل أن يضغطها فيتلقى خطأ
+  const HOLDS = ['holds:manage'], NEWS = ['news:manage'], ADMIT = ['sa_admissions:approve'];
+  const DESK = ['sa_scholarships:write', 'sa_scholarships:approve', 'request:decide', 'student:update'];
+  const ACT_PERMS = {
+    addhold: HOLDS, clearhold: HOLDS, edithold: HOLDS, delhold: HOLDS, 'sa-clear-hold': HOLDS,
+    'sa-q-status': DESK, uxdesknext: DESK, xhrcsv: ['staffatt:manage'],
+    newsedit: NEWS, newsdel: NEWS, nmdel: NEWS, nmlink: NEWS, nmup: NEWS,
+    'sa-run-sort': ADMIT, 'sa-enroll-app': ADMIT, 'sa-add-eq': ['course:manage', 'sa_admissions:approve'], 'sa-resolve-adv': ['sa_advising:edit'],
+  };
+  function gateActions() {
+    const can = window.UA.can;
+    for (const [act, perms] of Object.entries(ACT_PERMS)) {
+      if (perms.some((p) => can(p))) continue;
+      document.querySelectorAll(`#app [data-act="${act}"]`).forEach((el) => el.classList.add('ua-noperm'));
+    }
+    if (!can('news:manage')) document.getElementById('newsadd')?.closest('section')?.classList.add('ua-noperm');
+    if (!HOLDS.some((p) => can(p))) document.getElementById('h-no')?.closest('.inline-form')?.classList.add('ua-noperm');
+  }
+
+  let queued = false;
+  const watch = () => {
+    if (typeof MutationObserver !== 'function' || typeof document.getElementById !== 'function') return;
+    const app = document.getElementById('app');
+    if (!app || app.__gateWatch) return;
+    app.__gateWatch = true;
+    new MutationObserver(() => { if (queued) return; queued = true; requestAnimationFrame(() => { queued = false; try { if (window.UA.S?.me) gateActions(); } catch { /* لا يكسر العرض */ } }); }).observe(app, { childList: true, subtree: true });
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watch); else watch();
+
   // التركيب على خطاف ما بعد الرسم (يُستدعى بعد كل render)
   const hook = () => {
     const prev = window.UA.afterRenderEnhance;
     if (prev && prev.__gated) return;
-    const wrapped = function () { if (prev) prev.apply(this, arguments); try { apply(); } catch { /* العرض لا ينكسر بسبب البوابة */ } };
+    const wrapped = function () { if (prev) prev.apply(this, arguments); try { apply(); gateActions(); } catch { /* العرض لا ينكسر بسبب البوابة */ } };
     wrapped.__gated = true;
     window.UA.afterRenderEnhance = wrapped;
   };

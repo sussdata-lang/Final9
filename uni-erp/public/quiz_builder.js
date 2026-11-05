@@ -176,7 +176,7 @@
           ${write && q.status === 'draft' ? `<button class="btn sm" data-qt="send" data-id="${q.id}">إرسال للاعتماد</button> ` : ''}
           ${approve && q.status === 'pending' ? `<button class="btn sm pri" data-qt="approve" data-id="${q.id}">اعتماد</button> <button class="btn sm" data-qt="reject" data-id="${q.id}">إعادة</button> ` : ''}
           <button class="btn sm" data-qt="print" data-id="${q.id}">طباعة</button>
-          ${q.pending_grading ? `<button class="btn sm pri" data-qt="grade" data-id="${q.id}">تصحيح</button> ` : ''}
+          ${q.pending_grading && (write || approve) ? `<button class="btn sm pri" data-qt="grade" data-id="${q.id}">تصحيح</button> ` : ''}
           ${write ? `<button class="btn sm bad" data-qt="del" data-id="${q.id}">حذف</button>` : ''}`}</td></tr>`).join('') || `<tr><td colspan="10" class="empty">لا توجد اختبارات${student ? ' متاحة الآن' : ''}.</td></tr>`}
       </tbody></table></div></div>`;
   }
@@ -190,7 +190,7 @@
         if (a === 'new' || a === 'edit') { const courses = (await api('GET', '/api/courses').catch(() => ({ courses: [] }))).courses; box.removeEventListener('click', handler); open(box, a === 'edit' ? q : null, { courses, faculties: d.faculties }, render); }
         else if (a === 'send') { await api('POST', `/api/lms/quizzes/${q.id}/request-approval`, {}); notify('أُرسل للاعتماد'); render(); }
         else if (a === 'approve') { await api('POST', `/api/lms/quizzes/${q.id}/decide`, { approve: true }); notify('اعتُمد الاختبار'); render(); }
-        else if (a === 'reject') { const note = window.prompt('سبب الإعادة'); if (!note) return; await api('POST', `/api/lms/quizzes/${q.id}/decide`, { approve: false, note }); notify('أُعيد الاختبار'); render(); }
+        else if (a === 'reject') { const note = await askText('إعادة الاختبار للتعديل', { label: 'سبب الإعادة', type: 'textarea', submit: 'إعادة الاختبار' }); if (!note) return; await api('POST', `/api/lms/quizzes/${q.id}/decide`, { approve: false, note }); notify('أُعيد الاختبار'); render(); }
         else if (a === 'print') printPaper(q);
         else if (a === 'del') { if (!window.confirm(`حذف «${q.title}» نهائياً؟`)) return; await api('DELETE', `/api/lms/quizzes/${q.id}`); notify('حُذف'); render(); }
         else if (a === 'take') await take(q, modal, notify, render);

@@ -23,8 +23,8 @@ test('Uni-ERP v12 — Phases 1 to 4 Complete Integration Suite', async (t) => {
   });
   assert.equal(loginRes.status, 200);
   const loginData = await loginRes.json();
-  assert.ok(loginData.token, 'Should return session token for iframe persistence');
-  const headers = { 'Content-Type': 'application/json', 'X-Session-Token': loginData.token };
+  assert.equal(loginData.token, undefined, 'الجلسة في الكوكي وحدها');
+  const headers = { 'Content-Type': 'application/json', Cookie: loginRes.headers.get('set-cookie').split(';')[0] };
 
   // 2. Phase 1 (5.12 LMS & Digital Library)
   const lmsRes = await fetch(`${base}/api/lms/overview`, { headers });

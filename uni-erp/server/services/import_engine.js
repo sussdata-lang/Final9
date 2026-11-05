@@ -1,5 +1,6 @@
 // محرك الاستيراد الجدولي: فحص بلا كتابة ← «حفظ» برمز لمرة واحدة أو «إلغاء» ← سجل دفعات وتراجع.
 // كل كتابة تتم داخل معاملة واحدة مع سجل تغييراتها، وأسماء الجداول والأعمدة تأتي من التعريفات لا من الملف.
+import { bad } from '../validate.js';
 import crypto from 'node:crypto';
 import { readXlsx, writeXlsx } from '../lib/xlsx.js';
 import { parseSql, parseCsv } from '../lib/sqlparse.js';
@@ -14,7 +15,6 @@ import { IMPORT_DEFS, IMPORT_GROUPS, IMPORT_ORDER_HINT } from './import_defs.js'
 
 const MAX_ROWS = 20000, STAGING_MS = 30 * 60 * 1000, CHUNK = 500, MAX_ERRORS = 300, DAY = 86400000;
 const CHANGES_RETENTION_DAYS = 90;   // أقصى قيمة لإعداد import.undo_days؛ بعدها لا فائدة من الصور السابقة وفيها بيانات شخصية
-const bad = (m) => new HttpError(400, m, 'validation');
 const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
 const q = (id) => `"${id}"`;
 const toOf = (col) => col.to ?? col.name;

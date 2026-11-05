@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { sha256 } from './security.js';
 
-export const GENESIS = '0'.repeat(64);
+const GENESIS = '0'.repeat(64);
 const rowText = (prev, r) => [prev, r.at, r.actor_id ?? '', r.actor_label, r.role, r.action, r.ref, r.ip ?? ''].join('|');
 const legacyHash = (prev, r) => sha256(rowText(prev, r));
 // البصمة بمفتاح خارج القاعدة: من يكتب في القاعدة وحدها لا يستطيع إعادة حساب السلسلة. الصفوف الأقدم من المفتاح بلا مفتاح

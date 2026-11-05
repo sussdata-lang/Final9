@@ -20,7 +20,7 @@ function getGroup(db, id) {
   if (!g) throw new HttpError(404, 'الفئة غير موجودة.', 'not_found');
   return g;
 }
-export function membersOf(db, id) {
+function membersOf(db, id) {
   return db.prepare(`SELECT u.id, u.student_no, u.display_name, sp.first_name, sp.father_name, sp.last_name, pr.name AS program_name
     FROM student_group_members m JOIN users u ON u.id = m.student_id
     LEFT JOIN student_profiles sp ON sp.user_id = u.id LEFT JOIN programs pr ON pr.id = sp.program_id
@@ -57,18 +57,18 @@ const addMembers = (db, groupId, ids, now) => {
 };
 const insertGroup = (db, f, now) => Number(db.prepare('INSERT INTO student_groups (name, kind, program_id, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)').run(f.name, f.kind, f.programId, f.notes, now, now).lastInsertRowid);
 
-export function createGroup({ db }, actor, b, ip) {
+function createGroup({ db }, actor, b, ip) {
   const input = b ?? {}, f = fields(db, input), ids = studentIds(db, input.studentIds), now = Date.now();
   const id = tx(db, () => { const gid = insertGroup(db, f, now); addMembers(db, gid, ids, now); audit(db, actor, 'إنشاء فئة طلاب', f.name, ip); return gid; });
   return view(getGroup(db, id));
 }
-export function updateGroup({ db }, actor, id, b, ip) {
+function updateGroup({ db }, actor, id, b, ip) {
   const cur = getGroup(db, id), f = fields(db, b ?? {}, cur);
   db.prepare('UPDATE student_groups SET name = ?, kind = ?, program_id = ?, notes = ?, updated_at = ? WHERE id = ?').run(f.name, f.kind, f.programId, f.notes, Date.now(), cur.id);
   audit(db, actor, 'تعديل فئة طلاب', f.name === cur.name ? f.name : `${cur.name} ← ${f.name}`, ip);
   return view(getGroup(db, cur.id));
 }
-export function deleteGroup({ db }, actor, id, ip) {
+function deleteGroup({ db }, actor, id, ip) {
   const g = getGroup(db, id);
   tx(db, () => {
     db.prepare('UPDATE exam_schedules SET group_id = NULL WHERE group_id = ?').run(g.id);   // الامتحان يبقى، ويفقد ربطه فقط
@@ -77,7 +77,7 @@ export function deleteGroup({ db }, actor, id, ip) {
     audit(db, actor, 'حذف فئة طلاب', g.name, ip);
   });
 }
-export function changeMembers({ db }, actor, id, b, ip) {
+function changeMembers({ db }, actor, id, b, ip) {
   const g = getGroup(db, id), add = studentIds(db, b?.add), remove = studentIds(db, b?.remove), now = Date.now();
   tx(db, () => {
     addMembers(db, g.id, add, now);
@@ -89,7 +89,7 @@ export function changeMembers({ db }, actor, id, b, ip) {
   return { group: view(getGroup(db, g.id)), members: membersOf(db, g.id) };
 }
 // توزيع الطلاب بالترتيب على فئات متساوية: «مختبر 1»، «مختبر 2»…
-export function splitIntoGroups({ db }, actor, b, ip) {
+function splitIntoGroups({ db }, actor, b, ip) {
   const input = b ?? {}, ids = studentIds(db, input.studentIds), size = Number(input.size);
   if (!ids.length) throw bad('حدد الطلاب أولاً.', 'studentIds');
   if (!Number.isInteger(size) || size < 1 || size > 500) throw bad('حجم الفئة بين 1 و500.', 'size');

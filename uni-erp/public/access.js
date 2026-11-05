@@ -533,6 +533,7 @@
           <td style="white-space:nowrap">
             <button class="btn sm pri" data-act="xuedit" data-id="${u.id}">تعديل وصلاحيات ⚙️</button>
             <button class="btn sm" data-act="xupw" data-id="${u.id}">كلمة مرور جديدة</button>
+            ${u.id !== UA.S.me.id ? `<button class="btn sm" data-act="xumfa" data-id="${u.id}">إعادة ضبط التحقق بخطوتين</button>` : ''}
             ${
               self
                 ? ''
@@ -1157,6 +1158,12 @@
         await reload();
         toast('حُفظ تعديل الحساب ومصفوفة الصلاحيات بنجاح');
       }),
+    xumfa: (el, d) =>
+      run(async () => {
+        if (!confirm('إلغاء التحقق بخطوتين لهذا الحساب وإنهاء جلساته؟')) return;
+        await api('POST', `/api/admin/users/${d.id}/mfa-reset`, {});
+        toast('أُعيد ضبط التحقق بخطوتين');
+      }),
     xupw: (el, d) =>
       run(async () => {
         if (!confirm('ستُنشأ كلمة مرور مؤقتة جديدة وتُنهى جلسات هذا المستخدم. متابعة؟')) return;
@@ -1259,7 +1266,7 @@
     xurename: (el, d) =>
       run(async () => {
         const cur = X.data.units.find((u) => u.id === Number(d.id));
-        const name = prompt('الاسم الجديد للوحدة', cur.name);
+        const name = await askText('تعديل اسم الوحدة', { label: 'الاسم الجديد للوحدة', value: cur.name });
         if (!name || name === cur.name) return;
         await api('PUT', `/api/admin/units/${d.id}`, { name });
         await reload();

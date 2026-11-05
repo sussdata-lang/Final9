@@ -281,16 +281,15 @@
         box.querySelectorAll('.btn-del-file').forEach((btn) => {
           btn.onclick = async () => {
             if (!window.confirm('حذف هذا المرفق نهائياً؟')) return;
-            await api('DELETE', `/api/lms/files/${btn.dataset.file}`);
-            notify('حُذف المرفق');
-            render();
+            try { await api('DELETE', `/api/lms/files/${btn.dataset.file}`); notify('حُذف المرفق'); render(); }
+            catch (e) { if (!e.status) throw e; notify(e.message); }
           };
         });
         box.querySelectorAll('.btn-del-lec').forEach((btn) => {
           btn.onclick = async () => {
-            await api('DELETE', `/api/lms/lectures/${btn.dataset.id}`);
-            notify('تم حذف المحاضرة');
-            render();
+            if (!window.confirm('حذف هذه المحاضرة ومرفقاتها نهائيًا؟')) return;
+            try { await api('DELETE', `/api/lms/lectures/${btn.dataset.id}`); notify('تم حذف المحاضرة'); render(); }
+            catch (e) { if (!e.status) throw e; notify(e.message); }
           };
         });
       } else if (activeTab === 'quizzes') {
@@ -628,7 +627,7 @@
           <label>المدينة <input name="location"></label>
           <label>نطاق الراتب / المكافأة <input name="salary_range" placeholder="3,000,000 - 4,500,000 ل.س"></label>
           <label>المتطلبات الأساسية <textarea name="requirements" rows="2"></textarea></label>
-          <label>آخر موعد للتقديم <input name="deadline" type="date"></label>
+          <label>آخر موعد للتقديم <input name="deadline" type="date" required></label>
         `, async (data) => {
           await api('POST', '/api/alumni/jobs', data);
           notify('تم نشر الفرصة الوظيفية بنجاح');
@@ -1230,17 +1229,17 @@
             <div class="v12-card">
               <h3>توزيع الأخطاء حسب نوع العملية (Operations)</h3>
               <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px;">
-                ${(a.byOperation || []).map((op) => `
+                ${(a.byOperation || []).map((op) => { const all = (a.byOperation || []).reduce((n, x) => n + x.total, 0), percentage = all ? Math.round((op.total / all) * 100) : 0; return `
                   <div>
                     <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">
-                      <b>${esc(op.name)}</b>
-                      <span class="mono">${op.count} بلاغ (${op.percentage}%)</span>
+                      <b>${esc(op.label)}</b>
+                      <span class="mono">${op.total} بلاغ (${percentage}%)</span>
                     </div>
                     <div style="height:8px;background:#f1f5f9;border-radius:4px;overflow:hidden;">
-                      <div style="width:${Math.max(5, op.percentage)}%;height:100%;background:#0284c7;border-radius:4px;"></div>
+                      <div style="width:${Math.max(5, percentage)}%;height:100%;background:#0284c7;border-radius:4px;"></div>
                     </div>
                   </div>
-                `).join('')}
+                `; }).join('')}
               </div>
             </div>
 
@@ -1673,7 +1672,8 @@
   const LIB_W = ['holds:manage', ...LMS_W];
   const EXAM_W = ['exams_housing:write', 'exams_housing:edit', 'exams_housing:approve'];
   const WRITE_RULES = [
-    [['#btn-add-lec', '.btn-del-lec', '.btn-add-file', '.btn-del-file', '#btn-add-quiz'], LMS_W],
+    [['#btn-add-lec', '.btn-add-file', '#btn-add-quiz'], LMS_W],
+    [['.btn-del-lec', '.btn-del-file'], ['course:manage', 'lms_lib:delete', 'lms_lib:edit']],
     [['#btn-add-book', '#btn-add-loan', '.btn-ret-loan'], LIB_W],
     [['#btn-add-proj', '#btn-add-thesis'], ['research_grad:write', 'research_grad:edit', 'research_grad:approve']],
     [['#btn-add-alm', '#btn-add-job'], ['alumni_career:write', 'alumni_career:edit']],

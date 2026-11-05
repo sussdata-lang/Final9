@@ -1,4 +1,5 @@
 import { docNo, academicYear } from '../lib/doc_no.js';
+import { amount, required, text } from '../validate.js';
 import { listQuizzes, withoutAnswers, submitQuiz } from './quizzes.js';
 import { listAllSlots, DAYS } from './schedule.js';
 import { notify } from './push.js';
@@ -82,7 +83,7 @@ function executiveKpisFrom(db) {
 
 // ما يغطيه توقيع القسيمة: أي تعديل لاحق في هذه القيم يبطله
 const money2 = (v) => Number(v).toFixed(2);
-export const payslipPayload = (p) => Buffer.from([p.payslip_code, p.employee_code ?? '', p.employee_name, p.month_label, money2(p.basic_salary), money2(p.overload_pay), money2(p.allowances), money2(p.deductions), money2(p.net_salary)].join('|'), 'utf8');
+const payslipPayload = (p) => Buffer.from([p.payslip_code, p.employee_code ?? '', p.employee_name, p.month_label, money2(p.basic_salary), money2(p.overload_pay), money2(p.allowances), money2(p.deductions), money2(p.net_salary)].join('|'), 'utf8');
 
 export function buildEnterpriseSuiteOverview(db, scope = {}) {
   const mine = scope.studentNo ? 'WHERE student_no = ?' : '', mineArgs = scope.studentNo ? [scope.studentNo] : [];
@@ -227,17 +228,18 @@ export function registerEnterpriseSuiteRoutes(r, deps) {
     }
     const b = c.body || {};
     if (!b.instructor_name) throw new HttpError(400, 'اسم عضو الهيئة التدريسية مطلوب.');
-    const calc = computeFacultyOverloadPay(b.quorum_hours ?? 10, b.actual_teaching_hours ?? 14, b.supervision_hours ?? 2, b.hourly_rate ?? 100000);
+    const quorum = amount(b.quorum_hours, 'نصاب الساعات'), actual = amount(b.actual_teaching_hours, 'الساعات الفعلية'), supervision = amount(b.supervision_hours, 'ساعات الإشراف', { optional: true }), rate = amount(b.hourly_rate, 'أجر الساعة', { min: 1 });
+    const calc = computeFacultyOverloadPay(quorum, actual, supervision, rate);
     db.prepare(`
       INSERT INTO faculty_overload_records (instructor_name, academic_rank, faculty_name, quorum_hours, actual_teaching_hours, supervision_hours, overload_hours, hourly_rate, total_overload_pay, semester, status, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'الفصل الأول ${academicYear()}', 'معتمد للرواتب', ?)
     `).run(
       b.instructor_name,
-      b.academic_rank || 'أستاذ مساعد',
-      b.faculty_name || 'كلية هندسة الأمن السيبراني',
-      Number(b.quorum_hours ?? 10),
-      Number(b.actual_teaching_hours ?? 14),
-      Number(b.supervision_hours ?? 2),
+      text(b.academic_rank, 80),
+      required(b.faculty_name, 'الكلية', 120),
+      quorum,
+      actual,
+      supervision,
       calc.overloadHours,
       Number(b.hourly_rate ?? 100000),
       calc.totalOverloadPay,
@@ -267,9 +269,9 @@ export function registerEnterpriseSuiteRoutes(r, deps) {
     }
     if (!(Number(b.basic_salary) > 0)) throw new HttpError(400, 'الراتب الأساسي مطلوب.', 'validation');
     const basic = Number(b.basic_salary);
-    const overload = Number(b.overload_pay) || 0;
-    const allow = Number(b.allowances) || 0;
-    const ded = Number(b.deductions) || 0;
+    const overload = amount(b.overload_pay, 'أجر الساعات الإضافية', { optional: true });
+    const allow = amount(b.allowances, 'البدلات', { optional: true });
+    const ded = amount(b.deductions, 'الحسميات', { optional: true });
     const net = basic + overload + allow - ded;
     const issued = new Date();
     const code = docNo(`PAY-${issued.getFullYear()}${String(issued.getMonth() + 1).padStart(2, '0')}`);
@@ -361,14 +363,11 @@ export function registerEnterpriseSuiteRoutes(r, deps) {
 
   // 10. البحث الشامل الفوري (Command Palette Search API)
   r.add('GET', '/api/enterprise/global-search', (c) => {
-    const q = String(c.query.q || '').trim().toLowerCase();
-    const students = !c.user.can('student:read') ? [] : db.prepare("SELECT id, username, display_name, student_no, program FROM users WHERE role = 'student' LIMIT 30").all()
-      .filter((s) => !q || String(s.display_name).toLowerCase().includes(q) || String(s.student_no).toLowerCase().includes(q));
-    const courses = db.prepare('SELECT id, code, name, instructor FROM courses LIMIT 30').all()
-      .filter((x) => !q || String(x.name).toLowerCase().includes(q) || String(x.code).toLowerCase().includes(q));
-    const payslips = !canAny(c.user, ...SEES_PAYROLL) ? [] : db.prepare('SELECT payslip_code, employee_name, department, net_salary FROM hr_signed_payslips LIMIT 20').all()
-      .filter((p) => !q || String(p.employee_name).toLowerCase().includes(q) || String(p.payslip_code).toLowerCase().includes(q));
+    const like = `%${String(c.query.q || '').trim().replace(/[\\%_]/g, '\\$&')}%`;
+    const students = !c.user.can('student:read') ? [] : db.prepare("SELECT id, username, display_name, student_no, program FROM users WHERE role = 'student' AND (display_name ILIKE ? ESCAPE '\\' OR student_no ILIKE ? ESCAPE '\\') ORDER BY id LIMIT 8").all(like, like);
+    const courses = db.prepare("SELECT id, code, name, instructor FROM courses WHERE name ILIKE ? ESCAPE '\\' OR code ILIKE ? ESCAPE '\\' ORDER BY id LIMIT 8").all(like, like);
+    const payslips = !canAny(c.user, ...SEES_PAYROLL) ? [] : db.prepare("SELECT payslip_code, employee_name, department, net_salary FROM hr_signed_payslips WHERE employee_name ILIKE ? ESCAPE '\\' OR payslip_code ILIKE ? ESCAPE '\\' ORDER BY id DESC LIMIT 6").all(like, like);
 
-    c.json(200, { students: students.slice(0, 8), courses: courses.slice(0, 8), payslips: payslips.slice(0, 6) });
+    c.json(200, { students, courses, payslips });
   });
 }

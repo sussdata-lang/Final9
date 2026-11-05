@@ -233,9 +233,9 @@ test('مسارات الوحدات الموسعة وشؤون الطلاب وال�
   const roomId = Number(app.db.prepare("INSERT INTO dorm_rooms (building_name, room_no, capacity, occupied) VALUES ('م', '1', 2, 0)").run().lastInsertRowid);
   assert.equal((await c.call('POST', '/api/housing/allocations', { cookie: adm, body: { student_no: 'STU-1', room_id: 999999 } })).status, 400, 'لا إسكان في غرفة غير موجودة');
   for (const [u, body, expected] of [
-    ['/api/research/projects', { title: 'بحث' }, 201], ['/api/alumni/jobs', { title: 'وظيفة' }, 201], ['/api/qa/kpis', { title: 'مؤشر' }, 201],
+    ['/api/research/projects', { title: 'بحث' }, 201], ['/api/alumni/jobs', { title: 'وظيفة', deadline: '2030-01-01' }, 201], ['/api/qa/kpis', { title: 'مؤشر' }, 201],
     ['/api/expansions/exams', { course_code: 'X-1', course_name: 'x' }, 201],
-    ['/api/expansions/appraisals', { employee_name: 'x' }, 201],
+    ['/api/expansions/appraisals', { employee_name: 'x', period_label: 'التقييم السنوي' }, 201],
     ['/api/expansions/biometrics/sync', {}, 200], ['/api/devops/incidents', { error_message: 'x' }, 201],
   ]) {
     assert.equal((await c.call('POST', u, { cookie: adm, body })).status, expected, `${u} للمدير`);

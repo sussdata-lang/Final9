@@ -1,11 +1,11 @@
 // تعديل وحذف الذمم وقواعد الفحص الآلي (كانت تُنشأ وتُعطَّل فقط)
+import { bad } from '../validate.js';
 import { tx } from '../db.js';
 import { audit } from '../audit.js';
 import { HttpError } from '../http.js';
 import { cleanRuleParams } from './rules.js';
 
 const HOLD_TYPES = ['financial', 'disciplinary', 'library'];
-const bad = (m) => new HttpError(400, m, 'validation');
 
 export function updateHold({ db }, actor, id, b, ip) {
   const h = db.prepare('SELECT h.*, u.student_no FROM student_holds h JOIN users u ON u.id = h.student_id WHERE h.id = ?').get(Number(id));

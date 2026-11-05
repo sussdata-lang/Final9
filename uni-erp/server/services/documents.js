@@ -9,7 +9,7 @@ import { buildView } from './transcriptmodel.js';
 
 const r1 = (n) => Math.round(n * 10) / 10;
 // شعار الكلية الاختياري يوضع في public/brand/faculties/<الرمز>.svg أو .png؛ وإلا يُستعمل شعار الجامعة
-export function facultyLogo(cfg, code) {
+function facultyLogo(cfg, code) {
   if (!code || !/^[A-Z]{2,8}$/.test(code)) return null;
   for (const ext of ['svg', 'png']) if (fs.existsSync(path.join(cfg?.publicDir || '', 'brand', 'faculties', `${code}.${ext}`))) return `/brand/faculties/${code}.${ext}`;
   return null;
@@ -25,7 +25,7 @@ const sign = (cfg, hash, code) => hmac(cfg.signingKey, `${hash}|${code}`);
 
 // بيانات كشف العلامات: كل محاولة بسنتها وفصلها وعلاماتها؛ أحدث محاولة لكل مقرر تُحتسب في المعدل وما قبلها يُعلَّم «سابقة»
 // (نفس منطق شاشة «علاماتي»). تبقى الحقول القديمة (term, course, hours, mark, average) كما هي لتوافق الوثائق السابقة.
-export function transcriptData(db, studentId) {
+function transcriptData(db, studentId) {
   const rows = db.prepare(`SELECT g.id, g.term, g.course, g.hours, g.mark, g.course_id, g.level, g.semester, g.academic_year, g.theory_mark, g.practical_mark, c.code ccode
     FROM grades g LEFT JOIN courses c ON c.id = g.course_id WHERE g.student_id = ? AND g.workflow_status = 'approved'
     ORDER BY COALESCE(g.level, 99), COALESCE(g.semester, 9), g.course, g.academic_year DESC, g.id DESC`).all(studentId);

@@ -1,4 +1,6 @@
 import { tx } from '../db.js';
+import { amount, isoDay, required } from '../validate.js';
+import { nextNumber } from './numbering.js';
 // منظومة شؤون الموظفين المتكاملة (HR Integrated System — تدمج كافة الجداول مع الموجود حالياً دون أي تعارض)
 import { HttpError } from '../http.js';
 import { audit } from '../audit.js';
@@ -171,12 +173,12 @@ export function buildHrProOverview(db, refDateStr = DEFAULT_REF_DATE, options = 
       employeeId: ab.employee_id,
       employeeNo: ab.employeeNo,
       employeeName: ab.employeeName,
-      department: ab.department_name || ab.unitName || 'الموارد البشرية',
+      department: ab.department_name || ab.unitName || '',
       reason: ab.reason,
       absenceDays: calc.absenceDays,
       dailyRate: ab.daily_rate > 0 ? Number(ab.daily_rate) : calc.dailyRate,
       totalDeduction: Number(ab.total_deduction) || 0,
-      month: ab.month || 'يونيو',
+      month: ab.month || '',
       statusNote: calc.statusNote,
     };
   });
@@ -659,7 +661,7 @@ export function registerHrIntegratedRoutes(r, { db, cfg }) {
     if (!c.user.can('hr:manage') && c.user.role !== 'admin') throw new HttpError(403, 'لا تملك صلاحية هذا الإجراء.');
     const b = c.body ?? {};
     const name = clean(b.name, 100);
-    const employeeNo = clean(b.employeeNo || String(Date.now()).slice(-4), 30);
+    const employeeNo = clean(b.employeeNo || `EMP-${nextNumber(db, 'hr_employees', 'SELECT COUNT(*) FROM hr_employees')}`, 30);
     if (!name) throw new HttpError(400, 'اسم الموظف مطلوب.');
     const existing = db.prepare('SELECT id FROM hr_employees WHERE employeeNo = ?').get(employeeNo);
     if (existing) throw new HttpError(400, 'كود الموظف مسجّل مسبقاً.');
@@ -698,12 +700,12 @@ export function registerHrIntegratedRoutes(r, { db, cfg }) {
       employeeNo,
       name,
       personalId,
-      clean(b.email || `${employeeNo}@suss.edu.sy`, 100),
-      clean(b.phone || '0944000000', 30),
+      clean(b.email, 100),
+      clean(b.phone, 30),
       hireDate,
       statusDb,
       unitId,
-      clean(b.position || 'اداري', 80),
+      clean(b.position, 80),
       baseSalary,
       hireDate,
       housingAllowance,
@@ -713,7 +715,7 @@ export function registerHrIntegratedRoutes(r, { db, cfg }) {
       Number(b.annualLeaveQuota || settings.default_annual_leave_days || 21),
       insuranceAmount,
       taxAmount,
-      clean(b.department || 'الموارد البشرية', 80),
+      clean(b.department, 80),
       now,
       now
     );
@@ -799,7 +801,7 @@ export function registerHrIntegratedRoutes(r, { db, cfg }) {
       Number(settings.attendance_excellent_pct ?? 95),
       Number(settings.attendance_good_pct ?? 85)
     );
-    const month = clean(b.month || '2026-10', 20);
+    const month = required(b.month, 'الشهر', 20);
     const lateHours = Number(b.lateHours) || 0;
 
     db.prepare(`
@@ -828,7 +830,7 @@ export function registerHrIntegratedRoutes(r, { db, cfg }) {
     const emp = db.prepare('SELECT * FROM hr_employees WHERE id = ?').get(employeeId);
     if (!emp) throw new HttpError(404, 'الموظف غير موجود.');
     const { map: settings } = getHrAlertSettingsMap(db);
-    const reason = clean(b.reason || 'تأخير متكرر', 80);
+    const reason = required(b.reason, 'السبب', 80);
     const calc = calcAbsenceDeduction(
       emp.salary_base,
       b.absenceDays,
@@ -836,7 +838,7 @@ export function registerHrIntegratedRoutes(r, { db, cfg }) {
       Number(settings.salary_day_divisor ?? 30),
       Number(settings.absence_review_threshold_days ?? 3)
     );
-    const month = clean(b.month || 'أكتوبر', 30);
+    const month = required(b.month, 'الشهر', 30);
     const res = db.prepare(`
       INSERT INTO hr_absences (employee_id, reason, absence_days, daily_rate, total_deduction, month, month_code, status_note, created_at)
       VALUES (?, ?, ?, ?, ?, ?, '2026-10', ?, ?)
@@ -934,8 +936,8 @@ export function registerHrIntegratedRoutes(r, { db, cfg }) {
     const employeeId = Number(b.employeeId);
     const emp = db.prepare('SELECT * FROM hr_employees WHERE id = ?').get(employeeId);
     if (!emp) throw new HttpError(404, 'الموظف غير موجود.');
-    const countRow = db.prepare('SELECT COUNT(*) c FROM hr_advances').get().c;
-    const advanceCode = clean(b.advanceCode || `a${101 + countRow + Math.floor(Math.random() * 10)}`, 20);
+    const advanceCode = clean(b.advanceCode, 20) || `a${nextNumber(db, 'hr_advances', 'SELECT COUNT(*) + 100 FROM hr_advances')}`;
+    if (db.prepare('SELECT 1 AS x FROM hr_advances WHERE advance_code = ?').get(advanceCode)) throw new HttpError(409, 'رمز السلفة مستخدم.', 'conflict');
     const calc = calcAdvanceMetrics(b.amount, b.installmentsCount, b.paidInstallments || 0, b.status || 'مستحقة');
     const advanceDate = clean(b.advanceDate || new Date().toISOString().slice(0, 10), 20);
 
@@ -976,9 +978,9 @@ export function registerHrIntegratedRoutes(r, { db, cfg }) {
     const emp = db.prepare('SELECT * FROM hr_employees WHERE id = ?').get(employeeId);
     if (!emp) throw new HttpError(404, 'الموظف غير موجود.');
     const contractTypeAr = clean(b.contractTypeAr || 'دوام كامل', 50);
-    const startDate = clean(b.startDate || '2026-10-11', 20);
-    const endDate = clean(b.endDate || '2027-10-11', 20);
-    const salary = Number(b.salary || emp.salary_base || 5000);
+    const startDate = isoDay(b.startDate, 'تاريخ البداية');
+    const endDate = isoDay(b.endDate, 'تاريخ النهاية');
+    const salary = amount(b.salary || emp.salary_base, 'الراتب', { min: 1 });
     const { map: settings } = getHrAlertSettingsMap(db);
     const m = calcContractMetrics(startDate, endDate, DEFAULT_REF_DATE, Number(settings.contract_expiry_warning_days ?? 60), Number(settings.contract_expiry_critical_days ?? 15));
 
@@ -999,8 +1001,8 @@ export function registerHrIntegratedRoutes(r, { db, cfg }) {
     const ct = db.prepare('SELECT * FROM hr_contracts WHERE id = ?').get(id);
     if (!ct) throw new HttpError(404, 'العقد غير موجود.');
     const b = c.body ?? {};
-    const newStart = clean(b.startDate || '2026-10-11', 20);
-    const newEnd = clean(b.endDate || '2027-10-11', 20);
+    const newStart = isoDay(b.startDate, 'تاريخ البداية');
+    const newEnd = isoDay(b.endDate, 'تاريخ النهاية');
     const newSalary = b.salary !== undefined ? Number(b.salary) : ct.salary;
     const contractTypeAr = clean(b.contractTypeAr || ct.contract_type_ar || 'دوام كامل', 50);
     const { map: settings } = getHrAlertSettingsMap(db);

@@ -1,4 +1,5 @@
 import { tx } from '../db.js';
+import { bad } from '../validate.js';
 import { audit } from '../audit.js';
 import { HttpError } from '../http.js';
 
@@ -7,8 +8,7 @@ export const BUILTIN = new Set(['attendance', 'transcript', 'excellence_year', '
 const TYPES = ['text', 'textarea', 'select', 'number', 'decimal', 'date', 'ref'];
 const REFS = ['program', 'my_course', 'my_grade'];
 const AUDIENCES = ['student', 'staff', 'both'];
-export const MAX_FIELDS = 16;
-const bad = (m) => new HttpError(400, m, 'validation');
+const MAX_FIELDS = 16;
 
 function parseCommon(db, input) {
   const label = String(input?.label ?? '').replace(/\s+/g, ' ').trim();

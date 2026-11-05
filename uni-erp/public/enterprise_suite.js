@@ -274,10 +274,10 @@
       <section class="es-card">
         <h2><span>📚 بوابة التسجيل الذاتي للمقررات الدراسية (Self-Enrollment)</span><span class="es-num">ميزة #5</span></h2>
         <p class="sub">تسجيل مباشر للمقررات مع التحقق الآلي من الساعات المعتمدة والمتطلبات السابقة وبراءة الذمة المالية.</p>
-        <form id="es-enroll-form" class="inline-form" style="margin-bottom:14px">
+        ${UA.S.me.role === 'student' ? `<form id="es-enroll-form" class="inline-form" style="margin-bottom:14px">
           <label>المقرر المتاح للتسجيل<select id="es-enr-course" required>${(D.enrollableCourses || []).length ? (D.enrollableCourses || []).map((c) => `<option value="${esc(c.code)}">${esc(c.code)} — ${esc(c.name)} (${c.hours} س)</option>`).join('') : '<option value="">لا توجد مقررات متاحة</option>'}</select></label>
           <button class="btn pri" type="submit">تسجيل المقرر في الفصل الحالي</button>
-        </form>
+        </form>` : '<p class="small">يسجّل الطالب مقرراته من حسابه.</p>'}
         <div class="tbl-wrap">
           <table>
             <thead><tr><th>رمز المقرر</th><th>اسم المقرر</th><th>الساعات</th><th>المتطلب السابق</th><th>الفصل الدراسي</th><th>الحالة</th></tr></thead>

@@ -18,7 +18,7 @@ const studentRow = (db, no) => {
 };
 const genderFits = (profile, building) => !profile || building === (/أنث|إناث|female/i.test(profile) ? 'إناث' : 'ذكور');
 
-export function housingOverview({ db }, user) {
+function housingOverview({ db }, user) {
   const buildings = db.prepare('SELECT * FROM dorm_buildings ORDER BY name').all();
   const rooms = db.prepare(`SELECT r.*, b.id AS building_id, b.gender, (SELECT COUNT(*) FROM dorm_allocations a WHERE a.room_id = r.id AND ${RESIDENT}) AS residents
     FROM dorm_rooms r LEFT JOIN dorm_buildings b ON b.name = r.building_name ORDER BY r.building_name, r.room_no`).all();
@@ -36,7 +36,7 @@ const buildingFields = (b) => {
   if (!['ذكور', 'إناث'].includes(gender)) throw bad('حدد قسم المبنى: ذكور أو إناث.');
   return { name, gender, notes: clean(b?.notes, 300) };
 };
-export function createBuilding({ db }, user, b, ip) {
+function createBuilding({ db }, user, b, ip) {
   const f = buildingFields(b);
   if (db.prepare('SELECT 1 AS x FROM dorm_buildings WHERE name = ?').get(f.name)) throw bad('يوجد مبنى بهذا الاسم.');
   const id = Number(db.prepare('INSERT INTO dorm_buildings (name, gender, notes, created_at) VALUES (?, ?, ?, ?)').run(f.name, f.gender, f.notes, Date.now()).lastInsertRowid);
@@ -56,7 +56,7 @@ function addRooms(db, building, count, capacity) {
   }
   return added;
 }
-export function updateBuilding({ db }, user, id, b, ip) {
+function updateBuilding({ db }, user, id, b, ip) {
   const cur = db.prepare('SELECT * FROM dorm_buildings WHERE id = ?').get(Number(id));
   if (!cur) throw new HttpError(404, 'المبنى غير موجود.', 'not_found');
   const f = buildingFields(b);
@@ -70,7 +70,7 @@ export function updateBuilding({ db }, user, id, b, ip) {
   audit(db, user, 'تعديل مبنى سكن', f.name, ip);
   return { ok: true };
 }
-export function deleteBuilding({ db }, user, id, ip) {
+function deleteBuilding({ db }, user, id, ip) {
   const cur = db.prepare('SELECT * FROM dorm_buildings WHERE id = ?').get(Number(id));
   if (!cur) throw new HttpError(404, 'المبنى غير موجود.', 'not_found');
   if (db.prepare(`SELECT 1 AS x FROM dorm_allocations a JOIN dorm_rooms r ON r.id = a.room_id WHERE r.building_name = ? AND ${RESIDENT} LIMIT 1`).get(cur.name)) throw bad('في المبنى ساكنون؛ انقلهم أولاً.');
@@ -83,7 +83,7 @@ export function deleteBuilding({ db }, user, id, ip) {
 }
 
 /* ---------- الغرف ---------- */
-export function saveRoom({ db }, user, id, b, ip) {
+function saveRoom({ db }, user, id, b, ip) {
   const roomNo = clean(b?.room_no, 20), capacity = Number(b?.capacity), floor = Number(b?.floor_no) || 1, type = clean(b?.room_type, 40) || 'جماعية', status = clean(b?.status, 20) || 'متاحة';
   if (!roomNo) throw bad('رقم الغرفة مطلوب.');
   if (!(capacity >= 1 && capacity <= 30)) throw bad('السعة بين 1 و30.');
@@ -104,7 +104,7 @@ export function saveRoom({ db }, user, id, b, ip) {
   audit(db, user, 'إضافة غرفة سكن', `${building} ${roomNo}`, ip);
   return { id: nid };
 }
-export function deleteRoom({ db }, user, id, ip) {
+function deleteRoom({ db }, user, id, ip) {
   const cur = db.prepare('SELECT * FROM dorm_rooms WHERE id = ?').get(Number(id));
   if (!cur) throw new HttpError(404, 'الغرفة غير موجودة.', 'not_found');
   if (db.prepare(`SELECT 1 AS x FROM dorm_allocations a WHERE a.room_id = ? AND ${RESIDENT} LIMIT 1`).get(cur.id)) throw bad('في الغرفة ساكنون؛ انقلهم أولاً.');
@@ -125,7 +125,7 @@ function roomForResident(db, roomId, student, exceptAlloc = 0) {
 }
 const syncOccupied = (db, roomId) => db.prepare(`UPDATE dorm_rooms SET occupied = (SELECT COUNT(*) FROM dorm_allocations a WHERE a.room_id = ? AND ${RESIDENT}) WHERE id = ?`).run(Number(roomId), Number(roomId));
 
-export function allocate({ db }, user, b, ip) {
+function allocate({ db }, user, b, ip) {
   const st = studentRow(db, b?.student_no);
   if (db.prepare(`SELECT 1 AS x FROM dorm_allocations a WHERE a.student_no = ? AND ${RESIDENT} LIMIT 1`).get(st.student_no)) throw bad('هذا الطالب مسكَّن بالفعل؛ انقله من جدول الساكنين.');
   const room = roomForResident(db, b?.room_id, st);
@@ -138,7 +138,7 @@ export function allocate({ db }, user, b, ip) {
   audit(db, user, 'تسكين طالب', `${st.student_no} ← ${room.building_name} ${room.room_no}`, ip);
   return { id };
 }
-export function moveResident({ db }, user, id, b, ip) {
+function moveResident({ db }, user, id, b, ip) {
   const a = db.prepare(`SELECT * FROM dorm_allocations a WHERE a.id = ? AND ${RESIDENT}`).get(Number(id));
   if (!a) throw new HttpError(404, 'لا يوجد ساكن بهذا السجل.', 'not_found');
   const st = studentRow(db, a.student_no), room = roomForResident(db, b?.room_id, st, a.id);
@@ -149,7 +149,7 @@ export function moveResident({ db }, user, id, b, ip) {
   audit(db, user, 'نقل طالب بين الغرف', `${a.student_no} ← ${room.building_name} ${room.room_no}`, ip);
   return { ok: true };
 }
-export function checkOut({ db }, user, id, ip) {
+function checkOut({ db }, user, id, ip) {
   const a = db.prepare(`SELECT * FROM dorm_allocations a WHERE a.id = ? AND ${RESIDENT}`).get(Number(id));
   if (!a) throw new HttpError(404, 'لا يوجد ساكن بهذا السجل.', 'not_found');
   tx(db, () => {
@@ -170,14 +170,14 @@ const handoutFields = (db, b) => {
   const place = db.prepare(`SELECT r.building_name, r.room_no FROM dorm_allocations a JOIN dorm_rooms r ON r.id = a.room_id WHERE a.student_no = ? AND ${RESIDENT} LIMIT 1`).get(st.student_no);
   return { st, items, room: place ? `${place.building_name} / ${place.room_no}` : '', note: clean(b?.note, 300), day: clean(b?.handed_day, 10) || today(), returned: clean(b?.returned_day, 10) || null };
 };
-export function createHandout({ db }, user, b, ip) {
+function createHandout({ db }, user, b, ip) {
   const f = handoutFields(db, b), no = docNo('HND');
   const id = Number(db.prepare('INSERT INTO housing_handouts (handout_no, student_no, student_name, faculty_name, room_label, items_json, note, handed_day, returned_day, handed_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
     .run(no, f.st.student_no, f.st.display_name, f.st.faculty ?? '', f.room, JSON.stringify(f.items), f.note, f.day, f.returned, user.display_name, Date.now()).lastInsertRowid);
   audit(db, user, 'تسليم مواد سكن', `${f.st.student_no} / ${f.items.length} مادة`, ip);
   return { id, handoutNo: no };
 }
-export function updateHandout({ db }, user, id, b, ip) {
+function updateHandout({ db }, user, id, b, ip) {
   const cur = db.prepare('SELECT * FROM housing_handouts WHERE id = ?').get(Number(id));
   if (!cur) throw new HttpError(404, 'السجل غير موجود.', 'not_found');
   const f = handoutFields(db, b);
@@ -186,7 +186,7 @@ export function updateHandout({ db }, user, id, b, ip) {
   audit(db, user, 'تعديل سجل مواد سكن', cur.handout_no, ip);
   return { ok: true };
 }
-export function deleteHandout({ db }, user, id, ip) {
+function deleteHandout({ db }, user, id, ip) {
   const cur = db.prepare('SELECT * FROM housing_handouts WHERE id = ?').get(Number(id));
   if (!cur) throw new HttpError(404, 'السجل غير موجود.', 'not_found');
   db.prepare('DELETE FROM housing_handouts WHERE id = ?').run(cur.id);

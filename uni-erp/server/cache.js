@@ -241,6 +241,16 @@ export function cacheGetOrSet(db, namespace, key, computeFn, ttlMs) {
   return val;
 }
 
+export async function cacheGetOrSetAsync(db, namespace, key, computeFn, ttlMs) {
+  const ns = getNamespaces(db)[namespace];
+  if (!ns) return computeFn();
+  const hit = ns.get(key);
+  if (hit !== undefined) return hit;
+  const val = await computeFn();
+  ns.set(key, val, ttlMs);
+  return val;
+}
+
 /* ============================================================================
    1. التخزين المؤقت للوحدات التنظيمية وشجرتها وروابط الإحالة (O(1) Org Units Cache)
    ============================================================================ */
@@ -373,7 +383,7 @@ export function getCachedStaffUsersMap(db) {
    3. التخزين المؤقت للإعدادات العامة والفهارس المرجعية (Settings & Catalogs Cache)
    ============================================================================ */
 
-export function getSettingsSnapshot(db) {
+function getSettingsSnapshot(db) {
   return cacheGetOrSet(db, 'settings', 'site_settings:map', () => {
     const map = new Map();
     try {

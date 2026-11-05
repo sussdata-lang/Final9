@@ -14,7 +14,7 @@ const ext = (id, critical, valueDer) => D.seq(D.oid(id), ...(critical ? [D.bool(
 const pem = (der, label) => `-----BEGIN ${label}-----\n${der.toString('base64').replace(/.{1,64}/g, '$&\n')}-----END ${label}-----\n`;
 
 /* ---------- الهوية ---------- */
-export function generateSelfSigned({ cn, org, years = 5 }) {
+function generateSelfSigned({ cn, org, years = 5 }) {
   const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
   const spki = publicKey.export({ type: 'spki', format: 'der' }), subject = name([['C', 'SY'], ['O', org], ['OU', 'Student Records'], ['CN', cn]]);
   const from = new Date(Date.now() - 3600_000), to = new Date(from.getTime() + years * 365 * 86400_000);
@@ -85,11 +85,11 @@ export function signDetached(id, digest, { signingTime = new Date(), tsToken = n
 export function withTimestamp(id, digest, opts, tsToken) { return signDetached(id, digest, { ...opts, tsToken }); }
 
 /* ---------- RFC 3161 ---------- */
-export function timestampRequest(hash) {
+function timestampRequest(hash) {
   return D.seq(D.int(1), D.seq(D.seq(D.oid(O.sha256), D.nul()), D.octet(hash)), D.int(crypto.randomBytes(8)), D.bool(true));
 }
 // يُرجع { token (DER), time (Date) } أو يرمي. يتحقق من أن بصمة الرد تطابق المطلوب.
-export function parseTimestampResponse(buf, hash) {
+function parseTimestampResponse(buf, hash) {
   const top = D.read(buf), [status, token] = D.children(top);
   const st = D.value(D.children(status)[0]); if (!(st.length && (st[st.length - 1] === 0 || st[st.length - 1] === 1))) throw new Error('رفضت جهة الختم الزمني الطلب.');
   if (!token) throw new Error('رد الختم الزمني بلا رمز.');

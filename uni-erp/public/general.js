@@ -136,8 +136,8 @@
       const ta = $id(fid(d.k));
       const cur = ta ? ta.value.split('\n').map((x) => x.trim()).filter(Boolean) : [];
       const idx = Number(d.i);
-      const next = prompt('تعديل نص الخيار في القائمة المنسدلة:', cur[idx] || '');
-      if (next === null || !next.trim()) return;
+      const next = await askText('تعديل الخيار', { label: 'نص الخيار في القائمة المنسدلة', value: cur[idx] || '' });
+      if (!next) return;
       cur[idx] = next.trim();
       await saveSingleList(d.k, cur);
     },

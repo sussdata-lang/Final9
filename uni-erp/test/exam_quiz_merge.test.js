@@ -125,7 +125,7 @@ test('المدخلان القديمان حُذفا من المواد والعل�
 });
 
 test('رقم جامعي غير موجود يعيد رسالة مفهومة لا خطأ داخلياً', async () => {
-  const r = await call(adm, 'POST', '/api/expansions/office-bookings', { faculty_name: 'د', student_name: 'ط', student_no: 'NO-SUCH', topic: 'ت' });
+  const r = await call(adm, 'POST', '/api/expansions/office-bookings', { faculty_name: 'د', student_name: 'ط', student_no: 'NO-SUCH', topic: 'ت', slot_day: 'الإثنين', slot_time: '10:00' });
   assert.equal(r.status, 400);
   assert.match((await r.json()).message, /الرقم الجامعي/);
 });

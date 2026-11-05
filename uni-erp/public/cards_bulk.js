@@ -135,7 +135,7 @@
       if (st) UA.printHtml([UA.digitalCardHtml(st)], { card: true });
     },
     'card-batch': async () => {
-      const label = window.prompt('اسم الدفعة (مثال: بطاقات السنة الأولى 2026)');
+      const label = await askText('دفعة بطاقات جديدة', { label: 'اسم الدفعة', placeholder: 'بطاقات السنة الأولى 2026', submit: 'إنشاء الدفعة' });
       if (!label) return;
       try { const r = await api('POST', '/api/cards/batches', { label, filters: C.filters }); C.detail = await api('GET', `/api/cards/batches/${r.id}`); C.batches = (await api('GET', '/api/cards/batches')).batches; toast(`أُنشئت الدفعة (${r.total} بطاقة)`); UA.render(); }
       catch (e) { if (!e.status) throw e; toast(e.message); }
@@ -143,7 +143,7 @@
     'card-open': async (el, d) => { try { C.q = ''; C.detail = await api('GET', `/api/cards/batches/${d.id}`); UA.render(); } catch (e) { if (!e.status) throw e; toast(e.message); } },
     'card-close': () => { C.detail = null; UA.render(); },
     'card-give': async (el, d) => {
-      const receiver = window.prompt('اسم المستلم', d.name);
+      const receiver = await askText('تسجيل استلام البطاقة', { label: 'اسم المستلم', value: d.name, submit: 'تسجيل الاستلام' });
       if (!receiver) return;
       try { await api('POST', `/api/cards/handovers/${d.id}/receive`, { receiver }); await reloadDetail(); toast('سُجّل الاستلام'); }
       catch (e) { if (!e.status) throw e; toast(e.message); }

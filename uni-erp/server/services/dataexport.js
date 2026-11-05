@@ -15,7 +15,7 @@ const HOLD_LABEL = { financial: 'مالية', disciplinary: 'تأديبية', li
 const semLabel = (n) => (n === 1 ? 'الفصل الأول' : n === 2 ? 'الفصل الثاني' : '');
 const day = (ms) => (ms ? new Date(ms).toISOString().slice(0, 10) : '');
 
-export const DATASETS = [
+const DATASETS = [
   { id: 'students', label: 'الطلاب وسجلاتهم الكاملة', hint: 'كل بيانات الملف الشخصي والقيد وعدد الذمم' },
   { id: 'grades', label: 'العلامات', hint: 'حسب العام الدراسي والسنة والفصل' },
   { id: 'courses', label: 'المواد', hint: 'دليل المواد لكل برنامج وسنة وفصل' },
@@ -29,10 +29,10 @@ export const DATASETS = [
   { id: 'lectures', label: 'المحاضرات والمحتوى الرقمي', hint: 'مع الجهة المستهدفة' },
   { id: 'all', label: 'كل البيانات معاً', hint: 'مصنّف واحد بكل ما سبق' },
 ];
-export const FORMATS = ['xlsx', 'csv', 'json', 'docx'];
+const FORMATS = ['xlsx', 'csv', 'json', 'docx'];
 
 const int = (v) => { const n = Number(v); return Number.isInteger(n) && n > 0 ? n : null; };
-export function parseFilters(q = {}) {
+function parseFilters(q = {}) {
   const f = { faculty: int(q.faculty), program: int(q.program), level: int(q.level), semester: [1, 2].includes(Number(q.semester)) ? Number(q.semester) : null,
     academicYear: /^\d{4}\/\d{4}$/.test(String(q.academicYear ?? '')) ? String(q.academicYear) : null, status: STATUS_LABEL[q.status] ? q.status : null, enrollYear: int(q.enrollYear),
     akind: HALL_KINDS[q.akind] ? q.akind : null, ahall: q.ahall ? String(q.ahall).slice(0, 60) : null, acourse: int(q.acourse), astate: ['open', 'closed'].includes(q.astate) ? q.astate : null,
@@ -154,7 +154,7 @@ function lecturesSet(db) {
 
 const BUILD = { students: studentsSet, grades: gradesSet, courses: coursesSet, requests: requestsSet, holds: holdsSet, complaints: complaintsSet, attendance: attendanceSet, housing: housingSet, handouts: handoutsSet, quizzes: quizzesSet, lectures: lecturesSet };
 
-export function buildSets(db, dataset, filters) {
+function buildSets(db, dataset, filters) {
   const ids = dataset === 'all' ? Object.keys(BUILD) : [dataset];
   if (!ids.every((i) => BUILD[i])) throw new HttpError(400, 'مجموعة بيانات غير معروفة.', 'validation');
   const sets = ids.map((i) => BUILD[i](db, filters));

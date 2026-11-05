@@ -166,7 +166,6 @@ export const PERMISSION_CATALOG = [
 ];
 
 export const ASSIGNABLE = new Set(PERMISSION_CATALOG.flatMap((g) => g.items.map((i) => i.key)));
-export const PERMISSION_LABEL = Object.fromEntries(PERMISSION_CATALOG.flatMap((g) => g.items.map((i) => [i.key, i.label])));
 
 // مصفوفة أقسام المنصة الـ 14 مع تقسيم العمليات الخمس (عرض / كتابة / تعديل / اعتماد / حذف وتصدير)
 export const PLATFORM_MODULES_MATRIX = [
@@ -612,7 +611,6 @@ export const DEPARTMENT_ROLE_PRESETS = [
   },
 ];
 
-export const DEPARTMENT_PRESETS = DEPARTMENT_ROLE_PRESETS;
 for (const pr of DEPARTMENT_ROLE_PRESETS) {
   const pSet = new Set(pr.permissions || []);
   const modAcc = {};
@@ -788,24 +786,6 @@ export function resolveEffectivePermissions({
   return [...combined];
 }
 
-export function computeEffectivePermissions({
-  baseRolePerms = [],
-  unitDefaultPerms = [],
-  accessMode = 'role',
-  moduleAccess = {},
-  customPerms = [],
-  revokedPerms = [],
-} = {}) {
-  return resolveEffectivePermissions({
-    basePermissions: baseRolePerms,
-    unitPermissions: unitDefaultPerms,
-    accessMode,
-    moduleAccess,
-    customPermissions: customPerms,
-    revokedPermissions: revokedPerms,
-  });
-}
-
 /**
  * يستنتج مصفوفة حالة الأقسام (عرض/كتابة/تعديل/اعتماد/حذف) من قائمة صلاحيات فعلية
  */
@@ -821,7 +801,7 @@ export function buildModuleAccessState(effectivePerms = []) {
   return state;
 }
 
-export function deriveModuleAccessFromPermissions(perms = []) {
+function deriveModuleAccessFromPermissions(perms = []) {
   const set = new Set(Array.isArray(perms) ? perms : []);
   const result = {};
   for (const mod of PLATFORM_MODULES_MATRIX) {
@@ -1038,40 +1018,6 @@ function permissionsFromRow(db, u) {
   });
 }
 
-export function effectiveAccessProfile(db, u) {
-  if (!u) {
-    return {
-      accessMode: 'role',
-      dataScope: 'unit',
-      allowedViews: [],
-      moduleState: {},
-      capabilities: { viewCount: 0, writeCount: 0, editCount: 0, approveCount: 0, deleteCount: 0, totalModules: PLATFORM_MODULES_MATRIX.length, activeModules: [] },
-    };
-  }
-  const perms = effective(db, u);
-  const explicitViews = safeJsonParse(u.allowed_views_json, []);
-  let unitViews = [];
-  if (u.unit_id && explicitViews.length === 0) {
-    try {
-      const uRow = getCachedUnitById(db, u.unit_id);
-      unitViews = safeJsonParse(uRow?.allowed_views_json, []);
-    } catch {
-      unitViews = [];
-    }
-  }
-  const allowedViews = computeAllowedViews(perms, explicitViews.length > 0 ? explicitViews : unitViews, u.role, u.role === 'student' ? studentViewsOf(db, u.id) : null);
-  return {
-    accessMode: u.access_mode || 'role',
-    dataScope: u.data_scope || (u.role === 'admin' ? 'all' : 'unit'),
-    allowedViews,
-    explicitAllowedViews: explicitViews,
-    customPermissions: safeJsonParse(u.custom_permissions_json, []),
-    revokedPermissions: safeJsonParse(u.revoked_permissions_json, []),
-    moduleAccess: safeJsonParse(u.module_access_json, {}),
-    moduleState: buildModuleAccessState(perms),
-    capabilities: summarizeOperationCapabilities(perms),
-  };
-}
 
 export function roleLabel(db, u) {
   let lbl = ROLE_LABEL[u.role] ?? u.role;

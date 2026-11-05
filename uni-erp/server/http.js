@@ -22,9 +22,6 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=u
 export const COMPRESSIBLE_EXT = new Set(['.html', '.css', '.js', '.mjs', '.svg', '.json', '.webmanifest', '.ttf', '.otf', '.xml', '.txt', '.map']);
 const staticRamCache = new Map();
 
-export function invalidateStaticRamCache() {
-  staticRamCache.clear();
-}
 
 // ترويسات أمنية: لا سكربتات إلا من الموقع نفسه، ولا تضمين في إطارات، ولا تخمين لأنواع الملفات
 export const SECURITY_HEADERS = {
@@ -37,7 +34,7 @@ export const SECURITY_HEADERS = {
   'Permissions-Policy': 'camera=(self), microphone=(), geolocation=()',
 };
 
-export function originAllowed(cfg, req) {
+function originAllowed(cfg, req) {
   const origin = req.headers.origin;
   if (!origin) return true;
   if (origin === 'null') return false;
@@ -47,7 +44,7 @@ export function originAllowed(cfg, req) {
   return allowed.has(host);
 }
 
-export function parseCookies(header = '') {
+function parseCookies(header = '') {
   const out = {};
   for (const part of header.split(';')) {
     const i = part.indexOf('=');
@@ -150,7 +147,7 @@ async function readBody(req, limit) {
 }
 
 const ASYNC_COMPRESS_CHARS = 256 * 1024;
-export function sendJson(res, status, obj, headers = {}, req = null) {
+function sendJson(res, status, obj, headers = {}, req = null) {
   const bodyStr = JSON.stringify(obj);
   const acceptEncoding = req && req.headers ? String(req.headers['accept-encoding'] || '') : '';
   if (bodyStr.length > ASYNC_COMPRESS_CHARS && /\bbr\b/.test(acceptEncoding)) {
@@ -216,7 +213,7 @@ function serveStatic(cfg, pathname, req, res) {
   const versioned = /\.(js|css)$/.test(ext) && /[?&]v=/.test(req.url || '');
   const cacheControl = isImmutableFont
     ? 'public, max-age=86400, stale-while-revalidate=3600'
-    : versioned ? 'public, max-age=86400' : 'no-cache, must-revalidate';
+    : versioned ? 'public, max-age=2592000' : 'no-cache, must-revalidate';   // الرابط يتغير مع كل إصدار
 
   const staticSecHeaders = rel.startsWith('/archify/')
     ? {
@@ -284,6 +281,19 @@ export function startLoopWatch() {
   return () => { clearInterval(t); loopDelay.disable(); };
 }
 
+const routeTimes = new Map();
+function noteRoute(key, ms) {
+  let r = routeTimes.get(key);
+  if (!r) {
+    if (routeTimes.size >= 1000) routeTimes.clear();
+    r = { route: key, count: 0, totalMs: 0, maxMs: 0 };
+    routeTimes.set(key, r);
+  }
+  r.count++; r.totalMs += ms; if (ms > r.maxMs) r.maxMs = ms;
+}
+export const slowestRoutes = (limit = 20) => [...routeTimes.values()].sort((a, b) => b.totalMs - a.totalMs).slice(0, limit)
+  .map((r) => ({ route: r.route, count: r.count, totalMs: Math.round(r.totalMs), avgMs: Math.round((r.totalMs / r.count) * 10) / 10, maxMs: Math.round(r.maxMs) }));
+
 export function getHttpTelemetry() {
   const arr = httpTelemetry.recentLatenciesMs.slice().sort((a, b) => a - b);
   const pick = (p) => (arr.length ? Math.round(arr[Math.min(arr.length - 1, Math.floor(arr.length * p))] * 100) / 100 : 0.4);
@@ -340,7 +350,7 @@ export function makeHandler({ cfg, router, getUser }) {
       if (!url.pathname.startsWith('/api/')) {
         if (req.method !== 'GET' && req.method !== 'HEAD') throw new HttpError(405, 'الطريقة غير مسموحة.');
         // الخرائط المعمارية للموظفين فقط
-        if (url.pathname.startsWith('/archify/')) { const viewer = getUser(parseCookies(req.headers.cookie).sid); if (!viewer || viewer.role === 'student') throw new HttpError(404, 'غير موجود.', 'not_found'); }
+        if (url.pathname.startsWith('/archify/')) { const viewer = await getUser(parseCookies(req.headers.cookie).sid); if (!viewer || viewer.role === 'student') throw new HttpError(404, 'غير موجود.', 'not_found'); }
         if (serveStatic(cfg, url.pathname, req, res)) return;
         throw new HttpError(404, 'غير موجود.', 'not_found');
       }
@@ -352,8 +362,7 @@ export function makeHandler({ cfg, router, getUser }) {
       const ceiling = checkIpCeiling(req);
       if (ceiling.limited) throw tooMany(ceiling);
       const cookies = parseCookies(req.headers.cookie);
-      if (!cookies.sid && req.headers['x-session-token']) cookies.sid = String(req.headers['x-session-token']);
-      const user = getUser(cookies.sid);
+      const user = await getUser(cookies.sid);
       const rl = checkTieredRateLimit(req, user?.id ?? null);
       if (rl.limited) throw tooMany(rl);
 
@@ -363,6 +372,7 @@ export function makeHandler({ cfg, router, getUser }) {
         throw new HttpError(403, 'مصدر الطلب غير مسموح.', 'bad_origin');
       if (route.opts.auth !== false && !user) throw new HttpError(401, 'يلزم تسجيل الدخول.', 'unauthenticated');
       if (route.opts.auth !== false && user?.must_change_password && !route.opts.allowMustChange) throw new HttpError(403, 'يجب تغيير كلمة المرور المؤقتة أولاً.', 'password_change_required');
+      if (route.opts.auth !== false && user?.mfa_setup_required && !route.opts.allowMustChange) throw new HttpError(403, 'فعّل التحقق بخطوتين أولًا.', 'mfa_setup_required');
       const parsedBody = req.method === 'GET' ? {} : route.opts.upload ? await readUpload(req, route.opts.maxBody, cfg) : route.opts.raw ? await readRaw(req, route.opts.maxBody) : await readBody(req, route.opts.maxBody ?? 64 * 1024);
       // فحص WAF على الـ body بعد parse
       if (req._wafScanBody && typeof parsedBody === 'object' && !Buffer.isBuffer(parsedBody) && !route.opts.upload) {
@@ -377,12 +387,14 @@ export function makeHandler({ cfg, router, getUser }) {
       finally { if (route.opts.upload && parsedBody?.uploadPath) await fs.promises.rm(parsedBody.uploadPath, { force: true }).catch(() => {}); }
     } catch (e) {
       if (e instanceof HttpError) return sendJson(res, e.status, { error: e.code, message: e.message, ...(e.field ? { field: e.field } : {}) }, {}, req);
+      if (/duplicate key value violates unique constraint/.test(String(e?.message))) return sendJson(res, 409, { error: 'conflict', message: 'هذه القيمة مستخدمة مسبقًا؛ حدّث الصفحة وحاول مجددًا.' }, {}, req);
       if (/fk_\w+_student/.test(String(e?.message))) return sendJson(res, 400, { error: 'validation', message: 'الرقم الجامعي غير موجود في النظام.', field: 'student_no' }, {}, req);
       log.error(`${req.method} ${String(req.url).split('?')[0]}`, e);
       sendJson(res, 500, { error: 'internal', message: 'خطأ داخلي في الخادم.' }, {}, req);
     } finally {
       const dt = performance.now() - t0;
       httpTelemetry.recentLatenciesMs.push(dt);
+      if (url.pathname.startsWith('/api/')) noteRoute(`${req.method} ${url.pathname.replace(/\/\d+/g, '/:id')}`, dt);
       if (httpTelemetry.recentLatenciesMs.length > 500) httpTelemetry.recentLatenciesMs.shift();
     }
   };

@@ -516,7 +516,7 @@ export function getStudentAffairsSuiteOverview(deps, query = {}) {
 
 const LINK_PERMS = ['course:manage', 'sa_advising:edit'];
 // ربط مقررين في الخطة: المتطلب يجتازه الطالب قبل المقرر، ولا تُقبل حلقة تجعل مقرراً شرطاً لنفسه
-export function addCoursePrerequisite({ db }, actor, body, ip) {
+function addCoursePrerequisite({ db }, actor, body, ip) {
   requireSuitePerm(actor, ...LINK_PERMS);
   const courseId = Number(body?.courseId), prereqId = Number(body?.prereqCourseId), minMark = body?.minMark === undefined || body?.minMark === '' ? 60 : Number(body.minMark);
   if (!Number.isInteger(minMark) || minMark < 0 || minMark > 100) throw new HttpError(400, 'علامة الاجتياز عدد صحيح بين 0 و100.', 'validation');
@@ -539,7 +539,7 @@ export function addCoursePrerequisite({ db }, actor, body, ip) {
   audit(db, actor, 'ربط مقررين في الخطة الدراسية', `${prereq.name} ← ${course.name}`.slice(0, 100), ip);
   return { id };
 }
-export function removeCoursePrerequisite({ db }, actor, id, ip) {
+function removeCoursePrerequisite({ db }, actor, id, ip) {
   requireSuitePerm(actor, ...LINK_PERMS);
   const link = db.prepare('SELECT * FROM sa_course_prerequisites WHERE id = ?').get(Number(id));
   if (!link) throw new HttpError(404, 'الربط غير موجود.', 'not_found');
@@ -578,7 +578,7 @@ function studentOverview(data, studentId) {
 
 /* ---------- 1. عمليات القبول والمفاضلة والمعادلة ---------- */
 
-export function addAdmissionApplicant({ db }, actor, body, ip) {
+function addAdmissionApplicant({ db }, actor, body, ip) {
   requireSuitePerm(actor, 'sa_admissions:write', 'sa_admissions:approve', 'student:register');
   const fullName = String(body?.fullName || '').trim();
   const nationalId = String(body?.nationalId || '').trim();
@@ -757,7 +757,7 @@ export function addTransferEquivalence({ db }, actor, body, ip) {
 
 /* ---------- 2. عمليات الإرشاد الأكاديمي والإنذار المبكر ---------- */
 
-export function createAdvisingSession({ db }, actor, body, ip) {
+function createAdvisingSession({ db }, actor, body, ip) {
   requireSuitePerm(actor, 'sa_advising:edit');
   const studentId = Number(body?.studentId);
   const warningType = ['gpa_low', 'repeated_fail', 'absence_high'].includes(body?.warningType) ? body.warningType : 'gpa_low';
@@ -783,7 +783,7 @@ export function createAdvisingSession({ db }, actor, body, ip) {
   return { id: Number(info.lastInsertRowid) };
 }
 
-export function resolveAdvisingWarning({ db }, actor, id, ip) {
+function resolveAdvisingWarning({ db }, actor, id, ip) {
   requireSuitePerm(actor, 'sa_advising:edit');
   const res = db
     .prepare("UPDATE sa_advising_warnings SET status = 'resolved' WHERE id = ?")
@@ -1022,7 +1022,7 @@ export function bookDeskAppointment({ db }, actor, body, ip) {
   return { id: Number(info.lastInsertRowid), ticketNo };
 }
 
-export function updateDeskQueueStatus({ db }, actor, ticketId, status, ip) {
+function updateDeskQueueStatus({ db }, actor, ticketId, status, ip) {
   requireSuitePerm(actor, ...DESK_MANAGE);
   const allowed = ['waiting', 'serving', 'completed', 'no_show'];
   const nextStatus = allowed.includes(status) ? status : 'serving';

@@ -1,12 +1,12 @@
 // الإعدادات العامة: كل قيمة كانت ثابتة في الكود صارت هنا قابلة للتعديل من لوحة الإدارة.
 // المخطط (SCHEMA) هو المرجع الوحيد: يرسم الواجهة ويتحقق من القيم ويحدد الافتراضي. تُخزَّن في site_settings
 // بمفتاح `cfg.<key>` (JSON)، أو بالمفتاح القديم (legacy) حين كانت القيمة محفوظة سابقاً بنص عادي.
+import { bad } from '../validate.js';
 import { universityDepartments } from './hr_integrated.js';
 import { tx } from '../db.js';
 import { audit } from '../audit.js';
 import { HttpError } from '../http.js';
 
-const bad = (m) => new HttpError(400, m, 'validation');
 const opt = (...p) => p.map(([value, label]) => ({ value, label }));
 
 export const SCHEMA = [
@@ -74,6 +74,7 @@ export const SCHEMA = [
     { key: 'security.password_min', label: 'أقل طول لكلمة المرور', type: 'int', default: 10, min: 6, max: 64, unit: 'حرفاً' },
     { key: 'security.max_failed_logins', label: 'محاولات الدخول الفاشلة قبل القفل', type: 'int', default: 5, min: 3, max: 20 },
     { key: 'security.lock_minutes', label: 'مدة قفل الحساب', type: 'int', default: 15, min: 1, max: 1440, unit: 'دقيقة' },
+    { key: 'security.mfa_required', label: 'إلزام الأدوار الحساسة بالتحقق بخطوتين', type: 'bool', default: true, hint: 'المدير والمدقق ورؤساء المالية والموارد البشرية وتقنية المعلومات والامتحانات. يسري في الإنتاج.' },
     { key: 'security.session_hours', label: 'مدة الجلسة', type: 'int', default: 8, min: 1, max: 168, unit: 'ساعة', hint: 'تسري على الجلسات الجديدة بعد الحفظ.' },
   ] },
   { key: 'hr', label: 'الحضور والإجازات', desc: 'استحقاق الإجازة والعطلة الأسبوعية.', items: [

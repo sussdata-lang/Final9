@@ -217,11 +217,11 @@
     },
     gtdel: async (el, d) => {
       const x = A.gt.data.rows.find((r) => r.id === Number(d.id)); if (!x || !confirm(`حذف علامة «${x.course}» للطالب ${x.studentName} نهائياً؟`)) return;
-      let j = ''; if (x.workflowStatus === 'approved' && A.gt.data.workflow && A.gt.data.workflow.enabled) { j = prompt('العلامة معتمدة. اكتب تبرير الحذف (5 أحرف على الأقل):') || ''; if (!j) return; }
+      let j = ''; if (x.workflowStatus === 'approved' && A.gt.data.workflow && A.gt.data.workflow.enabled) { j = await askText('حذف علامة معتمدة', { label: 'تبرير الحذف', type: 'textarea', minLength: 5, submit: 'حذف العلامة' }); if (!j) return; }
       try { await api('DELETE', `/api/students/${x.studentId}/grades/${x.id}` + (j ? '?justification=' + encodeURIComponent(j) : '')); await loadGrades(); UA.render(); toast('حُذفت العلامة'); } catch (e) { if (!e.status) throw e; toast(e.message); }
     },
     gtwf: async (el, d) => {
-      let justification; if (d.stage === 'reviewed' && (A.gt.data.rows.find((r) => r.id === Number(d.id)) || {}).workflowStatus === 'approved') { justification = prompt('إعادة فتح علامة معتمدة: اكتب التبرير (5 أحرف على الأقل):') || ''; if (!justification) return; }
+      let justification; if (d.stage === 'reviewed' && (A.gt.data.rows.find((r) => r.id === Number(d.id)) || {}).workflowStatus === 'approved') { justification = await askText('إعادة فتح علامة معتمدة', { label: 'التبرير', type: 'textarea', minLength: 5, submit: 'إعادة الفتح' }); if (!justification) return; }
       try { const r = await api('POST', '/api/grades/workflow', { gradeIds: [Number(d.id)], stage: d.stage, justification }); await loadGrades(); UA.render(); toast(r.updated ? 'تم التحديث' : (r.skipped[0] && r.skipped[0].reason) || 'لم يتغير شيء'); } catch (e) { if (!e.status) throw e; toast(e.message); }
     },
     gtwfall: async (el, d) => {
@@ -261,7 +261,7 @@
   const CST = { open: ['p-review', 'قيد المعالجة'], answered: ['p-approved', 'تم الرد'], closed: ['p-approved', 'مغلقة'] };
   UA.loaders.comms = async () => {
     const q = A.cfilter === 'all' ? '' : '?status=' + A.cfilter;
-    [A.news, A.cmps] = await Promise.all([api('GET', '/api/news').then((r) => r.news), api('GET', '/api/complaints' + q).then((r) => r.complaints)]);
+    [A.news, A.cmps] = await Promise.all([api('GET', '/api/news').then((r) => r.news), UA.can('complaint:manage') || UA.can('complaint:create') ? api('GET', '/api/complaints' + q).then((r) => r.complaints) : []]);
   };
   function newsTab() {
     const ne = A.nedit ? A.news.find((n) => n.id === A.nedit) : null;
@@ -292,7 +292,7 @@
     cmpsel: async (el, d) => { A.csel = Number(d.id); UA.render(); },
     nmdel: async (el, d) => { if (!confirm('حذف هذا الوسيط؟')) return; try { await api('DELETE', '/api/news/media/' + d.id); await UA.loaders.comms(); UA.render(); } catch (e) { if (!e.status) throw e; toast(e.message); } },
     nmup: async (el, d) => { const fl = document.getElementById('nm-f-' + d.id).files[0]; if (!fl) { toast('اختر ملفاً'); return; } try { await UA.upload(`/api/news/${d.id}/media`, fl); await UA.loaders.comms(); UA.render(); toast('أُضيف الملف'); } catch (e) { if (!e.status) throw e; toast(e.message); } },
-    nmlink: async (el, d) => { const u = prompt('الصق الرابط (صورة/فيديو مباشر، يوتيوب، فيميو)'); if (!u) return; try { await api('POST', `/api/news/${d.id}/links`, { url: u }); await UA.loaders.comms(); UA.render(); toast('أُضيف الرابط'); } catch (e) { if (!e.status) throw e; toast(e.message); } },
+    nmlink: async (el, d) => { const u = await askText('إضافة رابط وسائط', { label: 'الرابط', hint: 'صورة أو فيديو مباشر، أو يوتيوب، أو فيميو', type: 'url', dir: 'ltr', submit: 'إضافة' }); if (!u) return; try { await api('POST', `/api/news/${d.id}/links`, { url: u }); await UA.loaders.comms(); UA.render(); toast('أُضيف الرابط'); } catch (e) { if (!e.status) throw e; toast(e.message); } },
     newsedit: async (el, d) => { A.nedit = Number(d.id); UA.render(); window.scrollTo(0, 0); },
     newscancel: async () => { A.nedit = null; UA.render(); },
     cmpdel: async (el, d) => {

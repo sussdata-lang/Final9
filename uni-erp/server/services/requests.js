@@ -3,6 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { tx } from '../db.js';
 import { nextNumber } from './numbering.js';
+import { readUpload, saveUpload } from './staging.js';
 import { audit } from '../audit.js';
 import { sha256 } from '../security.js';
 import { getSetting } from './settings.js';
@@ -13,7 +14,7 @@ import { linkedTargets } from './access.js';
 import { recordLeaveOnApprove } from './staffatt.js';
 import { getCachedServiceByCode, getCachedUnitById, getCachedUnitByCode, getCachedStaffUsersMap } from '../cache.js';
 
-export const ACADEMIC = new Set(['postponement', 'withdrawal', 'program_transfer', 'grade_appeal', 'violation_report']);
+const ACADEMIC = new Set(['postponement', 'withdrawal', 'program_transfer', 'grade_appeal', 'violation_report']);
 const pad = (n, w) => String(n).padStart(w, '0');
 
 export function detectMime(buf) {
@@ -24,7 +25,7 @@ export function detectMime(buf) {
 }
 
 // حقول «ref»: قوائم مرتبطة ببيانات الطالب نفسه (برامج أخرى، علاماته…). تُحوَّل لقائمة خيارات نصية تحمل المعرّف [#id]
-export function refOptions(db, studentId, ref) {
+function refOptions(db, studentId, ref) {
   const p = db.prepare('SELECT program_id, study_level FROM student_profiles WHERE user_id = ?').get(Number(studentId));
   if (ref === 'program') return db.prepare('SELECT id, faculty, name FROM programs WHERE active = 1 AND id != ? ORDER BY faculty, name').all(p?.program_id ?? -1).map((r) => ({ id: r.id, label: `${r.faculty} — ${r.name} [#${r.id}]` }));
   if (ref === 'my_course') return db.prepare('SELECT id, name, level FROM courses WHERE program_id = ? AND level <= ? ORDER BY level, name').all(p?.program_id ?? -1, p?.study_level ?? 0).map((r) => ({ id: r.id, label: `${r.name} (السنة ${r.level}) [#${r.id}]` }));
@@ -63,7 +64,7 @@ export function validateDetails(service, input, ctx) {
   return out;
 }
 
-export function addEvent(db, requestId, actorLabel, text) {
+function addEvent(db, requestId, actorLabel, text) {
   db.prepare('INSERT INTO request_events (request_id, at, actor_label, text) VALUES (?,?,?,?)').run(requestId, Date.now(), actorLabel, text);
 }
 
@@ -91,7 +92,7 @@ function listContext(db, rows) {
   };
 }
 
-export function requestView(db, r, { withStudent = false, ctx = null } = {}) {
+function requestView(db, r, { withStudent = false, ctx = null } = {}) {
   const cachedSvc = getCachedServiceByCode(db, r.service_code);
   const svc = cachedSvc
     ? { code: cachedSvc.code, label: cachedSvc.label, sla_hours: cachedSvc.sla_hours }
@@ -133,14 +134,14 @@ function readAttachments(db, cfg, service, input) {
   const slots = JSON.parse(service.attachments_json || '[]');
   let total = 0;
   return raw.map((a, i) => {
-    if (!a || typeof a.data !== 'string' || typeof a.name !== 'string') throw new HttpError(400, 'مرفق غير صالح.', 'validation');
-    const buf = Buffer.from(a.data, 'base64');
-    if (!buf.length || buf.length > MAX_ONE) throw new HttpError(413, `حجم المرفق الواحد يجب ألا يتجاوز ${MAX_ONE / 1048576} ميغابايت.`, 'too_large');
-    total += buf.length; if (total > MAX_TOTAL_ATTACH) throw new HttpError(413, `مجموع المرفقات يجب ألا يتجاوز ${MAX_TOTAL_ATTACH / 1048576} ميغابايت.`, 'too_large');
-    const mime = detectMime(buf);
+    if (!a || (typeof a.data !== 'string' && !a.staged) || typeof a.name !== 'string') throw new HttpError(400, 'مرفق غير صالح.', 'validation');
+    const file = readUpload(a);
+    if (!file.size || file.size > MAX_ONE) throw new HttpError(413, `حجم المرفق الواحد يجب ألا يتجاوز ${MAX_ONE / 1048576} ميغابايت.`, 'too_large');
+    total += file.size; if (total > MAX_TOTAL_ATTACH) throw new HttpError(413, `مجموع المرفقات يجب ألا يتجاوز ${MAX_TOTAL_ATTACH / 1048576} ميغابايت.`, 'too_large');
+    const mime = detectMime(file.head);
     if (!mime) throw new HttpError(415, 'المرفقات المسموحة: PDF أو PNG أو JPG.', 'bad_type');
     const slot = typeof a.slot === 'string' && slots.some((s) => s.label === a.slot) ? a.slot : (slots[i]?.label ?? null);
-    return { buf, mime, slot, name: path.basename(a.name).replace(/[^\p{L}\p{N}._ -]/gu, '_').slice(0, 100) || 'attachment' };
+    return { ...file, mime, slot, name: path.basename(a.name).replace(/[^\p{L}\p{N}._ -]/gu, '_').slice(0, 100) || 'attachment' };
   });
 }
 
@@ -189,9 +190,9 @@ export function createRequest({ db, cfg }, user, input, ip, opts = {}) {
       for (const att of atts) {
         const stored = crypto.randomBytes(16).toString('hex');
         const p = path.join(cfg.uploadDir, stored);
-        fs.writeFileSync(p, att.buf, { mode: 0o600 }); storedPaths.push(p);
+        saveUpload(att, p); storedPaths.push(p);
         db.prepare('INSERT INTO attachments (request_id, orig_name, stored_name, mime, size, sha256, slot_label) VALUES (?,?,?,?,?,?,?)')
-          .run(nextId, att.name, stored, att.mime, att.buf.length, sha256(att.buf), att.slot);
+          .run(nextId, att.name, stored, att.mime, att.size, att.sha, att.slot);
       }
       if (unit) addEvent(db, nextId, 'النظام', `أُسند الطلب تلقائياً إلى «${unit.name}»`);
       addEvent(db, nextId, 'النظام', rejected ? `الفحص الآلي: رُفض الطلب تلقائياً (${check.message})` : (kind === 'student' ? 'الفحص الآلي: اجتاز القواعد، أُحيل لمراجعة الموظف' : 'أُحيل لمراجعة الجهة المختصة'));
@@ -205,7 +206,7 @@ export function createRequest({ db, cfg }, user, input, ip, opts = {}) {
   }
 }
 
-export function listRequests({ db }, user, query) {
+export async function listRequests({ db }, user, query) {
   const scope = scopeOf(user), own = scope === 'own';
   const where = [], args = [];
   if (scope === 'own') { where.push('student_id = ?'); args.push(user.id); }
@@ -214,7 +215,7 @@ export function listRequests({ db }, user, query) {
     where.push(`(assigned_unit_id IN (${ids.map(() => '?').join(',')}) OR student_id = ?)`); args.push(...ids, user.id);
   }
   if (['review', 'approved', 'rejected'].includes(query.status)) { where.push('status = ?'); args.push(query.status); }
-  const rows = db.prepare(`SELECT * FROM requests ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY created_at DESC LIMIT 200`).all(...args);
+  const rows = await db.prepare(`SELECT * FROM requests ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY created_at DESC LIMIT 200`).allAsync(...args);
   if (!rows.length) return [];
   const ctx = listContext(db, rows);
   return rows.map((r) => requestView(db, r, { withStudent: !own, ctx }));
@@ -288,11 +289,11 @@ export function forwardRequest({ db }, user, id, input, ip) {
   });
 }
 
-export function stats({ db }) {
-  const by = Object.fromEntries(db.prepare('SELECT status, COUNT(*) c FROM requests GROUP BY status').all().map((r) => [r.status, r.c]));
-  const avg = db.prepare("SELECT AVG(decided_at - created_at) a FROM requests WHERE status = 'approved'").get().a;
-  const late = db.prepare(`SELECT COUNT(*) c FROM requests r JOIN service_types s ON s.code = r.service_code
-                           WHERE r.status = 'review' AND (? - r.created_at) > s.sla_hours * 3600000`).get(Date.now()).c;
+export async function stats({ db }) {
+  const by = Object.fromEntries((await db.prepare('SELECT status, COUNT(*) c FROM requests GROUP BY status').allAsync()).map((r) => [r.status, r.c]));
+  const avg = (await db.prepare("SELECT AVG(decided_at - created_at) a FROM requests WHERE status = 'approved'").getAsync()).a;
+  const late = (await db.prepare(`SELECT COUNT(*) c FROM requests r JOIN service_types s ON s.code = r.service_code
+                           WHERE r.status = 'review' AND (? - r.created_at) > s.sla_hours * 3600000`).getAsync(Date.now())).c;
   return { review: by.review ?? 0, approved: by.approved ?? 0, rejected: by.rejected ?? 0, avgApprovalMs: avg ? Math.round(avg) : null, slaBreaches: late };
 }
 

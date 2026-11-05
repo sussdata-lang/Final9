@@ -749,7 +749,7 @@
                 ${reqOptions}
               </select>
             </label>
-            <button type="button" class="btn pri" data-act="view" data-v="${esc(activeSim.quickView)}">انتقل لتقديم هذا الطلب الآن ←</button>
+            ${UA.viewsFor(UA.S.me.role).some((v) => v[0] === activeSim.quickView) ? `<button type="button" class="btn pri" data-act="view" data-v="${esc(activeSim.quickView)}">انتقل لتقديم هذا الطلب الآن ←</button>` : ''}
           </div>
 
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">

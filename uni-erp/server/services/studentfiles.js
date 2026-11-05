@@ -8,9 +8,9 @@ import { HttpError } from '../http.js';
 import { sniff } from './media.js';
 
 export const KINDS = { identity: 'الثبوتيات الشخصية', photo: 'الصورة الشخصية', other: 'مرفقات أخرى' };
-export const FILE_LIMITS = { photo: { max: 1, bytes: 3 * 1024 * 1024, pdf: false }, identity: { max: 5, bytes: 8 * 1024 * 1024, pdf: true }, other: { max: 10, bytes: 8 * 1024 * 1024, pdf: true } };
+const FILE_LIMITS = { photo: { max: 1, bytes: 3 * 1024 * 1024, pdf: false }, identity: { max: 5, bytes: 8 * 1024 * 1024, pdf: true }, other: { max: 10, bytes: 8 * 1024 * 1024, pdf: true } };
 const bad = (m) => new HttpError(400, m, 'validation');
-export const filesDir = (cfg) => path.join(cfg.uploadDir, 'students');
+const filesDir = (cfg) => path.join(cfg.uploadDir, 'students');
 
 function sniffFile(b) {
   if (b.length > 8 && b.subarray(0, 5).toString('latin1') === '%PDF-') return { kind: 'pdf', mime: 'application/pdf', ext: 'pdf' };
@@ -23,11 +23,6 @@ const view = (r) => ({ id: r.id, kind: r.kind, kindLabel: KINDS[r.kind], name: r
 
 export function listStudentFiles(db, studentId) {
   return db.prepare('SELECT * FROM student_files WHERE student_id = ? ORDER BY kind, id').all(Number(studentId)).map(view);
-}
-export function filesCount(db) {          // عدد المرفقات لكل طالب (لجدول الطلاب)
-  const m = new Map();
-  for (const r of db.prepare('SELECT student_id, COUNT(*) c, MAX(CASE WHEN kind = \'photo\' THEN id END) photo FROM student_files GROUP BY student_id').all()) m.set(r.student_id, { count: r.c, photoId: r.photo ?? null });
-  return m;
 }
 
 export function addStudentFile({ db, cfg }, actor, studentId, kind, origName, buf, ip) {

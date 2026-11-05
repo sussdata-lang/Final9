@@ -1,5 +1,6 @@
 // استيراد الطلاب والمقررات والعلامات من Excel (xlsx) أو CSV أو SQL (جمل INSERT فقط، لا يُنفَّذ أي SQL).
 // الخطوتان: فحص (commit=false: لا يُكتب شيء) ثم اعتماد (commit=true: يُحفظ الصحيح ويُبلَّغ عن المرفوض بالصف).
+import { bad } from '../validate.js';
 import { readXlsx, writeXlsx } from '../lib/xlsx.js';
 import { parseSql, parseCsv } from '../lib/sqlparse.js';
 import { tx } from '../db.js';
@@ -12,7 +13,6 @@ import { importLogRow } from './attendance.js';
 import { notify } from './push.js';
 
 export const MAX_BYTES = 10 * 1024 * 1024;
-const bad = (m) => new HttpError(400, m, 'validation');
 
 export const norm = (s) => String(s ?? '').replace(/[\u064B-\u065F\u0670\u0640]/g, '').replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/\*/g, '').replace(/[\s_\-./()،:]+/g, '').toLowerCase();
 export const latinDigits = (s) => String(s).replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
@@ -171,7 +171,7 @@ class Rollback extends Error {}
 
 // «السنة الدراسية» قد تأتي رقماً (1) أو نصاً كما تصدّره المنصة نفسها («السنة الأولى»، «الثانية»، «year 3»…)
 const LEVEL_WORDS = [['اول', 1], ['ثان', 2], ['ثالث', 3], ['رابع', 4], ['خامس', 5], ['سادس', 6], ['سابع', 7], ['ثامن', 8]];
-export function levelOf(v) {
+function levelOf(v) {
   const t = latinDigits(String(v ?? '')).trim();
   if (!t) return null;
   const d = /\d+/.exec(t); if (d) return Number(d[0]);

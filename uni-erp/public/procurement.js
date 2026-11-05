@@ -399,7 +399,7 @@
                 <td>${stBadge(REQ_STATUS, r.status)}</td>
                 <td style="white-space:nowrap">
                   <button class="btn sm" data-act="proc-view-req" data-id="${r.id}">التفاصيل</button>
-                  ${r.status === 'draft' && can('procurement:request') ? `<button class="btn pri sm" data-act="proc-sub-req" data-id="${r.id}">إرسال للاعتماد</button>` : ''}
+                  ${r.status === 'draft' && can('procurement:request') && (r.requester_id === UA.S.me.id || can('procurement:manage')) ? `<button class="btn pri sm" data-act="proc-sub-req" data-id="${r.id}">إرسال للاعتماد</button>` : ''}
                   ${r.status === 'pending' && can('procurement:manage') ? `<button class="btn pri sm" data-act="proc-app-req" data-id="${r.id}">✓ اعتماد</button> <button class="btn dan sm" data-act="proc-rej-req" data-id="${r.id}">✕ رفض</button>` : ''}
                   ${r.status === 'approved' && can('procurement:manage') ? `<button class="btn pri sm" data-act="proc-req-to-po" data-id="${r.id}">🚚 تحويل لأمر توريد</button>` : ''}
                 </td>

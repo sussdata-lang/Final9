@@ -1,5 +1,6 @@
 // مرفقات المحاضرات: PDF تُقرأ في المتصفح، والفيديو يُبث مع التقديم والتأخير، وعروض PowerPoint تُحوَّل إلى شرائح تُعرض في الصفحة.
 // نوع الملف من توقيعه لا من امتداده، وكل الملفات خارج المجلد العام ولا تُبث إلا لمن يملك الوصول.
+import { bad } from '../validate.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -9,10 +10,9 @@ import { sniff, streamFile } from './media.js';
 import { readPptx } from '../lib/pptx.js';
 
 const MB = 1024 * 1024;
-export const LECTURE_FILE_LIMITS = { pdf: 50 * MB, video: 200 * MB, slides: 50 * MB };
+const LECTURE_FILE_LIMITS = { pdf: 50 * MB, video: 200 * MB, slides: 50 * MB };
 const LABEL = { pdf: 'ملف PDF', video: 'الفيديو', slides: 'العرض التقديمي' };
 const MEDIA_MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp' };
-const bad = (m) => new HttpError(400, m, 'validation');
 const dirOf = (cfg) => path.join(cfg.uploadDir, 'lms');
 const mediaDir = (cfg, file) => path.join(dirOf(cfg), `${file}.media`);
 

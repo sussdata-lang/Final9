@@ -83,3 +83,21 @@ test('سجل تدقيق قديم فيه بصمات مكررة لا يمنع ال
   const { status } = await login();
   assert.equal(status, 200, 'يبقى تسجيل الدخول والتدقيق يعملان');
 });
+
+test('حد المعدل مشترك بين العمليات، والعملية المتكررة بالتوازي تُنفذ مرة واحدة', async () => {
+  const c = new pg.Client({ connectionString: url.href }); await c.connect();
+  await c.query("UPDATE users SET must_change_password = 0");
+  await c.end();
+  // 30 طلبًا في الدقيقة للعنوان: لو كان لكل عملية حدها لمر 90 طلبًا
+  let limited = 0, passed = 0;
+  for (let i = 0; i < 70; i++) {
+    const r = await call('GET', '/api/verify/NOPE-CODE');
+    if (r.status === 429) limited++; else passed++;
+    await new Promise((res) => setTimeout(res, 60));
+  }
+  assert.ok(limited > 15, `لم يسرِ الحد على كل العمليات: مر ${passed} ورُفض ${limited}`);
+
+  const { cookie } = await login();
+  const res = await Promise.all(Array.from({ length: 8 }, () => call('POST', '/api/finance/payroll-entry', { cookie, body: { month: '2026-01' } })));
+  assert.ok(res.every((r) => r.status < 500), JSON.stringify(res.map((r) => r.status)));
+});

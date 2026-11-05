@@ -53,15 +53,36 @@ export function newDocCode() {
 }
 
 // محدِّد معدل بسيط في الذاكرة (نافذة ثابتة). في الإنتاج متعدد الخوادم يُنقل إلى مخزن مشترك.
+// مع تعدد العمليات تُجمع العدادات كل ثانية في القاعدة، فيصير الحد على الموقع كله لا على كل عملية
+const clustered = () => Number(process.env.WEB_CONCURRENCY || 1) > 1;
+const rateOthers = new Map(), ratePending = new Map(), rateOwn = new Map();
+function sharedCount(key, windowMs, now) {
+  if (!clustered()) return 0;
+  const k = `${key}|${Math.floor(now / windowMs)}`;
+  ratePending.set(k, (ratePending.get(k) || 0) + 1);
+  return rateOthers.get(k) || 0;
+}
+export function takeRateDeltas() {
+  const out = [...ratePending.entries()];
+  ratePending.clear();
+  for (const [k, n] of out) rateOwn.set(k, (rateOwn.get(k) || 0) + n);
+  return out;
+}
+export function applyRateTotals(rows) {
+  for (const r of rows) rateOthers.set(r.key, Math.max(0, Number(r.count) - (rateOwn.get(r.key) || 0)));
+  if (rateOwn.size > 20000) { rateOwn.clear(); rateOthers.clear(); }
+}
+
 export class RateLimiter {
   constructor() { this.hits = new Map(); }
   check(key, limit, windowMs) {
     const now = Date.now();
     let e = this.hits.get(key);
-    if (!e || e.resetAt <= now) { e = { count: 0, resetAt: now + windowMs }; this.hits.set(key, e); }
+    if (!e || e.resetAt <= now) { const aligned = clustered() ? (Math.floor(now / windowMs) + 1) * windowMs : now + windowMs; e = { count: 0, resetAt: aligned }; this.hits.set(key, e); }
     e.count++;
+    const others = sharedCount(key, windowMs, now);
     if (this.hits.size > 10000) for (const [k, v] of this.hits) if (v.resetAt <= now) this.hits.delete(k);
-    return e.count <= limit;
+    return e.count + others <= limit;
   }
 }
 
@@ -99,8 +120,9 @@ const tieredBuckets = new Map(); // المفتاح ← { start, count }: عدّ�
 export const resetTieredRateLimit = () => tieredBuckets.clear();
 function bump(key, windowMs, now) {
   let b = tieredBuckets.get(key);
-  if (!b || now - b.start >= windowMs) { b = { start: now, count: 0 }; tieredBuckets.set(key, b); }
-  return ++b.count;
+  const start = clustered() ? Math.floor(now / windowMs) * windowMs : now;
+  if (!b || now - b.start >= windowMs) { b = { start, count: 0 }; tieredBuckets.set(key, b); }
+  return ++b.count + sharedCount(key, windowMs, now);
 }
 
 // سقف العنوان: يُفحص قبل قراءة الجلسة، فرمز مزور لا يصل إلى القاعدة بلا حد

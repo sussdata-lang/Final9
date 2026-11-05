@@ -59,6 +59,15 @@
         </div>
       </div>
 
+      ${(() => {
+        const table = (title, head, rows) => `<div style="margin-top:14px"><b style="font-size:13px">${title}</b><div class="tbl-wrap"><table class="grid-tbl"><thead><tr>${head.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('') || `<tr><td colspan="${head.length}" class="empty">لا قياسات بعد</td></tr>`}</tbody></table></div></div>`;
+        const nums = (r) => `<td>${r.count}</td><td>${r.avgMs}</td><td>${r.maxMs}</td><td>${r.totalMs}</td>`;
+        const pg = t.pgStatements || {};
+        return table('أبطأ المسارات منذ تشغيل هذه العملية', ['المسار', 'مرات', 'متوسط ms', 'أقصى ms', 'مجموع ms'], (t.slowRoutes || []).slice(0, 10).map((r) => `<tr><td class="mono" dir="ltr" style="text-align:start">${esc(r.route)}</td>${nums(r)}</tr>`))
+          + table('أبطأ الاستعلامات منذ تشغيل هذه العملية', ['الاستعلام', 'مرات', 'متوسط ms', 'أقصى ms', 'مجموع ms'], (t.slowQueries || []).slice(0, 10).map((r) => `<tr><td class="mono small" dir="ltr" style="text-align:start;white-space:normal">${esc(r.sql)}</td>${nums(r)}</tr>`))
+          + `<p class="small" style="margin:8px 0 0">pg_stat_statements: ${pg.enabled ? 'مفعّل' : 'غير مفعّل على هذه القاعدة؛ القياس أعلاه من داخل النظام'}. مدة تشغيل العملية: ${val(t.uptimeSec, ' ثانية')}.</p>`;
+      })()}
+
       <div style="margin-top:14px;padding:12px 14px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px">
           <b style="color:#054239;font-size:13px">نطاقات التخزين المؤقت (تُبطَل تلقائياً عند التعديل):</b>

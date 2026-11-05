@@ -1,11 +1,11 @@
 // الأنواع القديمة (الطلاب والمقررات والعلامات والقاعات والطلبات): فحص ← «حفظ» برمز لمرة واحدة أو «إلغاء»، بلا إعادة إرسال الملف.
 // كل حفظ يُسجَّل دفعة، والطلاب والعلامات يقبلان التراجع.
+import { bad } from '../validate.js';
 import { HttpError } from '../http.js';
 import { LEGACY_DEFS, stageFile, readStagedFile, claimStaged, recordLegacyBatch } from './import_engine.js';
 import { runImport } from './importer.js';
 import { importRequests } from './requestsxl.js';
 
-const bad = (m) => new HttpError(400, m, 'validation');
 const isHighLegacy = (def) => def.risk === 'high';
 export async function stagedImport(deps, actor, kind, body, ip) {
   const def = LEGACY_DEFS[kind];

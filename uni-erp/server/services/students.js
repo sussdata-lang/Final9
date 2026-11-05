@@ -80,7 +80,7 @@ export function sections(db) {
   ];
 }
 const allFields = (secs) => secs.flatMap((s) => s.fields);
-export const COLUMNS = allFields(sections({ prepare: () => ({ all: () => [] }) })).map((f) => f.name);
+const COLUMNS = allFields(sections({ prepare: () => ({ all: () => [] }) })).map((f) => f.name);
 
 /* ---------------- التحقق ---------------- */
 const CTRL = /[\u0000-\u001f\u007f]/;
@@ -179,7 +179,7 @@ export function validateProfile(db, input, { current = null } = {}) {
 }
 
 /* بيانات إضافية مفتوحة: حتى 20 زوجاً (عنوان، قيمة). تُحفظ كما هي بعد تنظيفها */
-export function cleanExtra(raw) {
+function cleanExtra(raw) {
   if (raw === undefined) return undefined;
   if (!Array.isArray(raw)) throw new HttpError(400, 'صيغة البيانات الإضافية غير صحيحة.', 'validation', 'extra');
   const out = [];
@@ -233,7 +233,7 @@ export function duplicateCheck(db, p, selfId = 0) {
   if (same) throw new HttpError(409, `يوجد طالب بنفس الاسم واسم الأم وتاريخ الميلاد (الرقم الجامعي ${same.student_no})؛ تحقق من عدم تكرار التسجيل.`, 'duplicate', 'first_name');
 }
 
-export function composeUser(db, p) {
+function composeUser(db, p) {
   const g = db.prepare('SELECT faculty, name, degree FROM programs WHERE id = ?').get(p.program_id);
   return { display: shortName(p), program: `${g.faculty === g.name ? g.name : `${g.degree} ${g.name}`} - ${levelLabel(p.study_level, db)}` };
 }
@@ -277,7 +277,7 @@ export function myProfile({ db }, user) {
 
 const like = (s) => '%' + s.replace(/[\\%_]/g, '\\$&') + '%';
 // حساب نطاقه كلية يرى طلابها فقط
-export const facultyScope = (user) => (user && user.role !== 'student' && user.data_scope === 'faculty' && user.scope_faculty ? user.scope_faculty : null);
+const facultyScope = (user) => (user && user.role !== 'student' && user.data_scope === 'faculty' && user.scope_faculty ? user.scope_faculty : null);
 const SCOPE_SQL = 'p.program_id IN (SELECT id FROM programs WHERE faculty = ?)';
 export function assertStudentInScope({ db }, user, id) {
   const faculty = facultyScope(user);
@@ -362,7 +362,7 @@ export const listFaculties = (db) => db.prepare('SELECT * FROM faculties ORDER B
 
 // رمز الكلية: الأحرف الأولى من كلمات اسمها الإنكليزي (بلا أدوات الربط)
 const STOP = new Set(['of', 'for', 'and', 'the', 'in', 'on', 'at', 'to', '&']);
-export const deriveCode = (en) => String(en).split(/\s+/).filter((w) => w && !STOP.has(w.toLowerCase())).map((w) => w[0].toUpperCase()).join('');
+const deriveCode = (en) => String(en).split(/\s+/).filter((w) => w && !STOP.has(w.toLowerCase())).map((w) => w[0].toUpperCase()).join('');
 
 export function addFaculty({ db }, actor, b, ip) {
   const name = String(b?.name ?? '').replace(/\s+/g, ' ').trim(), nameEn = String(b?.nameEn ?? '').replace(/\s+/g, ' ').trim();

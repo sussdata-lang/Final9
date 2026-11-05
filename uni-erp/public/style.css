@@ -87,6 +87,7 @@ input,select,textarea{background:var(--surface);border:1px solid var(--line);bor
 .steps li.done{border-color:var(--ok);color:var(--fg)}
 .steps li.cur{border-color:var(--warn);color:var(--fg);font-weight:600}
 .steps li.fail{border-color:var(--bad);color:var(--bad);font-weight:600}
+.ux-drawer-body .steps-5{grid-template-columns:1fr;gap:8px}
 .events{margin:0;padding:0;list-style:none;font-size:12.5px;color:var(--muted);display:grid;gap:2px}
 .reason{background:var(--bad-soft);color:var(--bad);border-radius:8px;padding:8px 12px;font-size:13.5px}
 .empty{color:var(--muted);text-align:center;padding:26px 8px}
@@ -2067,7 +2068,7 @@ body.sx-collapsed .ux-mirror{display:none}
 .ux-dev-switch{position:fixed;bottom:12px;inset-inline-start:50%;transform:translateX(50%);z-index:150;display:grid;justify-items:center;gap:6px;max-width:calc(100vw - 24px)}
 html[dir="ltr"] .ux-dev-switch{transform:translateX(-50%)}
 .ux-dev-toggle{padding:5px 14px;border:1px solid #C9A24B;border-radius:99px;background:#032E28;color:#E6CB84;font-size:12.5px;font-weight:700;cursor:pointer}
-.ux-dev-tabs{display:flex;flex-wrap:wrap;justify-content:center;gap:4px;padding:5px;max-width:100%;border-radius:12px;background:#032E28;box-shadow:0 10px 28px rgba(3,46,40,.35)}
+.ux-dev-tabs{display:flex;flex-wrap:wrap;justify-content:center;gap:4px;padding:5px;max-width:100%;max-height:45vh;overflow:auto;border-radius:12px;background:#032E28;box-shadow:0 10px 28px rgba(3,46,40,.35)}
 .ux-dev-tabs button{flex:none;padding:6px 12px;border:0;border-radius:8px;background:none;color:#CFE0DA;font-size:13px;font-weight:600;cursor:pointer}
 .ux-dev-tabs button:hover{background:rgba(255,255,255,.1);color:#fff}
 .ux-dev-tabs button[aria-selected="true"]{background:#C9A24B;color:#2C2208}
@@ -2104,3 +2105,16 @@ html[dir="ltr"] .ux-dev-switch{transform:translateX(-50%)}
 .v12-dlg .uf-actions{margin-top:0}
 tr.sx-row-click{cursor:pointer}
 tr.sx-row-click:hover>td{background:rgba(213,182,93,.08)}
+
+/* النموذج المنبثق الموحّد */
+.ask-dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--fg);padding:20px;width:min(440px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto}
+.ask-dialog::backdrop{background:rgba(8,14,20,.6)}
+.ask-form{display:grid;gap:12px}
+.ask-form h2{margin:0;font-size:17px}
+.ask-actions{display:flex;gap:8px;margin-top:4px}
+/* اسم الطالب تحت حقله: السطر محجوز دائمًا فلا يتحرك ما بعده */
+.sp-name{display:block;height:1.6em;line-height:1.6em;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin-top:3px;color:var(--muted,#64748b);font-weight:600}
+
+.ua-noperm{display:none!important}
+.mfa-qr{width:220px;max-width:100%;margin:10px auto;background:#fff;padding:8px;border-radius:8px}
+.mfa-qr svg{display:block;width:100%;height:auto}
