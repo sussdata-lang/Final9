@@ -1,4 +1,5 @@
 import { tx } from '../db.js';
+import { nextNumber } from './numbering.js';
 import { enqueueCertificate } from './enrollcert.js';
 import { audit } from '../audit.js';
 import { hashPassword, tempPassword } from '../security.js';
@@ -247,8 +248,8 @@ export async function registerStudent({ db, cfg }, actor, input, ip) {
     const fac = db.prepare('SELECT f.code FROM programs g JOIN faculties f ON f.id = g.faculty_id WHERE g.id = ?').get(p.program_id);
     if (!fac) throw new HttpError(400, 'هذا البرنامج غير مرتبط بكلية؛ عدّله من شاشة الكليات والبرامج أولاً.', 'validation', 'program_id');
     const prefix = `${fac.code}-${p.enroll_year}-`;
-    const last = db.prepare('SELECT MAX(CAST(substr(student_no, ?) AS INTEGER)) n FROM users WHERE student_no LIKE ?').get(prefix.length + 1, `${prefix}%`).n ?? 0;
-    const no = `${prefix}${String(last + 1).padStart(4, '0')}`;
+    const seq = nextNumber(db, `student:${prefix}`, 'SELECT MAX(CAST(substr(student_no, ?) AS INTEGER)) FROM users WHERE student_no LIKE ?', [prefix.length + 1, `${prefix}%`]);
+    const no = `${prefix}${String(seq).padStart(4, '0')}`;
     const u = composeUser(db, p), now = Date.now();
     const uid = Number(db.prepare('INSERT INTO users (username, display_name, password_hash, role, student_no, program, must_change_password, created_at) VALUES (?,?,?,?,?,?,1,?)')
       .run(no, u.display, hash, 'student', no, u.program, now).lastInsertRowid);

@@ -28,32 +28,34 @@ const cleanName = (name) => {
   const s = String(name ?? '').replace(/[\\/\u0000-\u001f<>"]/g, '').trim().slice(0, 120);
   return s || 'ملف';
 };
-function writeOrFail(write) {
-  try { write(); } catch (e) {
-    if (['EACCES', 'EPERM', 'EROFS', 'ENOSPC'].includes(e.code)) throw new HttpError(507, 'تعذّر حفظ الملف على الخادم: مجلد الرفع غير قابل للكتابة أو ممتلئ.', 'storage_unavailable');
-    throw e;
-  }
-}
-
-export function addLectureFile({ db, cfg }, actor, lectureId, buf, name, ip) {
+// الملف وصل إلى ملف مؤقت؛ يُنقل إلى مكانه دون قراءته في الذاكرة، والعرض التقديمي يُحلَّل في خيط منفصل
+export async function addLectureFile({ db, cfg }, actor, lectureId, upload, name, ip, readDeck) {
   const lecture = db.prepare('SELECT id, title FROM lms_lectures WHERE id = ?').get(Number(lectureId));
   if (!lecture) throw new HttpError(404, 'المحاضرة غير موجودة.', 'not_found');
-  if (!Buffer.isBuffer(buf) || !buf.length) throw bad('الملف فارغ.');
-  const t = detect(buf);
-  if (buf.length > LECTURE_FILE_LIMITS[t.kind]) throw new HttpError(413, `حجم ${LABEL[t.kind]} يتجاوز ${LECTURE_FILE_LIMITS[t.kind] / MB} ميغابايت.`, 'too_large');
+  if (!upload?.size) throw bad('الملف فارغ.');
+  const t = detect(upload.head);
+  if (upload.size > LECTURE_FILE_LIMITS[t.kind]) throw new HttpError(413, `حجم ${LABEL[t.kind]} يتجاوز ${LECTURE_FILE_LIMITS[t.kind] / MB} ميغابايت.`, 'too_large');
   let deck = null;
-  if (t.kind === 'slides') { try { deck = readPptx(buf); } catch (e) { throw bad(e.message); } }
+  if (t.kind === 'slides') { try { deck = await readDeck(upload.uploadPath); } catch (e) { if (e.status) throw e; throw bad(e.message); } }
   const file = `${crypto.randomBytes(16).toString('hex')}.${t.ext}`;
-  writeOrFail(() => {
-    fs.mkdirSync(dirOf(cfg), { recursive: true });
-    fs.writeFileSync(path.join(dirOf(cfg), file), buf);
-    if (deck?.media.length) { fs.mkdirSync(mediaDir(cfg, file), { recursive: true }); for (const m of deck.media) fs.writeFileSync(path.join(mediaDir(cfg, file), m.name), m.data); }
-  });
+  try {
+    await fs.promises.mkdir(dirOf(cfg), { recursive: true });
+    await fs.promises.rename(upload.uploadPath, path.join(dirOf(cfg), file));
+    if (deck?.media.length) {
+      await fs.promises.mkdir(mediaDir(cfg, file), { recursive: true });
+      for (const m of deck.media) await fs.promises.writeFile(path.join(mediaDir(cfg, file), m.name), m.data);
+    }
+  } catch (e) {
+    if (['EACCES', 'EPERM', 'EROFS', 'ENOSPC'].includes(e.code)) throw new HttpError(507, 'تعذّر حفظ الملف على الخادم: مجلد الرفع غير صالح للكتابة أو ممتلئ.', 'upload_failed');
+    throw e;
+  }
   const slidesJson = deck ? JSON.stringify({ width: deck.width, height: deck.height, slides: deck.slides }) : null;
-  const id = Number(db.prepare('INSERT INTO lms_lecture_files (lecture_id, filename, kind, mime, size, file, slides_json, created_at) VALUES (?,?,?,?,?,?,?,?)').run(lecture.id, cleanName(name), t.kind, t.mime, buf.length, file, slidesJson, Date.now()).lastInsertRowid);
+  const id = Number(db.prepare('INSERT INTO lms_lecture_files (lecture_id, filename, kind, mime, size, file, slides_json, created_at) VALUES (?,?,?,?,?,?,?,?)').run(lecture.id, cleanName(name), t.kind, t.mime, upload.size, file, slidesJson, Date.now()).lastInsertRowid);
   audit(db, actor, 'إرفاق ملف بمحاضرة', lecture.title.slice(0, 80), ip);
   return { id, kind: t.kind };
 }
+
+export const readDeckFile = async (file) => readPptx(await fs.promises.readFile(file));
 
 export function filesFor(db, lectureIds) {
   const map = new Map();

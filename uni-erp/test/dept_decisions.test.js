@@ -74,13 +74,13 @@ test('السكن والساعات المكتبية في شؤون الطلاب، 
   const exam = await login('exam_h'), house = await login('house_h');
   const room = Number(app.db.prepare("INSERT INTO dorm_rooms (building_name, room_no, capacity, occupied) VALUES ('مبنى', '1', 3, 0)").run().lastInsertRowid);
   student('DEC-H');
-  const alloc = { student_name: 'ط', student_no: 'DEC-H', room_id: room };
+  const alloc = { student_no: 'DEC-H', room_id: room };
   const office = { faculty_name: 'د', student_name: 'ط', student_no: 'DEC-H', topic: 'ت' };
 
-  assert.equal((await call('POST', '/api/expansions/dorm-allocations', { cookie: exam, body: alloc })).status, 403);
+  assert.equal((await call('POST', '/api/housing/allocations', { cookie: exam, body: alloc })).status, 403);
   assert.equal((await call('POST', '/api/expansions/office-bookings', { cookie: exam, body: office })).status, 403);
   assert.equal((await call('GET', '/api/student-life/overview', { cookie: exam })).status, 403);
-  assert.equal((await call('POST', '/api/expansions/dorm-allocations', { cookie: house, body: alloc })).status, 201);
+  assert.equal((await call('POST', '/api/housing/allocations', { cookie: house, body: alloc })).status, 201);
   assert.equal((await call('POST', '/api/expansions/office-bookings', { cookie: house, body: office })).status, 201);
 
   const life = (await call('GET', '/api/student-life/overview', { cookie: house })).json;

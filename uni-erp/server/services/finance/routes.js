@@ -6,6 +6,7 @@ import * as R from './reports.js';
 import * as F from './fees.js';
 import * as I from './invoices.js';
 import { listDiscounts, createDiscount } from './discounts.js';
+import * as B from './student_billing.js';
 
 // helpers لكتابة الإكسل
 let xlsxLib = null; const xlsx = () => xlsxLib ?? (xlsxLib = import('../../lib/xlsx.js'));
@@ -221,10 +222,10 @@ export async function registerFinance(r, deps, { writeXlsx }) {
   r.add('GET', '/api/finance/fee-types', fin('finance:fees', () => F.listFeeTypes(deps)));
   r.add('POST', '/api/finance/fee-types', fin('finance:fees', (c, b) => F.saveFeeType(deps, c.user, b, c.ip)));
   r.add('POST', '/api/finance/fee-types/:id/toggle', fin('finance:fees', (c, b) => F.toggleFeeType(deps, c.user, c.params.id, b?.active !== false, c.ip)));
-  r.add('GET', '/api/finance/charges', fin('finance:fees', (_c, _b, q) => ({ charges: F.listCharges(deps, q) })));
+  r.add('GET', '/api/finance/charges', fin('finance:fees', (_c, _b, q) => ({ charges: F.listCharges(deps, { limit: 200, ...q }) })));
   r.add('POST', '/api/finance/charges', finC('finance:fees', (c, b) => F.createCharge(deps, c.user, b, c.ip)));
-  r.add('POST', '/api/finance/charges/:id/void', fin('finance:fees', (c, b) => F.voidCharge(deps, c.user, c.params.id, b, c.ip)));
-  r.add('GET', '/api/finance/payments', fin('finance:fees', (_c, _b, q) => ({ payments: F.listPayments(deps, q) })));
+  r.add('POST', '/api/finance/charges/:id/void', fin('finance:fees', (c, b) => B.voidStudentCharge(deps, c.user, c.params.id, b, c.ip)));
+  r.add('GET', '/api/finance/payments', fin('finance:fees', (_c, _b, q) => ({ payments: F.listPayments(deps, { limit: 200, ...q }) })));
   r.add('POST', '/api/finance/payments', finC('finance:fees', (c, b) => F.createPayment(deps, c.user, b, c.ip)));
   r.add('POST', '/api/finance/payments/:id/void', fin('finance:fees', (c, b) => F.voidPayment(deps, c.user, c.params.id, b, c.ip)));
   r.add('GET', '/api/finance/student-statement/:id', fin('finance:fees', (c) => F.studentStatement(deps, c.params.id)));
@@ -233,22 +234,7 @@ export async function registerFinance(r, deps, { writeXlsx }) {
   r.add('POST', '/api/finance/payroll-entry', fin('finance:post', (c, b) => F.payrollEntry(deps, c.user, b, c.ip)));
 
   /* مسارات الرسوم الطلابية الإضافية لشاشة محاسبة الطلاب */
-  r.add('GET', '/api/finance/fees/overview', fin('finance:read', () => {
-    C.ready(db);
-    const charges = F.listCharges(deps);
-    const payments = F.listPayments(deps);
-    const billed = charges.filter((c) => c.status === 'open').reduce((s, c) => s + Number(c.amount || 0), 0);
-    const collected = payments.filter((p) => p.status === 'ok').reduce((s, p) => s + Number(p.amount || 0), 0);
-    const rem = Math.max(0, billed - collected);
-    return {
-      invoicesCount: charges.length,
-      totalBilled: billed,
-      totalCollected: collected,
-      totalRemaining: rem,
-      collectionRate: billed > 0 ? Math.round((collected / billed) * 100) : 100,
-      overdueCount: 0
-    };
-  }));
+  r.add('GET', '/api/finance/fees/overview', fin('finance:read', (c) => deps.heavy.run('billingOverview', c, [])));
 
   r.add('GET', '/api/finance/fee-structures', fin('finance:read', () => {
     C.ready(db);
@@ -276,97 +262,15 @@ export async function registerFinance(r, deps, { writeXlsx }) {
     return { ok: true, id };
   }));
 
-  r.add('GET', '/api/finance/student-invoices', fin('finance:read', () => {
-    C.ready(db);
-    const all = F.listCharges(deps);
-    const charges = all.filter((ch) => ch.kind === 'fee');
-    // حسومات الطالب في العام تُوزَّع على فواتيره حتى تنفد
-    const left = new Map();
-    for (const d of all) if (d.kind === 'discount' && d.status === 'open') { const k = `${d.studentId}|${d.academicYear}`; left.set(k, (left.get(k) || 0) + d.amount); }
-    const takeDiscount = (ch) => { if (ch.status !== 'open') return 0; const k = `${ch.studentId}|${ch.academicYear}`, use = Math.min(left.get(k) || 0, ch.amount); left.set(k, (left.get(k) || 0) - use); return use; };
-    const people = new Map(db.prepare("SELECT id, display_name, student_no FROM users WHERE role = 'student'").all().map((u) => [Number(u.id), u]));
-    return {
-      invoices: charges.map((ch) => { const discount = takeDiscount(ch), who = people.get(Number(ch.studentId)); return {
-        id: ch.id,
-        no: `CHG-${ch.id}`,
-        studentName: who?.display_name ?? '',
-        studentNo: who?.student_no ?? '',
-        academicYear: ch.academicYear || '2025/2026',
-        semester: 1,
-        totalAmount: ch.amount,
-        discountAmount: discount,
-        netAmount: ch.amount - discount,
-        paidAmount: ch.status === 'open' ? 0 : ch.amount,
-        status: ch.status === 'open' ? 'unpaid' : 'paid',
-        installments: [{ seq: 1, dueDay: ch.dueDay, amount: ch.amount, paidAmount: 0, status: ch.status }]
-      }; })
-    };
-  }));
-
-  r.add('POST', '/api/finance/student-invoices', finC('finance:fees', (c, b) => {
-    const ft = F.listFeeTypes(deps).find((f) => f.kind === 'fee' && f.active) || { id: 1 };
-    return F.createCharge(deps, c.user, {
-      studentId: b?.studentId,
-      feeTypeId: ft.id,
-      amount: b?.totalAmount,
-      dueDay: (b?.installments || [])[0]?.dueDay || C.today(),
-      academicYear: b?.academicYear || '2025/2026',
-      note: 'فاتورة رسوم دراسية معتمدة'
-    }, c.ip);
-  }));
-
-  r.add('GET', '/api/finance/student-invoices/:id', fin('finance:read', (c) => {
-    const ch = db.prepare('SELECT * FROM fin_charges WHERE id=?').get(Number(c.params.id));
-    if (!ch) throw C.bad('الفاتورة غير موجودة', 404, 'not_found');
-    return {
-      invoice: {
-        id: ch.id,
-        no: `CHG-${ch.id}`,
-        studentName: 'طالب جامعي',
-        netAmount: ch.amount / 100.0,
-        paidAmount: ch.status === 'open' ? 0 : ch.amount / 100.0,
-        installments: [{ seq: 1, dueDay: ch.due_day, amount: ch.amount / 100.0, paidAmount: 0, status: ch.status }]
-      }
-    };
-  }));
-
-  r.add('POST', '/api/finance/student-invoices/:id/pay', finC('finance:fees', (c, b) => {
-    const ch = db.prepare('SELECT * FROM fin_charges WHERE id=?').get(Number(c.params.id));
-    if (!ch) throw C.bad('الفاتورة غير موجودة', 404, 'not_found');
-    return F.createPayment(deps, c.user, {
-      studentId: ch.student_id,
-      amount: Number(b?.amount) || (ch.amount / 100.0),
-      method: b?.method || 'cash',
-      paidDay: C.today(),
-      note: `سداد الفاتورة CHG-${ch.id}`
-    }, c.ip);
-  }));
+  r.add('GET', '/api/finance/student-invoices', fin('finance:read', (_c, _b, q) => B.pageStudentInvoices(deps, q)));
+  r.add('POST', '/api/finance/student-invoices', finC('finance:fees', (c, b) => B.createStudentInvoice(deps, c.user, b, c.ip)));
+  r.add('GET', '/api/finance/student-invoices/:id', fin('finance:read', (c) => ({ invoice: B.getStudentInvoice(deps, c.params.id) })));
+  r.add('POST', '/api/finance/student-invoices/:id/pay', finC('finance:fees', (c, b) => B.payStudentInvoice(deps, c.user, c.params.id, b, c.ip)));
 
   r.add('GET', '/api/finance/discounts', fin('finance:read', () => ({ discounts: listDiscounts(deps) })));
   r.add('POST', '/api/finance/discounts', finC('finance:fees', (c, b) => createDiscount(deps, c.user, b, c.ip)));
-  r.add('GET', '/api/finance/fees/overdue', fin('finance:read', () => ({ installments: [] })));
-
-  r.add('GET', '/api/payroll/runs', fin('finance:read', () => {
-    const pm = F.payrollMonths(deps);
-    return {
-      runs: (pm.months || []).map((m, idx) => ({
-        id: idx + 1,
-        period: m.month,
-        title: `مسير رواتب شهر ${m.month}`,
-        status: m.entry ? 'approved' : 'draft',
-        totalNet: m.total,
-        finJournalId: m.entry?.id || null
-      }))
-    };
-  }));
-
-  r.add('POST', '/api/finance/payroll/:id/post', fin('finance:post', (c) => {
-    const pm = F.payrollMonths(deps);
-    const m = (pm.months || [])[Number(c.params.id) - 1] || (pm.months || [])[0];
-    if (!m) throw C.bad('الشهر غير موجود', 404, 'not_found');
-    const res = F.payrollEntry(deps, c.user, { month: m.month }, c.ip);
-    return { journalNo: res.entry.no };
-  }));
+  // يقرآن كل المستحقات والدفعات، فيعملان خارج الخيط الرئيسي
+  r.add('GET', '/api/finance/fees/overdue', fin('finance:read', async (c) => ({ installments: await deps.heavy.run('billingOverdue', c, []) })));
 
   /* ---- رسوم الطالب (self) ---- */
   r.add('GET', '/api/me/fees', async (c) => {

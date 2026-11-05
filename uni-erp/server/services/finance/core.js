@@ -1,5 +1,6 @@
 // النواة المحاسبية: الحسابات والسنوات والقيود مزدوجة القيد والترحيل والعكس. كل المبالغ أعداد صحيحة بوحدة 1/100.
 import { tx } from '../../db.js';
+import { nextNumber } from '../numbering.js';
 import { audit } from '../../audit.js';
 import { HttpError } from '../../http.js';
 import { getSetting } from '../settings.js';
@@ -250,7 +251,7 @@ export function postEntry(deps, actor, id, ip, { system = false } = {}) {
       }
     }
   }
-  const seq = (db.prepare('SELECT COALESCE(MAX(seq), 0) m FROM fin_entries WHERE year_id = ? AND type = ?').get(y.id, e.type).m) + 1;
+  const seq = nextNumber(db, `fin:${y.id}:${e.type}`, 'SELECT MAX(seq) FROM fin_entries WHERE year_id = ? AND type = ?', [y.id, e.type]);
   const no = `${e.type}-${y.name}-${pad(seq)}`;
   db.prepare("UPDATE fin_entries SET status = 'posted', seq = ?, no = ?, year_id = ?, posted_by = ?, posted_at = ? WHERE id = ?").run(seq, no, y.id, actor?.id ?? null, Date.now(), e.id);
   audit(db, actor, 'ترحيل قيد', no, ip);

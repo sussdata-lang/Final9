@@ -68,7 +68,7 @@ test('مسارات حزمة المؤسسة والأداء تفرض الصلاح�
   const adm = (await c.login('adm')).cookie, stu = (await c.login('stu')).cookie;
 
   // مسارات الأداء لا تعمل دون جلسة، ولا تعمل للطالب
-  for (const [m, u] of [['GET', '/api/v12/high-concurrency/telemetry'], ['POST', '/api/v12/high-concurrency/cache/flush'], ['POST', '/api/v12/high-concurrency/benchmark']]) {
+  for (const [m, u] of [['GET', '/api/v12/high-concurrency/telemetry'], ['POST', '/api/v12/high-concurrency/benchmark']]) {
     const body = m === 'POST' ? {} : undefined;
     assert.equal((await c.call(m, u, { body })).status, 401, `${u} بلا جلسة`);
     assert.equal((await c.call(m, u, { body, cookie: stu })).status, 403, `${u} للطالب`);
@@ -231,10 +231,10 @@ test('مسارات الوحدات الموسعة وشؤون الطلاب وال�
   const stuProfileless = await c.call('POST', `/api/students/${otherId}/card-activity`, { cookie: plain, body: {} });
   assert.notEqual(stuProfileless.status, 403, 'الموظف يسجّل نشاط البطاقة');
   const roomId = Number(app.db.prepare("INSERT INTO dorm_rooms (building_name, room_no, capacity, occupied) VALUES ('م', '1', 2, 0)").run().lastInsertRowid);
-  assert.equal((await c.call('POST', '/api/expansions/dorm-allocations', { cookie: adm, body: { student_name: 'x', student_no: 'STU-1', room_id: 999999 } })).status, 400, 'لا إسكان في غرفة غير موجودة');
+  assert.equal((await c.call('POST', '/api/housing/allocations', { cookie: adm, body: { student_no: 'STU-1', room_id: 999999 } })).status, 400, 'لا إسكان في غرفة غير موجودة');
   for (const [u, body, expected] of [
     ['/api/research/projects', { title: 'بحث' }, 201], ['/api/alumni/jobs', { title: 'وظيفة' }, 201], ['/api/qa/kpis', { title: 'مؤشر' }, 201],
-    ['/api/expansions/exams', { course_code: 'X-1', course_name: 'x' }, 201], ['/api/expansions/dorm-allocations', { student_name: 'x', student_no: 'STU-1', room_id: roomId }, 201],
+    ['/api/expansions/exams', { course_code: 'X-1', course_name: 'x' }, 201],
     ['/api/expansions/appraisals', { employee_name: 'x' }, 201],
     ['/api/expansions/biometrics/sync', {}, 200], ['/api/devops/incidents', { error_message: 'x' }, 201],
   ]) {

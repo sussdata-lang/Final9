@@ -58,14 +58,14 @@ function guard(db, newsId) {
   return n;
 }
 
-export function addUpload({ db, cfg }, actor, newsId, buf, cap, ip) {
-  const n = guard(db, newsId), t = sniff(buf);
+export async function addUpload({ db, cfg }, actor, newsId, upload, cap, ip) {
+  const n = guard(db, newsId), t = sniff(upload.head);
   if (!t) throw bad('نوع الملف غير مدعوم: الصور jpg/png/webp/gif والفيديو mp4/webm فقط.');
-  if (buf.length > LIMITS[t.kind]) throw new HttpError(413, `حجم ${t.kind === 'image' ? 'الصورة' : 'الفيديو'} يتجاوز ${LIMITS[t.kind] / 1048576} ميغابايت.`, 'too_large');
-  fs.mkdirSync(dirOf(cfg), { recursive: true });
+  if (upload.size > LIMITS[t.kind]) throw new HttpError(413, `حجم ${t.kind === 'image' ? 'الصورة' : 'الفيديو'} يتجاوز ${LIMITS[t.kind] / (1024 * 1024)} ميغابايت.`, 'too_large');
+  await fs.promises.mkdir(dirOf(cfg), { recursive: true });
   const file = `${crypto.randomBytes(16).toString('hex')}.${t.ext}`;
-  fs.writeFileSync(path.join(dirOf(cfg), file), buf);
-  const id = Number(db.prepare('INSERT INTO news_media (news_id, kind, source, file, mime, size, caption, created_at) VALUES (?,?,?,?,?,?,?,?)').run(n.id, t.kind, 'upload', file, t.mime, buf.length, caption(cap), Date.now()).lastInsertRowid);
+  await fs.promises.rename(upload.uploadPath, path.join(dirOf(cfg), file));
+  const id = Number(db.prepare('INSERT INTO news_media (news_id, kind, source, file, mime, size, caption, created_at) VALUES (?,?,?,?,?,?,?,?)').run(n.id, t.kind, 'upload', file, t.mime, upload.size, caption(cap), Date.now()).lastInsertRowid);
   audit(db, actor, `إرفاق ${t.kind === 'image' ? 'صورة' : 'فيديو'} بخبر`, n.title.slice(0, 80), ip);
   return { id, kind: t.kind };
 }

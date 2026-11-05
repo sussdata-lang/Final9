@@ -73,9 +73,7 @@ if (assets[2]) await seed('move2', 'POST', `${P}/assets/${assets[2].id}/move`, {
 /* ---------- 2ب) موظفون ورواتب (يغذّون شاشة الرواتب وتبويب «قيد الرواتب» في المالية) ---------- */
 const unitId = app.db.prepare('SELECT id FROM org_units ORDER BY id LIMIT 1').get()?.id;
 for (const [n, name, position, amount, hire] of [['101', 'سامر الخطيب', 'محاسب', 2400000, '2023-09-01'], ['102', 'ريما الحلبي', 'أمين مستودع', 2100000, '2024-02-15'], ['103', 'عماد الشامي', 'مسؤول مشتريات', 2800000, '2022-11-01'], ['104', 'لينا درويش', 'موظفة شؤون طلاب', 2000000, '2025-03-01'], ['105', 'هادي نصر', 'موظف جديد (بلا راتب)', 0, '2026-09-20']]) {
-  const e = await seed('emp' + n, 'POST', '/api/admin/hr/employees', { name, employeeNo: 'EMP-' + n, personalId: 'PID-' + n, email: `emp${n}@example.com`, phone: '0933000' + n, hireDate: hire, unit_id: unitId, position });
-  const id = e?.employee?.id ?? e?.id;
-  if (id && amount) await seed('sal' + n, 'POST', '/api/admin/hr/salaries', { employee_id: id, amount });
+  await seed('emp' + n, 'POST', '/api/hr-pro/employees', { name, employeeNo: 'EMP-' + n, personalId: 'PID-' + n, email: `emp${n}@example.com`, phone: '0933000' + n, hireDate: hire, unitId, position, baseSalary: amount });
 }
 
 /* ---------- 3) التقاط ردود كل مسارات GET ---------- */

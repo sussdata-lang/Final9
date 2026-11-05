@@ -116,7 +116,7 @@ export function registerMutationListener(fn) {
 // ==============================
 // Sync Query via Worker + SharedArrayBuffer
 // ==============================
-export const DB_POOL_MAX = 20;
+export const DB_POOL_MAX = Number(process.env.DB_POOL_MAX || 20);
 const HEADER_INTS = 3; // [status, dataLen, replySeq]
 const HEADER_BYTES = HEADER_INTS * 4;
 const SAB_SIZE = HEADER_BYTES + 8 * 1024 * 1024; // header + data(8MB)
@@ -583,6 +583,9 @@ async function runMigrations(poolConfig) {
     ...poolConfig,
     max: 3,
   });
+  // خادمان يبدآن معًا لا ينفذان الترحيلات في الوقت نفسه
+  const lock = await pool.connect();
+  await lock.query('SELECT pg_advisory_lock(727002)');
 
   try {
     // SQLite يوفّر COLLATE NOCASE؛ المكافئ في PostgreSQL تجميعة ICU غير حتمية (مستوى 2 = تجاهل حالة الأحرف)
@@ -681,6 +684,8 @@ async function runMigrations(poolConfig) {
       throw new Error(`[migrate] فشلت الترحيلات التالية: ${failures.join(', ')}`);
     }
   } finally {
+    await lock.query('SELECT pg_advisory_unlock(727002)').catch(() => {});
+    lock.release();
     await pool.end();
   }
 }
@@ -772,7 +777,7 @@ export async function openDb(connectionStringOrPath) {
 
   // 1) تشغيل migrations بشكل async أولاً
   try {
-    await runMigrations(poolConfig);
+    if (process.env.UNI_BOOT !== '0') await runMigrations(poolConfig);
   } catch (e) {
     if (e && (e.code === 'ECONNREFUSED' || e.code === 'ENOTFOUND' || e.code === 'ETIMEDOUT')) {
       throw new Error(`[DB] تعذّر الاتصال بـ PostgreSQL على ${target.host}:${target.port} (${e.code}). تحقق من DATABASE_URL وأن خدمة PostgreSQL تعمل وفي نفس المشروع.`, { cause: e });

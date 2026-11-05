@@ -6,10 +6,10 @@ const TYPE_OF_KIND = { scholarship: 'merit_top', sibling: 'sibling_discount', so
 
 export function listDiscounts({ db }) {
   ready(db);
-  return db.prepare(`SELECT s.id, s.scholarship_type, s.discount_percent, s.amount, s.academic_year, s.note, u.display_name, u.student_no
+  return db.prepare(`SELECT s.id, s.fin_charge_id, s.scholarship_type, s.discount_percent, s.amount, s.academic_year, s.note, u.display_name, u.student_no
     FROM sa_scholarships s JOIN users u ON u.id = s.student_id JOIN fin_charges c ON c.id = s.fin_charge_id
     WHERE s.status = 'active' AND c.status = 'open' ORDER BY s.id DESC LIMIT 200`).all().map((r) => ({
-    id: r.id, studentName: r.display_name, studentNo: r.student_no, academicYear: r.academic_year,
+    id: r.id, chargeId: r.fin_charge_id, studentName: r.display_name, studentNo: r.student_no, academicYear: r.academic_year,
     kindLabel: calculateScholarshipGrant({ scholarshipType: r.scholarship_type }).label,
     percent: Number(r.discount_percent), amount: Number(r.amount), reason: r.note,
   }));

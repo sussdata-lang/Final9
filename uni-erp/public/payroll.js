@@ -423,6 +423,8 @@
                 <th>خصم إجازة بدون راتب</th>
                 <th>تاريخ البداية</th>
                 <th>تاريخ النهاية</th>
+                <th>الحالة</th>
+                <th>إجراء</th>
               </tr>
             </thead>
             <tbody>
@@ -438,14 +440,20 @@
                   <td class="mono" style="color:${l.unpaidDeduction > 0 ? '#b91c1c' : 'inherit'};font-weight:700">${nfMoney(l.unpaidDeduction)}</td>
                   <td class="mono">${esc(l.startDate)}</td>
                   <td class="mono">${esc(l.endDate)}</td>
+                  <td>${badge(LEAVE_STATUS[l.status] || l.status, l.status === 'approved' ? 'ok' : l.status === 'pending' ? 'warn' : 'info')}${l.status === 'rejected' && l.notes ? `<div class="small">${esc(l.notes)}</div>` : ''}</td>
+                  <td style="white-space:nowrap">${l.status === 'pending' && UA.can('hr:manage') ? `<button class="btn sm pri" data-act="hrleaveapprove" data-id="${l.id}">اعتماد</button>
+                    <button class="btn sm" data-act="hrleavereject" data-id="${l.id}">رفض</button>
+                    <button class="btn sm" data-act="hrleavecancel" data-id="${l.id}">إلغاء</button>` : ''}</td>
                 </tr>
-              `).join('') || '<tr><td colspan="10" class="empty">لا توجد إجازات مسجّلة.</td></tr>'}
+              `).join('') || '<tr><td colspan="12" class="empty">لا توجد إجازات مسجّلة.</td></tr>'}
             </tbody>
           </table>
         </div>
       </section>
     `;
   }
+
+  const LEAVE_STATUS = { pending: 'قيد الاعتماد', approved: 'معتمدة', rejected: 'مرفوضة', cancelled: 'ملغاة' };
 
   /* ==================== 6) شاشة الرواتب والحسابات (الصورة 3) ==================== */
   function salTab(D) {
@@ -1131,7 +1139,7 @@
       `;
     } else if (m.type === 'leave') {
       content = `
-        <h2 id="mttl">تسجيل إجازة موظف</h2>
+        <h2 id="mttl">طلب إجازة موظف</h2>
         ${UA.formKit.render({
           id: 'hr-leave-form',
           bare: true,
@@ -1149,7 +1157,18 @@
           <label>تاريخ البداية *<input id="hlv-start" type="date" value="${today()}" required></label>
           <label>تاريخ النهاية *<input id="hlv-end" type="date" value="${today()}" required></label>` }],
           justification: { id: 'hlv-reason', label: 'سبب الإجازة', max: 200 },
-          actions: `<button class="btn pri" type="submit">حفظ الإجازة وتحديث الرصيد</button>
+          actions: `<button class="btn pri" type="submit">إرسال الطلب للاعتماد</button>
+            <button class="btn" type="button" data-act="hrmclose">إلغاء</button>`,
+        })}
+      `;
+    } else if (m.type === 'leave_reject') {
+      content = `
+        <h2 id="mttl">رفض طلب الإجازة</h2>
+        ${UA.formKit.render({
+          id: 'hr-leave-reject-form',
+          bare: true,
+          sections: [{ title: 'سبب الرفض', html: `<label>السبب *<input id="hlr-reason" maxlength="200" required></label>` }],
+          actions: `<button class="btn pri" type="submit">تأكيد الرفض</button>
             <button class="btn" type="button" data-act="hrmclose">إلغاء</button>`,
         })}
       `;
@@ -1340,6 +1359,20 @@
       await reload();
       toast('حُذف سجل الغياب');
     }),
+    hrleaveapprove: (el, d) => run(async () => {
+      await api('POST', `/api/hr-pro/leaves/${d.id}/approve`, {});
+      await reload();
+      toast('اعتُمدت الإجازة');
+    }),
+    hrleavecancel: (el, d) => run(async () => {
+      await api('POST', `/api/hr-pro/leaves/${d.id}/cancel`, {});
+      await reload();
+      toast('أُلغي طلب الإجازة');
+    }),
+    hrleavereject: (el, d) => {
+      B.modal = { type: 'leave_reject', item: { id: d.id } };
+      UA.render();
+    },
     hrleavenew: () => {
       B.modal = { type: 'leave' };
       UA.render();
@@ -1446,6 +1479,12 @@
       await reload();
       toast('سُجّل الغياب واحتُسب الخصم في الرواتب');
     }),
+    'hr-leave-reject-form': () => run(async () => {
+      await api('POST', `/api/hr-pro/leaves/${B.modal.item.id}/reject`, { reason: $id('hlr-reason').value });
+      B.modal = null;
+      await reload();
+      toast('رُفض طلب الإجازة');
+    }),
     'hr-leave-form': () => run(async () => {
       await api('POST', '/api/hr-pro/leaves', {
         employeeId: Number($id('hlv-emp').value),
@@ -1457,7 +1496,7 @@
       });
       B.modal = null;
       await reload();
-      toast('سُجّلت الإجازة وحُدّث الرصيد المتبقي');
+      toast('سُجّل طلب الإجازة، وينتظر الاعتماد');
     }),
     'hr-adv-form': () => run(async () => {
       await api('POST', '/api/hr-pro/advances', {

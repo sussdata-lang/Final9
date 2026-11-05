@@ -1,3 +1,4 @@
+import { tx } from '../db.js';
 // منظومة شؤون الموظفين المتكاملة (HR Integrated System — تدمج كافة الجداول مع الموجود حالياً دون أي تعارض)
 import { HttpError } from '../http.js';
 import { audit } from '../audit.js';
@@ -91,6 +92,7 @@ export function buildHrProOverview(db, refDateStr = DEFAULT_REF_DATE, options = 
       startDate: l.start_date,
       endDate: l.end_date,
       status: l.status,
+      notes: l.notes,
       reason: l.reason || '',
     };
   });
@@ -237,7 +239,7 @@ export function buildHrProOverview(db, refDateStr = DEFAULT_REF_DATE, options = 
   // 8) جدول الرواتب والحسابات الشامل (يربط الموظفين + البدلات + الغياب + الإجازات بدون راتب + السلف + التأمينات والضرائب)
   const payroll = rawEmps.map((emp) => {
     const empAbs = rawAbs.filter((a) => a.employee_id === emp.id);
-    const empLvs = leaves.filter((l) => l.employeeId === emp.id).map((l) => ({ status: l.status, unpaid_deduction: l.unpaidDeduction }));
+    const empLvs = leaves.filter((l) => l.employeeId === emp.id && l.status === 'approved').map((l) => ({ status: l.status, unpaid_deduction: l.unpaidDeduction }));
     const empAdvs = rawAdv.filter((ad) => ad.employee_id === emp.id);
     return calcEmployeePayroll(emp, empAbs, empLvs, empAdvs);
   });
@@ -377,7 +379,7 @@ export function buildHrProOverview(db, refDateStr = DEFAULT_REF_DATE, options = 
   const totalAdvances = Math.round(scopedAdvances.reduce((s, a) => s + a.amount, 0) * 100) / 100;
   const totalRemainingAdvances = Math.round(scopedAdvances.reduce((s, a) => s + a.remainingAmount, 0) * 100) / 100;
   const totalAbsenceDays = scopedAbsences.reduce((s, a) => s + a.absenceDays, 0);
-  const totalLeaveDays = scopedLeaves.reduce((s, l) => s + l.days, 0);
+  const totalLeaveDays = scopedLeaves.filter((l) => l.status === 'approved').reduce((s, l) => s + l.days, 0);
   const expiredContractsCount = scopedContracts.filter((c) => c.remainingDays < 0).length;
   const expiringSoonContractsCount = scopedContracts.filter((c) => c.renewalAlert === 'يحتاج تجديد').length;
   const validContractsCount = scopedContracts.filter((c) => c.renewalAlert === 'ساري').length;
@@ -423,7 +425,7 @@ export function buildHrProOverview(db, refDateStr = DEFAULT_REF_DATE, options = 
         { label: 'إجمالي الموظفين', value: employees.length, unit: 'موظف' },
         { label: 'مسير الاستحقاقات الشهري', value: Math.round(payroll.reduce((s, p) => s + p.grossEarnings, 0)), unit: 'ل.س' },
         { label: 'العقود السارية / المنتهية', value: `${contracts.filter((c) => c.renewalAlert === 'ساري').length} / ${contracts.filter((c) => c.remainingDays < 0).length}`, unit: 'عقد' },
-        { label: 'أيام الإجازات والغياب', value: `${leaves.reduce((s, l) => s + l.days, 0)} / ${absences.reduce((s, a) => s + a.absenceDays, 0)}`, unit: 'يوم' },
+        { label: 'أيام الإجازات والغياب', value: `${leaves.filter((l) => l.status === 'approved').reduce((s, l) => s + l.days, 0)} / ${absences.reduce((s, a) => s + a.absenceDays, 0)}`, unit: 'يوم' },
       ],
     },
     {
@@ -869,19 +871,60 @@ export function registerHrIntegratedRoutes(r, { db, cfg }) {
       'حج وعمرة': 'annual',
     };
     const dbType = typeMap[leaveTypeAr] || 'annual';
-    const startDate = clean(b.startDate || '2026-10-26', 20);
-    const endDate = clean(b.endDate || startDate, 20);
-    const days = Math.max(1, Number(b.days) || 1);
+    if (emp.status === 'terminated') throw new HttpError(400, 'خدمة الموظف منتهية.', 'validation');
+    const isDay = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v));
+    const startDate = clean(b.startDate, 20), endDate = clean(b.endDate || b.startDate, 20);
+    if (!isDay(startDate) || !isDay(endDate) || endDate < startDate) throw new HttpError(400, 'تاريخا البداية والنهاية غير صالحين.', 'validation');
+    const days = Number(b.days);
+    if (!Number.isInteger(days) || days < 1) throw new HttpError(400, 'عدد الأيام غير صالح.', 'validation');
+    if (db.prepare("SELECT 1 AS x FROM hr_leaves WHERE employee_id = ? AND status IN ('pending', 'approved') AND start_date <= ? AND end_date >= ? LIMIT 1").get(employeeId, endDate, startDate)) throw new HttpError(409, 'توجد إجازة معتمدة أو قيد الاعتماد في هذه الفترة.', 'conflict');
     const { map: settings } = getHrAlertSettingsMap(db);
     const m = calcLeaveMetrics(leaveTypeAr, days, emp.salary_base, emp.annual_leave_quota || 21, 0, Number(settings.salary_day_divisor ?? 30));
 
     const res = db.prepare(`
       INSERT INTO hr_leaves (employee_id, leave_type, leave_type_ar, status, start_date, end_date, days, unpaid_deduction, reason, notes, created_by, created_at, ip)
-      VALUES (?, ?, ?, 'approved', ?, ?, ?, ?, ?, 'مسجلة من شؤون الموظفين', ?, ?, ?)
+      VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?, '', ?, ?, ?)
     `).run(employeeId, dbType, leaveTypeAr, startDate, endDate, days, m.unpaidDeduction, clean(b.reason || `إجازة ${leaveTypeAr}`, 200), c.user.id, Date.now(), c.ip);
 
-    audit(db, c.user, 'تسجيل إجازة موظف', `${emp.employeeNo} (${leaveTypeAr} - ${days} أيام)`, c.ip);
+    audit(db, c.user, 'طلب إجازة موظف', `${emp.employeeNo} (${leaveTypeAr} - ${days} أيام)`, c.ip);
     c.json(201, { id: Number(res.lastInsertRowid), unpaidDeduction: m.unpaidDeduction });
+  });
+
+  // اعتماد الإجازة ورفضها وإلغاؤها: الطلب المعلق وحده يتغير
+  const pendingLeave = (c) => {
+    if (!c.user.can('hr:manage') && c.user.role !== 'admin') throw new HttpError(403, 'لا تملك صلاحية هذا الإجراء.');
+    const l = db.prepare('SELECT * FROM hr_leaves WHERE id = ?').get(Number(c.params.id));
+    if (!l) throw new HttpError(404, 'طلب الإجازة غير موجود.', 'not_found');
+    if (l.status !== 'pending') throw new HttpError(409, 'هذا الطلب ليس قيد الاعتماد.', 'conflict');
+    return l;
+  };
+  r.add('POST', '/api/hr-pro/leaves/:id/approve', (c) => {
+    const l = pendingLeave(c);
+    const emp = db.prepare('SELECT employeeNo, name FROM hr_employees WHERE id = ?').get(l.employee_id);
+    tx(db, () => {
+      db.prepare("UPDATE hr_leaves SET status = 'approved', reviewed_by = ?, reviewed_at = ? WHERE id = ?").run(c.user.id, Date.now(), l.id);
+      // رصيد إجازات الحساب المرتبط بالموظف، إن وُجد
+      const u = emp && db.prepare('SELECT id FROM users WHERE username = ? OR display_name = ? LIMIT 1').get(emp.employeeNo, emp.name);
+      if (u && !db.prepare('SELECT 1 AS x FROM leave_records WHERE user_id = ? AND from_day = ? AND to_day = ?').get(u.id, l.start_date, l.end_date)) {
+        db.prepare('INSERT INTO leave_records (user_id, year, type, from_day, to_day, days, created_at) VALUES (?,?,?,?,?,?,?)').run(u.id, Number(String(l.start_date).slice(0, 4)), l.leave_type_ar || 'سنوية', l.start_date, l.end_date, Number(l.days), Date.now());
+      }
+    });
+    audit(db, c.user, 'اعتماد إجازة موظف', emp?.employeeNo ?? String(l.employee_id), c.ip);
+    c.json(200, { ok: true, status: 'approved' });
+  });
+  r.add('POST', '/api/hr-pro/leaves/:id/reject', (c) => {
+    const l = pendingLeave(c);
+    const reason = clean(c.body?.reason, 200);
+    if (!reason) throw new HttpError(400, 'اكتب سبب الرفض.', 'validation');
+    db.prepare("UPDATE hr_leaves SET status = 'rejected', reviewed_by = ?, reviewed_at = ?, notes = ? WHERE id = ?").run(c.user.id, Date.now(), reason, l.id);
+    audit(db, c.user, 'رفض إجازة موظف', String(l.employee_id), c.ip);
+    c.json(200, { ok: true, status: 'rejected' });
+  });
+  r.add('POST', '/api/hr-pro/leaves/:id/cancel', (c) => {
+    const l = pendingLeave(c);
+    db.prepare("UPDATE hr_leaves SET status = 'cancelled', reviewed_by = ?, reviewed_at = ? WHERE id = ?").run(c.user.id, Date.now(), l.id);
+    audit(db, c.user, 'إلغاء طلب إجازة موظف', String(l.employee_id), c.ip);
+    c.json(200, { ok: true, status: 'cancelled' });
   });
 
   // 5) إدارة السلف والأقساط الشهرية

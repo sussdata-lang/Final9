@@ -1,3 +1,5 @@
+import { pipeline } from 'node:stream/promises';
+import { Transform } from 'node:stream';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -100,6 +102,35 @@ async function readRaw(req, limit) {
   const chunks = []; let size = 0;
   for await (const c of req) { size += c.length; if (size > limit) throw new HttpError(413, 'حجم الملف أكبر من المسموح.', 'too_large'); chunks.push(c); }
   return Buffer.concat(chunks);
+}
+
+// رفع كبير: يُبث إلى ملف مؤقت بدل الذاكرة، ويكفي أوله لتحديد نوعه
+const UPLOAD_HEAD = 64 * 1024, UPLOAD_IDLE_MS = 120_000;
+export const incomingDir = (cfg) => path.join(cfg.uploadDir, '.incoming');
+async function readUpload(req, limit, cfg) {
+  const declared = Number(req.headers['content-length']);
+  if (declared > limit) { req.resume(); throw new HttpError(413, 'حجم الملف أكبر من المسموح.', 'too_large'); }
+  await fs.promises.mkdir(incomingDir(cfg), { recursive: true });
+  const uploadPath = path.join(incomingDir(cfg), crypto.randomBytes(16).toString('hex'));
+  const out = fs.createWriteStream(uploadPath, { flags: 'wx' });
+  const heads = []; let size = 0, headSize = 0;
+  const count = new Transform({
+    transform(chunk, _enc, done) {
+      size += chunk.length;
+      if (size > limit) return done(new HttpError(413, 'حجم الملف أكبر من المسموح.', 'too_large'));
+      if (headSize < UPLOAD_HEAD) { heads.push(chunk.subarray(0, UPLOAD_HEAD - headSize)); headSize += heads[heads.length - 1].length; }
+      done(null, chunk);
+    },
+  });
+  // عميل متوقف لا يحجز الاتصال ولا الملف
+  req.setTimeout(UPLOAD_IDLE_MS, () => req.destroy(new HttpError(408, 'انقطع رفع الملف.', 'upload_timeout')));
+  try {
+    await pipeline(req, count, out);
+  } catch (e) {
+    await fs.promises.rm(uploadPath, { force: true });
+    throw e.status ? e : new HttpError(400, 'انقطع رفع الملف.', 'upload_failed');
+  }
+  return { uploadPath, size, head: Buffer.concat(heads) };
 }
 
 async function readBody(req, limit) {
@@ -332,16 +363,18 @@ export function makeHandler({ cfg, router, getUser }) {
         throw new HttpError(403, 'مصدر الطلب غير مسموح.', 'bad_origin');
       if (route.opts.auth !== false && !user) throw new HttpError(401, 'يلزم تسجيل الدخول.', 'unauthenticated');
       if (route.opts.auth !== false && user?.must_change_password && !route.opts.allowMustChange) throw new HttpError(403, 'يجب تغيير كلمة المرور المؤقتة أولاً.', 'password_change_required');
-      const parsedBody = req.method === 'GET' ? {} : route.opts.raw ? await readRaw(req, route.opts.maxBody) : await readBody(req, route.opts.maxBody ?? 64 * 1024);
+      const parsedBody = req.method === 'GET' ? {} : route.opts.upload ? await readUpload(req, route.opts.maxBody, cfg) : route.opts.raw ? await readRaw(req, route.opts.maxBody) : await readBody(req, route.opts.maxBody ?? 64 * 1024);
       // فحص WAF على الـ body بعد parse
-      if (req._wafScanBody && typeof parsedBody === 'object' && !Buffer.isBuffer(parsedBody)) {
+      if (req._wafScanBody && typeof parsedBody === 'object' && !Buffer.isBuffer(parsedBody) && !route.opts.upload) {
         const bodyHit = req._wafScanBody(parsedBody);
         if (bodyHit) throw new HttpError(403, `محتوى الطلب مرفوض${bodyHit.label ? ` (الحقل: ${String(bodyHit.label).slice(0, 60)})` : ''}.`, bodyHit.type);
       }
+      if (process.env.WEB_CONCURRENCY > 1 && process.env.NODE_ENV !== 'production') res.setHeader('X-Served-By', String(process.pid));
       const ctx = { req, res, ip, params, query: Object.fromEntries(url.searchParams), cookies, user, cfg,
         body: parsedBody,
         json: (status, obj, headers) => sendJson(res, status, obj, headers, req) };
-      await route.handler(ctx);
+      try { await route.handler(ctx); }
+      finally { if (route.opts.upload && parsedBody?.uploadPath) await fs.promises.rm(parsedBody.uploadPath, { force: true }).catch(() => {}); }
     } catch (e) {
       if (e instanceof HttpError) return sendJson(res, e.status, { error: e.code, message: e.message, ...(e.field ? { field: e.field } : {}) }, {}, req);
       if (/fk_\w+_student/.test(String(e?.message))) return sendJson(res, 400, { error: 'validation', message: 'الرقم الجامعي غير موجود في النظام.', field: 'student_no' }, {}, req);

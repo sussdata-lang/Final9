@@ -4,6 +4,7 @@ import { audit } from '../audit.js';
 import { HttpError } from '../http.js';
 import { registerStudent, STATUS_LABEL } from './students.js';
 import { createCharge } from './finance/fees.js';
+import { nextNumber } from './numbering.js';
 import { ready as readyFinance } from './finance/core.js';
 import { getSetting } from './settings.js';
 
@@ -586,7 +587,7 @@ export function addAdmissionApplicant({ db }, actor, body, ip) {
   if (!fullName || !nationalId || !Number.isFinite(hsScore) || hsScore <= 0 || !pref1) {
     throw new HttpError(400, 'يرجى إدخال اسم المتقدم، الرقم الوطني، مجموع الثانوية، والرغبة الأولى.', 'validation');
   }
-  const nextId = (db.prepare('SELECT COALESCE(MAX(id), 0) + 1 AS n FROM sa_applicants').get()?.n) || 1;
+  const nextId = nextNumber(db, 'sa_applicants', 'SELECT MAX(id) FROM sa_applicants');
   const appNo = `ADM-${new Date().getFullYear()}-${String(100 + nextId).padStart(4, '0')}`;
   const category = ['general', 'parallel', 'martyrs', 'transfer'].includes(body?.category) ? body.category : 'general';
   const hsType = String(body?.hsType || 'علمي').trim();
@@ -841,7 +842,7 @@ export function executeLifecycleMovement({ db }, actor, body, ip) {
   const toStatus = LIFECYCLE_STATUS[movementType] || prof.status;
   const toProgramId = movementType === 'program_transfer' && body?.toProgramId ? Number(body.toProgramId) : prof.program_id;
 
-  const nextId = (db.prepare('SELECT COALESCE(MAX(id), 0) + 1 AS n FROM sa_lifecycle_movements').get()?.n) || 1;
+  const nextId = nextNumber(db, 'sa_lifecycle_movements', 'SELECT MAX(id) FROM sa_lifecycle_movements');
   const movNo = `MOV-${new Date().getFullYear()}-${String(nextId).padStart(3, '0')}`;
   const decisionNo = String(body?.decisionNo || `قرار شؤون الطلاب #${100 + nextId}`).trim();
   const imp = LIFECYCLE_IMPACT[movementType] || LIFECYCLE_IMPACT.postponement;
@@ -935,7 +936,7 @@ export function grantStudentScholarship(deps, actor, body, ip) {
   const discountFeeType = db.prepare("SELECT id FROM fin_fee_types WHERE kind = 'discount' AND active = 1 ORDER BY id LIMIT 1").get();
   if (!discountFeeType) throw new HttpError(409, 'لا يوجد نوع رسم خصم نشط في المالية؛ عرّفه أو فعّله أولاً ليُسجَّل قيد المنحة.', 'conflict');
 
-  const nextId = (db.prepare('SELECT COALESCE(MAX(id), 0) + 1 AS n FROM sa_scholarships').get()?.n) || 1;
+  const nextId = nextNumber(db, 'sa_scholarships', 'SELECT MAX(id) FROM sa_scholarships');
   const grantNo = `SCH-${new Date().getFullYear()}-${String(nextId).padStart(3, '0')}`;
 
   const info = db
@@ -998,7 +999,7 @@ export function bookDeskAppointment({ db }, actor, body, ip) {
   const timeSlot = String(body?.timeSlot || '10:00 - 10:30');
   const counterWindow = String(body?.counterWindow || 'النافذة 1 — الوثائق والشهادات');
 
-  const nextId = (db.prepare('SELECT COALESCE(MAX(id), 0) + 1 AS n FROM sa_desk_appointments').get()?.n) || 1;
+  const nextId = nextNumber(db, 'sa_desk_appointments', 'SELECT MAX(id) FROM sa_desk_appointments');
   const ticketNo = `Q-${100 + nextId}`;
 
   const info = db

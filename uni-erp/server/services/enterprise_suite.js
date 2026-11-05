@@ -84,15 +84,16 @@ function executiveKpisFrom(db) {
 const money2 = (v) => Number(v).toFixed(2);
 export const payslipPayload = (p) => Buffer.from([p.payslip_code, p.employee_code ?? '', p.employee_name, p.month_label, money2(p.basic_salary), money2(p.overload_pay), money2(p.allowances), money2(p.deductions), money2(p.net_salary)].join('|'), 'utf8');
 
-export function buildEnterpriseSuiteOverview(db) {
+export function buildEnterpriseSuiteOverview(db, scope = {}) {
+  const mine = scope.studentNo ? 'WHERE student_no = ?' : '', mineArgs = scope.studentNo ? [scope.studentNo] : [];
   const scheduleSlots = listAllSlots(db);
   const scheduleCourses = db.prepare('SELECT id, code, name, instructor FROM courses WHERE active = 1 ORDER BY name').all();
   const quizzes = listQuizzes(db);
   const quizSubmissions = db.prepare('SELECT * FROM lms_quiz_submissions ORDER BY submitted_at DESC LIMIT 30').all();
-  const selfEnrollments = db.prepare('SELECT * FROM student_self_enrollments ORDER BY registered_at DESC').all();
-  const facultyOverloads = db.prepare('SELECT * FROM faculty_overload_records ORDER BY id DESC').all();
-  const signedPayslips = db.prepare('SELECT * FROM hr_signed_payslips ORDER BY issued_at DESC').all();
-  const feeInstallments = db.prepare('SELECT * FROM student_fee_installments ORDER BY id ASC').all();
+  const selfEnrollments = db.prepare(`SELECT * FROM student_self_enrollments ${mine} ORDER BY registered_at DESC LIMIT 1000`).all(...mineArgs);
+  const facultyOverloads = scope.studentNo ? [] : db.prepare('SELECT * FROM faculty_overload_records ORDER BY id DESC LIMIT 500').all();
+  const signedPayslips = scope.studentNo ? [] : db.prepare('SELECT * FROM hr_signed_payslips ORDER BY issued_at DESC LIMIT 500').all();
+  const feeInstallments = db.prepare(`SELECT * FROM student_fee_installments ${mine} ORDER BY id ASC LIMIT 2000`).all(...mineArgs);
   const notifications = db.prepare('SELECT * FROM multi_channel_notifications ORDER BY created_at DESC LIMIT 20').all();
   const encryptedSnapshots = db.prepare('SELECT * FROM encrypted_snapshots ORDER BY created_at DESC LIMIT 20').all();
   const offlineBatches = db.prepare('SELECT * FROM offline_sync_batches ORDER BY synced_at DESC LIMIT 20').all();
@@ -110,7 +111,7 @@ export function buildEnterpriseSuiteOverview(db) {
     notifications,
     encryptedSnapshots,
     offlineBatches,
-    executiveKpis: executiveKpisFrom(db),
+    executiveKpis: scope.skipKpis ? { facultiesComparison: [] } : executiveKpisFrom(db),
   };
 }
 
@@ -120,7 +121,7 @@ const SEES_PAYROLL = ['hr:manage', 'hr_payroll:approve'];
 
 // نسخة النظرة الشاملة حسب صلاحيات المستخدم: بيانات الرواتب والرسوم والنسخ لا تصل إلا لمن يملكها، والطالب يرى سجلاته فقط
 export function enterpriseOverviewFor(db, user) {
-  const ov = buildEnterpriseSuiteOverview(db);
+  const ov = buildEnterpriseSuiteOverview(db, { studentNo: user.role === 'student' ? (user.student_no || '-') : null, skipKpis: !user.can('stats:read') });
   const own = (rows) => rows.filter((row) => user.student_no && row.student_no === user.student_no);
   const seesAcademic = canAny(user, 'course:manage', 'grade:manage', 'academic:read');
   return {

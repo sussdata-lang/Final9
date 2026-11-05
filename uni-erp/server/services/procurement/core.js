@@ -1,5 +1,6 @@
 // المشتريات والمخازن والأصول — النواة
 import { tx } from '../../db.js';
+import { nextNumber } from '../numbering.js';
 import { audit } from '../../audit.js';
 import { HttpError } from '../../http.js';
 export const bad = (m, s=400, code='validation') => new HttpError(s, m, code);
@@ -15,10 +16,8 @@ export const today = () => new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Damas
 export { clean };
 const nextNo = (db, prefix, table) => {
   const y = today().slice(0,4);
-  const like = `${prefix}-${y}-%`;
-  const row = db.prepare(`SELECT no FROM ${table} WHERE no LIKE ? ORDER BY id DESC LIMIT 1`).get(like);
-  let n = 1;
-  if(row?.no){ const m = /-(\d+)$/.exec(row.no); if(m) n = Number(m[1])+1; }
+  const head = `${prefix}-${y}-`;
+  const n = nextNumber(db, `${table}:${head}`, `SELECT MAX(CAST(substr(no, ?) AS INTEGER)) FROM ${table} WHERE no LIKE ?`, [head.length + 1, `${head}%`]);
   return `${prefix}-${y}-${String(n).padStart(5,'0')}`;
 };
 /* Warehouses */
@@ -269,7 +268,7 @@ export function createReceipt({db},actor,b,ip){
         if (invAcc && supAcc && openYear) {
           const minorAmt = Math.round(receiptTotal * 100);
           const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Damascus' }).format(new Date());
-          const seq = (db.prepare("SELECT COALESCE(MAX(seq),0) m FROM fin_entries WHERE year_id=? AND type='JV'").get(openYear.id).m) + 1;
+          const seq = nextNumber(db, `fin:${openYear.id}:JV`, "SELECT MAX(seq) FROM fin_entries WHERE year_id = ? AND type = 'JV'", [openYear.id]);
           const jvNo = `JV-${openYear.name}-${String(seq).padStart(5, '0')}`;
           const desc = `قيد استحقاق استلام مخزني (أمر شراء ${o.no} — سند استلام #${rid})`;
           journalEntryId = Number(db.prepare("INSERT INTO fin_entries (year_id, seq, no, type, entry_day, description, reference, status, source, created_by, created_at, posted_by, posted_at) VALUES (?,?,?,'JV',?,?,?,'posted',?,?,?,?,?)")

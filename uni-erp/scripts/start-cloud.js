@@ -26,4 +26,4 @@ if (process.env.RESET_ACCOUNTS === '1' || resetCore) {
   const st = run('./structure.js');
   if (st.status !== 0) console.error('تعذّرت تهيئة الهيكل التنظيمي؛ يُكمل الخادم بدونها.');
 }
-await import('../server/index.js');
+await import('../server/cluster.js');

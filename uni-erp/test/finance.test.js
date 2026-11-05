@@ -488,3 +488,69 @@ test('POST /api/finance/discounts posts a real discount and lowers the balance',
   assert.equal((await statement()).balance, 250);
   assert.equal((await req('GET', '/api/finance/discounts', null, adminCookie)).body.discounts.length, 1);
 });
+
+// ── فواتير الطلاب: الأقساط والمسدد الفعلي والمتأخرات ─────────────────────────
+test('student invoices split into installments and track real payments', async () => {
+  const db = testApp.db;
+  const stuId = Number(db.prepare("INSERT INTO users (username, display_name, password_hash, role, student_no, created_at) VALUES ('bill1', 'طالب فواتير', 'x', 'student', 'BIL-1', ?)").run(Date.now()).lastInsertRowid);
+  const post = (url, body) => req('POST', url, body, adminCookie);
+  const list = async () => (await req('GET', '/api/finance/student-invoices?q=BIL-1', null, adminCookie)).body.invoices.sort((a, b) => a.dueDay.localeCompare(b.dueDay));
+  const good = { studentNo: 'BIL-1', academicYear: '2026/2027', totalAmount: 1000, installmentsCount: 3, firstDueDay: '2026-01-31' };
+
+  assert.equal((await post('/api/finance/student-invoices', { ...good, studentNo: 'NOPE' })).status, 404);
+  assert.equal((await post('/api/finance/student-invoices', { ...good, academicYear: '' })).status, 400);
+  assert.equal((await post('/api/finance/student-invoices', { ...good, totalAmount: 0 })).status, 400);
+  assert.equal((await post('/api/finance/student-invoices', { ...good, installmentsCount: 13 })).status, 400);
+  assert.equal((await post('/api/finance/student-invoices', { ...good, firstDueDay: '' })).status, 400);
+  assert.equal((await post('/api/finance/student-invoices', good)).status, 201);
+
+  let rows = await list();
+  assert.deepEqual(rows.map((r) => r.dueDay), ['2026-01-31', '2026-02-28', '2026-03-31'], 'شهريًا مع مراعاة نهاية الشهر');
+  assert.equal(rows.reduce((s, r) => s + r.totalAmount, 0), 1000, 'لا يضيع كسر من القسمة');
+  assert.equal(rows[2].totalAmount, 333.34);
+  assert.match(rows[0].note, /قسط 1 من 3/);
+
+  // الدفعة تذهب إلى الأقدم، ولا تتجاوز المتبقي
+  assert.equal((await post(`/api/finance/student-invoices/${rows[0].id}/pay`, { amount: 9999 })).status, 400);
+  assert.equal((await post(`/api/finance/student-invoices/${rows[0].id}/pay`, {})).status, 400, 'المبلغ مطلوب');
+  assert.equal((await post(`/api/finance/student-invoices/${rows[0].id}/pay`, { amount: 100 })).status, 201);
+  rows = await list();
+  assert.deepEqual(rows.map((r) => [r.paidAmount, r.status]), [[100, 'partial'], [0, 'unpaid'], [0, 'unpaid']]);
+
+  const overdue = (await req('GET', '/api/finance/fees/overdue', null, adminCookie)).body.installments.filter((x) => x.studentNo === 'BIL-1');
+  assert.equal(overdue.length, 3);
+  assert.equal(overdue[0].paidAmount, 100);
+  const ov = (await req('GET', '/api/finance/fees/overview', null, adminCookie)).body;
+  assert.equal(ov.totalBilled, 1000);
+  assert.equal(ov.totalCollected, 100);
+  assert.equal(ov.totalRemaining, 900);
+  assert.equal(ov.overdueCount, 3);
+
+  // ما عليه دفعة لا يُلغى، وإلغاء الدفعة يعيده
+  assert.equal((await post(`/api/finance/charges/${rows[0].id}/void`, { reason: 'خطأ' })).status, 409);
+  const payment = (await req('GET', '/api/finance/payments', null, adminCookie)).body.payments.find((p) => Number(p.studentId) === stuId);
+  assert.equal((await post(`/api/finance/payments/${payment.id}/void`, { reason: 'خطأ' })).status, 200);
+  assert.equal((await post(`/api/finance/charges/${rows[0].id}/void`, { reason: 'خطأ' })).status, 200);
+  rows = await list();
+  assert.deepEqual(rows.map((r) => [r.paidAmount, r.status]), [[0, 'cancelled'], [0, 'unpaid'], [0, 'unpaid']]);
+
+  const one = (await req('GET', `/api/finance/student-invoices/${rows[1].id}`, null, adminCookie)).body.invoice;
+  assert.equal(one.studentName, 'طالب فواتير');
+  assert.equal((await req('GET', '/api/finance/student-invoices/999999', null, adminCookie)).status, 404);
+});
+
+test('student invoices are paged and searchable with correct totals for each page', async () => {
+  const db = testApp.db;
+  const uid = Number(db.prepare("INSERT INTO users (username, display_name, password_hash, role, student_no, created_at) VALUES ('pg1', 'طالب صفحات', 'x', 'student', 'PGE-1', ?)").run(Date.now()).lastInsertRowid);
+  const fee = (await req('GET', '/api/finance/fee-types', null, adminCookie)).body.find((f) => f.kind === 'fee' && f.active);
+  for (let i = 0; i < 12; i++) await req('POST', '/api/finance/charges', { studentId: uid, feeTypeId: fee.id, amount: 100, dueDay: '2026-01-01', academicYear: 'Y' }, adminCookie);
+  const first = (await req('GET', '/api/finance/student-invoices?q=PGE-1&size=10', null, adminCookie)).body;
+  assert.equal(first.total, 12);
+  assert.equal(first.pages, 2);
+  assert.equal(first.invoices.length, 10);
+  const second = (await req('GET', '/api/finance/student-invoices?q=PGE-1&size=10&page=2', null, adminCookie)).body;
+  assert.equal(second.invoices.length, 2);
+  assert.equal(new Set([...first.invoices, ...second.invoices].map((i) => i.id)).size, 12);
+  assert.equal((await req('GET', '/api/finance/student-invoices?q=NOBODY', null, adminCookie)).body.total, 0);
+  assert.equal((await req('GET', '/api/finance/charges?limit=5', null, adminCookie)).body.charges.length, 5);
+});

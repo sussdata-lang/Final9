@@ -1,5 +1,6 @@
 // رسوم الطلاب: أنواع الرسوم، الاستحقاقات، المدفوعات/الإيصالات، كشف الطالب، إغلاق السنة، قيد الرواتب.
 import { tx } from '../../db.js';
+import { nextNumber } from '../numbering.js';
 import { audit } from '../../audit.js';
 import { bad, ready, sysAccount, createEntry, reverseEntry, fromMinor, toMinor, isDay, today, clean } from './core.js';
 import { getSetting } from '../settings.js';
@@ -32,16 +33,18 @@ export function toggleFeeType({ db }, actor, id, on, ip) {
 }
 
 /* --------- الاستحقاقات (Charges) --------- */
+const limitSql = (q) => (q.limit ? ` LIMIT ${Math.min(1000, Math.max(1, Number(q.limit) || 200))} OFFSET ${Math.max(0, Number(q.offset) || 0)}` : '');
 const chView = (r) => ({ id: r.id, studentId: r.student_id, feeTypeId: r.fee_type_id, feeType: r.ft_name, kind: r.ft_kind, amount: fromMinor(r.amount), dueDay: r.due_day, academicYear: r.academic_year, note: r.note, status: r.status, entryId: r.entry_id, createdAt: r.created_at });
 export function listCharges({ db }, q = {}) {
   ready(db);
   const w = [], a = [];
   if (q.studentId) { w.push('c.student_id = ?'); a.push(Number(q.studentId)); }
+  if (q.studentIds) { w.push(`c.student_id IN (${q.studentIds.map(Number).join(',') || 0})`); }
   if (q.feeTypeId) { w.push('c.fee_type_id = ?'); a.push(Number(q.feeTypeId)); }
   if (q.status) { w.push('c.status = ?'); a.push(q.status); }
   if (q.academicYear) { w.push('c.academic_year = ?'); a.push(String(q.academicYear)); }
   const where = w.length ? 'WHERE ' + w.join(' AND ') : '';
-  return db.prepare(`SELECT c.*, ft.name ft_name, ft.kind ft_kind FROM fin_charges c JOIN fin_fee_types ft ON ft.id = c.fee_type_id ${where} ORDER BY c.due_day DESC, c.id DESC`).all(...a).map(chView);
+  return db.prepare(`SELECT c.*, ft.name ft_name, ft.kind ft_kind FROM fin_charges c JOIN fin_fee_types ft ON ft.id = c.fee_type_id ${where} ORDER BY c.due_day DESC, c.id DESC${limitSql(q)}`).all(...a).map(chView);
 }
 export function createCharge(deps, actor, input, ip) {
   const { db } = deps; ready(db);
@@ -83,16 +86,17 @@ export function listPayments({ db }, q = {}) {
   ready(db);
   const w = [], a = [];
   if (q.studentId) { w.push('p.student_id = ?'); a.push(Number(q.studentId)); }
+  if (q.studentIds) { w.push(`p.student_id IN (${q.studentIds.map(Number).join(',') || 0})`); }
   if (['ok', 'void'].includes(q.status)) { w.push('p.status = ?'); a.push(q.status); }
   if (q.from) { w.push('p.paid_day >= ?'); a.push(q.from); } if (q.to) { w.push('p.paid_day <= ?'); a.push(q.to); }
   const where = w.length ? 'WHERE ' + w.join(' AND ') : '';
-  return db.prepare(`SELECT p.*, u.display_name student_name FROM fin_payments p JOIN users u ON u.id=p.student_id ${where} ORDER BY p.paid_day DESC, p.id DESC`).all(...a).map(pyView);
+  return db.prepare(`SELECT p.*, u.display_name student_name FROM fin_payments p JOIN users u ON u.id=p.student_id ${where} ORDER BY p.paid_day DESC, p.id DESC${limitSql(q)}`).all(...a).map(pyView);
 }
 function nextReceiptNo(db) {
   const prefix = getSetting(db, 'finance.receipt_prefix', 'RCP');
   const y = new Date().getFullYear();
-  const last = db.prepare("SELECT receipt_no FROM fin_payments WHERE receipt_no LIKE ? ORDER BY id DESC LIMIT 1").get(`${prefix}-${y}-%`);
-  const n = last ? Number(last.receipt_no.split('-').pop()) + 1 : 1;
+  const head = `${prefix}-${y}-`;
+  const n = nextNumber(db, `receipt:${head}`, 'SELECT MAX(CAST(substr(receipt_no, ?) AS INTEGER)) FROM fin_payments WHERE receipt_no LIKE ?', [head.length + 1, `${head}%`]);
   return `${prefix}-${y}-${String(n).padStart(5, '0')}`;
 }
 export function createPayment(deps, actor, input, ip) {

@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { tx } from '../db.js';
+import { nextNumber } from './numbering.js';
 import { audit } from '../audit.js';
 import { sha256 } from '../security.js';
 import { HttpError } from '../http.js';
@@ -126,7 +127,7 @@ export function createDoc(deps, user, input, ip) {
   const stored = [];
   try {
     const id = tx(db, () => {
-      const n = db.prepare('SELECT COALESCE(MAX(id),0)+1 n FROM corr_docs').get().n;
+      const n = nextNumber(db, 'corr_docs', 'SELECT MAX(id) FROM corr_docs');
       const no = `${getSetting(db, 'corr.no_prefix')}-${new Date().getFullYear()}-${pad(n, 5)}`;
       db.prepare("INSERT INTO corr_docs (id, no, title, subject, body, mode, status, creator_id, unit_id, created_at) VALUES (?,?,?,?,?,?,'draft',?,?,?)")
         .run(n, no, v.title, v.subject, v.body, v.mode, user.id, user.unit_id ?? null, Date.now());
@@ -228,7 +229,7 @@ export function decideDoc(deps, user, id, action, noteText, ip) {
       note(deps, [d.creator_id], d, `رُفض مستندك من ${user.label}: ${text}`);
       note(deps, ccIds(db, d.id), d, `رُفض المستند ${d.title}`);
     } else if (!db.prepare("SELECT 1 FROM corr_approvers WHERE doc_id = ? AND state != 'approved'").get(d.id)) {
-      const year = new Date().getFullYear(), outNo = db.prepare('SELECT COALESCE(MAX(out_no),0)+1 n FROM corr_docs WHERE out_year = ?').get(year).n;
+      const year = new Date().getFullYear(), outNo = nextNumber(db, `corr_out:${year}`, 'SELECT MAX(out_no) FROM corr_docs WHERE out_year = ?', [year]);
       db.prepare("UPDATE corr_docs SET status = 'approved', decided_at = ?, out_no = ?, out_year = ? WHERE id = ?").run(now, outNo, year, d.id);
       ev(db, d.id, 'ok', null, `اكتمل الاعتماد — رقم الصادر ${year}/${outNo}`);
       note(deps, [d.creator_id], d, `اعتُمد مستندك بالكامل (صادر ${year}/${outNo})`);
@@ -265,11 +266,11 @@ export function cancelDoc(deps, user, id, ip) {
   return docView(db, db.prepare('SELECT * FROM corr_docs WHERE id = ?').get(d.id), user);
 }
 
-export function readCorrFile({ db, cfg }, user, fid) {
+export async function readCorrFile({ db, cfg }, user, fid) {
   const f = db.prepare('SELECT * FROM corr_files WHERE id = ?').get(Number(fid));
   const d = f && db.prepare('SELECT * FROM corr_docs WHERE id = ?').get(f.doc_id);
   if (!f || !canSee(user, db, d)) throw new HttpError(404, 'غير موجود.', 'not_found');
-  const buf = fs.readFileSync(path.join(cfg.uploadDir, f.stored_name));
+  const buf = await fs.promises.readFile(path.join(cfg.uploadDir, f.stored_name));
   if (sha256(buf) !== f.sha256) throw new HttpError(500, 'سلامة المرفق مخالفة للمسجَّل.', 'integrity');
   return { buf, mime: f.mime, name: f.orig_name };
 }

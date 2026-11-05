@@ -24,16 +24,25 @@ export function audit(db, actor, action, ref = '', ip = null) {
     db.auditSink.push({ actor: actor ? { id: actor.id, label: actor.label, roleKey: actor.roleKey, role: actor.role } : null, action, ref: String(ref), ip });
     return;
   }
-  let prev = tailHashCache.get(db);
-  if (!prev) {
-    const last = db.prepare('SELECT hash FROM audit_log ORDER BY id DESC LIMIT 1').get();
-    prev = last ? last.hash : GENESIS;
-  }
   const row = { at: Date.now(), actor_id: actor?.id ?? null, actor_label: actor?.label ?? 'النظام', role: actor?.roleKey ?? actor?.role ?? 'system', action, ref: String(ref), ip };
-  const nextHash = rowHash(prev, row);
-  db.prepare('INSERT INTO audit_log (at, actor_id, actor_label, role, action, ref, ip, prev_hash, hash) VALUES (?,?,?,?,?,?,?,?,?)')
-    .run(row.at, row.actor_id, row.actor_label, row.role, row.action, row.ref, row.ip, prev, nextHash);
-  tailHashCache.set(db, nextHash);
+  let prev = tailHashCache.get(db);
+  // عملية أخرى قد تسبق إلى الذيل نفسه؛ حينها لا يُدرج الصف ويُعاد الحساب، فتبقى السلسلة خطًا واحدًا
+  for (let attempt = 0; attempt < 50; attempt++) {
+    if (!prev) {
+      const last = db.prepare('SELECT hash FROM audit_log ORDER BY id DESC LIMIT 1').get();
+      prev = last ? last.hash : GENESIS;
+    }
+    const nextHash = rowHash(prev, row);
+    const done = db.prepare('INSERT INTO audit_log (at, actor_id, actor_label, role, action, ref, ip, prev_hash, chain_prev, hash) VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT (chain_prev) DO NOTHING')
+      .run(row.at, row.actor_id, row.actor_label, row.role, row.action, row.ref, row.ip, prev, prev, nextHash);
+    if (done.changes) {
+      tailHashCache.set(db, nextHash);
+      return;
+    }
+    tailHashCache.delete(db);
+    prev = null;
+  }
+  throw new Error('تعذر تسجيل حدث التدقيق بعد محاولات متكررة.');
 }
 
 export function verifyAuditChain(db) {

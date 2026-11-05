@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import { createApp } from '../server/app.js';
@@ -115,4 +116,18 @@ test('الطالب لا يصل إلى مرفق محاضرة غير منشورة�
   assert.equal((await call('DELETE', `/api/lms/lectures/${id}`, { cookie: adm })).status, 200);
   assert.ok(!onDisk(), 'حذف المحاضرة يزيل مرفقاتها');
   assert.equal(Number(app.db.prepare('SELECT COUNT(*) c FROM lms_lecture_files WHERE lecture_id = ?').get(id).c), 0);
+});
+
+test('الرفع الكبير يُبث إلى القرص: يصل كاملًا، ويُرفض ما تجاوز الحد ولا يبقى ملف مؤقت', async () => {
+  const lecture = await newLecture('رفع كبير'), fsp = fs.promises, dirIn = path.join(dir, 'up', '.incoming');
+  const pdf = Buffer.concat([Buffer.from('%PDF-1.4\n'), crypto.randomBytes(3 * 1024 * 1024)]);
+  const send = (buf, name = 'a.pdf') => fetch(`${base}/api/lms/lectures/${lecture}/files?name=${name}`, { method: 'POST', headers: { Cookie: adm, 'Content-Type': 'application/octet-stream' }, body: buf });
+  const ok = await send(pdf);
+  assert.equal(ok.status, 201);
+  const id = (await ok.json()).id;
+  const back = Buffer.from(await (await fetch(`${base}/api/lms/files/${id}`, { headers: { Cookie: adm } })).arrayBuffer());
+  assert.ok(back.equals(pdf), 'الملف وصل مطابقًا');
+  assert.equal((await send(Buffer.from('not a known file at all, sixty four bytes of plain text'))).status, 400);
+  const left = await fsp.readdir(dirIn).catch(() => []);
+  assert.deepEqual(left, [], 'لا ملفات مؤقتة متبقية');
 });

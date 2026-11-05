@@ -93,6 +93,7 @@ export function addThreatScore(ip, points, reason, path) {
     rec.bannedAt = Date.now();
     rec.banCount++;
     rec.score = 0;
+    wafBanListener?.(ip, rec.banUntil);
     return { banned: true, until: rec.banUntil, duration };
   }
   return { banned: false };
@@ -302,7 +303,18 @@ export function resetWaf() { ipRegistry.clear(); }
 export function unbanIp(ip) {
   const rec = ipRegistry.get(ip);
   if (rec) { rec.banUntil = 0; rec.score = 0; }
+  wafBanListener?.(ip, 0);
   return !!rec;
+}
+
+// الحظر يسري على كل عمليات الخادم
+let wafBanListener = null;
+export const setWafBanListener = (fn) => { wafBanListener = fn; };
+export function applySharedBan(ip, until) {
+  if (!ipRegistry.has(ip) && !until) return;
+  const rec = getIpRecord(ip);
+  rec.banUntil = until;
+  if (!until) rec.score = 0;
 }
 
 export function testWafPattern(payload) {

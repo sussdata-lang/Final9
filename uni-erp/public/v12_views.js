@@ -175,9 +175,10 @@
   UA.views.lms = async function (el, _me, only) {
     let activeTab = only || (UA.gate ? UA.gate.firstTab('lms', 'lectures') : 'lectures');
     if (!only && activeTab === 'library') activeTab = 'lectures';
+    let bookQ = '';
     async function render() {
       el.innerHTML = `${SHARED_CSS}<div class="v12-wrap"><p class="hint">جارٍ تحميل بوابة التعلم الإلكتروني والمكتبة الرقمية…</p></div>`;
-      const d = await api('GET', '/api/lms/overview');
+      const d = await api('GET', '/api/lms/overview' + (activeTab === 'library' ? `?section=library${bookQ ? '&bookQ=' + encodeURIComponent(bookQ) : ''}` : ''));
       const s = d.stats;
       el.innerHTML = `
         ${SHARED_CSS}
@@ -301,7 +302,11 @@
             <div class="v12-card">
               <div class="v12-bar">
                 <h3>فهرس المكتبة الرقمية والورقية</h3>
-                <button class="btn pri" id="btn-add-book">＋ إضافة كتاب</button>
+                <div style="display:flex;gap:6px;flex-wrap:wrap">
+                  <input id="v12-book-q" placeholder="العنوان أو المؤلف أو ISBN" value="${esc(bookQ)}" style="width:190px">
+                  <button class="btn" id="btn-book-q">بحث</button>
+                  <button class="btn pri" id="btn-add-book">＋ إضافة كتاب</button>
+                </div>
               </div>
               <div class="tbl-wrap">
                 <table class="grid-tbl">
@@ -344,6 +349,7 @@
             </div>
           </div>
         `;
+        box.querySelector('#btn-book-q').onclick = () => { bookQ = box.querySelector('#v12-book-q').value.trim(); render(); };
         box.querySelector('#btn-add-book').onclick = () => openModal('إضافة كتاب جديد للمكتبة', `
           <label>عنوان الكتاب <input name="title" required placeholder="مثال: أمن الأنظمة السحابية"></label>
           <label>المؤلف <input name="author" required placeholder="اسم المؤلف"></label>

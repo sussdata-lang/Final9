@@ -97,7 +97,7 @@ test('معادلات منظومة شؤون الموظفين المتكاملة (
   assert.equal(pay1.netSalary, 5537.67);
 });
 
-test('التكامل الشامل لواجهات /api/hr-pro/* وعدم التعارض مع /api/admin/hr/*', async (t) => {
+test('التكامل الشامل لواجهات /api/hr-pro/* ', async (t) => {
   const app = await createApp({ dbPath: ':memory:', port: 0, scryptN: 1024, cookieSecure: false });
   await ensureCoreAccounts(app, 'Test-Only-Pass-1!');
   await new Promise((r) => app.server.listen(0, '127.0.0.1', r));
@@ -137,12 +137,6 @@ test('التكامل الشامل لواجهات /api/hr-pro/* وعدم التع
   assert.ok(byDays(-86) && byDays(42) && byDays(74), 'الأيام المتبقية للعقود الثلاثة');
   assert.ok(ov.alerts.length >= 1, 'يجب توليد تنبيهات العقود');
 
-  // 2) التأكد من توافق جدول hr_employees مع الواجهة القديمة /api/admin/hr/employees دون أي تعارض
-  const legacyRes = await fetch(`${base}/api/admin/hr/employees`, { headers });
-  assert.equal(legacyRes.status, 200);
-  const legacyData = await legacyRes.json();
-  assert.equal(legacyData.employees.length, 3);
-
   // 3) تجديد عقد منتهي والتحقق من تحوله إلى «ساري»
   const ctId = byDays(-86).id;
   const renewRes = await fetch(`${base}/api/hr-pro/contracts/${ctId}/renew`, {
@@ -165,4 +159,48 @@ test('التكامل الشامل لواجهات /api/hr-pro/* وعدم التع
   const ovAfter = await (await fetch(`${base}/api/hr-pro/overview?refDate=2026-10-11`, { headers })).json();
   // العقد المتبقي له 74 يوماً يصبح «يحتاج تجديد» عندما تصبح فترة التنبيه 90 يوماً!
   assert.equal(ovAfter.contracts.find((c) => c.remainingDays === 74).renewalAlert, 'يحتاج تجديد');
+});
+
+test('دورة الإجازة: طلب ثم اعتماد أو رفض أو إلغاء، والمعلقة لا تُخصم', async (t) => {
+  const app = await createApp({ dbPath: ':memory:', port: 0, scryptN: 1024, cookieSecure: false });
+  await ensureCoreAccounts(app, 'Test-Only-Pass-1!');
+  await new Promise((r) => app.server.listen(0, '127.0.0.1', r));
+  t.after(() => app.close());
+  const base = `http://127.0.0.1:${app.server.address().port}`;
+  const login = await fetch(`${base}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'admin', password: 'Test-Only-Pass-1!' }) });
+  const cookie = login.headers.get('set-cookie').split(';')[0];
+  const call = async (m, u, body) => { const r = await fetch(base + u, { method: m, headers: { Cookie: cookie, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }); return { s: r.status, j: await r.json().catch(() => ({})) }; };
+  const empId = Number(app.db.prepare("INSERT INTO hr_employees (employeeNo, name, personalId, hireDate, salary_base, created_at, updated_at) VALUES ('LV-1', 'موظف إجازة', 'P-LV-1', '2024-01-01', 3000, ?, ?)").run(Date.now(), Date.now()).lastInsertRowid);
+  const ask = (startDate, endDate, leaveTypeAr = 'بدون راتب') => call('POST', '/api/hr-pro/leaves', { employeeId: empId, leaveTypeAr, days: 2, startDate, endDate, reason: 'سبب' });
+  const row = async (id) => (await call('GET', '/api/hr-pro/overview')).j.leaves.find((l) => l.id === id);
+  const deductions = async () => (await call('GET', '/api/hr-pro/overview')).j.payroll.find((p) => p.employeeId === empId)?.totalDeductions;
+
+  assert.equal((await call('POST', '/api/hr-pro/leaves', { employeeId: empId, days: 2 })).s, 400, 'التاريخ مطلوب');
+  assert.equal((await ask('2026-03-05', '2026-03-01')).s, 400);
+  const before = await deductions();
+  const a = await ask('2026-03-01', '2026-03-02');
+  assert.equal(a.s, 201);
+  assert.equal((await row(a.j.id)).status, 'pending');
+  assert.equal(await deductions(), before, 'المعلقة لا تُخصم');
+  assert.equal((await ask('2026-03-02', '2026-03-03')).s, 409, 'لا تداخل مع طلب معلق');
+
+  assert.equal((await call('POST', `/api/hr-pro/leaves/${a.j.id}/approve`, {})).s, 200);
+  assert.equal((await row(a.j.id)).status, 'approved');
+  assert.ok((await deductions()) > before, 'المعتمدة تُخصم');
+  assert.equal((await call('POST', `/api/hr-pro/leaves/${a.j.id}/approve`, {})).s, 409);
+  assert.equal((await call('POST', `/api/hr-pro/leaves/${a.j.id}/cancel`, {})).s, 409);
+
+  const b = await ask('2026-04-01', '2026-04-02');
+  assert.equal((await call('POST', `/api/hr-pro/leaves/${b.j.id}/reject`, {})).s, 400, 'السبب مطلوب');
+  assert.equal((await call('POST', `/api/hr-pro/leaves/${b.j.id}/reject`, { reason: 'ضغط عمل' })).s, 200);
+  const rejected = await row(b.j.id);
+  assert.equal(rejected.status, 'rejected');
+  assert.equal(rejected.notes, 'ضغط عمل');
+
+  const c = await ask('2026-04-01', '2026-04-02');
+  assert.equal(c.s, 201, 'المرفوضة لا تمنع طلبًا جديدًا');
+  assert.equal((await call('POST', `/api/hr-pro/leaves/${c.j.id}/cancel`, {})).s, 200);
+  assert.equal((await row(c.j.id)).status, 'cancelled');
+  assert.equal((await call('POST', '/api/hr-pro/leaves/999999/approve', {})).s, 404);
+  assert.equal((await call('GET', '/api/admin/hr/employees')).s, 404, 'المسارات القديمة حُذفت');
 });

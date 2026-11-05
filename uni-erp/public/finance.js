@@ -33,6 +33,9 @@
     feeStructures: [],
     stuInvoices: [],
     discounts: [],
+    stuPayments: [],
+    currencies: [],
+    feeTypes: [],
     overdue: [],
     programs: []
   });
@@ -78,12 +81,13 @@
       const [ov, fy] = await Promise.all([api('GET', '/api/finance/overview'), api('GET', '/api/finance/fiscal-years')]);
       F.ov = ov; F.years = fy.fiscalYears;
     } else if (t === 'coa') {
-      const [a, c, y] = await Promise.all([
+      const [a, c, y, cur] = await Promise.all([
         api('GET', '/api/finance/accounts'),
         api('GET', '/api/finance/cost-centers'),
-        api('GET', '/api/finance/fiscal-years')
+        api('GET', '/api/finance/fiscal-years'),
+        api('GET', '/api/finance/currencies')
       ]);
-      F.accounts = a.accounts; F.centers = c.costCenters; F.years = y.fiscalYears;
+      F.accounts = a.accounts; F.centers = c.costCenters; F.years = y.fiscalYears; F.currencies = cur.currencies;
     } else if (t === 'journal') {
       const [j, a, c] = await Promise.all([
         api('GET', '/api/finance/journal' + (F.jeStatusFilter ? `?status=${F.jeStatusFilter}` : '')),
@@ -114,12 +118,16 @@
       const [ov, fs, inv, d, od] = await Promise.all([
         api('GET', '/api/finance/fees/overview'),
         api('GET', '/api/finance/fee-structures'),
-        api('GET', '/api/finance/student-invoices'),
+        api('GET', `/api/finance/student-invoices?page=${F.stuPage || 1}${F.stuQ ? '&q=' + encodeURIComponent(F.stuQ) : ''}`),
         api('GET', '/api/finance/discounts'),
         api('GET', '/api/finance/fees/overdue')
       ]);
-      F.feesOv = ov; F.feeStructures = fs.structures; F.stuInvoices = inv.invoices;
+      F.feesOv = ov; F.feeStructures = fs.structures; F.stuInvoices = inv.invoices; F.stuTotal = inv.total; F.stuPages = inv.pages;
       F.discounts = d.discounts; F.overdue = od.installments; F.programs = fs.programs || [];
+      if (can('finance:fees')) {
+        const [pay, ft, acc] = await Promise.all([api('GET', '/api/finance/payments'), api('GET', '/api/finance/fee-types'), api('GET', '/api/finance/accounts')]);
+        F.stuPayments = pay.payments; F.feeTypes = Array.isArray(ft) ? ft : []; F.accounts = acc.accounts;
+      }
     }
   }
 
@@ -137,7 +145,7 @@
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             ${can('finance:post') ? `<button class="btn pri sm" data-act="fin-new-je">+ قيد يومية مزدوج</button>` : ''}
-            ${can('finance:voucher') ? `
+            ${can('finance:entry') ? `
               <button class="btn sm" style="background:rgba(16,185,129,.2);color:#ecfdf5;border-color:rgba(16,185,129,.4)" data-act="fin-new-vch" data-kind="receipt">+ سند قبض</button>
               <button class="btn sm" style="background:rgba(244,63,94,.2);color:#fff1f2;border-color:rgba(244,63,94,.4)" data-act="fin-new-vch" data-kind="payment">+ سند صرف</button>
             ` : ''}
@@ -238,6 +246,14 @@
       </div>`;
   }
 
+  const currenciesCard = () => `
+        <div class="card" style="margin-top:14px">
+          <h3 style="margin-top:0">💱 العملات وأسعار الصرف</h3>
+          <div class="tbl-wrap"><table class="tbl"><thead><tr><th>الرمز</th><th>الاسم</th><th>السعر</th><th>الحالة</th><th></th></tr></thead><tbody>
+            ${F.currencies.map((x) => `<tr><td><code>${esc(x.code)}</code></td><td><b>${esc(x.name)}</b>${x.is_base ? ' <span class="mut">(أساسية)</span>' : ''}</td><td>${esc(x.rate)}</td><td>${x.active ? 'مفعلة' : 'معطلة'}</td><td>${can('finance:setup') && !x.is_base ? `<button class="btn sm" data-act="fin-cur-rate" data-code="${esc(x.code)}" data-rate="${esc(x.rate)}">تعديل السعر</button> <button class="btn sm" data-act="fin-toggle-cur" data-code="${esc(x.code)}" data-on="${x.active ? 0 : 1}">${x.active ? 'تعطيل' : 'تفعيل'}</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">لا توجد عملات</td></tr>'}
+          </tbody></table></div>
+        </div>`;
+
   function viewCoa() {
     const filtered = F.accounts.filter((a) => {
       if (F.coaTypeFilter && a.type !== F.coaTypeFilter) return false;
@@ -254,7 +270,7 @@
             <h3 style="margin:0">🌳 الدليل المحاسبي الشجري الموحد (${num(filtered.length)} حساب)</h3>
             <div class="mut" style="font-size:12px">اضغط على «دفتر الأستاذ» أمام أي حساب فرعي لاستعراض حركته التفصيلية</div>
           </div>
-          ${can('finance:manage') ? `<button class="btn pri sm" data-act="fin-new-acc">+ إضافة حساب في الدليل</button>` : ''}
+          ${can('finance:setup') ? `<button class="btn pri sm" data-act="fin-new-acc">+ إضافة حساب في الدليل</button>` : ''}
         </div>
 
         <div class="spread" style="margin-bottom:12px;flex-wrap:wrap;gap:8px">
@@ -282,7 +298,7 @@
               <td><span class="badge ${a.active ? 'b-ok' : 'b-mut'}">${a.active ? 'نشط' : 'معطّل'}</span></td>
               <td style="white-space:nowrap">
                 <button class="btn sm" data-act="fin-open-gl" data-id="${a.id}">📖 دفتر الأستاذ</button>
-                ${can('finance:manage') ? `<button class="btn sm" data-act="fin-edit-acc" data-id="${a.id}">تعديل</button>` : ''}
+                ${can('finance:setup') ? `<button class="btn sm" data-act="fin-edit-acc" data-id="${a.id}">تعديل</button>` : ''}
               </td>
             </tr>`;
           }).join('') || '<tr><td colspan="7" class="empty">لا توجد حسابات مطابقة</td></tr>'}
@@ -293,14 +309,14 @@
         <div class="card">
           <div class="spread" style="margin-bottom:10px">
             <h3 style="margin:0">🎯 مراكز التكلفة (${num(F.centers.length)})</h3>
-            ${can('finance:manage') ? `<button class="btn pri sm" data-act="fin-new-cc">+ مركز تكلفة</button>` : ''}
+            ${can('finance:setup') ? `<button class="btn pri sm" data-act="fin-new-cc">+ مركز تكلفة</button>` : ''}
           </div>
           <div class="tbl-wrap"><table class="tbl"><thead><tr><th>الرمز</th><th>اسم مركز التكلفة</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody>
             ${F.centers.map((c) => `<tr>
               <td><code>${esc(c.code)}</code></td>
               <td><b>${esc(c.name)}</b></td>
               <td><span class="badge ${c.active ? 'b-ok' : 'b-mut'}">${c.active ? 'نشط' : 'معطّل'}</span></td>
-              <td>${can('finance:manage') ? `<button class="btn dan sm" data-act="fin-del-cc" data-id="${c.id}">حذف</button>` : ''}</td>
+              <td>${can('finance:setup') ? `<button class="btn dan sm" data-act="fin-del-cc" data-id="${c.id}">حذف</button>` : ''}</td>
             </tr>`).join('') || '<tr><td colspan="4" class="empty">لا توجد مراكز تكلفة</td></tr>'}
           </tbody></table></div>
         </div>
@@ -308,7 +324,7 @@
         <div class="card">
           <div class="spread" style="margin-bottom:10px">
             <h3 style="margin:0">📅 السنوات والفترات المالية (${num(F.years.length)})</h3>
-            ${can('finance:manage') ? `<button class="btn pri sm" data-act="fin-new-fy">+ سنة مالية جديدة</button>` : ''}
+            ${can('finance:setup') ? `<button class="btn pri sm" data-act="fin-new-fy">+ سنة مالية جديدة</button>` : ''}
           </div>
           <div class="tbl-wrap"><table class="tbl"><thead><tr><th>السنة</th><th>من تاريخ</th><th>إلى تاريخ</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody>
             ${F.years.map((y) => `<tr>
@@ -316,7 +332,7 @@
               <td>${esc(y.startDay)}</td>
               <td>${esc(y.endDay)}</td>
               <td><span class="badge ${y.status === 'open' ? 'b-ok' : 'b-mut'}">${y.status === 'open' ? 'مفتوحة' : 'مقفلة'}</span></td>
-              <td>${can('finance:manage') && y.status === 'open' ? `<button class="btn dan sm" data-act="fin-close-fy" data-id="${y.id}">إقفال السنة</button>` : ''}</td>
+              <td>${can('finance:setup') && y.status === 'open' ? `<button class="btn dan sm" data-act="fin-close-fy" data-id="${y.id}">إقفال السنة</button>` : ''}</td>
             </tr>`).join('') || '<tr><td colspan="5" class="empty">لا توجد سنوات مالية</td></tr>'}
           </tbody></table></div>
         </div>
@@ -376,12 +392,12 @@
             <button class="btn ${s === 'parties' ? 'pri' : ''}" data-act="fin-tr-sub" data-sub="parties">👥 الأطراف والذمم المالية (${num(F.parties.length)})</button>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
-            ${can('finance:voucher') ? `
+            ${can('finance:entry') ? `
               <button class="btn pri sm" data-act="fin-new-vch" data-kind="receipt">+ سند قبض</button>
               <button class="btn sm" data-act="fin-new-vch" data-kind="payment">+ سند صرف</button>
               <button class="btn sm" data-act="fin-new-inv">+ فاتورة ذمم</button>
             ` : ''}
-            ${can('finance:manage') ? `<button class="btn sm" data-act="fin-new-party">+ تعريف طرف مالي</button>` : ''}
+            ${can('finance:setup') ? `<button class="btn sm" data-act="fin-new-party">+ تعريف طرف مالي</button>` : ''}
           </div>
         </div>
       </div>
@@ -596,29 +612,39 @@
       <div class="card" style="margin-bottom:14px;padding:12px 16px">
         <div class="spread" style="flex-wrap:wrap;gap:8px">
           <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button class="btn sm ${sub === 'invoices' ? 'pri' : ''}" data-act="fin-fee-sub" data-sub="invoices">🧾 فواتير وأقساط الطلاب (${num(F.stuInvoices.length)})</button>
+            <button class="btn sm ${sub === 'invoices' ? 'pri' : ''}" data-act="fin-fee-sub" data-sub="invoices">🧾 فواتير وأقساط الطلاب (${num(F.stuTotal || 0)})</button>
             <button class="btn sm ${sub === 'structures' ? 'pri' : ''}" data-act="fin-fee-sub" data-sub="structures">📐 هياكل الرسوم الدراسية (${num(F.feeStructures.length)})</button>
             <button class="btn sm ${sub === 'discounts' ? 'pri' : ''}" data-act="fin-fee-sub" data-sub="discounts">🎖️ المنح والحسومات (${num(F.discounts.length)})</button>
             <button class="btn sm ${sub === 'overdue' ? 'pri' : ''}" data-act="fin-fee-sub" data-sub="overdue">⚠️ الأقساط المتأخرة (${num(F.overdue.length)})</button>
+            ${can('finance:fees') ? `<button class="btn sm ${sub === 'payments' ? 'pri' : ''}" data-act="fin-fee-sub" data-sub="payments">💵 الدفعات المحصلة (${num(F.stuPayments.length)})</button>
+            <button class="btn sm ${sub === 'feetypes' ? 'pri' : ''}" data-act="fin-fee-sub" data-sub="feetypes">🏷️ أنواع الرسوم (${num(F.feeTypes.length)})</button>` : ''}
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
-            ${can('finance:voucher') ? `<button class="btn pri sm" data-act="fin-new-stu-inv">+ إصدار فاتورة رسوم لطالب</button>` : ''}
-            ${can('finance:manage') ? `
-              <button class="btn sm" data-act="fin-new-fs">+ هيكل رسوم</button>
-              <button class="btn sm" data-act="fin-new-disc">+ منح حسم/منحة</button>
-            ` : ''}
+            ${can('finance:fees') ? `<button class="btn pri sm" data-act="fin-new-stu-inv">+ إصدار فاتورة رسوم لطالب</button>` : ''}
+            ${can('finance:setup') ? `<button class="btn sm" data-act="fin-new-fs">+ هيكل رسوم</button>` : ''}
+            ${can('finance:fees') ? `<button class="btn sm" data-act="fin-new-disc">+ منح حسم/منحة</button>
+              <button class="btn sm" data-act="fin-new-ft">+ نوع رسم</button>` : ''}
           </div>
         </div>
       </div>
 
       ${sub === 'invoices' ? `
         <div class="card">
-          <h3 style="margin-top:0">🧾 فواتير الرسوم الدراسية وخطط التقسيط</h3>
+          <div class="spread" style="flex-wrap:wrap;gap:8px;margin-bottom:10px">
+            <h3 style="margin:0">🧾 فواتير الرسوم الدراسية وخطط التقسيط</h3>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+              <input id="fsi-q" placeholder="الرقم الجامعي أو الاسم" value="${esc(F.stuQ || '')}" style="width:190px">
+              <button class="btn sm" data-act="fin-stu-search">بحث</button>
+              <button class="btn sm" data-act="fin-stu-page" data-p="${(F.stuPage || 1) - 1}" ${(F.stuPage || 1) <= 1 ? 'disabled' : ''}>السابق</button>
+              <span class="mut" style="font-size:12px">صفحة ${num(F.stuPage || 1)} من ${num(F.stuPages || 1)}</span>
+              <button class="btn sm" data-act="fin-stu-page" data-p="${(F.stuPage || 1) + 1}" ${(F.stuPage || 1) >= (F.stuPages || 1) ? 'disabled' : ''}>التالي</button>
+            </div>
+          </div>
           <div class="tbl-wrap"><table class="tbl"><thead><tr><th>رقم الفاتورة</th><th>الطالب</th><th>العام والفصل</th><th>الإجمالي</th><th>الحسم</th><th>الصافي</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody>
             ${F.stuInvoices.map((i) => `<tr>
               <td><code>${esc(i.no)}</code></td>
               <td><b>${esc(i.studentName)}</b> <span class="mut">(${esc(i.studentNo || '')})</span></td>
-              <td>${esc(i.academicYear)} · ف${i.semester}</td>
+              <td>${esc(i.academicYear)}<div class="mut" style="font-size:11px">${esc(i.feeType || '')}${i.note ? ' · ' + esc(i.note) : ''} · ${esc(i.dueDay)}</div></td>
               <td>${money(i.totalAmount)}</td>
               <td>${money(i.discountAmount)}</td>
               <td><b>${money(i.netAmount)}</b></td>
@@ -627,7 +653,9 @@
               <td>${badge(INV_STATUS, i.status)}</td>
               <td>
                 <button class="btn sm" data-act="fin-view-stu-inv" data-id="${i.id}">الأقساط</button>
-                ${i.status !== 'paid' && i.status !== 'cancelled' && can('finance:voucher') ? `<button class="btn pri sm" data-act="fin-pay-stu-inv" data-id="${i.id}">💵 تحصيل دفعة</button>` : ''}
+                ${i.status !== 'paid' && i.status !== 'cancelled' && can('finance:fees') ? `<button class="btn pri sm" data-act="fin-pay-stu-inv" data-id="${i.id}">💵 تحصيل دفعة</button>` : ''}
+                ${can('finance:fees') ? `<button class="btn sm" data-act="fin-stu-statement" data-id="${i.studentId}">كشف الحساب</button>` : ''}
+                ${i.status !== 'cancelled' && i.paidAmount === 0 && can('finance:fees') ? `<button class="btn dan sm" data-act="fin-void-charge" data-id="${i.id}">إلغاء</button>` : ''}
               </td>
             </tr>`).join('') || '<tr><td colspan="10" class="empty">لا توجد فواتير رسوم طلابية</td></tr>'}
           </tbody></table></div>
@@ -639,11 +667,25 @@
             ${F.feeStructures.map((s) => `<tr><td><b>${esc(s.programName)}</b></td><td>${esc(s.academicYear)}</td><td>الفصل ${s.semester}</td><td>${money(s.tuitionFee)}</td><td>${money(s.registrationFee)}</td><td><b>${money(s.totalFee)}</b></td></tr>`).join('') || '<tr><td colspan="6" class="empty">لا توجد هياكل رسوم</td></tr>'}
           </tbody></table></div>
         </div>
+      ` : sub === 'payments' ? `
+        <div class="card">
+          <h3 style="margin-top:0">💵 الدفعات المحصلة من الطلاب</h3>
+          <div class="tbl-wrap"><table class="tbl"><thead><tr><th>الإيصال</th><th>الطالب</th><th>التاريخ</th><th>المبلغ</th><th>الطريقة</th><th>الحالة</th><th></th></tr></thead><tbody>
+            ${F.stuPayments.map((p) => `<tr><td><code>${esc(p.receiptNo)}</code></td><td><b>${esc(p.student || '')}</b></td><td>${esc(p.paidDay)}</td><td>${money(p.amount)}</td><td>${p.method === 'bank' ? 'تحويل مصرفي' : 'نقدي'}</td><td>${p.status === 'void' ? 'ملغاة' : 'سارية'}</td><td>${p.status === 'ok' ? `<button class="btn dan sm" data-act="fin-void-pay" data-id="${p.id}">إلغاء</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="7" class="empty">لا توجد دفعات</td></tr>'}
+          </tbody></table></div>
+        </div>
+      ` : sub === 'feetypes' ? `
+        <div class="card">
+          <h3 style="margin-top:0">🏷️ أنواع الرسوم والخصومات</h3>
+          <div class="tbl-wrap"><table class="tbl"><thead><tr><th>الرمز</th><th>الاسم</th><th>النوع</th><th>الحالة</th><th></th></tr></thead><tbody>
+            ${F.feeTypes.map((t) => `<tr><td><code>${esc(t.code)}</code></td><td><b>${esc(t.name)}</b></td><td>${t.kind === 'discount' ? 'خصم' : 'رسم'}</td><td>${t.active ? 'مفعل' : 'معطل'}</td><td><button class="btn sm" data-act="fin-toggle-ft" data-id="${t.id}" data-on="${t.active ? 0 : 1}">${t.active ? 'تعطيل' : 'تفعيل'}</button></td></tr>`).join('') || '<tr><td colspan="5" class="empty">لا توجد أنواع رسوم</td></tr>'}
+          </tbody></table></div>
+        </div>
       ` : sub === 'discounts' ? `
         <div class="card">
           <h3 style="margin-top:0">🎖️ سجل المنح والإعفاءات والحسومات الطلابية</h3>
-          <div class="tbl-wrap"><table class="tbl"><thead><tr><th>الطالب</th><th>العام الدراسي</th><th>النوع</th><th>النسبة / المبلغ</th><th>السبب والقرار</th></tr></thead><tbody>
-            ${F.discounts.map((d) => `<tr><td><b>${esc(d.studentName)}</b> (${esc(d.studentNo || '')})</td><td>${esc(d.academicYear)}</td><td>${esc(d.kindLabel)}</td><td><b>${d.percent}% · ${money(d.amount)}</b></td><td>${esc(d.reason)}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">لا توجد منح أو حسومات</td></tr>'}
+          <div class="tbl-wrap"><table class="tbl"><thead><tr><th>الطالب</th><th>العام الدراسي</th><th>النوع</th><th>النسبة / المبلغ</th><th>السبب والقرار</th><th></th></tr></thead><tbody>
+            ${F.discounts.map((d) => `<tr><td><b>${esc(d.studentName)}</b> (${esc(d.studentNo || '')})</td><td>${esc(d.academicYear)}</td><td>${esc(d.kindLabel)}</td><td><b>${d.percent}% · ${money(d.amount)}</b></td><td>${esc(d.reason)}</td><td>${can('finance:fees') ? `<button class="btn dan sm" data-act="fin-void-charge" data-id="${d.chargeId}">إلغاء</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">لا توجد منح أو حسومات</td></tr>'}
           </tbody></table></div>
         </div>
       ` : `
@@ -656,6 +698,20 @@
       `}`;
   }
 
+  async function loadPayrollMonths() {
+    const { months } = await api('GET', '/api/finance/payroll-months');
+    const box = document.getElementById('fin-payroll-box');
+    if (!box) return;
+    box.className = '';
+    box.innerHTML = `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>الشهر</th><th>الموظفون</th><th>بلا راتب مسجل</th><th>الإجمالي</th><th>القيد</th><th></th></tr></thead><tbody>
+      ${months.map((m) => `<tr>
+        <td><code>${esc(m.month)}</code></td><td>${num(m.employees)}</td><td>${num(m.missingSalary)}</td><td><b>${money(m.total)}</b></td>
+        <td>${m.entry ? `<code>${esc(m.entry.no)}</code>${m.entry.reversed ? ' <span class="mut">(معكوس)</span>' : ''}` : '<span class="mut">غير مرحّل</span>'}</td>
+        <td><button class="btn sm" data-act="fin-preview-payroll" data-month="${esc(m.month)}">معاينة${!m.entry && m.total > 0 ? ' وترحيل' : ''}</button></td>
+      </tr>`).join('')}
+    </tbody></table></div>`;
+  }
+
   function viewPayrollFin() {
     return `
       <div class="card">
@@ -666,13 +722,13 @@
           </div>
           <button class="btn pri sm" data-act="fin-load-payroll-runs">🔄 جلب مسيرات الرواتب من شؤون العاملين</button>
         </div>
-        <div id="fin-payroll-box" class="empty">اضغط «جلب مسيرات الرواتب» لاستعراض المسيرات المعتمدة وترحيل قيودها المالية</div>
+        <div id="fin-payroll-box" class="empty">اضغط «جلب مسيرات الرواتب» لاستعراض آخر 12 شهرًا ومعاينة قيودها وترحيلها</div>
       </div>`;
   }
 
   function renderBody() {
     if (F.tab === 'overview') return viewOverview();
-    if (F.tab === 'coa') return viewCoa();
+    if (F.tab === 'coa') return viewCoa() + currenciesCard();
     if (F.tab === 'journal') return viewJournal();
     if (F.tab === 'treasury') return viewTreasury();
     if (F.tab === 'reports') return viewReports();
@@ -1055,9 +1111,9 @@
         const today = new Date().toISOString().slice(0, 10);
         showModal(`<h3>🧾 إصدار فاتورة رسوم دراسية وخطة تقسيط لطالب</h3>
           <div class="form-grid">
-            <label>معرّف الطالب (User ID)<input id="fsi-stu" type="number" placeholder="4"></label>
-            <label>العام الدراسي<input id="fsi-yr"></label>
-            <label>الفصل الدراسي<select id="fsi-sem"><option value="1">الفصل الأول</option><option value="2">الفصل الثاني</option></select></label>
+            <label>الرقم الجامعي<input id="fsi-stu" dir="ltr" required></label>
+            <label>العام الدراسي<input id="fsi-yr" required></label>
+            <label>نوع الرسم<select id="fsi-ft">${F.feeTypes.filter((t) => t.kind === 'fee' && t.active).map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></label>
             <label>المبلغ الإجمالي (ل.س)<input id="fsi-amt" type="number"></label>
             <label>عدد الأقساط<select id="fsi-cnt"><option value="1">دفعة واحدة</option><option value="2" selected>قسطان</option><option value="3">3 أقساط</option></select></label>
             <label>استحقاق القسط الأول<input id="fsi-due" type="date" value="${today}"></label>
@@ -1065,17 +1121,72 @@
           <div class="row-end"><button class="btn" data-act="fin-close-modal">إلغاء</button><button class="btn pri" data-act="fin-save-stu-inv">إصدار الفاتورة وترحيل القيد</button></div>`);
       }
       else if (act === 'fin-save-stu-inv') {
-        const cnt = Number(document.getElementById('fsi-cnt').value);
-        const due = document.getElementById('fsi-due').value;
-        const installments = Array.from({ length: cnt }, (_, i) => ({ dueDay: due, amount: 0, seq: i + 1 }));
         await api('POST', '/api/finance/student-invoices', {
-          studentId: Number(document.getElementById('fsi-stu').value),
+          studentNo: document.getElementById('fsi-stu').value,
           academicYear: document.getElementById('fsi-yr').value,
-          semester: Number(document.getElementById('fsi-sem').value),
+          feeTypeId: Number(document.getElementById('fsi-ft').value),
           totalAmount: Number(document.getElementById('fsi-amt').value),
-          installments
+          installmentsCount: Number(document.getElementById('fsi-cnt').value),
+          firstDueDay: document.getElementById('fsi-due').value
         });
         toast('أُصدرت فاتورة الطالب مع خطة الأقساط'); closeModal(); await refresh();
+      }
+      else if (act === 'fin-stu-page') { F.stuPage = Number(b.dataset.p); await refresh(); }
+      else if (act === 'fin-stu-search') { F.stuQ = document.getElementById('fsi-q').value.trim(); F.stuPage = 1; await refresh(); }
+      else if (act === 'fin-stu-statement') {
+        const st = await api('GET', `/api/finance/student-statement/${b.dataset.id}`);
+        showModal(`<h3>كشف حساب: ${esc(st.student.name)}</h3>
+          <p>الرسوم: <b>${money(st.totalCharged)}</b> · الحسومات: <b>${money(st.totalDiscounts)}</b> · المدفوع: <b>${money(st.totalPaid)}</b> · الرصيد: <b>${money(st.balance)}</b></p>
+          <div class="tbl-wrap"><table class="tbl"><thead><tr><th>التاريخ</th><th>البيان</th><th>مدين</th><th>دائن</th></tr></thead><tbody>
+            ${st.charges.filter((c) => c.status === 'open').map((c) => `<tr><td>${esc(c.dueDay)}</td><td>${esc(c.feeType)}${c.note ? ' · ' + esc(c.note) : ''}</td><td>${c.kind === 'fee' ? money(c.amount) : ''}</td><td>${c.kind === 'discount' ? money(c.amount) : ''}</td></tr>`).join('')}
+            ${st.payments.filter((p) => p.status === 'ok').map((p) => `<tr><td>${esc(p.paidDay)}</td><td>دفعة ${esc(p.receiptNo)}</td><td></td><td>${money(p.amount)}</td></tr>`).join('')}
+          </tbody></table></div>
+          <div class="row-end" style="margin-top:12px"><button class="btn pri" data-act="fin-close-modal">إغلاق</button></div>`);
+      }
+      else if (act === 'fin-void-charge' || act === 'fin-void-pay') {
+        const isPay = act === 'fin-void-pay';
+        showModal(`<h3>${isPay ? 'إلغاء الدفعة' : 'إلغاء القيد'}</h3>
+          <p class="hint">يُعكس قيدها المحاسبي ويبقى أثرها في السجل.</p>
+          <label>سبب الإلغاء<input id="fv-reason" required></label>
+          <div class="row-end" style="margin-top:12px"><button class="btn" data-act="fin-close-modal">تراجع</button><button class="btn dan" data-act="fin-do-void" data-kind="${isPay ? 'payments' : 'charges'}" data-id="${b.dataset.id}">تأكيد الإلغاء</button></div>`);
+      }
+      else if (act === 'fin-do-void') {
+        const reason = document.getElementById('fv-reason').value.trim();
+        if (!reason) { toast('اكتب سبب الإلغاء'); return; }
+        await api('POST', `/api/finance/${b.dataset.kind}/${b.dataset.id}/void`, { reason });
+        toast('أُلغي وعُكس قيده'); closeModal(); await refresh();
+      }
+      else if (act === 'fin-new-ft') {
+        const leaf = F.accounts.filter((a) => a.active && a.postable && ['revenue', 'expense'].includes(a.type));
+        showModal(`<h3>نوع رسم جديد</h3>
+          <div class="form-grid">
+            <label>الرمز<input id="ft-code" dir="ltr" required></label>
+            <label>الاسم<input id="ft-name" required></label>
+            <label>النوع<select id="ft-kind"><option value="fee">رسم</option><option value="discount">خصم</option></select></label>
+            <label>الحساب<select id="ft-acc">${leaf.map((a) => `<option value="${a.id}">${esc(a.code)} · ${esc(a.name)}</option>`).join('')}</select></label>
+          </div>
+          <div class="row-end"><button class="btn" data-act="fin-close-modal">إلغاء</button><button class="btn pri" data-act="fin-save-ft">حفظ</button></div>`);
+      }
+      else if (act === 'fin-save-ft') {
+        await api('POST', '/api/finance/fee-types', { code: document.getElementById('ft-code').value, name: document.getElementById('ft-name').value, kind: document.getElementById('ft-kind').value, accountId: Number(document.getElementById('ft-acc').value) });
+        toast('حُفظ نوع الرسم'); closeModal(); F.feeSub = 'feetypes'; await refresh();
+      }
+      else if (act === 'fin-toggle-ft') {
+        await api('POST', `/api/finance/fee-types/${b.dataset.id}/toggle`, { active: b.dataset.on === '1' });
+        toast('حُدّث نوع الرسم'); await refresh();
+      }
+      else if (act === 'fin-cur-rate') {
+        showModal(`<h3>سعر صرف ${esc(b.dataset.code)}</h3>
+          <label>السعر مقابل العملة الأساسية<input id="cur-rate" type="number" min="0" step="any" value="${esc(b.dataset.rate)}"></label>
+          <div class="row-end" style="margin-top:12px"><button class="btn" data-act="fin-close-modal">إلغاء</button><button class="btn pri" data-act="fin-save-cur" data-code="${esc(b.dataset.code)}">حفظ</button></div>`);
+      }
+      else if (act === 'fin-save-cur') {
+        await api('PUT', `/api/finance/currencies/${encodeURIComponent(b.dataset.code)}`, { rate: Number(document.getElementById('cur-rate').value) });
+        toast('حُدّث سعر الصرف'); closeModal(); await refresh();
+      }
+      else if (act === 'fin-toggle-cur') {
+        await api('PUT', `/api/finance/currencies/${encodeURIComponent(b.dataset.code)}`, { active: b.dataset.on === '1' });
+        toast('حُدّثت العملة'); await refresh();
       }
       else if (act === 'fin-view-stu-inv') {
         const { invoice: inv } = await api('GET', `/api/finance/student-invoices/${b.dataset.id}`);
@@ -1103,27 +1214,19 @@
         });
         toast('تم تحصيل الدفعة وإصدار سند قبض وقيد محاسبي آلي'); closeModal(); await refresh();
       }
-      else if (act === 'fin-load-payroll-runs') {
-        const r = await api('GET', '/api/payroll/runs');
-        const box = document.getElementById('fin-payroll-box');
-        if (box) {
-          box.className = '';
-          box.innerHTML = `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>الشهر</th><th>العنوان</th><th>الحالة</th><th>إجمالي الصافي</th><th>القيد المالي</th><th>إجراء</th></tr></thead><tbody>
-            ${(r.runs || []).map((x) => `<tr>
-              <td><code>${esc(x.period)}</code></td>
-              <td><b>${esc(x.title)}</b></td>
-              <td>${esc(x.status)}</td>
-              <td><b>${money(x.totalNet)}</b></td>
-              <td>${x.finJournalId ? `<code>JE#${x.finJournalId}</code>` : '<span class="mut">غير مرحّل</span>'}</td>
-              <td>${['approved', 'paid'].includes(x.status) && !x.finJournalId && can('finance:post') ? `<button class="btn pri sm" data-act="fin-post-payroll" data-id="${x.id}">ترحيل قيد الرواتب</button>` : ''}</td>
-            </tr>`).join('') || '<tr><td colspan="6" class="empty">لا توجد مسيرات رواتب</td></tr>'}
-          </tbody></table></div>`;
-        }
+      else if (act === 'fin-load-payroll-runs') { await loadPayrollMonths(); }
+      else if (act === 'fin-preview-payroll') {
+        const p = await api('GET', `/api/finance/payroll-preview?month=${encodeURIComponent(b.dataset.month)}`);
+        showModal(`<h3>رواتب شهر ${esc(p.month)}</h3>
+          <p>الإجمالي: <b>${money(p.total)}</b> · الموظفون: <b>${num(p.rows.length)}</b>${p.missing.length ? ` · <span style="color:#dc2626">بلا راتب مسجل: ${num(p.missing.length)}</span>` : ''}</p>
+          <div class="tbl-wrap"><table class="tbl"><thead><tr><th>الرقم</th><th>الموظف</th><th>الراتب</th></tr></thead><tbody>
+            ${p.rows.map((x) => `<tr><td><code>${esc(x.employeeNo)}</code></td><td>${esc(x.name)}</td><td>${money(x.amount)}</td></tr>`).join('') || '<tr><td colspan="3" class="empty">لا توجد رواتب مسجلة</td></tr>'}
+          </tbody></table></div>
+          <div class="row-end" style="margin-top:12px"><button class="btn" data-act="fin-close-modal">إغلاق</button>${!p.entry && p.total > 0 && can('finance:post') ? `<button class="btn pri" data-act="fin-post-payroll" data-month="${esc(p.month)}">ترحيل القيد</button>` : ''}</div>`);
       }
       else if (act === 'fin-post-payroll') {
-        const r = await api('POST', `/api/finance/payroll/${b.dataset.id}/post`, {});
-        toast(`تم ترحيل مسير الرواتب بالقيد رقم ${r.journalNo}`);
-        document.querySelector('[data-act="fin-load-payroll-runs"]')?.click();
+        const r = await api('POST', '/api/finance/payroll-entry', { month: b.dataset.month });
+        toast(`رُحّلت رواتب الشهر بالقيد ${r.entry.no}`); closeModal(); await loadPayrollMonths();
       }
     } catch (err) {
       toast(err.message || 'تعذّر تنفيذ العملية المالية');

@@ -6,9 +6,11 @@ import { Worker } from 'node:worker_threads';
 import { audit } from './audit.js';
 import { flushAllCaches } from './cache.js';
 import { HttpError } from './http.js';
+import { isClustered, publish } from './services/bus.js';
 
 const WORKER_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), 'heavy_worker.js');
-const POOL_SIZE = 2;
+// مع تعدد العمليات يكفي خيط لكل عملية: الخيوط الكلية تتضاعف بعددها
+const POOL_SIZE = Number(process.env.HEAVY_POOL ?? (isClustered() ? 1 : 2));
 const IDLE_MS = 30_000;
 
 export function createHeavyPool({ db, cfg }) {
@@ -43,7 +45,7 @@ export function createHeavyPool({ db, cfg }) {
       try {
         // سجل التدقيق سلسلة بصمات لها كاتب واحد هو الخيط الرئيسي، فتُكتب بنود الخيط هنا بعد نجاحه
         for (const a of m.audits ?? []) audit(db, a.actor, a.action, a.ref, a.ip);
-        if (m.audits?.length || job.writes) flushAllCaches(db);
+        if (m.audits?.length || job.writes) { flushAllCaches(db); publish(db, 'flush'); }
       } catch (e) { console.error('[heavy] audit replay', e.message); }
       if (m.error) job.reject(m.error.status ? new HttpError(m.error.status, m.error.message, m.error.code, m.error.field) : new Error(m.error.message));
       else job.resolve(m.result);

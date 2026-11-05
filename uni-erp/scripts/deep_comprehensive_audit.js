@@ -9,7 +9,6 @@ import { createDoc, sendDoc, getDoc, listDocs, decideDoc, commentDoc } from '../
 import { createRequest, decide, forwardRequest, listRequests, getRequest } from '../server/services/requests.js';
 import * as Fin from '../server/services/finance/core.js';
 import * as Proc from '../server/services/procurement/core.js';
-import * as Hr from '../server/services/hr.js';
 import * as Acad from '../server/services/academics.js';
 import * as Stu from '../server/services/students.js';
 import * as StaffAtt from '../server/services/staffatt.js';
@@ -262,68 +261,6 @@ async function runDeepAudit() {
     }
   } catch (e) {
     recordTest('Procurement', 'Asset Movement', 'WARN', e.message);
-  }
-
-  // -------------------------------------------------------------
-  // TEST 6: HUMAN RESOURCES, ATTENDANCE & PAYROLL
-  // -------------------------------------------------------------
-  console.log('\n--- TEST 6: HUMAN RESOURCES & PAYROLL ---');
-  // 6.1 Duplicate Active Employee Contract
-  try {
-    const emp = db.prepare('SELECT id, full_name FROM hr_employees LIMIT 1').get();
-    if (emp) {
-      Hr.createContract(db, {
-        employee_id: emp.id,
-        contract_type: 'full_time',
-        start_date: '2026-01-01',
-        end_date: '2026-12-31',
-        basic_salary: 1500000,
-        status: 'active'
-      }, adminActor);
-      // Attempt to create a 2nd active contract overlapping the same period
-      Hr.createContract(db, {
-        employee_id: emp.id,
-        contract_type: 'part_time',
-        start_date: '2026-02-01',
-        end_date: '2026-11-30',
-        basic_salary: 800000,
-        status: 'active'
-      }, adminActor);
-      recordFinding(
-        'Overlapping Active HR Contracts for Single Employee',
-        'Medium',
-        'uni-erp/server/services/hr.js (createContract)',
-        'System allowed creating multiple simultaneous active contracts with basic salaries for the same employee without expiring or terminating the previous one.',
-        'When creating or activating a contract, verify no conflicting active contract exists or auto-close previous active contract.'
-      );
-      recordTest('HR', 'Contract Overlap Check', 'FAIL', 'Allowed overlapping active contracts.');
-    }
-  } catch (e) {
-    recordTest('HR', 'Contract Overlap Check', 'PASS', `Handled contract creation: ${e.message}`);
-  }
-
-  // 6.2 Negative Basic Salary in Payroll Slip
-  try {
-    const emp = db.prepare('SELECT id FROM hr_employees LIMIT 1').get();
-    if (emp) {
-      Hr.createSalaryRecord(db, {
-        employee_id: emp.id,
-        month: '2026-10',
-        basic_salary: -100000,
-        allowances: 0,
-        deductions: 50000
-      }, adminActor);
-      recordFinding(
-        'Negative Basic Salary Accepted in HR Payroll',
-        'High',
-        'uni-erp/server/services/hr.js (createSalaryRecord)',
-        'Allowed negative basic_salary (-100,000), which corrupted net salary calculations and tax withholding.',
-        'Validate basic_salary >= 0 and net_salary >= 0.'
-      );
-      recordTest('HR', 'Salary Sanity Check', 'FAIL', 'Negative salary allowed.');
-    }
-  } catch (e) {
-    recordTest('HR', 'Salary Sanity Check', 'PASS', `Blocked negative salary: ${e.message}`);
   }
 
   // -------------------------------------------------------------

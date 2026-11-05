@@ -18,9 +18,8 @@ const ck = lr.headers.get('set-cookie').split(';')[0];
 const call = async (m, u, b) => { const r = await fetch(base + u, { method: m, headers: { cookie: ck, ...(b ? { 'Content-Type': 'application/json' } : {}) }, body: b ? JSON.stringify(b) : undefined }); return { s: r.status, j: await r.json().catch(() => null) }; };
 const unit = app.db.prepare('SELECT id FROM org_units LIMIT 1').get();
 const emp = async (n, hire, amount) => {
-  const e = await call('POST', '/api/admin/hr/employees', { name: 'موظف ' + n, employeeNo: 'E' + n, personalId: 'P' + n, email: `e${n}@x.com`, phone: '09' + n, hireDate: hire, unit_id: unit.id, position: 'محاسب' });
-  const id = e.j?.employee?.id ?? e.j?.id; assert.ok(id, 'employee created');
-  if (amount) assert.equal((await call('POST', '/api/admin/hr/salaries', { employee_id: id, amount })).s, 201);
+  const id = Number(app.db.prepare('INSERT INTO hr_employees (employeeNo, name, personalId, hireDate, unit_id, created_at, updated_at) VALUES (?,?,?,?,?,?,?)').run('E' + n, 'موظف ' + n, 'P' + n, hire, unit.id, Date.now(), Date.now()).lastInsertRowid);
+  if (amount) app.db.prepare('INSERT INTO hr_salaries (employee_id, amount, effective_at, created_at) VALUES (?,?,?,?)').run(id, amount, Date.now() - 1000, Date.now());
 };
 const month = (() => { const d = new Date(); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`; })();
 

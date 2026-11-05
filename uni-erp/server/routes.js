@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { Router, HttpError, sendRaw, sendStream, getHttpTelemetry, getWafStats, unbanIp, SECURITY_HEADERS as SEC } from './http.js';
 import { tx, getDbPerfStats, DB_POOL_MAX } from './db.js';
-import { getCacheTelemetry, flushAllCaches, getServicesSnapshot, getCachedUnitByCode, getOrgUnitsSnapshot, cacheGetOrSet } from './cache.js';
+import { getCacheTelemetry, getServicesSnapshot, getCachedUnitByCode, getOrgUnitsSnapshot, cacheGetOrSet } from './cache.js';
 import { registerFinance } from './services/finance/routes.js';
 import { registerProcurement } from './services/procurement/routes.js';
 import { registerV12Modules } from './services/v12_modules.js';
@@ -37,7 +37,6 @@ import { createBackup, backupInfo, backupPath, deleteBackup, verifyBackup } from
 import { vapidKeys, subscribe as pushSubscribe, unsubscribe as pushUnsubscribe, subscriptionCount, notify, notifyNews, notifyGrade, notifyRequest, notifyComplaint } from './services/push.js';
 import { scan as hallScan, addManual as hallAdd, updateLog as hallUpdate, deleteLog as hallDelete, listLogs, openLogs, findStudent } from './services/attendance.js';
 import { listFaculty, createFaculty, updateFaculty as updateMember, toggleFaculty as toggleMember, deleteFaculty as deleteMember } from './services/faculty.js';
-import { listEmployees, getEmployee, createEmployee, updateEmployee, toggleEmployeeStatus, deleteEmployee, createSalaryRecord, listSalaries, latestSalary, listLeaves, createLeaveRequest, getLeave, approveLeaveRequest, rejectLeaveRequest, cancelLeaveRequest, listContracts, createContract, listOptions } from './services/hr.js';
 import { addUpload, addLink, deleteMedia, streamMedia } from './services/media.js';
 import { analytics, filterOptions } from './services/analytics.js';
 import { buildReportXlsx, buildReportDocx } from './services/reports.js';
@@ -96,7 +95,6 @@ export async function buildRouter(deps) {
   // ===== WAF Console =====
   r.add('GET', '/api/admin/waf/stats', (c) => { need(c, 'settings:manage'); c.json(200, getWafStats()); });
   r.add('POST', '/api/admin/waf/unban', (c) => { need(c, 'settings:manage'); const { ip } = c.body; if (!ip) throw new HttpError(400, 'ip مطلوب.', 'bad_request'); unbanIp(ip); c.json(200, { ok: true, ip }); });
-  r.add('GET', '/api/admin/waf/test', (c) => { need(c, 'settings:manage'); c.json(200, { active: true, rules: ['sqli','xss','path_traversal','proto_pollution','scanner_agents','tiered_rate_limit'] }); });
 
   r.add('GET', '/api/admin/general', (c) => { need(c, 'settings:manage'); c.json(200, listSettings(db)); });
   r.add('PUT', '/api/admin/general', (c) => { need(c, 'settings:manage'); c.json(200, saveSettings(deps, c.user, c.body, c.ip)); });
@@ -151,7 +149,7 @@ export async function buildRouter(deps) {
   r.add('PUT', '/api/news/:id', (c) => { need(c, 'news:manage'); c.json(200, updateNews(deps, c.user, c.params.id, c.body, c.ip)); });
   r.add('DELETE', '/api/news/:id', (c) => { need(c, 'news:manage'); deleteNews(deps, c.user, c.params.id, c.ip); c.json(200, { ok: true }); });
   // وسائط الأخبار: رفع مباشر (جسم خام، النوع من البايتات)، رابط، حذف، وبثّ الملف مع Range
-  r.add('POST', '/api/news/:id/media', (c) => { need(c, 'news:manage'); c.json(201, addUpload(deps, c.user, c.params.id, c.body, c.query.caption, c.ip)); }, { raw: true, maxBody: 51 * 1024 * 1024 });
+  r.add('POST', '/api/news/:id/media', async (c) => { need(c, 'news:manage'); c.json(201, await addUpload(deps, c.user, c.params.id, c.body, c.query.caption, c.ip)); }, { upload: true, maxBody: 51 * 1024 * 1024 });
   r.add('POST', '/api/news/:id/links', (c) => { need(c, 'news:manage'); c.json(201, addLink(deps, c.user, c.params.id, c.body.url, c.body.caption, c.ip)); });
   r.add('DELETE', '/api/news/media/:id', (c) => { need(c, 'news:manage'); deleteMedia(deps, c.user, c.params.id, c.ip); c.json(200, { ok: true }); });
   r.add('GET', '/api/media/:id', (c) => { streamMedia(deps, c.req, c.res, c.params.id, SEC); });
@@ -299,7 +297,7 @@ export async function buildRouter(deps) {
   r.add('DELETE', '/api/corr/templates/:code', (c) => { need(c, 'corr:templates'); c.json(200, deleteTemplate(deps, c.user, c.params.code, c.ip)); });
   r.add('GET', '/api/corr/notifications', (c) => { corr(c); c.json(200, listNotifs(deps, c.user)); });
   r.add('POST', '/api/corr/notifications/read', (c) => { corr(c); c.json(200, readNotifs(deps, c.user, c.body)); });
-  r.add('GET', '/api/corr/files/:id', (c) => { corr(c); const a = readCorrFile(deps, c.user, c.params.id); sendRaw(c.res, 200, { 'Content-Type': a.mime, 'Content-Disposition': `${c.query.inline === '1' ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(a.name)}` }, a.buf); });
+  r.add('GET', '/api/corr/files/:id', async (c) => { corr(c); const a = await readCorrFile(deps, c.user, c.params.id); sendRaw(c.res, 200, { 'Content-Type': a.mime, 'Content-Disposition': `${c.query.inline === '1' ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(a.name)}` }, a.buf); });
   r.add('GET', '/api/corr', (c) => { corr(c); c.json(200, { docs: listDocs(deps, c.user, c.query) }); });
   r.add('POST', '/api/corr', (c) => { need(c, 'corr:use'); c.json(201, { doc: createDoc(deps, c.user, c.body, c.ip) }); }, { maxBody: 11 * 1024 * 1024 });
   r.add('GET', '/api/corr/:id', (c) => { corr(c); c.json(200, { doc: getDoc(deps, c.user, c.params.id) }); });
@@ -331,24 +329,6 @@ export async function buildRouter(deps) {
   r.add('DELETE', '/api/faculty/:id', (c) => { need(c, 'faculty:manage'); deleteMember(deps, c.user, c.params.id, c.ip); c.json(200, { ok: true }); });
 
   // ---- الموارد البشرية والرواتب (وحدة 5.7) ----
-  r.add('GET', '/api/admin/hr/employees', (c) => { need(c, 'hr:manage'); c.json(200, listEmployees(deps.db, c.query)); });
-  r.add('POST', '/api/admin/hr/employees', (c) => { need(c, 'hr:manage'); c.json(201, createEmployee(deps.db, c.user, c.body, c.ip)); });
-  r.add('GET', '/api/admin/hr/employee/:id', (c) => { need(c, 'hr:manage'); c.json(200, getEmployee(deps.db, c.params.id, c.query)); });
-  r.add('PUT', '/api/admin/hr/employee/:id', (c) => { need(c, 'hr:manage'); c.json(200, updateEmployee(deps.db, c.user, c.params.id, c.body, c.ip)); });
-  r.add('POST', '/api/admin/hr/employee/:id/toggle', (c) => { need(c, 'hr:manage'); c.json(200, toggleEmployeeStatus(deps.db, c.user, c.params.id, !!c.body.enabled, c.ip)); });
-  r.add('DELETE', '/api/admin/hr/employee/:id', (c) => { need(c, 'hr:manage'); c.json(200, deleteEmployee(deps.db, c.user, c.params.id, c.ip)); });
-  r.add('GET', '/api/admin/hr/salaries', (c) => { need(c, 'hr:manage'); c.json(200, listSalaries(deps.db, c.query)); });
-  r.add('POST', '/api/admin/hr/salaries', (c) => { need(c, 'hr:manage'); c.json(201, createSalaryRecord(deps.db, c.user, Number(c.body.employee_id), Number(c.body.amount), c.body.effective_at ? Number(c.body.effective_at) : Date.now(), c.ip)); });
-  r.add('GET', '/api/admin/hr/salary/:employeeId/latest', (c) => { need(c, 'hr:manage'); c.json(200, { salary: latestSalary(deps.db, Number(c.params.employeeId)) }); });
-  r.add('GET', '/api/admin/hr/leaves', (c) => { need(c, 'hr:manage'); c.json(200, listLeaves(deps.db, c.query)); });
-  r.add('POST', '/api/admin/hr/leaves', (c) => { need(c, 'hr:manage'); c.json(201, createLeaveRequest(deps.db, c.user, c.body, c.ip)); });
-  r.add('GET', '/api/admin/hr/leave/:id', (c) => { need(c, 'hr:manage'); c.json(200, getLeave(deps.db, c.params.id)); });
-  r.add('POST', '/api/admin/hr/leave/:id/approve', (c) => { need(c, 'hr:manage'); c.json(200, approveLeaveRequest(deps.db, c.user, c.params.id, c.ip)); });
-  r.add('POST', '/api/admin/hr/leave/:id/reject', (c) => { need(c, 'hr:manage'); c.json(200, rejectLeaveRequest(deps.db, c.user, c.params.id, c.body.reason, c.ip)); });
-  r.add('POST', '/api/admin/hr/leave/:id/cancel', (c) => { need(c, 'hr:manage'); c.json(200, cancelLeaveRequest(deps.db, c.user, c.params.id, c.ip)); });
-  r.add('GET', '/api/admin/hr/contracts', (c) => { need(c, 'hr:manage'); c.json(200, listContracts(deps.db, c.query)); });
-  r.add('POST', '/api/admin/hr/contracts', (c) => { need(c, 'hr:manage'); c.json(201, createContract(deps.db, c.user, c.body, c.ip)); });
-  r.add('GET', '/api/admin/hr/options', (c) => { need(c, 'hr:manage'); c.json(200, listOptions(deps.db)); });
 
   // ---- الخدمات والطلبات ----
   r.add('GET', '/api/services', (c) => {
@@ -392,8 +372,8 @@ export async function buildRouter(deps) {
       : (c.user.role === 'admin' && !c.user.role_key ? getOrgUnitsSnapshot(db).units.filter((u) => u.active).map((u) => ({ id: u.id, name: u.name })) : []);
     c.json(200, { targets });
   });
-  r.add('GET', '/api/attachments/:id', (c) => {
-    const a = readAttachment(deps, c.user, c.params.id);
+  r.add('GET', '/api/attachments/:id', async (c) => {
+    const a = await readAttachment(deps, c.user, c.params.id);
     sendRaw(c.res, 200, { 'Content-Type': a.mime, 'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(a.name)}` }, a.buf);
   });
   // ---- لوحة الإحصاءات والتصدير ----
@@ -586,13 +566,6 @@ export async function buildRouter(deps) {
     });
   });
 
-  r.add('POST', '/api/v12/high-concurrency/cache/flush', (c) => {
-    needAny(c, 'devops:manage', 'settings:manage');
-    flushAllCaches(db);
-    invalidateSessionCache();
-    c.json(200, { ok: true, cacheTelemetry: getCacheTelemetry(db) });
-  });
-
   // الاختبار يرسل طلبات حقيقية تُحسب على حد المعدل للعنوان المحلي، فلا يُكرَّر قبل انقضاء نافذة الحد
   let lastBenchmarkAt = 0;
   r.add('POST', '/api/v12/high-concurrency/benchmark', async (c) => {
@@ -602,17 +575,6 @@ export async function buildRouter(deps) {
     lastBenchmarkAt = Date.now();
     const benchmark = await deps.heavy.run('liveBenchmark', c, [{ port: c.req.socket.localPort, token: c.cookies.sid }]);
     c.json(200, { ok: true, benchmark });
-  });
-
-  // مسار إدراج دفعات المراسلات الفورية (يدعم عشرات المراسلات في الثانية ضمن معاملة ذرية واحدة)
-  r.add('POST', '/api/corr/batch', (c) => {
-    need(c, 'corr:use');
-    const items = Array.isArray(c.body?.items) ? c.body.items : [];
-    if (!items.length || items.length > 100) throw new HttpError(400, 'أرسل بين 1 و100 مراسلة في الدفعة الواحدة.', 'validation');
-    const created = tx(db, () => {
-      return items.map((item) => createDoc(deps, c.user, item, c.ip));
-    });
-    c.json(201, { ok: true, count: created.length, docs: created });
   });
 
   return r;

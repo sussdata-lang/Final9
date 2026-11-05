@@ -15,6 +15,8 @@ import { buildReportXlsx, buildReportDocx } from './services/reports.js';
 import { exportRequests } from './services/requestsxl.js';
 import { preview as exportPreview, renderExport } from './services/dataexport.js';
 import { runLiveBenchmark } from './services/live_benchmark.js';
+import { feesOverview, listOverdue } from './services/finance/student_billing.js';
+import { readDeckFile } from './services/lms_files.js';
 
 const db = connectDb(workerData.pgUrl);
 const deps = { db, cfg: workerData.cfg };
@@ -27,6 +29,9 @@ const JOBS = {
   stagedImport: (actor, ...a) => stagedImport(deps, actor, ...a),
   stagedRequestsImport: (actor, ...a) => stagedRequestsImport(deps, actor, ...a),
   suiteOverview: (actor, q) => suiteOverviewFor(deps, actor, q),
+  readDeck: (_actor, file) => readDeckFile(file),
+  billingOverview: () => feesOverview(deps),
+  billingOverdue: () => listOverdue(deps),
   analytics: (_actor, q) => ({ options: filterOptions(db), ...analytics(db, q, new Date()) }),
   analyticsXlsx: (_actor, q) => buildReportXlsx(db, q),
   exportRequests: (actor, q) => exportRequests(deps, actor, q),

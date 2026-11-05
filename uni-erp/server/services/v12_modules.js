@@ -218,21 +218,27 @@ export async function registerV12Modules(r, deps) {
       ? db.prepare(`SELECT * FROM lms_lectures l WHERE l.published <> 0
           AND (l.target_faculty = '' OR l.target_faculty = (SELECT g.faculty FROM student_profiles p JOIN programs g ON g.id = p.program_id WHERE p.user_id = ?))
           AND (l.target_group_id IS NULL OR EXISTS (SELECT 1 FROM student_group_members m WHERE m.group_id = l.target_group_id AND m.student_id = ?))
-          ORDER BY l.week_no ASC, l.id DESC`).all(c.user.id, c.user.id)
-      : db.prepare('SELECT * FROM lms_lectures ORDER BY week_no ASC, id DESC').all();
+          ORDER BY l.week_no ASC, l.id DESC LIMIT 300`).all(c.user.id, c.user.id)
+      : db.prepare('SELECT * FROM lms_lectures ORDER BY week_no ASC, id DESC LIMIT 300').all();
     const lectureFiles = filesFor(db, rows.map((l) => l.id));
     const lectures = rows.map((l) => ({ ...l, files: lectureFiles.get(l.id) ?? [] }));
     const quizzes = listQuizzes(db).filter((q) => !isStudent(c) || (q.open && (!q.faculty_name || q.faculty_name === db.prepare('SELECT g.faculty AS f FROM student_profiles p JOIN programs g ON g.id = p.program_id WHERE p.user_id = ?').get(c.user.id)?.f)));
-    const books = db.prepare('SELECT * FROM library_books ORDER BY id DESC').all();
-    const loanSql = (where) => `SELECT l.*, b.title AS book_title, b.isbn FROM library_loans l JOIN library_books b ON b.id = l.book_id ${where} ORDER BY l.id DESC`;
-    const loans = seesAllLoans ? db.prepare(loanSql('')).all() : isStudent(c) && c.user.student_no ? db.prepare(loanSql('WHERE l.borrower_no = ?')).all(c.user.student_no) : [];
+    // الكتب والإعارات لتبويب المكتبة وحده، وبحدّ مع البحث
+    const library = c.query?.section === 'library';
+    const bookQ = clean(c.query?.bookQ, 60);
+    const books = !library ? [] : bookQ
+      ? db.prepare("SELECT * FROM library_books WHERE title ILIKE ? OR author ILIKE ? OR isbn ILIKE ? ORDER BY id DESC LIMIT 200").all(...Array(3).fill(`%${bookQ.replace(/[%_\\]/g, '')}%`))
+      : db.prepare('SELECT * FROM library_books ORDER BY id DESC LIMIT 200').all();
+    const bookTotals = db.prepare('SELECT COALESCE(SUM(copies_total), 0) AS total, COALESCE(SUM(copies_available), 0) AS available FROM library_books').get();
+    const loanSql = (where) => `SELECT l.*, b.title AS book_title, b.isbn FROM library_loans l JOIN library_books b ON b.id = l.book_id ${where} ORDER BY l.id DESC LIMIT 300`;
+    const loans = !library ? [] : seesAllLoans ? db.prepare(loanSql('')).all() : isStudent(c) && c.user.student_no ? db.prepare(loanSql('WHERE l.borrower_no = ?')).all(c.user.student_no) : [];
     c.json(200, {
       stats: {
         lecturesCount: lectures.length,
         quizzesCount: quizzes.length,
-        booksCount: books.reduce((s, b) => s + Number(b.copies_total || 0), 0),
-        availableBooks: books.reduce((s, b) => s + Number(b.copies_available || 0), 0),
-        activeLoans: loans.filter((l) => l.status !== 'returned').length,
+        booksCount: Number(bookTotals.total),
+        availableBooks: Number(bookTotals.available),
+        activeLoans: seesAllLoans ? Number(db.prepare("SELECT COUNT(*) AS n FROM library_loans WHERE status <> 'returned'").get().n) : loans.filter((l) => l.status !== 'returned').length,
       },
       lectures,
       // الإجابة الصحيحة لا تصل إلا لمن يدير المحتوى
@@ -286,10 +292,10 @@ export async function registerV12Modules(r, deps) {
   });
 
   // مرفقات المحاضرة: الرفع لمن يدير المحتوى، والعرض لكل من يصل إلى الشاشة
-  r.add('POST', '/api/lms/lectures/:id/files', (c) => {
+  r.add('POST', '/api/lms/lectures/:id/files', async (c) => {
     requireV12Perm(c, 'course:manage', 'lms_lib:write', 'lms_lib:edit');
-    c.json(201, addLectureFile(deps, c.user, c.params.id, c.body, c.query.name, c.ip));
-  }, { raw: true, maxBody: 205 * 1024 * 1024 });
+    c.json(201, await addLectureFile(deps, c.user, c.params.id, c.body, c.query.name, c.ip, (file) => deps.heavy.run('readDeck', c, [file])));
+  }, { upload: true, maxBody: 205 * 1024 * 1024 });
   const lmsViewer = (c) => { if (!isStudent(c)) requireV12Perm(c, ...LMS_READ); return { student: isStudent(c) }; };
   r.add('GET', '/api/lms/files/:id', (c) => { streamLectureFile(deps, c.req, c.res, c.params.id, SECURITY_HEADERS, lmsViewer(c)); });
   r.add('GET', '/api/lms/files/:id/slides', (c) => { c.json(200, lectureSlides(deps, c.params.id, lmsViewer(c))); });
@@ -638,11 +644,14 @@ export async function registerV12Modules(r, deps) {
     // الامتحان المربوط بفئة يظهر للطالب إن كان من أعضائها
     const myGroups = isStudent(c) ? new Set(groupsOfStudent(db, c.user.id).map((g) => g.id)) : null;
     const exams = db.prepare('SELECT e.*, g.name AS group_name FROM exam_schedules e LEFT JOIN student_groups g ON g.id = e.group_id ORDER BY e.exam_date ASC, e.start_time ASC').all().filter((e) => !myGroups || !e.group_id || myGroups.has(e.group_id));
-    const appeals = db.prepare('SELECT * FROM grade_appeals ORDER BY id DESC').all();
-    const promotions = db.prepare('SELECT * FROM faculty_promotions ORDER BY id DESC').all();
-    const appraisals = db.prepare('SELECT * FROM hr_appraisals ORDER BY id DESC').all();
-    const trainings = db.prepare('SELECT * FROM hr_trainings ORDER BY id DESC').all();
-    const biometrics = db.prepare('SELECT * FROM hr_biometric_devices ORDER BY id ASC').all();
+    const appeals = isStudent(c)
+      ? db.prepare('SELECT * FROM grade_appeals WHERE student_no = ? ORDER BY id DESC LIMIT 200').all(c.user.student_no ?? '')
+      : db.prepare('SELECT * FROM grade_appeals ORDER BY id DESC LIMIT 1000').all();
+    const staffRows = (sql) => (isStudent(c) ? [] : db.prepare(sql).all());
+    const promotions = staffRows('SELECT * FROM faculty_promotions ORDER BY id DESC LIMIT 500');
+    const appraisals = staffRows('SELECT * FROM hr_appraisals ORDER BY id DESC LIMIT 500');
+    const trainings = staffRows('SELECT * FROM hr_trainings ORDER BY id DESC LIMIT 500');
+    const biometrics = staffRows('SELECT * FROM hr_biometric_devices ORDER BY id ASC LIMIT 500');
 
     c.json(200, {
       exams,
@@ -660,15 +669,16 @@ export async function registerV12Modules(r, deps) {
     if (!isStudent(c)) requireV12Perm(c, ...HOUSING_READ, 'faculty:manage');
     const section = (rows, perms) => (isStudent(c) ? rows.filter((x) => x.student_no === c.user.student_no) : hasV12Perm(c, perms) ? rows : []);
     c.json(200, {
-      officeBookings: section(db.prepare('SELECT * FROM office_hour_bookings ORDER BY id DESC').all(), [...HOUSING_READ, 'faculty:manage']),
+      officeBookings: section(isStudent(c) ? db.prepare('SELECT * FROM office_hour_bookings WHERE student_no = ? ORDER BY id DESC LIMIT 200').all(c.user.student_no ?? '') : db.prepare('SELECT * FROM office_hour_bookings ORDER BY id DESC LIMIT 1000').all(), [...HOUSING_READ, 'faculty:manage']),
       dormRooms: db.prepare('SELECT * FROM dorm_rooms ORDER BY building_name, room_no').all(),
       dormAllocations: section(db.prepare(`
         SELECT a.*, r.building_name, r.room_no
         FROM dorm_allocations a
         JOIN dorm_rooms r ON r.id = a.room_id
-        ORDER BY a.id DESC
-      `).all(), [...HOUSING_READ, 'student:read']),
-      activities: db.prepare('SELECT * FROM student_activities ORDER BY id DESC').all(),
+        ${isStudent(c) ? 'WHERE a.student_no = ?' : ''}
+        ORDER BY a.id DESC LIMIT 2000
+      `).all(...(isStudent(c) ? [c.user.student_no ?? ''] : [])), [...HOUSING_READ, 'student:read']),
+      activities: db.prepare('SELECT * FROM student_activities ORDER BY id DESC LIMIT 300').all(),
     });
   });
 
@@ -807,29 +817,6 @@ export async function registerV12Modules(r, deps) {
       clean(b.topic, 200),
       Date.now()
     );
-    c.json(201, { id: Number(res.lastInsertRowid) });
-  });
-
-  r.add('POST', '/api/expansions/dorm-allocations', (c) => {
-    requireV12Perm(c, 'sa_housing:manage');
-    const b = c.body ?? {};
-    const roomId = Number(b.room_id);
-    if (!db.prepare('SELECT 1 AS x FROM dorm_rooms WHERE id = ?').get(roomId)) throw new HttpError(400, 'اختر غرفة موجودة.', 'validation');
-    const res = tx(db, () => {
-      db.prepare('UPDATE dorm_rooms SET occupied = LEAST(capacity, occupied + 1) WHERE id = ?').run(roomId);
-      return db.prepare(`
-        INSERT INTO dorm_allocations (room_id, student_name, student_no, faculty_name, check_in_date, academic_year, payment_status, status)
-        VALUES (?, ?, ?, ?, ?, '${academicYear()}', ?, 'ساكن')
-      `).run(
-        roomId,
-        clean(b.student_name, 100),
-        clean(b.student_no, 40),
-        clean(b.faculty_name, 100),
-        clean(b.check_in_date || new Date().toISOString().slice(0, 10), 20),
-        clean(b.payment_status || 'مسدد', 30)
-      );
-    });
-    audit(db, c.user, 'تسكين طالب في السكن الجامعي', clean(b.student_no, 40), c.ip);
     c.json(201, { id: Number(res.lastInsertRowid) });
   });
 
@@ -988,15 +975,6 @@ export async function registerV12Modules(r, deps) {
     const id = Number(c.params.id);
     db.prepare('DELETE FROM devops_incident_reports WHERE id = ?').run(id);
     audit(db, c.user, 'حذف بلاغ خطأ من سجل DevOps', `Incident #${id}`, c.ip);
-    c.json(200, { ok: true });
-  });
-
-  r.add('PUT', '/api/devops/settings/:key', (c) => {
-    requireV12Perm(c, 'devops:manage', 'settings:manage', 'backup:manage');
-    const key = clean(c.params.key, 40);
-    const val = JSON.stringify(c.body ?? {});
-    db.prepare('INSERT INTO infra_settings (key, value_json, updated_at) VALUES (?, ?, ?) ON CONFLICT (key) DO UPDATE SET value_json = EXCLUDED.value_json, updated_at = EXCLUDED.updated_at').run(key, val, Date.now());
-    audit(db, c.user, `تحديث إعدادات البنية التحتية (${key})`, key, c.ip);
     c.json(200, { ok: true });
   });
 

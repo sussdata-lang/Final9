@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { configureLogger, closeLogger } from './lib/logger.js';
 import { drainCertificates } from './services/enrollcert.js';
 import { drainPush } from './services/push.js';
@@ -16,9 +18,14 @@ import { ensureForms } from './services/forms/index.js';
 import { ready as financeReady } from './services/finance/core.js';
 import { hashPassword } from './security.js';
 import { createHeavyPool } from './heavy.js';
-import { startLoopWatch } from './http.js';
+import { incomingDir, startLoopWatch } from './http.js';
 import { purgeAuditLog } from './audit.js';
 import { purgeIdempotencyKeys } from './services/idempotency.js';
+import { isClustered, publish, startBus } from './services/bus.js';
+import { flushSessionTouches, invalidateSessionCache } from './services/auth.js';
+import { applySharedBan, setWafBanListener } from './waf.js';
+import { registerMutationListener } from './db.js';
+import { extractMutatedTableFromSql, flushAllCaches, getInvalidatedNamespacesForTable, invalidateCacheForSql } from './cache.js';
 import { getSetting } from './services/settings.js';
 import { demoModeBlocked } from './services/dev_accounts.js';
 
@@ -29,7 +36,9 @@ export async function createApp(overrides = {}) {
   const db = await openDb(cfg.dbPath);
   cfg.pgUrl = db.pgUrl;   // للنسخ الاحتياطي والاستعادة (pg_dump / pg_restore)
   // شرط التهيئة: إذا كانت قاعدة البيانات الافتراضية أو في الذاكرة
-  if (!overrides.dbPath || overrides.dbPath === ':memory:') {
+  // التهيئة والمهام الدورية للعملية الأولى وحدها عند تعدد العمليات
+  const bootOwner = process.env.UNI_BOOT !== '0', scheduler = process.env.UNI_SCHEDULER !== '0';
+  if (bootOwner && (!overrides.dbPath || overrides.dbPath === ':memory:')) {
     const pw = seedPassword();
     // وضع العرض يعيد كلمة مرور كل الحسابات، ومنها الطلاب، عند كل تشغيل ويفعّل المعطل منها، فلا يعمل إلا بطلب صريح (DEMO_MODE=1) أو في قاعدة الذاكرة للاختبار، ويُرفض مع NODE_ENV=production
     const demo = overrides.dbPath === ':memory:' || process.env.DEMO_MODE === '1';
@@ -104,11 +113,37 @@ export async function createApp(overrides = {}) {
   // تنظيف الجلسات المنتهية كل ساعة
   const timer = setInterval(() => db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now()), 3600_000);
   timer.unref();
-  const stopBackups = startBackupScheduler({ db, cfg });
+  const stopBackups = scheduler ? startBackupScheduler({ db, cfg }) : () => {};
+  // ما يتغير في عملية يُبطَل من ذاكرة بقية العمليات
+  const SHARED_NS = new Set(['identity', 'org_units', 'settings', 'catalog']);
+  let stopBus = () => {}, touchTimer = null;
+  if (isClustered()) {
+    const unlisten = registerMutationListener((sql) => {
+      const table = extractMutatedTableFromSql(sql);
+      const session = ['users', 'roles', 'org_units'].includes(table) || (table === 'sessions' && /^\s*DELETE/i.test(sql));
+      if (session || getInvalidatedNamespacesForTable(table).some((n) => SHARED_NS.has(n))) publish(db, 'mut', { sql: `UPDATE ${table}`, session });
+    });
+    setWafBanListener((ip, until) => publish(db, 'ban', { ip, until }));
+    const stopListening = startBus({ url: db.pgUrl, onMessage: (type, d) => {
+      if (type === 'mut') { invalidateCacheForSql(db, d.sql); if (d.session) invalidateSessionCache(); }
+      else if (type === 'flush') { flushAllCaches(db); invalidateSessionCache(); }
+      else if (type === 'ban') applySharedBan(d.ip, d.until);
+    } });
+    touchTimer = setInterval(() => { try { flushSessionTouches(db); } catch (e) { console.warn('session touch:', e.message); } }, 60_000);
+    touchTimer.unref();
+    stopBus = () => { unlisten(); stopListening(); };
+  }
   const stopLoopWatch = startLoopWatch();
+  if (scheduler) {
+    const dayAgo = Date.now() - 24 * 3600_000;
+    fs.promises.readdir(incomingDir(cfg)).then((names) => Promise.all(names.map(async (n) => {
+      const p = path.join(incomingDir(cfg), n);
+      if ((await fs.promises.stat(p)).mtimeMs < dayAgo) await fs.promises.rm(p, { force: true });
+    }))).catch(() => {});
+  }
   // مدة الاحتفاظ بسجل التدقيق من الإعدادات العامة
   const auditPurge = () => { try { purgeIdempotencyKeys(db); } catch (e) { console.warn('idempotency purge:', e.message); } try { const r = purgeAuditLog(db, getSetting(db, 'audit.retention_years')); if (r.removed) console.log(`سجل التدقيق: حُذف ${r.removed} صفاً تجاوز مدة الاحتفاظ.`); } catch (e) { console.error('audit purge:', e.message); } };
-  const purgeFirst = setTimeout(auditPurge, 120_000), purgeTimer = setInterval(auditPurge, 24 * 3600_000);
-  purgeFirst.unref(); purgeTimer.unref();
-  return { server, db, cfg, limiter, router, close: async () => { clearInterval(timer); clearTimeout(purgeFirst); clearInterval(purgeTimer); stopBackups(); stopLoopWatch(); await drainCertificates(db); await drainPush(); await heavy.close(); await new Promise((res) => server.close(() => { db.close(); res(); })); await closeLogger(); } };
+  const purgeFirst = scheduler ? setTimeout(auditPurge, 120_000) : null, purgeTimer = scheduler ? setInterval(auditPurge, 24 * 3600_000) : null;
+  purgeFirst?.unref(); purgeTimer?.unref();
+  return { server, db, cfg, limiter, router, close: async () => { stopBus(); clearInterval(touchTimer); try { flushSessionTouches(db); } catch {} clearInterval(timer); clearTimeout(purgeFirst); clearInterval(purgeTimer); stopBackups(); stopLoopWatch(); await drainCertificates(db); await drainPush(); await heavy.close(); await new Promise((res) => server.close(() => { db.close(); res(); })); await closeLogger(); } };
 }

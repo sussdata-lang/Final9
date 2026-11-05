@@ -3,6 +3,7 @@ import { workflowOn, initialStatus, canApprove, needJustification, logChange } f
 import { audit } from '../audit.js';
 import { HttpError } from '../http.js';
 import { tx } from '../db.js';
+import { nextNumber } from './numbering.js';
 import { getSetting } from './settings.js';
 
 export const passMark = (db) => getSetting(db, 'grades.pass_mark');
@@ -176,7 +177,7 @@ export function createComplaint({ db }, user, b, ip) {
   const subject = text(b?.subject, 3, 120, 'الموضوع'), body = text(b?.body, 10, 2000, 'نص الشكوى');
   return tx(db, () => {
     if (db.prepare("SELECT COUNT(*) c FROM complaints WHERE student_id = ? AND status = 'open'").get(user.id).c >= 5) throw new HttpError(429, 'لديك 5 شكاوى قيد المعالجة؛ انتظر الرد قبل إضافة جديدة.', 'rate_limited');
-    const id = db.prepare('SELECT COALESCE(MAX(id),0)+1 n FROM complaints').get().n, no = `CMP-${new Date().getFullYear()}-${String(id).padStart(5, '0')}`;
+    const id = nextNumber(db, 'complaints', 'SELECT MAX(id) FROM complaints'), no = `CMP-${new Date().getFullYear()}-${String(id).padStart(5, '0')}`;
     db.prepare('INSERT INTO complaints (id, no, student_id, subject, body, created_at) VALUES (?,?,?,?,?,?)').run(id, no, user.id, subject, body, Date.now());
     audit(db, user, 'تقديم شكوى', no, ip);
     return { complaint: cview(db.prepare(`${CSEL} WHERE c.id = ?`).get(id), false) };

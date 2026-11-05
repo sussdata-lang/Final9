@@ -6,6 +6,7 @@ import { effective, roleLabel, computeAllowedViews, summarizeUserAccessProfile, 
 import { getSetting } from './settings.js';
 import { cacheGetOrSet, getCachedUnitById, getCachedUnitTree, extractMutatedTableFromSql } from '../cache.js';
 import { registerMutationListener } from '../db.js';
+import { isClustered } from './bus.js';
 import { studentViewsOf } from './settings.js';
 
 // تجزئة وهمية تُستخدم عند غياب المستخدم كي يتساوى زمن الاستجابة (منع تعداد الحسابات)
@@ -50,9 +51,26 @@ const SESSION_CACHE_TTL_MS = 25_000;
 const SESSION_IDLE_MS = Number(process.env.SESSION_IDLE_MIN ?? 120) * 60_000;
 const sessionLastSeen = new Map();
 const MAX_LAST_SEEN = 50_000;
+const pendingTouches = new Map();
+const TOUCH_MS = 60_000;
+// آخر نشاط مسجل في القاعدة، مع تعدد العمليات فقط: كل عملية ترى جزءًا من طلبات الجلسة
+function sharedLastSeen(db, token, local) {
+  if (!isClustered()) return local;
+  if (local && Date.now() - local < SESSION_IDLE_MS) return local;
+  const row = db.prepare('SELECT last_seen FROM sessions WHERE token_hash = ?').get(sha256(token));
+  return Math.max(Number(row?.last_seen) || 0, local || 0) || local;
+}
+export function flushSessionTouches(db) {
+  const rows = [...pendingTouches.entries()];
+  pendingTouches.clear();
+  for (let i = 0; i < rows.length; i += 200) {
+    const part = rows.slice(i, i + 200);
+    db.prepare(`UPDATE sessions SET last_seen = ${Math.max(...part.map((r) => r[1]))} WHERE token_hash IN (${part.map(() => '?').join(',')})`).run(...part.map((r) => sha256(r[0])));
+  }
+}
 export function idleExpired(db, token, now) {
   if (!SESSION_IDLE_MS) return false;
-  const last = sessionLastSeen.get(token);
+  const last = sharedLastSeen(db, token, sessionLastSeen.get(token));
   if (last && now - last > SESSION_IDLE_MS) {
     sessionLastSeen.delete(token);
     db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(sha256(token));
@@ -61,6 +79,7 @@ export function idleExpired(db, token, now) {
   sessionLastSeen.delete(token);
   if (sessionLastSeen.size >= MAX_LAST_SEEN) sessionLastSeen.delete(sessionLastSeen.keys().next().value);
   sessionLastSeen.set(token, now);
+  if (isClustered() && (!last || now - last >= TOUCH_MS || !pendingTouches.has(token))) pendingTouches.set(token, now);
   return false;
 }
 let sessionCacheHits = 0;

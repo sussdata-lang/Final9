@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { tx } from '../db.js';
+import { nextNumber } from './numbering.js';
 import { audit } from '../audit.js';
 import { sha256 } from '../security.js';
 import { getSetting } from './settings.js';
@@ -171,7 +172,7 @@ export function createRequest({ db, cfg }, user, input, ip, opts = {}) {
   try {
     const result = tx(db, () => {
       const check = kind === 'student' ? runRules(db, { studentId: user.id, serviceCode: service.code, hasAttachment: atts.length > 0 }) : { ok: true };
-      const nextId = (db.prepare('SELECT COALESCE(MAX(id),0)+1 n FROM requests').get().n);
+      const nextId = nextNumber(db, 'requests', 'SELECT MAX(id) FROM requests');
       const no = `REQ-${new Date().getFullYear()}-${pad(nextId, 5)}`;
       const now = Date.now();
       const rejected = !check.ok;
@@ -295,11 +296,11 @@ export function stats({ db }) {
   return { review: by.review ?? 0, approved: by.approved ?? 0, rejected: by.rejected ?? 0, avgApprovalMs: avg ? Math.round(avg) : null, slaBreaches: late };
 }
 
-export function readAttachment({ db, cfg }, user, id) {
+export async function readAttachment({ db, cfg }, user, id) {
   const a = db.prepare('SELECT a.*, r.student_id FROM attachments a JOIN requests r ON r.id = a.request_id WHERE a.id = ?').get(Number(id));
   if (!a || !visibleTo(user, db.prepare('SELECT * FROM requests WHERE id = ?').get(a.request_id))) throw new HttpError(404, 'غير موجود.', 'not_found');
   const file = path.join(cfg.uploadDir, a.stored_name);
-  const buf = fs.readFileSync(file);
+  const buf = await fs.promises.readFile(file);
   if (sha256(buf) !== a.sha256) throw new HttpError(500, 'سلامة المرفق مخالفة للمسجَّل.', 'integrity');
   return { buf, mime: a.mime, name: a.orig_name };
 }

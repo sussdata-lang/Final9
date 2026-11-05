@@ -13,7 +13,6 @@ import { createBackup, listBackups, decrypt } from '../server/services/backup.js
 import { readZip } from '../server/lib/zip.js';
 import { createApp } from '../server/app.js';
 import { hashPassword } from '../server/security.js';
-import { deleteEmployee } from '../server/services/hr.js';
 import { idleExpired } from '../server/services/auth.js';
 import { revokePassword, rotateSigningMaterial } from '../server/services/credentials.js';
 import { verifyPassword, checkTieredRateLimit, checkIpCeiling, resetTieredRateLimit } from '../server/security.js';
@@ -141,18 +140,6 @@ test('مهلة الخمول تنهي الجلسة وتحذفها، والنشا�
   assert.equal(deleted, 1);
 });
 
-test('موظف له سلفة لا يُحذف، فسجلاته أساس الرواتب', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'uni-erp-emp-'));
-  const app = await createApp({ dbPath: ':memory:', uploadDir: path.join(dir, 'up'), logDir: path.join(dir, 'logs'), dataDir: dir, scryptN: 1024, port: 0, backupAuto: false });
-  try {
-    const cols = app.db.prepare("SELECT column_name c FROM information_schema.columns WHERE table_name = 'hr_employees' AND is_nullable = 'NO' AND column_default IS NULL AND column_name <> 'id'").all().map((r) => r.c);
-    const id = Number(app.db.prepare(`INSERT INTO hr_employees (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`).run(...cols.map((c) => (/_at$|salary|amount/.test(c) ? 1 : `RISK-${c}`))).lastInsertRowid);
-    const advCols = app.db.prepare("SELECT column_name c FROM information_schema.columns WHERE table_name = 'hr_advances' AND is_nullable = 'NO' AND column_default IS NULL AND column_name NOT IN ('id', 'employee_id')").all().map((r) => r.c);
-    app.db.prepare(`INSERT INTO hr_advances (employee_id, ${advCols.join(', ')}) VALUES (?, ${advCols.map(() => '?').join(', ')})`).run(id, ...advCols.map((c) => (c === 'advance_code' ? 'RISK-A1' : /_at$|amount|installment|month/.test(c) ? 1 : 'x')));
-    assert.throws(() => deleteEmployee(app.db, null, id, '::1'), (e) => e.status === 400);
-    assert.ok(app.db.prepare('SELECT id FROM hr_employees WHERE id = ?').get(id));
-  } finally { await app.close(); }
-});
 
 test('إبطال الكلمة المكشوفة يشمل من يستعملها فقط، ولا يسمح بها بعده', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'uni-erp-rev-'));
