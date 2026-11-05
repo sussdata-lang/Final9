@@ -66,38 +66,6 @@ export class RateLimiter {
 }
 
 // ============================================================
-// قفل الحساب المتدرج (Progressive Account Lockout)
-// ============================================================
-const accountLockouts = new Map(); // username → {failures, lockedUntil, lockCount}
-const LOCKOUT_DURATIONS = [15 * 60_000, 60 * 60_000, 24 * 60 * 60_000]; // 15min, 1h, 24h
-
-export function recordLoginFailure(username) {
-  const rec = accountLockouts.get(username) || { failures: 0, lockedUntil: 0, lockCount: 0 };
-  rec.failures++;
-  if (rec.failures >= 5) {
-    const dur = LOCKOUT_DURATIONS[Math.min(rec.lockCount, LOCKOUT_DURATIONS.length - 1)];
-    rec.lockedUntil = Date.now() + dur;
-    rec.lockCount++;
-    rec.failures = 0;
-    accountLockouts.set(username, rec);
-    return { locked: true, until: rec.lockedUntil, duration: dur, lockCount: rec.lockCount };
-  }
-  accountLockouts.set(username, rec);
-  return { locked: false, remaining: 5 - rec.failures };
-}
-
-export function checkAccountLockout(username) {
-  const rec = accountLockouts.get(username);
-  if (!rec || rec.lockedUntil <= Date.now()) return { locked: false };
-  return { locked: true, until: rec.lockedUntil, retryAfter: Math.ceil((rec.lockedUntil - Date.now()) / 1000) };
-}
-
-export function recordLoginSuccess(username) {
-  const rec = accountLockouts.get(username);
-  if (rec) { rec.failures = 0; rec.lockedUntil = 0; }
-}
-
-// ============================================================
 // Session Fingerprinting
 // ============================================================
 export function createSessionFingerprint(req) {
@@ -124,42 +92,36 @@ const TIERED_RULES = [
 ];
 const TRUSTED_IPS = new Set(String(process.env.WAF_TRUSTED_IPS || '').split(',').map((s) => s.trim()).filter(Boolean));
 export const isTrustedIp = (ip) => TRUSTED_IPS.has(String(ip));
-const tieredBuckets = new Map(); // `rule:ip` → [{time}]
+// الحد لكل مستخدم بعد الدخول، ولكل عنوان قبله: الجامعة قد تخرج كلها من عنوان واحد فلا يوقف مستخدم واحد الجميع.
+// RATE_IP_MAX سقف للعنوان كله في الدقيقة، يحمي من الإغراق وفيه متسع لحرم كامل.
+const IP_CEILING = Number(process.env.RATE_IP_MAX ?? 120_000);
+const tieredBuckets = new Map(); // المفتاح ← { start, count }: عدّاد نافذة ثابتة، لا سجل لكل طلب
 export const resetTieredRateLimit = () => tieredBuckets.clear();
+function bump(key, windowMs, now) {
+  let b = tieredBuckets.get(key);
+  if (!b || now - b.start >= windowMs) { b = { start: now, count: 0 }; tieredBuckets.set(key, b); }
+  return ++b.count;
+}
 
-export function checkTieredRateLimit(req) {
+// سقف العنوان: يُفحص قبل قراءة الجلسة، فرمز مزور لا يصل إلى القاعدة بلا حد
+export function checkIpCeiling(req, ceiling = IP_CEILING) {
   const ip = req.ip || req.socket?.remoteAddress || '0.0.0.0';
   if (isTrustedIp(ip)) return { limited: false };
-  const now = Date.now();
+  return bump(`ceiling:${ip}`, 60_000, Date.now()) > ceiling ? { limited: true, rule: 'ip', retryAfter: 60 } : { limited: false };
+}
+
+export function checkTieredRateLimit(req, userId = null) {
+  const ip = req.ip || req.socket?.remoteAddress || '0.0.0.0';
+  if (userId == null && isTrustedIp(ip)) return { limited: false };
+  const who = userId != null ? `u${userId}` : ip, now = Date.now();
   for (const rule of TIERED_RULES) {
     if (!rule.pattern.test(req.url)) continue;
     if (rule.methods && !rule.methods.includes(req.method)) continue;
-    const k = `${rule.key}:${ip}`;
-    const times = (tieredBuckets.get(k) || []).filter((t) => now - t < rule.windowMs);
-    times.push(now);
-    tieredBuckets.set(k, times);
-    if (times.length > rule.max) {
-      return { limited: true, rule: rule.key, retryAfter: Math.ceil(rule.windowMs / 1000), count: times.length };
-    }
+    const count = bump(`${rule.key}:${who}`, rule.windowMs, now);
+    if (count > rule.max) return { limited: true, rule: rule.key, retryAfter: Math.ceil(rule.windowMs / 1000), count };
     return { limited: false };
   }
   return { limited: false };
-}
-
-// ============================================================
-// Idempotency Shield للعمليات المالية
-// ============================================================
-const idempotencyStore = new Map(); // key → {at, resultId}
-
-export function checkIdempotency(key, windowMs = 300_000) {
-  if (!key) return { duplicate: false };
-  const rec = idempotencyStore.get(key);
-  if (rec && Date.now() - rec.at < windowMs) return { duplicate: true, resultId: rec.resultId };
-  return { duplicate: false };
-}
-
-export function markIdempotencyUsed(key, resultId) {
-  if (key) idempotencyStore.set(key, { at: Date.now(), resultId });
 }
 
 // ============================================================
@@ -167,13 +129,5 @@ export function markIdempotencyUsed(key, resultId) {
 // ============================================================
 setInterval(() => {
   const now = Date.now();
-  for (const [k, times] of tieredBuckets) {
-    const fresh = times.filter((t) => now - t < 180_000);
-    if (!fresh.length) tieredBuckets.delete(k); else tieredBuckets.set(k, fresh);
-  }
-  for (const [u, rec] of accountLockouts) {
-    if (rec.lockedUntil > 0 && rec.lockedUntil < now - 48 * 60 * 60_000) accountLockouts.delete(u);
-  }
-  const cutoff = now - 600_000;
-  for (const [k, v] of idempotencyStore) if (v.at < cutoff) idempotencyStore.delete(k);
+  for (const [k, b] of tieredBuckets) if (now - b.start > 180_000) tieredBuckets.delete(k);
 }, 5 * 60_000).unref();

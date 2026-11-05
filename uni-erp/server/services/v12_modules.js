@@ -1,5 +1,5 @@
 import { docNo, academicYear } from '../lib/doc_no.js';
-import { listQuizzes, withoutAnswers, submitQuiz } from './quizzes.js';
+import { listQuizzes, withoutAnswers, submitQuiz, startQuiz, createQuiz, updateQuiz, deleteQuiz, requestQuizApproval, decideQuiz, listSubmissions, gradeSubmission } from './quizzes.js';
 import { groupsOfStudent, listGroups, groupSize } from './student_groups.js';
 import { HttpError } from '../http.js';
 import { log } from '../lib/logger.js';
@@ -14,6 +14,8 @@ const clean = (v, max = 300) => String(v ?? '').trim().slice(0, max);
 const need = (v, label, max = 300) => { const s = clean(v, max); if (!s) throw new HttpError(400, `«${label}» مطلوب.`, 'validation'); return s; };
 
 // استدعاء Gemini AI من الخادم (مع بديل ذكي فوري في حال عدم توفر المفتاح أو انتهاء المهلة في بيئة الاختبار)
+const RULE_BASED_MODEL = 'rule-based';
+const aiModelEnabled = () => Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'MY_GEMINI_API_KEY');
 export async function callGeminiAI(systemPrompt, userPrompt, fallbackFn) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (apiKey && apiKey !== 'MY_GEMINI_API_KEY' && !process.env.NODE_TEST_CONTEXT) {
@@ -34,7 +36,7 @@ export async function callGeminiAI(systemPrompt, userPrompt, fallbackFn) {
       log.warn('gemini: ' + err.message);
     }
   }
-  return { text: fallbackFn(), model: 'uni-ai-engine-v12' };
+  return { text: fallbackFn(), model: RULE_BASED_MODEL };
 }
 
 // ==================== تحليلات وإحصائيات DevOps المتقدمة ====================
@@ -209,13 +211,18 @@ export async function registerV12Modules(r, deps) {
 
   // ==================== 5.12 التعلم الإلكتروني والمكتبة الرقمية (LMS & Library) ====================
   r.add('GET', '/api/lms/overview', (c) => {
-    if (!isStudent(c)) requireV12Perm(c, ...LMS_READ);
-    const canManage = hasV12Perm(c, LMS_MANAGE);
+    if (!isStudent(c)) requireV12Perm(c, ...LMS_READ, 'sa_quiz:write', 'sa_quiz:approve');
+    const canManage = hasV12Perm(c, [...LMS_MANAGE, 'sa_quiz:write', 'sa_quiz:approve']);
     const seesAllLoans = canManage || hasV12Perm(c, ['lms_lib:view', 'holds:manage']);
-    const rows = db.prepare(`SELECT * FROM lms_lectures ${isStudent(c) ? 'WHERE published <> 0' : ''} ORDER BY week_no ASC, id DESC`).all();
+    const rows = isStudent(c)
+      ? db.prepare(`SELECT * FROM lms_lectures l WHERE l.published <> 0
+          AND (l.target_faculty = '' OR l.target_faculty = (SELECT g.faculty FROM student_profiles p JOIN programs g ON g.id = p.program_id WHERE p.user_id = ?))
+          AND (l.target_group_id IS NULL OR EXISTS (SELECT 1 FROM student_group_members m WHERE m.group_id = l.target_group_id AND m.student_id = ?))
+          ORDER BY l.week_no ASC, l.id DESC`).all(c.user.id, c.user.id)
+      : db.prepare('SELECT * FROM lms_lectures ORDER BY week_no ASC, id DESC').all();
     const lectureFiles = filesFor(db, rows.map((l) => l.id));
     const lectures = rows.map((l) => ({ ...l, files: lectureFiles.get(l.id) ?? [] }));
-    const quizzes = listQuizzes(db).filter((q) => !isStudent(c) || q.open);
+    const quizzes = listQuizzes(db).filter((q) => !isStudent(c) || (q.open && (!q.faculty_name || q.faculty_name === db.prepare('SELECT g.faculty AS f FROM student_profiles p JOIN programs g ON g.id = p.program_id WHERE p.user_id = ?').get(c.user.id)?.f)));
     const books = db.prepare('SELECT * FROM library_books ORDER BY id DESC').all();
     const loanSql = (where) => `SELECT l.*, b.title AS book_title, b.isbn FROM library_loans l JOIN library_books b ON b.id = l.book_id ${where} ORDER BY l.id DESC`;
     const loans = seesAllLoans ? db.prepare(loanSql('')).all() : isStudent(c) && c.user.student_no ? db.prepare(loanSql('WHERE l.borrower_no = ?')).all(c.user.student_no) : [];
@@ -234,6 +241,8 @@ export async function registerV12Modules(r, deps) {
         : isStudent(c) && c.user.student_no ? db.prepare('SELECT * FROM lms_quiz_submissions WHERE student_no = ? ORDER BY submitted_at DESC LIMIT 30').all(c.user.student_no) : [],
       books,
       loans,
+      faculties: isStudent(c) ? [] : db.prepare('SELECT DISTINCT faculty AS f FROM programs WHERE active = 1 ORDER BY f').all().map((x) => x.f),
+      groups: isStudent(c) ? [] : listGroups(db).map((g) => ({ id: g.id, name: g.name })),
     });
   });
 
@@ -243,8 +252,8 @@ export async function registerV12Modules(r, deps) {
     const title = clean(b.title, 160);
     if (!title) throw new HttpError(400, 'عنوان المحاضرة مطلوب.');
     const res = db.prepare(`
-      INSERT INTO lms_lectures (course_code, course_name, title, kind, week_no, instructor_name, content_url, summary, views_count, published, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 1, ?)
+      INSERT INTO lms_lectures (course_code, course_name, title, kind, week_no, instructor_name, content_url, summary, views_count, published, target_faculty, target_group_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 1, ?, ?, ?)
     `).run(
       need(b.course_code, 'رمز المقرر', 30),
       clean(b.course_name, 100),
@@ -254,10 +263,18 @@ export async function registerV12Modules(r, deps) {
       clean(b.instructor_name || c.user.display_name, 80),
       clean(b.content_url, 200),
       clean(b.summary, 400),
+      clean(b.target_faculty, 120),
+      Number(b.target_group_id) || null,
       Date.now()
     );
     audit(db, c.user, 'إضافة محاضرة رقمية LMS', title, c.ip);
-    c.json(201, { id: Number(res.lastInsertRowid) });
+    // تنبيه الطلاب المعنيين فور النشر
+    const targetIds = db.prepare(`SELECT u.id FROM users u JOIN student_profiles p ON p.user_id = u.id JOIN programs g ON g.id = p.program_id
+      WHERE u.role = 'student' AND u.active = 1 AND p.status = 'active' AND (? = '' OR g.faculty = ?)
+      AND (?::bigint IS NULL OR EXISTS (SELECT 1 FROM student_group_members m WHERE m.group_id = ? AND m.student_id = u.id))`)
+      .all(clean(b.target_faculty, 120), clean(b.target_faculty, 120), Number(b.target_group_id) || null, Number(b.target_group_id) || null).map((x) => x.id);
+    if (targetIds.length) notify(deps, targetIds, { title: 'محاضرة جديدة', body: `${clean(b.course_name, 60)}: ${title}`, tag: 'lecture' });
+    c.json(201, { id: Number(res.lastInsertRowid), notified: targetIds.length });
   });
 
   r.add('DELETE', '/api/lms/lectures/:id', (c) => {
@@ -283,31 +300,18 @@ export async function registerV12Modules(r, deps) {
     c.json(200, { ok: true });
   });
 
-  r.add('POST', '/api/lms/quizzes', (c) => {
-    requireV12Perm(c, 'course:manage', 'lms_lib:write', 'lms_lib:edit');
-    const b = c.body ?? {};
-    const title = clean(b.title, 150);
-    if (!title) throw new HttpError(400, 'عنوان الاختبار مطلوب.');
-    const questions = Array.isArray(b.questions) ? b.questions : [
-      { q: clean(b.sample_question || 'سؤال تقييمي أساسي في المقرر', 200), options: ['الخيار الأول (صحيح)', 'الخيار الثاني', 'الخيار الثالث'], ans: 0 },
-    ];
-    const res = db.prepare(`
-      INSERT INTO lms_quizzes (course_code, course_name, title, duration_min, total_marks, questions_json, attempts_count, avg_score, published, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, 0, 0, 1, ?)
-    `).run(
-      need(b.course_code, 'رمز المقرر', 30),
-      clean(b.course_name || 'مبادئ الأمن السيبراني', 100),
-      title,
-      Number(b.duration_min) || 20,
-      Number(b.total_marks) || 20,
-      JSON.stringify(questions),
-      Date.now()
-    );
-    audit(db, c.user, 'إنشاء اختبار إلكتروني LMS', title, c.ip);
-    c.json(201, { id: Number(res.lastInsertRowid) });
-  });
+  // الاختبارات: يعدّها قسم شؤون الطلاب، ويعتمدها مدرس المقرر
+  const QUIZ_WRITE = ['sa_quiz:write'], QUIZ_APPROVE = ['sa_quiz:approve'];
+  r.add('POST', '/api/lms/quizzes', (c) => { requireV12Perm(c, ...QUIZ_WRITE); c.json(201, createQuiz(deps, c.user, c.body, c.ip)); });
+  r.add('PUT', '/api/lms/quizzes/:id', (c) => { requireV12Perm(c, ...QUIZ_WRITE); c.json(200, updateQuiz(deps, c.user, c.params.id, c.body, c.ip)); });
+  r.add('DELETE', '/api/lms/quizzes/:id', (c) => { requireV12Perm(c, ...QUIZ_WRITE); c.json(200, deleteQuiz(deps, c.user, c.params.id, c.ip)); });
+  r.add('POST', '/api/lms/quizzes/:id/request-approval', (c) => { requireV12Perm(c, ...QUIZ_WRITE); c.json(200, requestQuizApproval(deps, c.user, c.params.id, c.ip)); });
+  r.add('POST', '/api/lms/quizzes/:id/decide', (c) => { requireV12Perm(c, ...QUIZ_APPROVE); c.json(200, decideQuiz(deps, c.user, c.params.id, c.body, c.ip)); });
+  r.add('POST', '/api/lms/quizzes/:id/start', (c) => { c.json(200, startQuiz(deps, c.user, c.params.id)); });
+  r.add('GET', '/api/lms/quizzes/:id/submissions', (c) => { requireV12Perm(c, ...QUIZ_WRITE, ...QUIZ_APPROVE); c.json(200, listSubmissions(deps, c.params.id)); });
+  r.add('POST', '/api/lms/quiz-submissions/:id/grade', (c) => { requireV12Perm(c, ...QUIZ_APPROVE); c.json(200, gradeSubmission(deps, c.user, c.params.id, c.body, c.ip)); });
 
-  r.add('POST', '/api/lms/quizzes/:id/submit', (c) => { c.json(200, submitQuiz(db, c.user, c.params.id, c.body?.answers)); });
+  r.add('POST', '/api/lms/quizzes/:id/submit', (c) => { c.json(200, submitQuiz(deps, c.user, c.params.id, c.body?.answers)); });
 
   r.add('POST', '/api/lms/books', (c) => {
     requireV12Perm(c, 'holds:manage', 'lms_lib:write', 'lms_lib:edit', 'course:manage');
@@ -664,7 +668,6 @@ export async function registerV12Modules(r, deps) {
         JOIN dorm_rooms r ON r.id = a.room_id
         ORDER BY a.id DESC
       `).all(), [...HOUSING_READ, 'student:read']),
-      scholarships: section(db.prepare('SELECT * FROM scholarships ORDER BY id DESC').all(), [...HOUSING_READ, 'sa_scholarships:view', 'sa_scholarships:write', 'sa_scholarships:approve', 'finance:read', 'finance:fees', 'student:read']),
       activities: db.prepare('SELECT * FROM student_activities ORDER BY id DESC').all(),
     });
   });
@@ -736,7 +739,7 @@ export async function registerV12Modules(r, deps) {
       clean(b.exam_date || new Date().toISOString().slice(0, 10), 20),
       clean(b.start_time || '09:00', 10),
       clean(b.end_time || '11:00', 10),
-      clean(b.hall_name || 'المدرج A2', 60),
+      clean(b.hall_name || '', 60),
       Number(b.capacity) || 0,
       groupCount ?? (Number(b.enrolled_count) || 0),
       clean(b.proctor_name || 'لجنة المراقبة المركزية', 100),
@@ -745,8 +748,8 @@ export async function registerV12Modules(r, deps) {
     );
     audit(db, c.user, 'جدولة امتحان وتوزيع قاعة', clean(b.course_name, 60), c.ip);
     const capacity = Number(b.capacity) || 0;
-    const clash = hallClash(clean(b.exam_date || new Date().toISOString().slice(0, 10), 20), clean(b.hall_name || 'المدرج A2', 60), clean(b.start_time || '09:00', 10), clean(b.end_time || '11:00', 10), Number(res.lastInsertRowid));
-    c.json(201, { id: Number(res.lastInsertRowid), ...(clash ? { conflictWarning: clashText(clean(b.course_name, 60), clean(b.hall_name || 'المدرج A2', 60), clash.course_name) } : {}), ...(groupCount !== null && capacity && groupCount > capacity ? { capacityWarning: `عدد طلاب الفئة (${groupCount}) يتجاوز سعة القاعة (${capacity}).` } : {}) });
+    const clash = hallClash(clean(b.exam_date || new Date().toISOString().slice(0, 10), 20), clean(b.hall_name || '', 60), clean(b.start_time || '09:00', 10), clean(b.end_time || '11:00', 10), Number(res.lastInsertRowid));
+    c.json(201, { id: Number(res.lastInsertRowid), ...(clash ? { conflictWarning: clashText(clean(b.course_name, 60), clean(b.hall_name || '', 60), clash.course_name) } : {}), ...(groupCount !== null && capacity && groupCount > capacity ? { capacityWarning: `عدد طلاب الفئة (${groupCount}) يتجاوز سعة القاعة (${capacity}).` } : {}) });
   });
 
   r.add('POST', '/api/expansions/appeals', (c) => {
@@ -830,25 +833,6 @@ export async function registerV12Modules(r, deps) {
     c.json(201, { id: Number(res.lastInsertRowid) });
   });
 
-  r.add('POST', '/api/expansions/scholarships', (c) => {
-    requireV12Perm(c, 'sa_scholarships:approve', 'finance:fees');
-    const b = c.body ?? {};
-    const res = db.prepare(`
-      INSERT INTO scholarships (student_name, student_no, program_name, scholarship_type, discount_percent, amount_covered, academic_year, status, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, '${academicYear()}', 'مفعّلة', ?)
-    `).run(
-      clean(b.student_name, 100),
-      clean(b.student_no, 40),
-      clean(b.program_name, 100),
-      clean(b.scholarship_type || 'تفوق أكاديمي', 80),
-      Number(b.discount_percent) || 0,
-      Number(b.amount_covered) || 0,
-      Date.now()
-    );
-    audit(db, c.user, 'منح إعفاء/منحة دراسية', clean(b.student_no, 40), c.ip);
-    c.json(201, { id: Number(res.lastInsertRowid) });
-  });
-
   r.add('POST', '/api/expansions/appraisals', (c) => {
     requireV12Perm(c, 'hr_emp:edit', 'hr:manage');
     const b = c.body ?? {};
@@ -923,6 +907,7 @@ export async function registerV12Modules(r, deps) {
         avgLatencyMs: devopsData.stats.avgLatencyMs,
       },
       settings,
+      cache: { redisConfigured: Boolean(process.env.REDIS_URL) },
       incidents: devopsData.incidents,
       analytics: {
         stats: devopsData.stats,
@@ -1021,8 +1006,7 @@ export async function registerV12Modules(r, deps) {
     const pgSql = [
       '-- ====================================================================',
       '-- مخطط قاعدة بيانات PostgreSQL 16 المولّد آلياً لمنظومة Uni-ERP v12',
-      '-- يدعم التوسع الأفقي، Connection Pooling (PgBouncer)، ونسخ القراءة',
-      '-- ====================================================================',
+            '-- ====================================================================',
       'BEGIN;',
       ...tables.map((t) => {
         const converted = String(t.sql || '')
@@ -1046,7 +1030,7 @@ export async function registerV12Modules(r, deps) {
     const chats = student
       ? db.prepare('SELECT * FROM ai_advisor_chats WHERE user_label = ? ORDER BY id DESC LIMIT 20').all(clean(c.user.display_name, 80))
       : db.prepare('SELECT * FROM ai_advisor_chats ORDER BY id DESC LIMIT 20').all();
-    c.json(200, {
+    c.json(200, { aiEnabled: aiModelEnabled(),
       warnings,
       triageLogs,
       chats,

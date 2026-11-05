@@ -51,6 +51,8 @@ const DOC_FIX = {
 };
 const col = (rows, start) => rows[0].findIndex((h) => String(h).startsWith(start));
 const FIX = {
+  lms_quiz_questions: (rows) => { rows[1][0] = db.prepare('SELECT title FROM lms_quizzes ORDER BY id LIMIT 1').get()?.title ?? rows[1][0]; },
+  housing_handouts: (rows) => { rows[1][col(rows, 'الرقم الجامعي')] = 'SAMPLE-1'; },
   career_applications: (rows) => { rows[1][col(rows, 'المسمى الوظيفي')] = 'وظيفة مرجعية'; },
   unit_links: (rows) => { const u = db.prepare('SELECT code FROM org_units WHERE code IS NOT NULL ORDER BY id LIMIT 2').all(); rows[1][0] = u[0].code; rows[1][1] = u[1].code; },
   student_group_members: (rows) => { rows[1][0] = db.prepare('SELECT name FROM student_groups ORDER BY id LIMIT 1').get()?.name ?? rows[1][0]; rows[1][col(rows, 'الرقم الجامعي')] = 'SAMPLE-1'; },

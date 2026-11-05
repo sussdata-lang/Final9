@@ -11,29 +11,60 @@
   const cardMode = () => { try { return localStorage.getItem(MODE_KEY) === 'card' ? 'card' : 'sheet'; } catch { return 'sheet'; } };
   UA.cardPrintModeHtml = () => `<label style="min-width:230px">مقاس الطباعة<select data-card-print-mode data-no-other="1"><option value="sheet"${cardMode() === 'sheet' ? ' selected' : ''}>ورقة عادية (البطاقة فقط، بحجمها الحقيقي)</option><option value="card"${cardMode() === 'card' ? ' selected' : ''}>طابعة بطاقات أو PDF بمقاس البطاقة</option></select></label>`;
   document.addEventListener('change', (e) => { if (e.target && e.target.matches && e.target.matches('[data-card-print-mode]')) { try { localStorage.setItem(MODE_KEY, e.target.value); } catch { /* يبقى الافتراضي */ } } });
-  function fitCards(root, cards) {
-    root.className = cardMode() === 'sheet' ? 'ux-print-cards ux-print-sheet' : 'ux-print-cards';
-    root.innerHTML = cards.map((h) => `<div class="ux-cr80"><div class="ux-cr80-in">${h}</div></div>`).join('');
-    root.style.cssText = `display:block;position:fixed;left:-9999px;top:0;visibility:hidden;width:${CARD_W}px`;
-    let tall = 0;
-    for (const el of root.querySelectorAll('.ux-cr80-in')) { el.style.width = `${CARD_W}px`; tall = Math.max(tall, el.firstElementChild.offsetHeight); }
-    root.style.cssText = '';
-    root.style.setProperty('--ux-card-zoom', Math.min(PAGE_W / CARD_W, PAGE_H / (tall || 1)).toFixed(4));
+  // قواعد الوثيقة المطبوعة فقط، بلا @page الموقع: هامش صفر يمنع المتصفح من طباعة التاريخ والعنوان والرابط
+  const cssOf = (test) => {
+    const out = [];
+    for (const sheet of document.styleSheets) {
+      let rules; try { rules = sheet.cssRules; } catch { continue; }
+      for (const r of rules) {
+        if (r.constructor.name === 'CSSFontFaceRule') out.push(r.cssText);
+        else if (r.selectorText && test(r.selectorText)) out.push(r.cssText);
+      }
+    }
+    return out.join('\n');
+  };
+  function printInFrame(bodyHtml, pageCss, extraCss = '') {
+    const f = document.createElement('iframe');
+    f.setAttribute('aria-hidden', 'true');
+    f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+    document.body.appendChild(f);
+    const doc = f.contentDocument;
+    doc.open();
+    doc.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><style>${pageCss}\nhtml,body{margin:0;padding:0;background:#fff}*{-webkit-print-color-adjust:exact;print-color-adjust:exact;box-sizing:border-box}\n${extraCss}</style></head><body>${bodyHtml}</body></html>`);
+    doc.close();
+    const win = f.contentWindow;
+    const remove = () => setTimeout(() => f.remove(), 500);
+    win.addEventListener('afterprint', remove, { once: true });
+    const imgs = [...doc.images].map((i) => (i.complete ? null : new Promise((res) => { i.onload = i.onerror = res; })));
+    Promise.all([...imgs, doc.fonts ? doc.fonts.ready : null]).then(() => setTimeout(() => { win.focus(); win.print(); }, 60));
   }
+  UA.printDocument = printInFrame;
+  // البطاقة الشخصية بحجمها الحقيقي 85.6×54 مم، كل بطاقة في صفحة
+  function printCards(cards) {
+    const sheet = cardMode() === 'sheet';
+    const css = `.c{width:85.6mm;height:54mm;overflow:hidden;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#042f28,#095246);break-after:page;${sheet ? 'margin:12mm auto 0' : ''}}.c:last-child{break-after:auto}
+      .i{width:${CARD_W}px;flex:none;zoom:var(--z,.59)}.i>[data-digital-card]{max-width:none!important;margin:0!important;border:0!important;border-radius:0!important;box-shadow:none!important}`;
+    const probe = document.createElement('div');
+    probe.style.cssText = `position:fixed;left:-9999px;top:0;visibility:hidden;width:${CARD_W}px`;
+    probe.innerHTML = cards[0];
+    document.body.appendChild(probe);
+    const tall = probe.firstElementChild ? probe.firstElementChild.offsetHeight : 1;
+    probe.remove();
+    const zoom = Math.min(PAGE_W / CARD_W, PAGE_H / (tall || 1)).toFixed(4);
+    printInFrame(cards.map((h) => `<div class="c"><div class="i" style="--z:${zoom}">${h}</div></div>`).join(''), sheet ? '@page{size:A4 portrait;margin:0}' : '@page{size:85.6mm 54mm;margin:0}', css);
+  }
+  // شهادة التسجيل: كل طالب في صفحة A4
+  UA.printCertificates = (list) => {
+    const css = cssOf((s) => /\.idc|\.bc128|--idc-g/.test(s) && !/print-root/.test(s));
+    printInFrame(list.map((h) => `<div class="p">${h}</div>`).join(''), '@page{size:A4 portrait;margin:0}', `:root{--idc-g:#054239;--idc-gold:#C9A24B}.p{width:210mm;min-height:297mm;padding:10mm;break-after:page;display:flex;align-items:flex-start;justify-content:center}.p:last-child{break-after:auto}.p .idc{width:100%;max-width:170mm}.no-print{display:none!important}${css}`);
+  };
   UA.printHtml = function (html, opts = {}) {
+    if (opts.card) { printCards(Array.isArray(html) ? html : [html]); return; }
     let root = document.getElementById('printroot');
     if (!root) { root = document.createElement('div'); root.id = 'printroot'; document.body.appendChild(root); }
     root.className = '';
     root.removeAttribute('style');
-    if (opts.card) {
-      fitCards(root, Array.isArray(html) ? html : [html]);
-      // قاعدة الصفحة تُضاف عند الطباعة فقط: إبقاؤها دائماً يجعل كل طباعة أخرى بحجم البطاقة
-      const size = document.createElement('style');
-      size.id = 'ux-card-page';
-      size.textContent = cardMode() === 'sheet' ? '@page{size:A4 portrait;margin:0}' : '@page{size:85.6mm 54mm;margin:0}';
-      document.head.appendChild(size);
-      window.addEventListener('afterprint', () => size.remove(), { once: true });
-    } else root.innerHTML = html;
+    root.innerHTML = html;
     document.body.classList.add('print-root');
     const done = () => { document.body.classList.remove('print-root'); root.innerHTML = ''; };
     window.addEventListener('afterprint', done, { once: true });
@@ -45,7 +76,8 @@
     const s = String(studentNo || '').trim().toUpperCase();
     if (!s) return 'SUSS-0000-00';
     let h1 = 0x811c9dc5, h2 = 0x5bd1e995;
-    const combined = `SUSS:SECURE:TOKEN:2026:${s}:${seed}`;
+    void seed;   // الرمز ثابت للطالب: لا يتغير بين الشاشات ولا بين الأعوام
+    const combined = `SUSS:SECURE:TOKEN:${s}`;
     for (let i = 0; i < combined.length; i++) {
       const code = combined.charCodeAt(i);
       h1 ^= code;
@@ -57,6 +89,14 @@
     return `SUSS-${s}-${hex}`;
   }
   UA.generateStudentSecureBarcode = generateStudentSecureBarcode;
+  // رمز NFC ثابت لكل طالب، مشتق من رقمه الجامعي
+  UA.studentNfcCode = (studentNo) => {
+    let h = 0xcbf29ce4;
+    for (const ch of `SUSS:NFC:${String(studentNo || '').trim().toUpperCase()}`) { h ^= ch.charCodeAt(0); h = Math.imul(h, 0x01000193); }
+    let g = 0x9dc5811c;
+    for (const ch of `${String(studentNo || '').trim().toUpperCase()}:NFC`) { g ^= ch.charCodeAt(0); g = Math.imul(g, 0x5bd1e995); }
+    return `NFC-${(h >>> 0).toString(16).toUpperCase().padStart(8, '0')}${(g >>> 0).toString(16).toUpperCase().padStart(8, '0').slice(0, 4)}`;
+  };
 
   /* ---------- بطاقة تسجيل الطالب (الشكل الوحيد المعتمد): كل ما في «شهادة تسجيل طالب» + الباركود + بيانات الدخول ---------- */
   const photoOf = (files) => (files || []).filter((f) => f.kind === 'photo').pop() || null;
@@ -82,7 +122,7 @@
     const secureBc = st.barcode || generateStudentSecureBarcode(st.studentNo, pf.national_id || pf.enroll_year || '2026');
     return `<div class="idc" id="idcard">
       <div class="idc-h"><img src="/brand/crest.svg" alt="" width="46" height="54"><div><b>${esc(uni)}</b><span>وزارة الداخلية — قسم شؤون الطلاب</span></div></div>
-      <div class="idc-t">شهادة تسجيل وبطاقة طالب مصدقة</div>
+      <div class="idc-t">شهادة تسجيل طالب</div>
       <div class="idc-b">
         <div class="idc-top">${ph ? `<img class="idc-ph" src="${esc(ph)}" alt="">` : ''}<dl class="idc-rows">${rows.map((r) => `<div><dt>${esc(r[0])}</dt><dd${r[2] ? ' dir="ltr"' : ''}>${esc(r[1])}</dd></div>`).join('')}</dl></div>
         ${extra.length ? `<dl class="idc-rows idc-ex">${extra.map((x) => `<div><dt>${esc(x.label)}</dt><dd>${esc(x.value)}</dd></div>`).join('')}</dl>` : ''}

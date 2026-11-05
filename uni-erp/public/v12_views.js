@@ -171,8 +171,10 @@
     return failed;
   }
 
-  UA.views.lms = async function (el) {
-    let activeTab = UA.gate ? UA.gate.firstTab('lms', 'lectures') : 'lectures';
+  UA.v12Modal = (...a) => openModal(...a);
+  UA.views.lms = async function (el, _me, only) {
+    let activeTab = only || (UA.gate ? UA.gate.firstTab('lms', 'lectures') : 'lectures');
+    if (!only && activeTab === 'library') activeTab = 'lectures';
     async function render() {
       el.innerHTML = `${SHARED_CSS}<div class="v12-wrap"><p class="hint">جارٍ تحميل بوابة التعلم الإلكتروني والمكتبة الرقمية…</p></div>`;
       const d = await api('GET', '/api/lms/overview');
@@ -183,7 +185,7 @@
           <div class="v12-hero">
             <div>
               <span class="v12-badge-gold">الوحدة 5.12</span>
-              <h1>التعلم الإلكتروني والمكتبة الرقمية (LMS & Library)</h1>
+              <h1>التعلم الإلكتروني (LMS)</h1>
               <p>منصة المحاضرات التفاعلية، بنوك الأسئلة والاختبارات الذاتية، وفهرس المكتبة الرقمية ونظام الإعارة المركزية.</p>
             </div>
           </div>
@@ -197,11 +199,11 @@
           <div class="v12-tabs">
             <button class="v12-tab ${activeTab === 'lectures' ? 'active' : ''}" data-t="lectures">📚 المحاضرات والمحتوى الرقمي</button>
             <button class="v12-tab ${activeTab === 'quizzes' ? 'active' : ''}" data-t="quizzes">📝 بنك الأسئلة والاختبارات</button>
-            <button class="v12-tab ${activeTab === 'library' ? 'active' : ''}" data-t="library">🏛️ المكتبة الرقمية والإعارة</button>
           </div>
           <div id="v12-lms-body"></div>
         </div>
       `;
+      if (only) el.querySelectorAll('.v12-hero,.v12-kpis,.v12-tabs').forEach((x) => x.remove());
       el.querySelectorAll('.v12-tab').forEach((b) => {
         b.onclick = () => { activeTab = b.dataset.t; renderBody(d); el.querySelectorAll('.v12-tab').forEach((x) => x.classList.toggle('active', x.dataset.t === activeTab)); };
       });
@@ -249,6 +251,8 @@
           <label>عنوان المحاضرة <input name="title" placeholder="مثال: المحاضرة 3: بروتوكولات المصادقة الرقمية" required></label>
           <label>نوع المحتوى <select name="kind"><option value="pdf">ملف PDF</option><option value="video">محاضرة فيديو</option><option value="slides">عرض تقديمي</option><option value="assignment">تكليف عملي</option></select></label>
           <label>رقم الأسبوع <input name="week_no" type="number" value="3" min="1" max="16"></label>
+          <label>الكلية أو المعهد المستهدف <select name="target_faculty" data-no-other="1"><option value="">كل الكليات والمعاهد</option>${(d.faculties || []).map((f) => `<option>${esc(f)}</option>`).join('')}</select></label>
+          <label>فئة الطلاب <select name="target_group_id" data-no-other="1"><option value="">كل الفئات</option>${(d.groups || []).map((g) => `<option value="${g.id}">${esc(g.name)}</option>`).join('')}</select></label>
           <label>ملخص المحاضرة <textarea name="summary" rows="2" placeholder="وصف موجز للمحاور العلمية..."></textarea></label>
           <label>المرفقات (PDF، فيديو mp4 أو webm، عرض pptx) <input id="v12-lec-files" type="file" multiple accept=".pdf,.mp4,.webm,.pptx"></label>
         `, async (data) => {
@@ -289,63 +293,8 @@
           };
         });
       } else if (activeTab === 'quizzes') {
-        box.innerHTML = `
-          <div class="v12-card">
-            <div class="v12-bar">
-              <h3>بنك الاختبارات الإلكترونية الذاتية</h3>
-              ${UA.S?.me?.role === 'student' ? '' : '<button class="btn pri" id="btn-add-quiz">＋ إنشاء اختبار إلكتروني</button>'}
-            </div>
-            <div class="tbl-wrap">
-              <table class="grid-tbl">
-                <thead><tr><th>الرمز</th><th>المقرر</th><th>عنوان الاختبار</th><th>المدة</th><th>الدرجة العظمى</th><th>عدد المتقدمين</th><th>متوسط الدرجات</th><th>إجراء</th></tr></thead>
-                <tbody>
-                  ${d.quizzes.map((q) => `
-                    <tr>
-                      <td class="mono">${esc(q.course_code)}</td>
-                      <td>${esc(q.course_name)}</td>
-                      <td><b>${esc(q.title)}</b></td>
-                      <td>${q.duration_min} دقيقة</td>
-                      <td>${q.total_marks} درجة</td>
-                      <td>${fmt(q.attempts_count)} طالب</td>
-                      <td><b>${q.avg_score}</b> / ${q.total_marks}</td>
-                      <td><button class="btn sm pri btn-try-quiz" data-id="${q.id}" ${UA.S?.me?.role === 'student' && !q.open ? 'disabled' : ''}>${UA.S?.me?.role === 'student' ? 'تقديم الاختبار' : 'معاينة الاختبار'}</button></td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          ${(d.quizSubmissions || []).length ? `<div class="v12-card"><div class="v12-bar"><h3>أحدث التسليمات المصححة آلياً</h3></div><div class="tbl-wrap"><table class="grid-tbl"><thead><tr><th>الطالب</th><th>الرقم الجامعي</th><th>النتيجة</th><th>وقت التسليم</th></tr></thead><tbody>${d.quizSubmissions.map((x) => `<tr><td><b>${esc(x.student_name)}</b></td><td class="mono">${esc(x.student_no)}</td><td><b>${x.score} / ${x.total_marks}</b></td><td>${new Date(Number(x.submitted_at)).toLocaleString('ar-SY')}</td></tr>`).join('')}</tbody></table></div></div>` : ''}
-        `;
-        const addQuizBtn = box.querySelector('#btn-add-quiz');
-        if (addQuizBtn) addQuizBtn.onclick = () => openModal('إنشاء اختبار إلكتروني جديد', `
-          <label>رمز المقرر <input name="course_code" placeholder="CYB-101" required></label>
-          <label>اسم المقرر <input name="course_name" placeholder="مبادئ الأمن السيبراني والتشفير" required></label>
-          <label>عنوان الاختبار <input name="title" placeholder="مثال: اختبار الأسبوع الرابع" required></label>
-          <label>المدة الزمنية (بالدقائق) <input name="duration_min" type="number" value="25"></label>
-          <label>الدرجة الكلية <input name="total_marks" type="number" value="20"></label>
-          <label>سؤال نموذجي <input name="sample_question" placeholder="ما الهدف الرئيسي من التوقيع الرقمي PAdES؟"></label>
-        `, async (data) => {
-          await api('POST', '/api/lms/quizzes', data);
-          notify('تم إنشاء الاختبار الإلكتروني');
-          render();
-        });
-        box.querySelectorAll('.btn-try-quiz').forEach((btn) => {
-          btn.onclick = () => {
-            const q = d.quizzes.find((x) => String(x.id) === btn.dataset.id);
-            if (!q) return;
-            if (UA.S?.me?.role === 'student') {
-              openModal(q.title, q.questions.map((it, i) => `<fieldset style="grid-column:1/-1;border:1px solid var(--line,#dce3dd);border-radius:8px;padding:10px"><legend style="font-weight:700">س${i + 1}: ${esc(it.q)}</legend>${(it.options || []).map((o, k) => `<label style="display:block"><input type="radio" name="q_${i}" value="${k}"> ${esc(o)}</label>`).join('')}</fieldset>`).join(''), async (data) => {
-                const answers = q.questions.map((_, i) => (data[`q_${i}`] === undefined ? null : Number(data[`q_${i}`])));
-                const r = await api('POST', `/api/lms/quizzes/${q.id}/submit`, { answers });
-                notify(`النتيجة: ${r.score} من ${r.totalMarks} (${r.correctCount} من ${r.questionsCount} إجابات صحيحة)`);
-                render();
-              });
-              return;
-            }
-            notify(`معاينة: «${q.title}» (${q.questions.length} سؤال — التصحيح الآلي مفعّل)`);
-          };
-        });
+        box.innerHTML = UA.quizBank.table(d) + ((d.quizSubmissions || []).length ? `<div class="v12-card"><div class="v12-bar"><h3>أحدث التسليمات</h3></div><div class="tbl-wrap"><table class="grid-tbl"><thead><tr><th>الطالب</th><th>الرقم الجامعي</th><th>النتيجة</th><th>وقت التسليم</th></tr></thead><tbody>${d.quizSubmissions.map((x) => `<tr><td><b>${esc(x.student_name)}</b></td><td class="mono">${esc(x.student_no)}</td><td><b>${x.score} / ${x.total_marks}</b>${x.needs_grading ? ' <span class="small">(بانتظار التصحيح)</span>' : ''}</td><td>${new Date(Number(x.submitted_at)).toLocaleString('ar-SY')}</td></tr>`).join('')}</tbody></table></div></div>` : '');
+        UA.quizBank.bindTable(box, d, { modal: openModal, notify, render, api });
       } else {
         box.innerHTML = `
           <div class="v12-grid2">
@@ -670,7 +619,7 @@
           <label>المسمى الوظيفي <input name="title" required placeholder="مثال: محلل أمن سيبراني"></label>
           <label>الجهة المعلنة <input name="company_name" required></label>
           <label>نوع الفرصة <select name="job_type"><option value="دوام كامل">دوام كامل</option><option value="تدريب تعاوني">تدريب تعاوني</option><option value="عن بعد">عن بعد</option></select></label>
-          <label>المدينة <input name="location" value="دمشق"></label>
+          <label>المدينة <input name="location"></label>
           <label>نطاق الراتب / المكافأة <input name="salary_range" placeholder="3,000,000 - 4,500,000 ل.س"></label>
           <label>المتطلبات الأساسية <textarea name="requirements" rows="2"></textarea></label>
           <label>آخر موعد للتقديم <input name="deadline" type="date"></label>
@@ -685,7 +634,7 @@
             <label>اسم المتقدم <input name="applicant_name" required placeholder="م. سامر فؤاد النجار"></label>
             <label>الرقم الجامعي <input name="student_no" required placeholder="CYB-2021-0031"></label>
             <label>المعدل التراكمي <input name="gpa" type="number" step="0.1" placeholder="88.4"></label>
-            <label>ملخص السيرة الذاتية والمهارات <textarea name="cv_summary" rows="2" required>خبرة عملية في أمن التطبيقات واختبار الاختراق.</textarea></label>
+            <label>ملخص السيرة الذاتية والمهارات <textarea name="cv_summary" rows="2" required></textarea></label>
           `, async (data) => {
             await api('POST', '/api/alumni/applications', data);
             notify('تم إرسال طلب الترشح للوظيفة');
@@ -1028,8 +977,8 @@
   };
 
   /* السكن والساعات المكتبية والمنح والأنشطة: خدمات شؤون الطلاب، منفصلة عن الامتحانات */
-  UA.views.student_life = async function (el) {
-    let activeTab = UA.gate ? UA.gate.firstTab('student_life', 'office') : 'office';
+  UA.views.student_life = async function (el, _me, only) {
+    let activeTab = only || 'office';
     async function render() {
       const d = await api('GET', '/api/student-life/overview');
       el.innerHTML = `
@@ -1038,8 +987,8 @@
           <div class="v12-hero">
             <div>
               <span class="v12-badge-gold">شؤون الطلاب</span>
-              <h1>السكن والساعات المكتبية</h1>
-              <p>حجوزات الساعات المكتبية، والسكن الجامعي، والمنح، والأنشطة الطلابية.</p>
+              <h1>الساعات المكتبية والأنشطة</h1>
+              <p>حجوزات الساعات المكتبية والأنشطة الطلابية.</p>
             </div>
           </div>
           <div class="v12-tabs">
@@ -1049,6 +998,7 @@
           <div id="v12-life-body"></div>
         </div>
       `;
+      if (only) el.querySelectorAll('.v12-hero,.v12-kpis,.v12-tabs').forEach((x) => x.remove());
       el.querySelectorAll('.v12-tab').forEach((b) => {
         b.onclick = () => { activeTab = b.dataset.t; renderBody(d); el.querySelectorAll('.v12-tab').forEach((x) => x.classList.toggle('active', x.dataset.t === activeTab)); };
       });
@@ -1097,50 +1047,8 @@
       } else if (activeTab === 'dorms') {
         box.innerHTML = `
           <div class="v12-grid2">
-            <div class="v12-card">
-              <div class="v12-bar">
-                <h3>السكن الجامعي وتسكين الطلاب</h3>
-                <button class="btn pri" id="btn-add-dorm">＋ تسكين طالب</button>
-              </div>
-              <div class="tbl-wrap">
-                <table class="grid-tbl">
-                  <thead><tr><th>الوحدة السكنية والغرفة</th><th>الطالب</th><th>الكلية</th><th>الرسوم</th><th>الحالة</th></tr></thead>
-                  <tbody>
-                    ${d.dormAllocations.map((a) => `
-                      <tr>
-                        <td><b>${esc(a.building_name)}</b> · غرفة <span class="mono">${esc(a.room_no)}</span></td>
-                        <td>${esc(a.student_name)}<div class="mono small">${esc(a.student_no)}</div></td>
-                        <td>${esc(a.faculty_name)}</td>
-                        <td><span class="pill p-approved">${esc(a.payment_status)}</span></td>
-                        <td>${esc(a.status)}</td>
-                      </tr>
-                    `).join('')}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <div class="v12-card">
-              <div class="v12-bar">
-                <h3>المنح الدراسية والإعفاءات</h3>
-                <button class="btn pri" id="btn-add-sch">＋ قرار منحة / إعفاء</button>
-              </div>
-              <div class="tbl-wrap">
-                <table class="grid-tbl">
-                  <thead><tr><th>الطالب</th><th>نوع المنحة</th><th>نسبة الإعفاء</th><th>المبلغ المغطى</th><th>الحالة</th></tr></thead>
-                  <tbody>
-                    ${d.scholarships.map((s) => `
-                      <tr>
-                        <td><b>${esc(s.student_name)}</b><div class="mono small">${esc(s.student_no)}</div></td>
-                        <td>${esc(s.scholarship_type)}</td>
-                        <td><b>${s.discount_percent}%</b></td>
-                        <td>${fmt(s.amount_covered)} ل.س</td>
-                        <td><span class="pill p-approved">${esc(s.status)}</span></td>
-                      </tr>
-                    `).join('')}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+
+
           </div>
           <div class="v12-card">
             <h3>الأندية الطلابية والفعاليات اللامنهجية</h3>
@@ -1163,29 +1071,6 @@
             </div>
           </div>
         `;
-        box.querySelector('#btn-add-dorm').onclick = () => openModal('تسكين طالب في السكن الجامعي', `
-          <label>الغرفة المتاحة <select name="room_id">${d.dormRooms.map((r) => `<option value="${r.id}">${esc(r.building_name)} - غرفة ${esc(r.room_no)} (${r.occupied}/${r.capacity})</option>`).join('')}</select></label>
-          <label>اسم الطالب <input name="student_name" required></label>
-          <label>الرقم الجامعي <input name="student_no" placeholder="CYB-2026-0008" required></label>
-          <label>الكلية <input name="faculty_name" placeholder="كلية هندسة الأمن السيبراني"></label>
-          <label>حالة السداد <select name="payment_status"><option value="مسدد">مسدد بالكامل</option><option value="قسط جزئي">قسط جزئي</option><option value="إعفاء">إعفاء منحة</option></select></label>
-        `, async (data) => {
-          await api('POST', '/api/expansions/dorm-allocations', data);
-          notify('تم تسكين الطالب بنجاح');
-          render();
-        });
-        box.querySelector('#btn-add-sch').onclick = () => openModal('منح إعفاء أو منحة دراسية لطالب', `
-          <label>اسم الطالب <input name="student_name" required></label>
-          <label>الرقم الجامعي <input name="student_no" placeholder="CYB-2026-0004" required></label>
-          <label>البرنامج <input name="program_name" placeholder="هندسة الأمن السيبراني"></label>
-          <label>نوع المنحة <select name="scholarship_type">${managedOptions('scholarshipTypes')}</select></label>
-          <label>نسبة الخصم (%) <input name="discount_percent" type="number" placeholder="50"></label>
-          <label>المبلغ المغطى (ل.س) <input name="amount_covered" type="number" placeholder="1750000"></label>
-        `, async (data) => {
-          await api('POST', '/api/expansions/scholarships', data);
-          notify('تم اعتماد المنحة الدراسية');
-          render();
-        });
       }
     }
     await render();
@@ -1203,8 +1088,6 @@
       const d = await api('GET', '/api/devops/overview');
       const m = d.metrics;
       const dbCfg = d.settings.db_engine || {};
-      const redisCfg = d.settings.redis_cluster || {};
-      const ssoCfg = d.settings.sso_auth || {};
       const incidents = d.incidents || [];
       const openCount = m.openIncidentsCount || incidents.filter((x) => x.status !== 'resolved').length;
       const critCount = m.criticalIncidentsCount || incidents.filter((x) => x.severity === 'critical' && x.status !== 'resolved').length;
@@ -1216,7 +1099,7 @@
             <div>
               <span class="v12-badge-gold">المرحلة 3 · البنية التحتية والتوسع ومركز DevOps</span>
               <h1>مركز البنية التحتية وتسجيل تقارير الأخطاء (DevOps & Incident Hub)</h1>
-              <p>رصد بلاغات أخطاء استوديو الكود وعمليات الحفظ/التحميل لحظياً، وإدارة عنقود PostgreSQL 16، مخزن Redis الموزع، وبوابة SSO.</p>
+              <p>رصد بلاغات الأخطاء، وحالة قاعدة البيانات والتخزين المؤقت.</p>
             </div>
           </div>
           <div class="v12-kpis">
@@ -1224,7 +1107,7 @@
             <div class="v12-kpi"><span>بلاغات الأخطاء المفتوحة</span><strong style="color:${openCount > 0 ? '#ef4444' : '#10b981'}">${fmt(openCount)} بلاغاً</strong></div>
             <div class="v12-kpi"><span>أخطاء حرجة غير محلولة</span><strong style="color:${critCount > 0 ? '#dc2626' : '#94a3b8'}">${fmt(critCount)}</strong></div>
             <div class="v12-kpi"><span>الذاكرة المستخدمة (Heap)</span><strong>${m.heapUsedMb} MB</strong></div>
-            <div class="v12-kpi"><span>سجلات التدقيق المشفرة</span><strong>${fmt(m.auditCount)}</strong></div>
+            <div class="v12-kpi"><span>سجلات التدقيق</span><strong>${fmt(m.auditCount)}</strong></div>
           </div>
 
           <div class="v12-tabs" style="margin-bottom:1.25rem;">
@@ -1236,7 +1119,7 @@
               ${openCount > 0 ? `<span style="margin-inline-start:6px;background:#ef4444;color:#fff;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:bold;">${openCount}</span>` : ''}
             </button>
             <button class="v12-tab ${activeTab === 'infra' ? 'active' : ''}" data-t="infra">
-              ⚙️ عنقود قاعدة البيانات والتوسع (PostgreSQL / Redis / SSO)
+              ⚙️ قاعدة البيانات والتخزين المؤقت
             </button>
           </div>
 
@@ -1303,7 +1186,6 @@
             </div>
             <div style="display:flex;gap:8px;">
               <button class="btn sm" id="btn-launch-recharts" style="background:#D5B65D;color:#042f28;font-weight:800;cursor:pointer;">📊 فتح التحليلات في صفحة الإحصاءات</button>
-              <button class="btn sm" id="btn-sim-dev-chart" style="background:rgba(255,255,255,0.15);color:#fff;cursor:pointer;">🧪 محاكاة خطأ وتحديث الرسم</button>
             </div>
           </div>
 
@@ -1379,22 +1261,6 @@
           window.UA.openAnalytics('devops');
         };
 
-        box.querySelector('#btn-sim-dev-chart').onclick = async () => {
-          const simCode = `SIM-DEV-${Date.now().toString().slice(-5)}`;
-          await api('POST', '/api/devops/incidents', {
-            report_code: simCode,
-            source: 'Code Studio Inspector (اختبار)',
-            event_type: 'FILE_SAVE_FAILURE',
-            severity: 'critical',
-            file_path: 'public/payroll.js',
-            error_message: 'فشل في حفظ التعديلات المصدرية: مهلة الاتصال بالخادم انقضت (Timeout Error)',
-            error_details: { code: 'ETIMEDOUT', action: 'Simulate' },
-            client_context: { user: 'مدير النظام' },
-          });
-          notify('تم تسجيل البلاغ التجريبي وتحديث الرسوم البيانية!');
-          render();
-        };
-
       } else if (activeTab === 'incidents') {
         const incidents = d.incidents || [];
         const filtered = incidents.filter((x) => {
@@ -1425,7 +1291,6 @@
                   <option value="critical" ${filterStatus === 'critical' ? 'selected' : ''}>الحرجة فقط (${critCount})</option>
                   <option value="resolved" ${filterStatus === 'resolved' ? 'selected' : ''}>تم حلها (${resolvedCount})</option>
                 </select>
-                <button class="btn sm" id="btn-sim-inc" title="محاكاة بلاغ خطأ من الاستوديو">🧪 تجربة إرسال بلاغ</button>
                 <button class="btn sm pri" id="btn-ref-inc">🔄 تحديث</button>
               </div>
             </div>
@@ -1506,30 +1371,6 @@
 
         box.querySelector('#btn-ref-inc').onclick = () => render();
 
-        box.querySelector('#btn-sim-inc').onclick = async () => {
-          const simCode = `SIM-DEV-${Date.now().toString().slice(-5)}`;
-          await api('POST', '/api/devops/incidents', {
-            report_code: simCode,
-            source: 'Code Studio Inspector (اختبار)',
-            event_type: 'FILE_SAVE_FAILURE',
-            severity: 'critical',
-            file_path: 'public/payroll.js',
-            error_message: 'فشل في حفظ التعديلات المصدرية: مهلة الاتصال بالخادم انقضت (Timeout Error)',
-            error_details: {
-              code: 'ETIMEDOUT',
-              stack: 'Error: Request timed out after 5000ms at handleSaveFile (App.tsx:162)',
-              action: 'Saving payroll.js changes',
-            },
-            client_context: {
-              browser: navigator.userAgent,
-              resolution: `${window.innerWidth}x${window.innerHeight}`,
-              user: UA.S.me ? UA.S.me.name : 'مدير النظام',
-            },
-          });
-          notify(`تم تسجيل البلاغ التجريبي ${simCode} بنجاح في وحدة DevOps!`);
-          render();
-        };
-
         box.querySelectorAll('.btn-view-inc').forEach((btn) => {
           btn.onclick = () => {
             const inc = (d.incidents || []).find((x) => x.id === Number(btn.dataset.id));
@@ -1576,7 +1417,7 @@
           btn.onclick = () => {
             const id = Number(btn.dataset.id);
             openModal('اعتماد حل البلاغ وإغلاقه في DevOps', `
-              <label>ملاحظة الحل الفني والإجراء المتخذ <textarea name="note" rows="3" required placeholder="مثال: تم فحص أذونات القرص وإعادة تشغيل معالج الملفات وتأكيد سلامة الحفظ.">تمت معالجة الخلل وتأكيد سلامة مسار التخزين والاتصال.</textarea></label>
+              <label>ملاحظة الحل الفني والإجراء المتخذ <textarea name="note" rows="3" required placeholder="مثال: تم فحص أذونات القرص وإعادة تشغيل معالج الملفات وتأكيد سلامة الحفظ."></textarea></label>
             `, async (data) => {
               await api('POST', `/api/devops/incidents/${id}/resolve`, data);
               notify('تم اعتماد حل البلاغ وتحديث سجلات التدقيق');
@@ -1597,7 +1438,6 @@
       } else {
         // Tab Infra
         const dbCfg = d.settings.db_engine || {};
-        const redisCfg = d.settings.redis_cluster || {};
 
         box.innerHTML = `
           <div class="v12-grid2">
@@ -1617,13 +1457,10 @@
             </div>
 
             <div class="v12-card">
-              <h3>⚡ مخزن الجلسات الموزع (Redis Cluster) والدخول الموحد (SSO)</h3>
+              <h3>⚡ التخزين المؤقت</h3>
               <table class="grid-tbl">
                 <tbody>
-                  <tr><td><b>وضع الجلسات ومحدد المعدل</b></td><td><span class="pill ${redisCfg.mode ? 'p-approved' : 'p-review'}">${esc(redisCfg.mode || 'غير مضبوط')}</span></td></tr>
-                  <tr><td><b>نسبة إصابة الكاش (Cache Hit Ratio)</b></td><td>${redisCfg.hitRatio ? `<b>${redisCfg.hitRatio}%</b>` : 'لا قياس'}${redisCfg.sessionTtlSec ? ` · TTL: ${redisCfg.sessionTtlSec} ثانية` : ''}</td></tr>
-                  <tr><td><b>الدخول الموحد LDAP / Active Directory</b></td><td><span class="pill p-review">غير منفَّذ بعد</span></td></tr>
-                  <tr><td><b>Microsoft Entra ID & Google Workspace</b></td><td><span class="pill p-review">غير منفَّذ بعد</span></td></tr>
+                  <tr><td><b>Redis</b></td><td><span class="pill ${d.cache && d.cache.redisConfigured ? 'p-approved' : 'p-review'}">${d.cache && d.cache.redisConfigured ? 'مضبوط عبر REDIS_URL' : 'غير مضبوط: ذاكرة الخادم فقط'}</span></td></tr>
                 </tbody>
               </table>
             </div>
@@ -1674,6 +1511,7 @@
               <span class="v12-badge-gold">الذكاء الاصطناعي</span>
               <h1>الذكاء الاصطناعي الجامعي (AI-Powered University)</h1>
               <p>نظام الإنذار الأكاديمي المبكر لكشف التعثر الطلابي، المرشد الأكاديمي الذكي للخطط واللوائح، والمصنّف الآلي للمراسلات والشكاوى.</p>
+              ${d.aiEnabled ? '' : '<p class="small" style="margin-top:8px;font-weight:700">لا يوجد نموذج ذكاء اصطناعي مفعّل: الردود والتشخيصات هنا مولّدة بقواعد ثابتة.</p>'}
             </div>
           </div>
           <div class="v12-kpis">

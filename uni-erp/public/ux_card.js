@@ -10,25 +10,20 @@
      6. شؤون الطلاب: البطاقة الجامعية الذكية والباركود المشفر + اللجنة التأديبية
      ========================================================================== */
   /* ---------- تخزين واسترجاع سجل نشاط البطاقة الرقمية (Check-in / Check-out Logs) ---------- */
-  const CARD_LOGS_STORAGE_KEY = 'suss_digital_card_activity_logs_v3';
-  try { localStorage.removeItem('suss_digital_card_activity_logs_v2'); } catch {}   // كان يحمل سجلات نموذجية
-
-  function getCardLogs() {
-    try {
-      const raw = localStorage.getItem(CARD_LOGS_STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch {}
-    return [];
+  // السجل على الخادم وحده؛ ويُزال ما تركته النسخ السابقة في المتصفح
+  for (const k of ['suss_digital_card_activity_logs_v2', 'suss_digital_card_activity_logs_v3']) { try { localStorage.removeItem(k); } catch {} }
+  const cardLogState = { studentId: null, logs: [] };
+  const fromServer = (r) => ({ id: r.id, studentId: r.student_id, studentNo: r.student_no, studentName: r.student_name, eventType: r.event_type, locationName: r.location_name, locationCode: r.location_code, method: r.method, terminalId: r.terminal_id, status: r.status, reason: r.reason, pkiHash: r.pki_hash, timestamp: Number(r.created_at) });
+  async function loadCardLogs(studentId) {
+    cardLogState.studentId = studentId;
+    const d = await UA.api('GET', `/api/students/${studentId}/card-activity`);
+    if (cardLogState.studentId !== studentId) return;
+    cardLogState.logs = (d.logs || []).map(fromServer);
+    UA.render();
   }
+  const getCardLogs = () => cardLogState.logs;
 
-  function saveCardLogs(logs) {
-    try {
-      localStorage.setItem(CARD_LOGS_STORAGE_KEY, JSON.stringify(logs));
-    } catch {}
-  }
+
 
   function formatCardLogTime(ts) {
     if (!ts) return { fullText: '—', rel: '—', timeStr: '—', dateStr: '—' };
@@ -64,6 +59,7 @@
     if (!st) return '<section class="card" style="margin-top:0"><h2 style="margin-top:0">🪪 البطاقة الجامعية الرقمية</h2><p class="hint">لا يوجد طلاب لعرض بطاقاتهم. سجّل طالباً أولاً من «تسجيل طالب جديد».</p></section>';
     const secureBarcode = UA.generateStudentSecureBarcode ? UA.generateStudentSecureBarcode(st.studentNo, st.nationalId || '2026') : `SUSS-${st.studentNo}-SEC94`;
 
+    if (cardLogState.studentId !== st.id) { cardLogState.logs = []; loadCardLogs(st.id).catch(() => {}); }
     const allLogs = getCardLogs();
     // تصفية سجلات الطالب المحدد
     const stLogs = allLogs.filter((l) => Number(l.studentId) === Number(st.id) || String(l.studentNo) === String(st.studentNo));
@@ -121,9 +117,9 @@
         </label>
         ${UA.cardPrintModeHtml ? UA.cardPrintModeHtml() : ''}
         <button class="btn pri" type="button" data-act="printdigicard" style="height:38px;padding:0 18px">🖨️ طباعة البطاقة الذكية الرسمية</button>
-        <button class="btn ok" type="button" data-act="certifydigicard" style="height:38px;padding:0 18px;background:#054239;color:#fff">🛡️ تصديق إلكتروني رسمي (X.509 PKI)</button>
       </div>
 
+      <p class="small" style="margin:0 0 10px">رمز البطاقة الثابت: <b class="mono" dir="ltr">${esc(UA.generateStudentSecureBarcode(st.studentNo))}</b> · رمز NFC الثابت: <b class="mono" dir="ltr">${esc(UA.studentNfcCode(st.studentNo))}</b></p>
       ${UA.digitalCardHtml(st, { screen: true })}
 
       <!-- ==========================================================================
@@ -214,7 +210,7 @@
         <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:12px;padding:14px;margin-bottom:18px">
           <div style="font-size:13px;font-weight:800;color:#042f28;margin-bottom:8px;display:flex;align-items:center;gap:6px">
             <span>⚡ منصة التحقق وتمرير البطاقة الميداني اللحظي (Live Card Tap Simulator)</span>
-            <small style="font-weight:normal;color:#64748b;font-size:11.5px">اختبار فوري للمسح الضوئي للباركود أو تلامس NFC في مرافق الحرم</small>
+            <small style="font-weight:normal;color:#64748b;font-size:11.5px">تسجيل يدوي لحركة البطاقة على الخادم، ولا يتصل بقارئ فعلي</small>
           </div>
           <div class="inline-form" style="gap:10px;align-items:flex-end;flex-wrap:wrap">
             <label style="flex:2;min-width:200px">موقع البوابة / المرفق الأكاديمي
@@ -241,7 +237,7 @@
                 🔵 تسجيل خروج (Check-out)
               </button>
               <button class="btn" type="button" data-act="simcarddenied" style="height:38px;padding:0 12px;color:#dc2626;border-color:#fca5a5" title="محاكاة محاولة دخول غير مصرحة">
-                ⚠️ تجربة رفض
+                ⚠️ تسجيل رفض
               </button>
             </div>
           </div>
@@ -283,9 +279,6 @@
             </button>
             <button class="btn" type="button" data-act="printcardlogs" style="height:32px;padding:0 12px;font-size:12px;display:flex;align-items:center;gap:4px">
               🖨️ طباعة السجل
-            </button>
-            <button class="btn" type="button" data-act="resetcardlogs" style="height:32px;padding:0 10px;font-size:12px;color:#64748b" title="مسح السجل المحلي">
-              🔄 إعادة ضبط
             </button>
           </div>
         </div>
@@ -363,7 +356,7 @@
               }).join('') : `
                 <tr>
                   <td colspan="8" style="padding:24px;text-align:center;color:#94a3b8">
-                    لا توجد حركات مطابقة للفلتر المحدد. يمكنك استخدام منصة المحاكاة أعلاه لتسجيل أول حركة دخول أو خروج فورياً.
+                    لا توجد حركات مطابقة للفلتر المحدد. يمكنك تسجيل أول حركة من النموذج أعلاه.
                   </td>
                 </tr>
               `}
@@ -371,7 +364,7 @@
           </table>
         </div>
         <div style="margin-top:8px;font-size:11.5px;color:#64748b;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap">
-          <span>يتم توثيق كافة حركات التحقق بنظام التوقيع الرقمي X.509 المقاوم للتزوير وتخزينها مركزياً.</span>
+          <span>تُحفظ كل حركة على الخادم مع بصمة SHA-256 للسجل، وهي ليست توقيعًا من البطاقة.</span>
           <span>عرض <b>${filteredLogs.length}</b> من أصل <b>${stLogs.length}</b> حركة للطالب</span>
         </div>
       </div>
@@ -444,5 +437,5 @@
     </section>`;
   };
 
-  UA.cardLogs = { CARD_LOGS_STORAGE_KEY, getCardLogs, saveCardLogs, formatCardLogTime };
+  UA.cardLogs = { getCardLogs, loadCardLogs, formatCardLogTime };
 })();

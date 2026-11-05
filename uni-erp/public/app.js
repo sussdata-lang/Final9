@@ -30,6 +30,11 @@ Object.assign(window.UA, {
     inflightGets.clear();
   }
 
+  // عمليات المال: مفتاح واحد لكل عملية، يبقى عند انقطاع الشبكة فلا تتكرر عند إعادة الإرسال
+  const MONEY_POST = /^\/api\/(finance\/(journal|vouchers|invoices(\/\d+\/pay)?|charges|payments|payroll-entry|student-invoices(\/\d+\/pay)?)|enterprise\/(installments\/\d+\/pay|payslips\/issue)|student-affairs-suite\/scholarships)$/;
+  const moneyKeys = new Map();
+  const moneyKeyFor = (id) => { if (!moneyKeys.has(id)) moneyKeys.set(id, crypto.randomUUID ? crypto.randomUUID() : Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('')); return moneyKeys.get(id); };
+
   async function api(method, url, body) {
     const m = String(method || 'GET').toUpperCase();
     const isCacheableGet = m === 'GET' && !url.startsWith('/api/verify') && !url.includes('/audit/verify') && !url.includes('high-concurrency');
@@ -49,8 +54,12 @@ Object.assign(window.UA, {
     try { sessionStorage.removeItem('uni_sid'); } catch { /* غير متاح */ }   // بقايا نسخة سابقة كانت تحفظ الرمز هنا
     const runFetch = (async () => {
       const headers = body ? { 'Content-Type': 'application/json' } : {};
+      const moneyId = m === 'POST' && MONEY_POST.test(url) ? `${url}|${JSON.stringify(body ?? null)}` : null;
+      if (moneyId) headers['Idempotency-Key'] = moneyKeyFor(moneyId);
       const res = await fetch(url, { method: m, credentials: 'same-origin', headers, body: body ? JSON.stringify(body) : undefined });
       let j = null; try { j = await res.json(); } catch { /* ليس JSON */ }
+      // وصل الرد: تُنسى العملية بعد مهلة الضغطة المزدوجة، أو فورًا إن رُفضت
+      if (moneyId) { if (res.ok) setTimeout(() => moneyKeys.delete(moneyId), 5000); else moneyKeys.delete(moneyId); }
       if (res.ok && url === '/api/auth/login' && j && j.token) {
         clearApiCache();
       }
@@ -116,9 +125,9 @@ Object.assign(window.UA, {
         ['guide', tr('دليل المواد والخطة')],
         ['grades', tr('علاماتي والسجل الأكاديمي')],
         ['fees', tr('كشف الرسوم')],
-        ['lms', tr('التعلم الإلكتروني والمكتبة')],
+        ['lms', tr('التعلم الإلكتروني')],
         ['expansions', tr('الامتحانات والتظلمات')],
-        ['student_life', tr('السكن والساعات المكتبية')],
+        ['student_life', tr('السكن الجامعي')],
         ['alumni', tr('الخريجون والتوظيف')],
         ['ai', tr('المرشد الذكي AI')],
         ['news', tr('الأخبار والإعلانات')],
@@ -138,12 +147,13 @@ Object.assign(window.UA, {
       v.push(['affairs', can('student:read') || can('student:register') || can('sa_admissions:view') || can('sa_advising:view') || can('sa_scholarships:view') ? tr('شؤون الطلاب') : can('request:read_all') ? tr('الطلبات') : tr('الطلبات المحالة لقسمي')]);
     }
     // 2) الأكاديمي والامتحانات (تضم المقررات والعلامات وميزات التطوير الأكاديمي)
-    if (can('course:manage') || can('grade:manage') || can('grade:approve') || can('grade:approve_own') || can('faculty:manage')) v.push(['academics', tr('المواد والعلامات والامتحانات')]);
+    if (can('course:manage') || can('grade:manage') || can('grade:approve') || can('grade:approve_own') || can('faculty:manage')) v.push(['academics', tr('المواد والعلامات')]);
     if (can('attendance:manage')) v.push(['attendance', tr('سجل القاعات')]);
     v.push(['expansions', tr('الامتحانات والتقييم')]);
-    v.push(['student_life', tr('السكن والساعات المكتبية')]);
+    v.push(['student_life', tr('السكن الجامعي')]);
     // 2-ب) الوحدات المتقدمة (5.12–5.15)
-    v.push(['lms', tr('التعلم الإلكتروني والمكتبة')]);
+    v.push(['lms', tr('التعلم الإلكتروني')]);
+    v.push(['labtools', tr('أدوات تجريبية')]);
     v.push(['research', tr('البحث والدراسات العليا')]);
     v.push(['alumni', tr('الخريجون والتوظيف')]);
     v.push(['qa', tr('الجودة والاعتماد المؤسسي')]);
@@ -251,12 +261,10 @@ Object.assign(window.UA, {
     tabs.push(
       ['groups', 'فئات الطلاب'],
       ['digital_card', 'البطاقة الجامعية الرقمية والباركود الذكي (NFC / QR)'],
-      ['admissions', '1. القبول والمفاضلة والمعادلة'],
-      ['advising', '2. الخطة التفاعلية والإرشاد والإنذار'],
-      ['lifecycle', '3. حركات القيد والانضباط المسلكي'],
-      ['disciplinary', '4. اللجنة التأديبية وسجل اللجان الانضباطية والمخالفات'],
-      ['scholarships', '5. المنح والإعفاءات (مدمجة مالياً)'],
-      ['desk_queue', '6. مكتب خدمة الطالب والدور الذكي']
+      ['advising', '1. الخطة التفاعلية والإرشاد والإنذار'],
+      ['lifecycle', '2. حركات القيد والانضباط واللجان التأديبية'],
+      ['scholarships', '3. المنح والإعفاءات (مدمجة مالياً)'],
+      ['desk_queue', '4. مكتب خدمة الطالب والدور الذكي']
     );
     const cur = S.stTab === 'edit' ? 'list' : S.stTab;
     const bar = `<div class="sub-tabs no-print" role="tablist">${tabs.map((t) => `<button class="chip" role="tab" data-act="sttab" data-t="${t[0]}" aria-pressed="${cur === t[0]}">${t[1]}${t[0] === 'requests' && st && st.review ? ` <span class="badge-n">${st.review}</span>` : ''}</button>`).join('')}</div>`;
@@ -266,8 +274,8 @@ Object.assign(window.UA, {
       bodyHtml = UA.renderStudentGroups();
     } else if (cur === 'digital_card' && UA.renderDigitalCardSection) {
       bodyHtml = UA.renderDigitalCardSection();
-    } else if (cur === 'disciplinary' && UA.renderDisciplinarySection) {
-      bodyHtml = UA.renderDisciplinarySection();
+    } else if (cur === 'lifecycle' && UA.studentAffairsSuite) {
+      bodyHtml = UA.studentAffairsSuite.renderTab('lifecycle') + (UA.renderDisciplinarySection ? UA.renderDisciplinarySection() : '');
     } else if (suiteTabs.includes(cur) && UA.studentAffairsSuite) {
       bodyHtml = UA.studentAffairsSuite.renderTab(cur);
     } else if (S.stTab === 'requests' || !tabs.some((t) => t[0] === cur)) {
@@ -616,7 +624,7 @@ Object.assign(window.UA, {
     restoreScrollAndFocus(snap);
   }
   /* ---------- ملفات الأقسام الكبيرة تُحمَّل عند فتحها ---------- */
-  const LAZY = { finance: ['finance.js'], procurement: ['procurement.js'], access: ['access.js'], guidelines: ['guidelines.js'], lms: ['v12_views.js'], research: ['v12_views.js'], alumni: ['v12_views.js'], qa: ['v12_views.js'], expansions: ['v12_views.js'], student_life: ['v12_views.js'], ai: ['v12_views.js'], audit: ['v12_views.js'] };
+  const LAZY = { finance: ['finance.js'], procurement: ['procurement.js'], access: ['access.js'], guidelines: ['guidelines.js'], lms: ['v12_views.js', 'quiz_builder.js'], research: ['v12_views.js'], alumni: ['v12_views.js'], qa: ['v12_views.js'], expansions: ['v12_views.js'], student_life: ['v12_views.js', 'housing.js'], labtools: ['v12_views.js', 'quiz_builder.js', 'housing.js'], ai: ['v12_views.js'], audit: ['v12_views.js'] };
   const ASSET_V = (document.currentScript && document.currentScript.src.split('?')[1]) || '';
   const scripts = new Map();
   function loadScript(file) {
@@ -821,6 +829,7 @@ Object.assign(window.UA, {
       else if (a === 'sttab') {
         S.stTab = d.t; S.err = ''; S.fieldErr = null; S.stEdit = null;
         if (d.t === 'list') await loadStudents();
+        if (d.t === 'lifecycle' && can('holds:manage')) { try { S.admin = { ...(S.admin || {}), holds: (await api('GET', '/api/admin/holds')).holds }; } catch (e) { if (!e.status) throw e; } }
         if (UA.loadStudentAffairsSuite && ['admissions', 'advising', 'lifecycle', 'scholarships', 'desk_queue', 'requests'].includes(d.t)) {
           await UA.loadStudentAffairsSuite();
         }
@@ -881,5 +890,5 @@ Object.assign(window.UA, {
   // التبديل التلقائي بين عرض الحاسوب والجوال عند تغيّر عرض النافذة (تدوير الجهاز أو تغيير حجم النافذة)
   try { UA.mq.addEventListener('change', () => { if (S.me) { $('#layer').innerHTML = ''; render(); } }); } catch { /* متصفح قديم */ }
 
-  Object.assign(UA, { ensureView, spill, relatedRequests, header, siteFoot, upload, mediaHtml, viewsFor, S, api, esc, fmt, dur, $, val, toast, render, guard, go, loadFor, can, pill, steps, detailsText, events, docHtml, verifyView, readFile, afterLogin, ROLE_LABEL });
+  Object.assign(UA, { ensureView, spill, relatedRequests, header, siteFoot, upload, mediaHtml, viewsFor, S, api, esc, fmt, dur, $, val, toast, render, guard, go, loadFor, can, pill, steps, detailsText, events, reqCard, docHtml, verifyView, readFile, afterLogin, ROLE_LABEL });
 })();

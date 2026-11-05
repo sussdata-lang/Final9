@@ -16,8 +16,35 @@ export function getSlots(db, courseId) {
     .map((r) => ({ id: r.id, day: r.day, dayLabel: DAYS[r.day], start: hm(r.start_min), end: hm(r.end_min), hall: r.hall ?? '', groupId: r.group_id ?? null, groupName: r.group_name ?? '' }));
 }
 
+// تعارض موعد مع مقرر آخر: القاعة نفسها أو المدرّس نفسه في وقت متداخل
+export function findSlotConflict(others, course, slot) {
+  for (const o of others) {
+    if (o.course_id === course.id || o.day !== slot.day || !(slot.a < o.end_min && o.start_min < slot.b)) continue;
+    if (slot.hall && o.hall === slot.hall) return `تضارب قاعة: القاعة ${o.hall} محجوزة لمقرر «${o.course_name}» في ${DAYS[o.day]} ${hm(o.start_min)}-${hm(o.end_min)}.`;
+    const sameMember = course.member_id && o.member_id === course.member_id;
+    const sameName = course.instructor && o.instructor === course.instructor;
+    if (sameMember || sameName) return `تضارب مدرّس: لدى ${course.instructor || 'المدرّس'} مقرر «${o.course_name}» في ${DAYS[o.day]} ${hm(o.start_min)}-${hm(o.end_min)}.`;
+  }
+  return null;
+}
+
+// كل مواعيد الجامعة، للعرض في شاشة الجدول
+export function listAllSlots(db) {
+  return db.prepare(`SELECT s.id, s.course_id, s.day, s.start_min, s.end_min, s.hall, c.code, c.name, c.instructor, p.faculty, g.name AS group_name
+    FROM course_schedules s JOIN courses c ON c.id = s.course_id LEFT JOIN programs p ON p.id = c.program_id LEFT JOIN student_groups g ON g.id = s.group_id
+    ORDER BY s.day, s.start_min`).all().map((r) => ({
+    id: r.id, course_id: r.course_id, course_code: r.code ?? '', course_name: r.name, faculty_name: r.faculty ?? '', instructor_name: r.instructor ?? '',
+    hall_code: r.hall ?? '', day_name: DAYS[r.day], time_slot: `${hm(r.start_min)} - ${hm(r.end_min)}`, group_name: r.group_name ?? '', status: 'معتمد',
+  }));
+}
+
+export function addSlot(deps, actor, courseId, slot, ip) {
+  const current = getSlots(deps.db, courseId).map((s) => ({ day: s.day, start: s.start, end: s.end, hall: s.hall, groupId: s.groupId }));
+  return setSlots(deps, actor, courseId, [...current, slot], ip);
+}
+
 export function setSlots({ db }, actor, courseId, slots, ip) {
-  const c = db.prepare('SELECT id, name FROM courses WHERE id = ?').get(Number(courseId));
+  const c = db.prepare('SELECT id, name, member_id, instructor FROM courses WHERE id = ?').get(Number(courseId));
   if (!c) throw new HttpError(404, 'المقرر غير موجود.', 'not_found');
   if (!Array.isArray(slots) || slots.length > 20) throw new HttpError(400, 'الحد الأقصى 20 موعداً للمقرر.', 'validation');
   const clean = slots.map((s, i) => {
@@ -30,6 +57,11 @@ export function setSlots({ db }, actor, courseId, slots, ip) {
     if (groupId && !db.prepare('SELECT 1 AS x FROM student_groups WHERE id = ?').get(groupId)) throw new HttpError(400, `الموعد ${i + 1}: الفئة غير موجودة.`, 'validation');
     return { day, a, b, hall: hall || null, groupId };
   });
+  const others = db.prepare('SELECT s.course_id, s.day, s.start_min, s.end_min, s.hall, x.name AS course_name, x.member_id, x.instructor FROM course_schedules s JOIN courses x ON x.id = s.course_id WHERE s.course_id <> ?').all(c.id);
+  for (const s of clean) {
+    const reason = findSlotConflict(others, c, s);
+    if (reason) throw new HttpError(409, reason, 'schedule_conflict');
+  }
   tx(db, () => {
     db.prepare('DELETE FROM course_schedules WHERE course_id = ?').run(c.id);
     for (const s of clean) db.prepare('INSERT INTO course_schedules (course_id, day, start_min, end_min, hall, group_id) VALUES (?,?,?,?,?,?)').run(c.id, s.day, s.a, s.b, s.hall, s.groupId);

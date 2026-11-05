@@ -166,6 +166,27 @@ test('Database Integration: Student Affairs Suite (1, 2, 3, 5, 6) seeds and exec
   assert.equal(schRes.discountPercent, 100);
   assert.equal(schRes.amount, 1500000);
 
+  // المنحة مربوطة بقيد خصم فعلي على حساب الخصومات المعرَّف
+  const charge = db.prepare('SELECT c.*, ft.code, c.entry_id FROM fin_charges c JOIN fin_fee_types ft ON ft.id = c.fee_type_id WHERE c.id = ?').get(schRes.finChargeId);
+  assert.ok(charge?.entry_id, 'يجب ترحيل قيد الخصم');
+  assert.equal(charge.code, 'scholarship');
+  assert.equal(db.prepare('SELECT fin_charge_id FROM sa_scholarships WHERE id = ?').get(schRes.id).fin_charge_id, schRes.finChargeId);
+  const countGrants = () => Number(db.prepare('SELECT COUNT(*) AS c FROM sa_scholarships').get().c);
+  const grants = countGrants();
+
+  // فشل القيد يصل إلى المستخدم ولا يترك منحة بلا خصم
+  assert.throws(() => grantStudentScholarship(deps, actor, { studentId: 999999, scholarshipType: 'martyrs_kin', baseTuition: 1000 }, '127.0.0.1'), (e) => e.status === 400 || e.status === 404);
+  assert.equal(countGrants(), grants);
+  assert.throws(() => grantStudentScholarship(deps, actor, { studentId: 3, scholarshipType: 'martyrs_kin', baseTuition: 1000, amount: -5 }, '127.0.0.1'), (e) => e.status === 400);
+  assert.equal(countGrants(), grants);
+
+  // غياب نوع الخصم يوقف المنح ولا يُنشئ نوعًا على حساب عشوائي
+  db.prepare("UPDATE fin_fee_types SET active = 0 WHERE kind = 'discount'").run();
+  assert.throws(() => grantStudentScholarship(deps, actor, { studentId: 3, scholarshipType: 'martyrs_kin', baseTuition: 1000 }, '127.0.0.1'), (e) => e.status === 409);
+  assert.equal(countGrants(), grants);
+  assert.equal(db.prepare("SELECT 1 AS x FROM fin_fee_types WHERE code = 'SCH-DISC'").get(), undefined);
+  db.prepare("UPDATE fin_fee_types SET active = 1 WHERE kind = 'discount'").run();
+
   // Book smart queue appointment
   const qRes = bookDeskAppointment(
     deps,

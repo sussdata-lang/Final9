@@ -47,26 +47,27 @@
   // نتائج البحث: طباعة بطاقة طالب واحد من بينها
   function matchesHtml() {
     if (!C.filters.q || !C.list) return '';
-    const rows = C.list.students.slice(0, 30).map((s) => `<tr><td class="mono">${esc(s.studentNo)}</td><td><b>${esc(s.name)}</b></td><td>${esc(s.program.faculty || '')}</td><td>${esc(s.levelLabel)}</td><td><button type="button" class="btn sm pri" data-act="card-print-one" data-id="${s.id}">طباعة بطاقته</button></td></tr>`).join('');
+    const rows = C.list.students.slice(0, 30).map((s) => `<tr><td class="mono">${esc(s.studentNo)}</td><td><b>${esc(s.name)}</b></td><td>${esc(s.program.faculty || '')}</td><td>${esc(s.levelLabel)}</td><td><button type="button" class="btn sm" data-act="card-cert-one" data-id="${s.id}">شهادة التسجيل</button> <button type="button" class="btn sm pri" data-act="card-print-one" data-id="${s.id}">البطاقة الشخصية</button></td></tr>`).join('');
     return `<div class="tbl-wrap" style="margin-top:10px"><table><thead><tr><th>الرقم الجامعي</th><th>الطالب</th><th>الكلية</th><th>السنة</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="hint">لا طلاب مطابقون.</td></tr>'}</tbody></table></div>${C.list.students.length > 30 ? '<p class="small">تُعرض أول 30 نتيجة؛ أكمل كتابة الاسم.</p>' : ''}`;
   }
   function panel() {
     const list = C.list, count = list ? list.total : 0;
     return `<details class="card" style="margin-top:0;margin-bottom:16px" data-card-bulk${C.open ? ' open' : ''}>
-      <summary style="cursor:pointer;font-weight:800">📇 تصدير البطاقات دفعة واحدة وجدول الاستلام</summary>
+      <summary style="cursor:pointer;font-weight:800">📇 طباعة شهادات التسجيل والبطاقات الشخصية وجدول الاستلام</summary>
       ${!C.opts ? '<p class="hint">جارٍ التحميل…</p>' : `<div style="margin-top:12px">${filtersHtml()}
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px">
           <b>${count} طالب مطابق${list && list.truncated ? ' (يُعرض أول 2000؛ ضيّق الفلاتر)' : ''}</b>
           <span style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
             ${UA.cardPrintModeHtml()}
-            <button type="button" class="btn pri" data-act="card-print"${count ? '' : ' disabled'}>${count === 1 ? 'طباعة بطاقة هذا الطالب' : 'تصدير كل البطاقات (طباعة أو PDF)'}</button>
+            <button type="button" class="btn pri" data-act="card-print-certs"${count ? '' : ' disabled'}>${count === 1 ? 'طباعة شهادة التسجيل' : `طباعة شهادات التسجيل (${count})`}</button>
+            <button type="button" class="btn pri" data-act="card-print"${count ? '' : ' disabled'}>${count === 1 ? 'طباعة البطاقة الشخصية' : `طباعة البطاقات الشخصية (${count})`}</button>
             <button type="button" class="btn" data-act="card-batch"${count ? '' : ' disabled'}>حفظها دفعة لتسجيل الاستلام</button>
           </span>
         </div>
         ${matchesHtml()}
         ${(C.batches || []).length ? `<h4 style="margin:16px 0 6px">دفعات البطاقات</h4><div class="tbl-wrap"><table><thead><tr><th>الدفعة</th><th>أنشأها</th><th>التاريخ</th><th>المستلَم</th><th></th></tr></thead><tbody>${C.batches.map((b) => `<tr><td><b>${esc(b.label)}</b></td><td>${esc(b.creator)}</td><td class="small">${esc(dt(b.createdAt))}</td><td>${b.received} / ${b.total}</td><td><button type="button" class="btn sm" data-act="card-open" data-id="${b.id}">جدول الاستلام</button></td></tr>`).join('')}</tbody></table></div>` : '<p class="small" style="margin-top:12px">لا توجد دفعات بعد.</p>'}
         ${detailHtml()}</div>`}
-      ${C.list && C.list.students && C.list.students[0] && UA.digitalCardHtml ? `<aside class="ux-card-preview" aria-label="معاينة البطاقة"><b class="small">معاينة البطاقة</b>${UA.digitalCardHtml(C.list.students[0], { screen: true })}</aside>` : ''}
+      ${C.list && C.list.students && C.list.students[0] && UA.idCard ? `<aside class="ux-card-preview" aria-label="معاينة شهادة التسجيل"><b class="small">معاينة شهادة التسجيل</b>${UA.idCard(C.list.students[0], { cred: { username: C.list.students[0].studentNo, tempPassword: '••••••••' } })}</aside>` : ''}
     </details>`;
   }
 
@@ -107,6 +108,16 @@
     }
     if (e.target && e.target.id === 'card-q') { C.q = e.target.value; const at = e.target.selectionStart; UA.render(); const again = document.getElementById('card-q'); if (again) { again.focus(); again.setSelectionRange(at, at); } }
   });
+  // الشهادة تحمل كلمة مرور مؤقتة، وهي مخزنة بصمة فلا تُقرأ: تُصدر جديدة لمن لم يدخل بعد، ومن غيّر كلمته لا تُمس
+  async function printCertificates(body, count) {
+    const msg = count === 1 ? 'ستُصدر كلمة مؤقتة جديدة إن لم يدخل الطالب بعد، وتبطل الورقة السابقة. متابعة؟' : `ستُطبع ${count} شهادة، وتُصدر كلمة مؤقتة جديدة لمن لم يدخل بعد، وتبطل أوراقهم السابقة. متابعة؟`;
+    if (!window.confirm(msg)) return;
+    try {
+      toast('جارٍ تجهيز الشهادات…');
+      const { students } = await api('POST', '/api/cards/certificates', body);
+      UA.printCertificates(students.map((s) => UA.idCard(s, { cert: s.cert, cred: { username: s.studentNo, tempPassword: s.tempPassword || 'غيّرها الطالب بعد أول دخول' } })));
+    } catch (e) { if (!e.status) throw e; toast(e.message); }
+  }
   const reloadDetail = async () => { C.detail = await api('GET', `/api/cards/batches/${C.detail.batch.id}`); C.batches = (await api('GET', '/api/cards/batches')).batches; UA.render(); };
   Object.assign(UA.actions, {
     'card-print': async () => {
@@ -114,6 +125,11 @@
       const list = (await api('GET', `/api/cards/students?${query()}`)).students;
       UA.printHtml(list.map((st) => UA.digitalCardHtml(st)), { card: true });
     },
+    'card-print-certs': async () => {
+      if (!C.list || !C.list.total) return;
+      await printCertificates({ filters: C.filters }, C.list.total);
+    },
+    'card-cert-one': async (el, d) => { await printCertificates({ studentIds: [Number(d.id)] }, 1); },
     'card-print-one': (el, d) => {
       const st = C.list && C.list.students.find((s) => s.id === Number(d.id));
       if (st) UA.printHtml([UA.digitalCardHtml(st)], { card: true });

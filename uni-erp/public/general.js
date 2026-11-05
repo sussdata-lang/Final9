@@ -11,7 +11,7 @@
   const LINKS = [
     ['الأكاديمي: الكليات والبرامج والسنوات الدراسية والفصول', 'programs', 'admin'],
     ['الخدمات ونماذج الطلبات (المدة والحقول والمرفقات)', 'services', 'admin'],
-    ['اللجنة التأديبية وسجل اللجان الانضباطية والمخالفات', 'holds', 'admin'],
+    ['اللجنة التأديبية وسجل اللجان الانضباطية والمخالفات', 'lifecycle', 'affairs'],
     ['وحدات النظام الجامعي (5.1–5.17)', 'units', 'admin'],
     ['التحقق العام والوثائق الرقمية', 'verify', 'admin'],
     ['قواعد الفحص الآلي', 'rules', 'admin'],
@@ -142,6 +142,6 @@
       await saveSingleList(d.k, cur);
     },
     gres: async (el, d) => { if (!confirm('إعادة هذا الإعداد إلى قيمته الافتراضية؟')) return; try { const r = await api('POST', '/api/admin/general/reset', { keys: [d.k] }); B.cfg = { tabs: r.tabs }; toast('أُعيد إلى الافتراضي'); UA.render(); } catch (e) { if (!e.status) throw e; toast(e.message); } },
-    gadmin: async (el, d) => { UA.S.adminTab = d.t; await UA.go('admin'); if (UA.adminCfg && UA.adminCfg.tabs.some((x) => x[0] === d.t)) { await UA.adminCfg.load(d.t); UA.render(); } },
+    gadmin: async (el, d) => { if (d.v === 'affairs') { UA.S.stTab = d.t; await UA.go('affairs'); return; } UA.S.adminTab = d.t; await UA.go('admin'); if (UA.adminCfg && UA.adminCfg.tabs.some((x) => x[0] === d.t)) { await UA.adminCfg.load(d.t); UA.render(); } },
   });
 })();

@@ -179,3 +179,11 @@ export async function ensureStructure({ db, cfg }, { activate = false, password 
   });
   return out;
 }
+
+// من لا يحتاج ملف الطالب كاملاً يبحث عنه بالاسم والرقم الجامعي فقط. شؤون الطلاب والتسجيل والامتحانات والأكاديمية يبقى لهم الملف
+const LOOKUP_ONLY = new Set(['finance', 'of_finance', 'library', 'research', 'legal', 'safety', 'alumni', 'discipline', 'of_support']);
+for (const n of STRUCTURE) if (LOOKUP_ONLY.has(n.code)) n.perms = n.perms.map((p) => (p === 'student:read' ? 'student:lookup' : p));
+
+// الاختبارات الإلكترونية: يعدّها قسم شؤون الطلاب، ويعتمدها عضو الهيئة التدريسية
+for (const n of STRUCTURE) if (['affairs', 'sa_registry', 'of_studies'].includes(n.code)) n.perms.push('sa_quiz:write');
+FACULTY_ROLE.perms.push('sa_quiz:approve');

@@ -9,7 +9,7 @@ import { suiteOverviewFor, executeAdmissionsSorting } from './services/student_a
 import { createCardBatch, cardBatchXlsx } from './services/cards.js';
 import { transitionGrades } from './services/workflow.js';
 import { verifyBackup } from './services/backup.js';
-import { verifyAuditChain } from './audit.js';
+import { verifyAuditChain, setAuditKey } from './audit.js';
 import { analytics, filterOptions } from './services/analytics.js';
 import { buildReportXlsx, buildReportDocx } from './services/reports.js';
 import { exportRequests } from './services/requestsxl.js';
@@ -18,6 +18,7 @@ import { runLiveBenchmark } from './services/live_benchmark.js';
 
 const db = connectDb(workerData.pgUrl);
 const deps = { db, cfg: workerData.cfg };
+setAuditKey(workerData.cfg?.auditKey);
 
 const JOBS = {
   checkImport: (actor, ...a) => checkImport(deps, actor, ...a),

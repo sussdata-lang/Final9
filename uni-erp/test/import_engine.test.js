@@ -238,7 +238,10 @@ test('كل نوع مرجعي: القالب يُنزَّل ويُستورد، و�
   if (!app.db.prepare("SELECT 1 AS x FROM fin_fee_types WHERE kind = 'discount' AND active = 1").get()) app.db.prepare("INSERT INTO fin_fee_types (code, name, kind, account_id) VALUES ('LOOP-DISC', 'خصم', 'discount', (SELECT id FROM fin_accounts WHERE code = 'T-ACC'))").run();
   app.db.prepare("INSERT INTO hr_employees (employeeno, name, personalid, hiredate, created_at, updated_at) VALUES ('T-EMP', 'موظف اختبار', 'T-PID', '2024-01-01', ?, ?)").run(Date.now(), Date.now());
   app.db.prepare("INSERT INTO student_groups (name, created_at) VALUES ('فئة الحلقة', ?)").run(Date.now());
+  app.db.prepare("INSERT INTO lms_quizzes (course_code, course_name, title, created_at) VALUES ('Q-LOOP', 'م', 'اختبار الحلقة', ?)").run(Date.now());
   const extra = {
+    lms_quiz_questions: (rows) => { rows[1][0] = 'اختبار الحلقة'; },
+    housing_handouts: (rows) => { rows[1][rows[0].findIndex((h) => h.startsWith('الرقم الجامعي'))] = 'LOOP-1'; },
     student_group_members: (rows) => { rows[1][0] = 'فئة الحلقة'; rows[1][rows[0].findIndex((h) => h.startsWith('الرقم الجامعي'))] = 'LOOP-1'; },
     unit_links: (rows) => { const u = app.db.prepare('SELECT code FROM org_units WHERE code IS NOT NULL ORDER BY id LIMIT 2').all(); rows[1][0] = u[0].code; rows[1][1] = u[1].code; },
     course_schedules: (rows) => { rows[1][0] = 'COURSE-A'; },
@@ -826,7 +829,7 @@ test('الأقساط والأسئلة والروابط: الحالة تُحسب�
   assert.equal(quiz.json.valid, 1);
   await commit('lms_quizzes', quiz.json.stagingToken);
   const saved = (await call('GET', '/api/lms/overview', { cookie: adm })).json.quizzes.find((q) => q.title === 'اختبار');
-  assert.equal(saved.questions[0].ans, 1, 'تعمل في الشاشة');
+  assert.deepEqual(saved.questions[0].correct, [1], 'تعمل في الشاشة');
 
   const lec = ['رمز المقرر', 'اسم المقرر', 'العنوان', 'المدرّس', 'الرابط'];
   assert.match((await check('lms_lectures', csv([lec, ['C-1', 'مقرر', 'م', 'د', 'javascript:alert(1)']]))).json.errors[0].message, /رابط/);
@@ -843,8 +846,8 @@ test('صلاحية مالية الطلاب منفصلة، وصلاحية الو�
   app.db.prepare("INSERT INTO users (username, display_name, password_hash, role, custom_permissions_json, created_at) VALUES ('sfbasic', 'sf', ?, 'staff', ?, ?)").run(hash, JSON.stringify(['import:student_fin']), Date.now());
   const c = (await call('POST', '/api/auth/login', { body: { username: 'sfbasic', password: PW } })).cookie;
   const kinds = (await call('GET', '/api/import-engine/catalog', { cookie: c })).json.kinds.map((k) => k.kind);
-  assert.ok(kinds.includes('scholarships'));
-  assert.ok(!kinds.includes('fin_charges') && !kinds.includes('sa_lifecycle_movements'));
+  // كل أنواع مالية الطلاب عالية الخطورة منذ دمج سجل المنح الإداري، فصلاحية الوحدة وحدها لا تعرض شيئاً منها
+  for (const k of ['fin_charges', 'fin_payments', 'sa_scholarships', 'student_fee_installments', 'sa_lifecycle_movements']) assert.ok(!kinds.includes(k), k);
   assert.equal((await check('fin_payments', csv([['رقم الإيصال'], ['x']]), c)).status, 403);
 });
 

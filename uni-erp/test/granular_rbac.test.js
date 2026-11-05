@@ -127,6 +127,7 @@ test('4. Database & API Integration: Create user with custom department permissi
         password: PW,
         accessMode: 'custom',
         dataScope: 'faculty',
+        scopeFaculty: app.db.prepare('SELECT faculty FROM programs ORDER BY id LIMIT 1').get().faculty,
         customPermissions: ['finance:read', 'finance:entry', 'finance:fees', 'sa_scholarships:view', 'sa_scholarships:write', 'student:read'],
         allowedViews: ['desk', 'overview', 'finance', 'affairs', 'verify'],
       },

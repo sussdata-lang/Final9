@@ -51,7 +51,7 @@
     film: '<rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/>',
   };
   const ico = (n, s = 20) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[n] || ''}</svg>`;
-  const NAV_ICON = { desk: 'home', overview: 'home', enterprise: 'layers', home: 'home', guide: 'guide', grades: 'bars', fees: 'wallet', tx: 'file', affairs: 'users', student_life: 'layers', dashboard: 'bars', academics: 'book', comms: 'news', exchange: 'exchange', internal: 'file', corr: 'mail', hr: 'briefcase', payroll: 'briefcase', procurement: 'box', finance: 'wallet', settings: 'settings', units: 'layers', import: 'upload', export: 'download', attendance: 'calendar', admin: 'settings', access: 'shield', audit: 'audit', verify: 'check', lms: 'library', research: 'research', alumni: 'graduation', qa: 'quality', expansions: 'clipboard', devops: 'settings', ai: 'spark', guidelines: 'guide' };
+  const NAV_ICON = { desk: 'home', overview: 'home', enterprise: 'layers', home: 'home', guide: 'guide', grades: 'bars', fees: 'wallet', tx: 'file', affairs: 'users', student_life: 'layers', labtools: 'layers', dashboard: 'bars', academics: 'book', comms: 'news', exchange: 'exchange', internal: 'file', corr: 'mail', hr: 'briefcase', payroll: 'briefcase', procurement: 'box', finance: 'wallet', settings: 'settings', units: 'layers', import: 'upload', export: 'download', attendance: 'calendar', admin: 'settings', access: 'shield', audit: 'audit', verify: 'check', lms: 'library', research: 'research', alumni: 'graduation', qa: 'quality', expansions: 'clipboard', devops: 'settings', ai: 'spark', guidelines: 'guide' };
   const PARENT = { site: 'admin', services: 'admin' };
   /* مجموعات القائمة الجانبية وترتيبها */
   const NAV_GROUP = {
@@ -61,8 +61,9 @@
     payroll: 'الإدارة والموارد', hr: 'الإدارة والموارد', corr: 'الإدارة والموارد', internal: 'الإدارة والموارد', finance: 'الإدارة والموارد', procurement: 'الإدارة والموارد',
     dashboard: 'البيانات والتقارير', exchange: 'البيانات والتقارير', ai: 'البيانات والتقارير', comms: 'البيانات والتقارير',
     admin: 'الإدارة والحوكمة', access: 'الإدارة والحوكمة', audit: 'الإدارة والحوكمة', units: 'الإدارة والحوكمة', verify: 'الإدارة والحوكمة', guidelines: 'الإدارة والحوكمة',
+    labtools: 'أدوات تجريبية',
   };
-  const NAV_ORDER = ['overview', 'desk', 'affairs', 'student_life', 'academics', 'attendance', 'expansions', 'lms', 'research', 'alumni', 'qa', 'payroll', 'hr', 'corr', 'internal', 'finance', 'procurement', 'dashboard', 'exchange', 'ai', 'comms', 'admin', 'access', 'audit', 'units', 'verify', 'guidelines'];
+  const NAV_ORDER = ['overview', 'desk', 'affairs', 'student_life', 'academics', 'attendance', 'expansions', 'lms', 'research', 'alumni', 'qa', 'payroll', 'hr', 'corr', 'internal', 'finance', 'procurement', 'dashboard', 'exchange', 'ai', 'comms', 'admin', 'access', 'audit', 'units', 'verify', 'guidelines', 'labtools'];
   const SIDE_LABEL = { corr: 'الديوان والمراسلات', guidelines: 'دليل الإرشادات التفاعلي' };
   const EXTRA_LABEL = { site: 'إعدادات الموقع', services: 'الخدمات' };
 
@@ -219,12 +220,10 @@
       it.push(
         ['affairs', 'groups', 'فئات الطلاب'],
         ['affairs', 'digital_card', 'البطاقة الرقمية والباركود الذكي'],
-        ['affairs', 'admissions', '1. القبول والمفاضلة والمعادلة'],
-        ['affairs', 'advising', '2. الخطة والإرشاد والإنذار'],
-        ['affairs', 'lifecycle', '3. حركات القيد والانضباط'],
-        ['affairs', 'disciplinary', '4. سجل اللجان الانضباطية والتأديبية'],
-        ['affairs', 'scholarships', '5. المنح والإعفاءات المالية'],
-        ['affairs', 'desk_queue', '6. مكتب خدمة الطالب والدور']
+        ['affairs', 'advising', '1. الخطة والإرشاد والإنذار'],
+        ['affairs', 'lifecycle', '2. حركات القيد والانضباط'],
+        ['affairs', 'scholarships', '3. المنح والإعفاءات المالية'],
+        ['affairs', 'desk_queue', '4. مكتب خدمة الطالب والدور']
       );
       return `<div class="sx-sub-list" role="group" aria-label="شؤون الطلاب">${it.filter((x) => okTab('sttab', x[1])).map((x) => `<button data-sx="sub" data-v="${x[0]}" data-t="${x[1]}"${S.view === x[0] && t === x[1] ? ' aria-current="true"' : ''}>${esc(x[2])}</button>`).join('')}</div>`;
     };

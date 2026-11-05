@@ -416,8 +416,9 @@
               <td style="color:${i.total - i.paidAmount > 0 ? '#dc2626' : '#16a34a'}"><b>${money(i.total - i.paidAmount)}</b></td>
               <td>${badge(INV_ST, i.status)}</td>
               <td>
-                ${i.status === 'draft' && can('finance:voucher') ? `<button class="btn pri sm" data-act="fin-iss-inv" data-id="${i.id}">إصدار وترحيل</button>` : ''}
-                ${['draft', 'issued'].includes(i.status) && i.paidAmount === 0 && can('finance:voucher') ? `<button class="btn dan sm" data-act="fin-can-inv" data-id="${i.id}">إلغاء</button>` : ''}
+                ${i.status === 'draft' && can('finance:entry') ? `<button class="btn pri sm" data-act="fin-iss-inv" data-id="${i.id}">إصدار وترحيل</button>` : ''}
+                ${['issued', 'partial'].includes(i.status) && can('finance:entry') ? `<button class="btn pri sm" data-act="fin-pay-inv" data-id="${i.id}">تسجيل دفعة</button>` : ''}
+                ${['draft', 'issued'].includes(i.status) && i.paidAmount === 0 && can('finance:entry') ? `<button class="btn dan sm" data-act="fin-can-inv" data-id="${i.id}">إلغاء</button>` : ''}
               </td>
             </tr>`).join('') || '<tr><td colspan="9" class="empty">لا توجد فواتير</td></tr>'}
           </tbody></table></div>
@@ -786,8 +787,8 @@
         showModal(`<h3>فتح سنة مالية جديدة</h3>
           <div class="form-grid">
             <label>رمز السنة<input id="ffy-code" placeholder="2027"></label>
-            <label>تاريخ البداية<input id="ffy-s" type="date" value="2027-01-01"></label>
-            <label>تاريخ النهاية<input id="ffy-e" type="date" value="2027-12-31"></label>
+            <label>تاريخ البداية<input id="ffy-s" type="date"></label>
+            <label>تاريخ النهاية<input id="ffy-e" type="date"></label>
           </div>
           <div class="row-end"><button class="btn" data-act="fin-close-modal">إلغاء</button><button class="btn pri" data-act="fin-save-fy">فتح السنة المالية</button></div>`);
       }
@@ -819,7 +820,7 @@
           <div id="je-lines">
             <div class="form-grid je-line" style="margin-bottom:6px;grid-template-columns:1.6fr .8fr .8fr 1fr 1fr">
               <select class="je-acc">${accOpts}</select>
-              <input class="je-deb" type="number" placeholder="مدين" value="100000">
+              <input class="je-deb" type="number" placeholder="مدين">
               <input class="je-cred" type="number" placeholder="دائن" value="0">
               <select class="je-cc">${ccOpts}</select>
               <input class="je-memo" placeholder="إيضاح السطر">
@@ -827,7 +828,7 @@
             <div class="form-grid je-line" style="margin-bottom:6px;grid-template-columns:1.6fr .8fr .8fr 1fr 1fr">
               <select class="je-acc">${accOpts}</select>
               <input class="je-deb" type="number" placeholder="مدين" value="0">
-              <input class="je-cred" type="number" placeholder="دائن" value="100000">
+              <input class="je-cred" type="number" placeholder="دائن">
               <select class="je-cc">${ccOpts}</select>
               <input class="je-memo" placeholder="إيضاح السطر">
             </div>
@@ -898,7 +899,7 @@
             <label>حساب الصندوق / المصرف<select id="fv-cash">${(cashAccs.length ? cashAccs : leaf).map((a) => `<option value="${a.id}">${esc(a.code)} · ${esc(a.name)}</option>`).join('')}</select></label>
             <label>الحساب المقابل<select id="fv-cnt">${leaf.map((a) => `<option value="${a.id}" ${kind === 'receipt' && a.code === '4100' ? 'selected' : ''}>${esc(a.code)} · ${esc(a.name)}</option>`).join('')}</select></label>
             <label>الطرف المالي (اختياري)<select id="fv-party"><option value="">— بدون طرف —</option>${F.parties.map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></label>
-            <label>المبلغ (ل.س)<input id="fv-amt" type="number" value="100000"></label>
+            <label>المبلغ (ل.س)<input id="fv-amt" type="number"></label>
             <label style="grid-column:1/-1">البيان والتفاصيل<input id="fv-desc" placeholder="${kind === 'receipt' ? 'قبض رسوم دراسية / إيراد خدمات' : 'صرف نفقات تشغيلية / دفعة لمورد'}"></label>
           </div>
           <div class="row-end"><button class="btn" data-act="fin-close-modal">إلغاء</button><button class="btn pri" data-act="fin-save-vch">إصدار السند وتوليد القيد المحاسبي</button></div>`);
@@ -919,26 +920,53 @@
 
       else if (act === 'fin-new-inv') {
         const today = new Date().toISOString().slice(0, 10);
+        const accOpts = (types) => F.accounts.filter((a) => a.active && a.postable && types.includes(a.type)).map((a) => `<option value="${a.id}">${esc(a.code)} · ${esc(a.name)}</option>`).join('');
         showModal(`<h3>📄 إنشاء فاتورة ذمم جديدة</h3>
+          ${F.parties.length ? '' : '<p class="hint">لا توجد أطراف مالية بعد؛ أضف طرفًا من تبويب الأطراف أولاً.</p>'}
           <div class="form-grid">
             <label>نوع الفاتورة<select id="fi-kind"><option value="sale">فاتورة مبيعات / إيراد</option><option value="purchase">فاتورة مشتريات / مورد</option></select></label>
             <label>الطرف المالي<select id="fi-party">${F.parties.map((p) => `<option value="${p.id}">${esc(p.name)} (${p.kind === 'customer' ? 'عميل' : 'مورد'})</option>`).join('')}</select></label>
+            <label>حساب الإيراد أو المصروف<select id="fi-counter"><option value="">الحساب الافتراضي للنوع</option><optgroup label="إيرادات (للمبيعات)">${accOpts(['revenue'])}</optgroup><optgroup label="مصروفات وأصول (للمشتريات)">${accOpts(['expense', 'asset'])}</optgroup></select></label>
             <label>تاريخ الإصدار<input id="fi-day" type="date" value="${today}"></label>
-            <label>وصف البند<input id="fi-desc" value="خدمات أكاديمية / توريد مستلزمات"></label>
+            <label>وصف البند<input id="fi-desc"></label>
             <label>الكمية<input id="fi-qty" type="number" value="1"></label>
-            <label>سعر الوحدة (ل.س)<input id="fi-price" type="number" value="250000"></label>
+            <label>سعر الوحدة (ل.س)<input id="fi-price" type="number"></label>
           </div>
-          <div class="row-end"><button class="btn" data-act="fin-close-modal">إلغاء</button><button class="btn pri" data-act="fin-save-inv">حفظ وإصدار الفاتورة</button></div>`);
+          <div class="row-end"><button class="btn" data-act="fin-close-modal">إلغاء</button><button class="btn" data-act="fin-save-inv" data-draft="1">حفظ كمسودة</button><button class="btn pri" data-act="fin-save-inv">حفظ وإصدار الفاتورة</button></div>`);
       }
       else if (act === 'fin-save-inv') {
+        const draft = b.dataset.draft === '1';
         await api('POST', '/api/finance/invoices', {
           kind: document.getElementById('fi-kind').value,
           partyId: Number(document.getElementById('fi-party').value),
+          counterAccountId: Number(document.getElementById('fi-counter').value) || null,
           issueDay: document.getElementById('fi-day').value,
-          issue: true,
+          issue: !draft,
           lines: [{ description: document.getElementById('fi-desc').value, qty: Number(document.getElementById('fi-qty').value), unitPrice: Number(document.getElementById('fi-price').value) }]
         });
-        toast('أُصدرت الفاتورة ورُحّل قيدها'); closeModal(); await refresh();
+        toast(draft ? 'حُفظت الفاتورة كمسودة' : 'أُصدرت الفاتورة ورُحّل قيدها'); closeModal(); await refresh();
+      }
+      else if (act === 'fin-pay-inv') {
+        const inv = F.invoices.find((x) => String(x.id) === b.dataset.id);
+        const cashAccs = F.accounts.filter((a) => a.active && a.postable && String(a.code).startsWith('11'));
+        const left = Math.round((inv.total - inv.paidAmount) * 100) / 100;
+        showModal(`<h3>💵 تسجيل دفعة على الفاتورة ${esc(inv.no)}</h3>
+          <p class="hint">${esc(inv.partyName)} — المتبقي ${money(left)}</p>
+          <input type="hidden" id="fp-inv" value="${inv.id}">
+          <div class="form-grid">
+            <label>المبلغ (ل.س)<input id="fp-amt" type="number" min="0" step="0.01" value="${left}"></label>
+            <label>تاريخ الدفعة<input id="fp-day" type="date" value="${new Date().toISOString().slice(0, 10)}"></label>
+            <label>الصندوق أو المصرف<select id="fp-cash">${cashAccs.map((a) => `<option value="${a.id}">${esc(a.code)} · ${esc(a.name)}</option>`).join('')}</select></label>
+          </div>
+          <div class="row-end"><button class="btn" data-act="fin-close-modal">إلغاء</button><button class="btn pri" data-act="fin-save-pay-inv">تسجيل الدفعة وترحيل قيدها</button></div>`);
+      }
+      else if (act === 'fin-save-pay-inv') {
+        await api('POST', `/api/finance/invoices/${document.getElementById('fp-inv').value}/pay`, {
+          amount: Number(document.getElementById('fp-amt').value),
+          day: document.getElementById('fp-day').value,
+          cashAccountId: Number(document.getElementById('fp-cash').value) || null
+        });
+        toast('سُجلت الدفعة ورُحّل قيدها'); closeModal(); await refresh();
       }
       else if (act === 'fin-iss-inv') { await api('POST', `/api/finance/invoices/${b.dataset.id}/issue`, {}); toast('أُصدرت الفاتورة'); await refresh(); }
       else if (act === 'fin-can-inv') { await api('POST', `/api/finance/invoices/${b.dataset.id}/cancel`, {}); toast('أُلغيت الفاتورة'); await refresh(); }
@@ -985,10 +1013,10 @@
         showModal(`<h3>📐 تعريف هيكل رسوم دراسية</h3>
           <div class="form-grid">
             <label>البرنامج الأكاديمي<select id="ffs-prog">${F.programs.map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></label>
-            <label>العام الدراسي<input id="ffs-yr" value="2025/2026"></label>
+            <label>العام الدراسي<input id="ffs-yr"></label>
             <label>الفصل الدراسي<select id="ffs-sem"><option value="1">الفصل الأول</option><option value="2">الفصل الثاني</option></select></label>
-            <label>رسوم التعليم (ل.س)<input id="ffs-tui" type="number" value="1500000"></label>
-            <label>رسوم التسجيل والخدمات<input id="ffs-reg" type="number" value="150000"></label>
+            <label>رسوم التعليم (ل.س)<input id="ffs-tui" type="number"></label>
+            <label>رسوم التسجيل والخدمات<input id="ffs-reg" type="number"></label>
           </div>
           <div class="row-end"><button class="btn" data-act="fin-close-modal">إلغاء</button><button class="btn pri" data-act="fin-save-fs">حفظ الهيكل</button></div>`);
       }
@@ -1006,10 +1034,10 @@
         showModal(`<h3>🎖️ منح حسم أو منحة لطالب</h3>
           <div class="form-grid">
             <label>معرّف الطالب (User ID)<input id="fd-stu" type="number" placeholder="4"></label>
-            <label>العام الدراسي<input id="fd-yr" value="2025/2026"></label>
+            <label>العام الدراسي<input id="fd-yr"></label>
             <label>النوع<select id="fd-kind"><option value="scholarship">منحة تفوق</option><option value="sibling">حسم أخوة</option><option value="social">إعفاء اجتماعي</option></select></label>
-            <label>نسبة الحسم (%)<input id="fd-pct" type="number" value="25"></label>
-            <label style="grid-column:1/-1">السبب ورقم القرار<input id="fd-rsn" value="تفوق أكاديمي بموجب قرار مجلس الجامعة"></label>
+            <label>نسبة الحسم (%)<input id="fd-pct" type="number"></label>
+            <label style="grid-column:1/-1">السبب ورقم القرار<input id="fd-rsn"></label>
           </div>
           <div class="row-end"><button class="btn" data-act="fin-close-modal">إلغاء</button><button class="btn pri" data-act="fin-save-disc">حفظ المنحة/الحسم</button></div>`);
       }
@@ -1028,9 +1056,9 @@
         showModal(`<h3>🧾 إصدار فاتورة رسوم دراسية وخطة تقسيط لطالب</h3>
           <div class="form-grid">
             <label>معرّف الطالب (User ID)<input id="fsi-stu" type="number" placeholder="4"></label>
-            <label>العام الدراسي<input id="fsi-yr" value="2025/2026"></label>
+            <label>العام الدراسي<input id="fsi-yr"></label>
             <label>الفصل الدراسي<select id="fsi-sem"><option value="1">الفصل الأول</option><option value="2">الفصل الثاني</option></select></label>
-            <label>المبلغ الإجمالي (ل.س)<input id="fsi-amt" type="number" value="1500000"></label>
+            <label>المبلغ الإجمالي (ل.س)<input id="fsi-amt" type="number"></label>
             <label>عدد الأقساط<select id="fsi-cnt"><option value="1">دفعة واحدة</option><option value="2" selected>قسطان</option><option value="3">3 أقساط</option></select></label>
             <label>استحقاق القسط الأول<input id="fsi-due" type="date" value="${today}"></label>
           </div>

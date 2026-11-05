@@ -5,7 +5,7 @@ import zlib from 'node:zlib';
 import crypto from 'node:crypto';
 import { log } from './lib/logger.js';
 import { wafMiddleware, getWafStats, unbanIp } from './waf.js';
-import { checkTieredRateLimit } from './security.js';
+import { checkTieredRateLimit, checkIpCeiling } from './security.js';
 
 export class HttpError extends Error {
   constructor(status, message, code = 'error', field = undefined) { super(message); this.status = status; this.code = code; this.field = field; }
@@ -316,20 +316,20 @@ export function makeHandler({ cfg, router, getUser }) {
       httpTelemetry.totalRequests++;
       if (req.method !== 'GET' && req.method !== 'HEAD') httpTelemetry.totalWriteRequests++;
 
-      // --- Tiered Rate Limiter ---
-      const rl = checkTieredRateLimit(req);
-      if (rl.limited) {
-        res.setHeader('Retry-After', String(rl.retryAfter));
-        throw new HttpError(429, `طلبات كثيرة جداً (${rl.rule}). حاول بعد ${rl.retryAfter} ثانية.`, 'rate_limited');
-      }
+      // --- حدود المعدل: سقف العنوان أولاً، ثم لكل مستخدم بعد معرفة جلسته ---
+      const tooMany = (rl) => { res.setHeader('Retry-After', String(rl.retryAfter)); return new HttpError(429, `طلبات كثيرة جداً (${rl.rule}). حاول بعد ${rl.retryAfter} ثانية.`, 'rate_limited'); };
+      const ceiling = checkIpCeiling(req);
+      if (ceiling.limited) throw tooMany(ceiling);
+      const cookies = parseCookies(req.headers.cookie);
+      if (!cookies.sid && req.headers['x-session-token']) cookies.sid = String(req.headers['x-session-token']);
+      const user = getUser(cookies.sid);
+      const rl = checkTieredRateLimit(req, user?.id ?? null);
+      if (rl.limited) throw tooMany(rl);
 
       const { route, params, pathMatched } = router.match(req.method, url.pathname);
       if (!route) throw new HttpError(pathMatched ? 405 : 404, pathMatched ? 'الطريقة غير مسموحة.' : 'غير موجود.', 'not_found');
       if (req.method !== 'GET' && req.method !== 'HEAD' && !originAllowed(cfg, req))
         throw new HttpError(403, 'مصدر الطلب غير مسموح.', 'bad_origin');
-      const cookies = parseCookies(req.headers.cookie);
-      if (!cookies.sid && req.headers['x-session-token']) cookies.sid = String(req.headers['x-session-token']);
-      const user = getUser(cookies.sid);
       if (route.opts.auth !== false && !user) throw new HttpError(401, 'يلزم تسجيل الدخول.', 'unauthenticated');
       if (route.opts.auth !== false && user?.must_change_password && !route.opts.allowMustChange) throw new HttpError(403, 'يجب تغيير كلمة المرور المؤقتة أولاً.', 'password_change_required');
       const parsedBody = req.method === 'GET' ? {} : route.opts.raw ? await readRaw(req, route.opts.maxBody) : await readBody(req, route.opts.maxBody ?? 64 * 1024);

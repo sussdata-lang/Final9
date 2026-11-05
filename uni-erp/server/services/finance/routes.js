@@ -4,6 +4,7 @@ const need = (ctx, perm) => { if (!ctx.user.can(perm)) throw new HttpError(403, 
 import * as C from './core.js';
 import * as R from './reports.js';
 import * as F from './fees.js';
+import * as I from './invoices.js';
 
 // helpers لكتابة الإكسل
 let xlsxLib = null; const xlsx = () => xlsxLib ?? (xlsxLib = import('../../lib/xlsx.js'));
@@ -25,9 +26,7 @@ export async function registerFinance(r, deps, { writeXlsx }) {
 
   /* ---- السنوات المالية ---- */
   const getYearsHandler = () => { const y = C.listYears(db); return { years: y, fiscalYears: y }; };
-  r.add('GET', '/api/finance/years', fin('finance:read', getYearsHandler));
   r.add('GET', '/api/finance/fiscal-years', fin('finance:read', getYearsHandler));
-  r.add('POST', '/api/finance/years', finC('finance:setup', (c, b) => C.createYear(deps, c.user, b, c.ip)));
   r.add('POST', '/api/finance/fiscal-years', finC('finance:setup', (c, b) => C.createYear(deps, c.user, b, c.ip)));
   r.add('POST', '/api/finance/fiscal-years/:id/close', fin('finance:setup', (c, b) => F.closeYear(deps, c.user, c.params.id, c.ip)));
 
@@ -39,15 +38,8 @@ export async function registerFinance(r, deps, { writeXlsx }) {
   r.add('DELETE', '/api/finance/accounts/:id', fin('finance:setup', (c) => C.deleteAccount(deps, c.user, c.params.id, c.ip)));
 
   /* ---- القيود اليومية ---- */
-  r.add('GET', '/api/finance/entries', fin('finance:read', (_c, _b, q) => C.listEntries(deps, q)));
-  r.add('GET', '/api/finance/entries/:id', fin('finance:read', (c) => C.getEntry(deps, c.params.id)));
-  r.add('POST', '/api/finance/entries', finC('finance:entry', (c, b) => C.createEntry(deps, c.user, b, c.ip)));
-  r.add('PUT', '/api/finance/entries/:id', fin('finance:entry', (c, b) => C.updateEntry(deps, c.user, c.params.id, b, c.ip)));
-  r.add('DELETE', '/api/finance/entries/:id', fin('finance:entry', (c) => C.deleteEntry(deps, c.user, c.params.id, c.ip)));
-  r.add('POST', '/api/finance/entries/:id/post', fin('finance:post', (c, b) => C.postEntry(deps, c.user, c.params.id, c.ip)));
-  r.add('POST', '/api/finance/entries/:id/reverse', finC('finance:post', (c, b) => C.reverseEntry(deps, c.user, c.params.id, b, c.ip)));
 
-  /* مسارات توافقية لدفتر اليومية /api/finance/journal */
+  /* دفتر اليومية */
   r.add('GET', '/api/finance/journal', fin('finance:read', (_c, _b, q) => C.listEntries(deps, q)));
   r.add('GET', '/api/finance/journal/:id', fin('finance:read', (c) => C.getEntry(deps, c.params.id)));
   r.add('POST', '/api/finance/journal', finC('finance:entry', (c, b) => C.createEntry(deps, c.user, b, c.ip)));
@@ -95,45 +87,11 @@ export async function registerFinance(r, deps, { writeXlsx }) {
     return { voucher: { id: entry.id, no: entry.no, amount: amt, kind: b?.kind } };
   }));
 
-  r.add('GET', '/api/finance/invoices', fin('finance:read', () => {
-    C.ready(db);
-    const rows = db.prepare(`SELECT e.id, e.no, e.type, e.entry_day, e.description,
-        (SELECT p.name FROM fin_lines l JOIN fin_parties p ON p.id=l.party_id WHERE l.entry_id=e.id LIMIT 1) party_name,
-        (SELECT COALESCE(SUM(l.debit),0) FROM fin_lines l WHERE l.entry_id=e.id) / 100.0 amount
-      FROM fin_entries e WHERE e.type='JV' AND e.reference LIKE 'INV-%' ORDER BY e.id DESC LIMIT 100`).all();
-    return {
-      invoices: rows.map((r) => ({
-        id: r.id,
-        no: r.no || `INV-${r.id}`,
-        kind: 'sale',
-        partyName: r.party_name || 'عميل أكاديمي',
-        issueDay: r.entry_day,
-        total: r.amount,
-        paidAmount: r.amount,
-        status: 'paid'
-      }))
-    };
-  }));
-
-  r.add('POST', '/api/finance/invoices', finC('finance:entry', (c, b) => {
-    C.ready(db);
-    const day = b?.issueDay || C.today();
-    const party = db.prepare('SELECT * FROM fin_parties WHERE id=?').get(Number(b?.partyId));
-    const pName = party?.name || 'جهة معتمدة';
-    const total = (b?.lines || []).reduce((s, l) => s + (Number(l.qty || 1) * Number(l.unitPrice || 0)), 0) || 100000;
-    const desc = `فاتورة ذمم: ${pName} — ${(b?.lines || [])[0]?.description || 'خدمات'}`;
-    const recAcc = C.sysAccount(db, 'students').id;
-    const revAcc = C.sysAccount(db, 'rev_tuition').id;
-    const lines = [
-      { accountId: recAcc, debit: total, credit: 0, partyId: party?.id ?? null, note: desc },
-      { accountId: revAcc, debit: 0, credit: total, partyId: party?.id ?? null, note: desc }
-    ];
-    const entry = C.createEntry(deps, c.user, { day, reference: `INV-${Date.now()}`, description: desc, lines, post: true }, c.ip, { type: 'JV', post: true, system: true });
-    return { invoice: { id: entry.id, no: entry.no, total, status: 'issued' } };
-  }));
-
-  r.add('POST', '/api/finance/invoices/:id/issue', fin('finance:entry', () => ({ ok: true })));
-  r.add('POST', '/api/finance/invoices/:id/cancel', fin('finance:entry', () => ({ ok: true })));
+  r.add('GET', '/api/finance/invoices', fin('finance:read', () => ({ invoices: I.listInvoices(deps) })));
+  r.add('POST', '/api/finance/invoices', finC('finance:entry', (c, b) => ({ invoice: I.createInvoice(deps, c.user, b, c.ip) })));
+  r.add('POST', '/api/finance/invoices/:id/issue', fin('finance:entry', (c) => ({ invoice: I.issueInvoice(deps, c.user, c.params.id, c.ip) })));
+  r.add('POST', '/api/finance/invoices/:id/cancel', fin('finance:entry', (c) => ({ invoice: I.cancelInvoice(deps, c.user, c.params.id, c.ip) })));
+  r.add('POST', '/api/finance/invoices/:id/pay', fin('finance:entry', (c, b) => ({ invoice: I.payInvoice(deps, c.user, c.params.id, b, c.ip) })));
 
   /* ---- الأطراف ---- */
   r.add('GET', '/api/finance/parties', fin('finance:read', (_c, _b, q) => {
@@ -272,7 +230,6 @@ export async function registerFinance(r, deps, { writeXlsx }) {
   r.add('GET', '/api/finance/payroll-months', fin('finance:read', () => F.payrollMonths(deps)));
   r.add('GET', '/api/finance/payroll-preview', fin('finance:read', (_c, _b, q) => F.payrollPreview(deps, q.month)));
   r.add('POST', '/api/finance/payroll-entry', fin('finance:post', (c, b) => F.payrollEntry(deps, c.user, b, c.ip)));
-  r.add('POST', '/api/finance/years/:id/close', fin('finance:setup', (c, b) => F.closeYear(deps, c.user, c.params.id, c.ip)));
 
   /* مسارات الرسوم الطلابية الإضافية لشاشة محاسبة الطلاب */
   r.add('GET', '/api/finance/fees/overview', fin('finance:read', () => {

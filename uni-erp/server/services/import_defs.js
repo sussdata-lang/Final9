@@ -99,10 +99,6 @@ const list = [
     columns: [req('course_code', 'رمز المقرر', 'code', { max: 30, example: 'SMPL-101' }), req('course_name', 'اسم المقرر', 'text', { max: 100, example: 'مقرر تجريبي' }), req('program_name', 'البرنامج', 'text', { max: 100, example: 'برنامج تجريبي' }),
       c('exam_type', 'نوع الامتحان', 'text', { max: 30, default: 'نهائي', example: 'نهائي' }), req('exam_date', 'التاريخ', 'date', { example: '2026-12-20' }), req('start_time', 'وقت البدء', 'time', { example: '09:00' }), req('end_time', 'وقت الانتهاء', 'time', { example: '11:00' }),
       req('hall_name', 'القاعة', 'text', { max: 60, example: 'القاعة 1' }), c('capacity', 'السعة', 'int', { min: 0, max: 5000, default: 60, example: 60 }), c('enrolled_count', 'المسجلون', 'int', { min: 0, max: 5000, default: 0, example: 40 }), req('proctor_name', 'المراقب', 'text', { max: 100, example: 'مراقب تجريبي' }), c('status', 'الحالة', 'text', { max: 30, default: 'مجدول' })] },
-  { kind: 'smart_schedule_slots', table: 'smart_schedule_slots', title: 'فترات الجدولة الذكية', group: 'academic', perm: 'import:academic', risk: 'low', key: [], stamp: NOW,
-    desc: 'فترات الجدول الذكي. لا يوجد مفتاح فريد، فإعادة الاستيراد تكرر الفترات.',
-    columns: [req('course_code', 'رمز المقرر', 'code', { max: 30, example: 'SMPL-101' }), req('course_name', 'اسم المقرر', 'text', { max: 100, example: 'مقرر تجريبي' }), req('faculty_name', 'الكلية', 'text', { max: 100, example: 'كلية تجريبية' }), req('instructor_name', 'المدرّس', 'text', { max: 100, example: 'د. مثال تجريبي' }),
-      req('hall_code', 'رمز القاعة', 'code', { max: 30, example: 'H-1' }), req('day_name', 'اليوم', 'text', { max: 20, example: 'الأحد' }), req('time_slot', 'الفترة', 'text', { max: 30, example: '09:00 - 11:00' }), c('section_code', 'الشعبة', 'text', { max: 30, default: 'شعبة 1' }), c('enrolled_count', 'المسجلون', 'int', { min: 0, max: 5000, default: 35 }), c('capacity', 'السعة', 'int', { min: 0, max: 5000, default: 60 }), c('status', 'الحالة', 'text', { max: 30, default: 'معتمد' })] },
   { kind: 'hr_lookups', table: 'hr_system_lookups', title: 'قوائم الموارد البشرية', group: 'hr', perm: 'import:hr', risk: 'low', key: ['category', 'label'],
     desc: 'قيم قوائم الموارد البشرية مثل المسميات وأنواع الإجازات. الأقسام تتبع هيكل الجامعة.',
     columns: [req('category', 'الفئة', 'enum', { options: { positions: ['المسميات'], emp_statuses: ['حالات الموظف'], contract_types: ['أنواع العقود'], leave_types: ['أنواع الإجازات'], absence_reasons: ['أسباب الغياب'], advance_statuses: ['حالات السلف'], contract_statuses: ['حالات العقود'] }, example: 'المسميات' }),
@@ -494,10 +490,31 @@ const list = [
 
   /* ---------- مالية الطلاب ---------- */
   { kind: 'student_fee_installments', table: 'student_fee_installments', title: 'أقساط الرسوم', group: 'student_fin', perm: 'import:student_fin', risk: 'high', key: ['installment_code'], deps: ['students'],
-    desc: 'أقساط رسوم الطلاب. الحالة تُحسب من المبلغ المسدد، والقسط المسدد بالكامل لا يُعدَّل.',
-    impactNote: 'المبالغ المسددة تظهر للطالب مباشرة في حساب أقساطه.',
+    desc: 'أقساط رسوم الطلاب. كل صف يُنشئ استحقاقاً مالياً، والمبلغ المسدد يُنشئ دفعة. الحالة تُحسب من المبلغ المسدد، والقسط المسدد بالكامل لا يُعدَّل.',
+    impactNote: 'كل صف يُرحَّل قيداً محاسبياً، والمبالغ تظهر في رصيد الطالب.',
     protect: (row) => (Number(row.paid_at) ? 'هذا القسط مسدد ولا يُعدَّل من الاستيراد.' : null),
-    validate: (v, row) => (Number(v.paid_amount ?? row?.paid_amount ?? 0) > Number(v.amount ?? row?.amount) ? 'المبلغ المسدد أكبر من قيمة القسط.' : null),
+    validate: (v, row, ctx) => {
+      if (Number(v.paid_amount ?? row?.paid_amount ?? 0) > Number(v.amount ?? row?.amount)) return 'المبلغ المسدد أكبر من قيمة القسط.';
+      if (row) return null;
+      return openYear(ctx, String(v.due_date).slice(0, 10)) || (ctx.db.prepare("SELECT 1 AS x FROM fin_fee_types WHERE kind = 'fee' AND active = 1 LIMIT 1").get() ? null : 'عرّف نوع رسم في المالية قبل استيراد الأقساط.');
+    },
+    createRow: ({ deps, actor, values, ip }) => {
+      const { db } = deps, cols = Object.keys(values), q = (k) => `"${k}"`;
+      const id = Number(db.prepare(`INSERT INTO student_fee_installments (${cols.map(q).join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`).run(...cols.map((k) => values[k])).lastInsertRowid);
+      const stu = db.prepare("SELECT id FROM users WHERE student_no = ? AND role = 'student'").get(values.student_no);
+      if (!stu) throw new Error('لا يوجد حساب طالب بهذا الرقم الجامعي.');
+      const fee = db.prepare("SELECT id FROM fin_fee_types WHERE kind = 'fee' AND active = 1 ORDER BY id LIMIT 1").get();
+      const charge = createCharge(deps, actor, { studentId: stu.id, feeTypeId: fee.id, amount: values.amount, dueDay: String(values.due_date).slice(0, 10), note: `قسط ${values.installment_code}` }, ip);
+      const paid = Number(values.paid_amount) > 0 ? createPayment(deps, actor, { studentId: stu.id, amount: values.paid_amount, note: `قسط ${values.installment_code}` }, ip) : null;
+      db.prepare('UPDATE student_fee_installments SET fin_charge_id = ?, fin_payment_id = ? WHERE id = ?').run(charge.id, paid?.payment.id ?? null, id);
+      return id;
+    },
+    revertRow: ({ deps, actor, id, ip }) => {
+      const { db } = deps, row = db.prepare('SELECT fin_charge_id, fin_payment_id FROM student_fee_installments WHERE id = ?').get(id);
+      if (row?.fin_payment_id) voidPayment(deps, actor, row.fin_payment_id, { reason: 'تراجع عن دفعة استيراد' }, ip);
+      if (row?.fin_charge_id) voidCharge(deps, actor, row.fin_charge_id, { reason: 'تراجع عن دفعة استيراد' }, ip);
+      db.prepare('DELETE FROM student_fee_installments WHERE id = ?').run(id);   // القيود تُعكس وتبقى، أما القسط نفسه فليس قيداً
+    },
     derive: (v, row) => {
       const amount = Number(v.amount ?? row?.amount), paid = Number(v.paid_amount ?? row?.paid_amount ?? 0);
       v.paid_amount = paid;
@@ -550,11 +567,6 @@ const list = [
       db.prepare('DELETE FROM sa_scholarships WHERE id = ?').run(id);
     },
     columns: [req('grant_no', 'رقم المنحة', 'code', { max: 30, example: 'SCH-SMPL-1' }), studentFk(), req('scholarship_type', 'نوع المنحة', 'text', { max: 60, example: 'تفوق أكاديمي' }), req('discount_percent', 'نسبة الحسم', 'num', { min: 0, max: 100, example: 50 }), req('amount', 'قيمة المنحة', 'num', { min: 0.01, max: 1e13, example: 750000 }), c('academic_year', 'العام الدراسي', 'text', { max: 20, default: '2026/2027', example: '2026/2027' }), c('gpa_at_grant', 'المعدل عند المنح', 'num', { min: 0, max: 100 }), c('note', 'ملاحظة', 'text', { max: 200 })] },
-  { kind: 'scholarships', table: 'scholarships', title: 'سجل المنح الإداري', group: 'student_fin', perm: 'import:student_fin', risk: 'medium', key: ['student_no', 'scholarship_type', 'academic_year'], deps: ['students'], stamp: NOW,
-    desc: 'السجل الإداري للمنح في شاشة السكن والمنح. لا يُنشئ قيوداً مالية.',
-    columns: [studentNoFk(), req('program_name', 'البرنامج', 'text', { max: 120, example: 'برنامج تجريبي' }), req('scholarship_type', 'نوع المنحة', 'text', { max: 80, example: 'تفوق أكاديمي' }), c('discount_percent', 'نسبة الحسم', 'int', { min: 0, max: 100, default: 50, example: 50 }), c('amount_covered', 'المبلغ المغطى', 'num', { min: 0, max: 1e13, default: 0, example: 0 }), c('academic_year', 'العام الدراسي', 'text', { max: 20, default: '2026/2027', example: '2026/2027' }), c('status', 'الحالة', 'text', { max: 30, default: 'مفعّلة' })] },
-
-  /* ---------- الخريجون والبحث والأنشطة ---------- */
   { kind: 'alumni_records', table: 'alumni_records', title: 'سجل الخريجين', group: 'misc', perm: 'import:misc', risk: 'low', key: ['student_no'], stamp: NOW,
     desc: 'الخريجون، ومنهم من ليس له حساب في النظام. رمز التوثيق يُولَّد تلقائياً.',
     derive: (v, row) => { if (!row) v.verified_code = `GRAD-${v.grad_year}-${String(v.student_no).replace(/[^A-Za-z0-9]/g, '')}`; },
@@ -577,7 +589,24 @@ const list = [
     columns: [req('club_name', 'النادي', 'text', { max: 100, example: 'نادي تجريبي' }), req('title', 'العنوان', 'text', { max: 150, example: 'نشاط تجريبي' }), c('category', 'الفئة', 'text', { max: 40, default: 'علمي', example: 'علمي' }), req('event_date', 'التاريخ', 'date', { example: '2026-12-10' }), req('location', 'المكان', 'text', { max: 100, example: 'القاعة 1' }), req('supervisor_name', 'المشرف', 'text', { max: 100, example: 'د. مثال تجريبي' }), c('participants_count', 'المشاركون', 'int', { min: 0, max: 100000, default: 0, example: 25 }), c('budget', 'الميزانية', 'num', { min: 0, max: 1e13, default: 0 }), c('status', 'الحالة', 'text', { max: 30, default: 'قادم' })] },
 
   /* ---------- السكن والمكتبة ---------- */
+  { kind: 'dorm_buildings', table: 'dorm_buildings', title: 'مباني السكن', group: 'misc', perm: 'import:misc', risk: 'low', key: ['name'], stamp: NOW,
+    desc: 'مباني السكن الجامعي وقسم كل مبنى (ذكور أو إناث). تُستورد قبل الغرف.',
+    columns: [req('name', 'اسم المبنى', 'text', { max: 100, example: 'مبنى تجريبي' }), req('gender', 'القسم', 'enum', { options: { 'ذكور': ['ذكور'], 'إناث': ['إناث'] }, example: 'ذكور' }), c('notes', 'ملاحظات', 'text', { max: 300, example: 'مبنى جديد' })] },
+  { kind: 'housing_handouts', table: 'housing_handouts', title: 'مواد السكن المسلمة', group: 'misc', perm: 'import:misc', risk: 'low', key: ['handout_no'], deps: ['students'], stamp: NOW,
+    desc: 'المواد المسلمة لطلاب السكن. اكتب أسماء المواد مفصولة بفاصلة كما في قائمة الإعدادات العامة، وأضف ×2 بعد الاسم للكمية.',
+    derive: (v, row, ctx, side) => {
+      const allowed = new Set(getSetting(ctx.db, 'housing.supply_items'));
+      const items = String(side.items ?? '').split(/[,،]/).map((s) => s.trim()).filter(Boolean).map((s) => { const m = s.match(/^(.*?)\s*[×x]\s*(\d+)$/); return { name: m ? m[1].trim() : s, qty: m ? Number(m[2]) : 1, serial: '' }; });
+      if (!items.length) fail('اكتب مادة واحدة على الأقل.');
+      for (const it of items) if (!allowed.has(it.name)) fail(`«${it.name}» ليست في قائمة المواد في الإعدادات العامة.`);
+      v.items_json = JSON.stringify(items);
+      const place = ctx.db.prepare("SELECT r.building_name, r.room_no FROM dorm_allocations a JOIN dorm_rooms r ON r.id = a.room_id WHERE a.student_no = ? AND a.status = 'ساكن' LIMIT 1").get(v.student_no);
+      v.room_label = place ? `${place.building_name} / ${place.room_no}` : '';
+      v.faculty_name = ctx.db.prepare('SELECT g.faculty AS f FROM users u JOIN student_profiles p ON p.user_id = u.id JOIN programs g ON g.id = p.program_id WHERE u.student_no = ?').get(v.student_no)?.f ?? '';
+    },
+    columns: [req('handout_no', 'رقم السجل', 'code', { max: 40, example: 'HND-SMPL-1' }), studentNoFk(), req('items', 'المواد', 'text', { max: 1000, sideOnly: true, example: 'سرير، فرشة، كمبيوتر محمول' }), req('handed_day', 'تاريخ التسليم', 'date', { example: '2026-10-01' }), c('returned_day', 'تاريخ الإرجاع', 'date'), c('note', 'ملاحظات', 'text', { max: 300, example: 'تسليم أولي' }), c('handed_by', 'المسلِّم', 'text', { max: 100, example: 'أمين السكن' })] },
   { kind: 'dorm_rooms', table: 'dorm_rooms', title: 'غرف السكن', group: 'misc', perm: 'import:misc', risk: 'low', key: ['building_name', 'room_no'],
+    deps: ['dorm_buildings'],
     desc: 'غرف السكن الجامعي. عدد الساكنين يأتي من الإسكان لا من الملف.',
     validate: (v, row) => (row && v.capacity !== undefined && v.capacity < Number(row.occupied) ? 'السعة أقل من عدد الساكنين الحاليين.' : null),
     derive: (v, row) => { if (!row) v.occupied = 0; },
@@ -635,11 +664,23 @@ const list = [
 
   /* ---------- التعلم الإلكتروني ---------- */
   { kind: 'lms_lectures', table: 'lms_lectures', title: 'المحاضرات الإلكترونية', group: 'misc', perm: 'import:misc', risk: 'low', key: ['course_code', 'title'], stamp: NOW,
-    desc: 'بيانات المحاضرات وروابطها. الملفات نفسها لا تُرفع من هنا.',
-    columns: [req('course_code', 'رمز المقرر', 'code', { max: 30, example: 'SMPL-101' }), req('course_name', 'اسم المقرر', 'text', { max: 100, example: 'مقرر تجريبي' }), req('title', 'العنوان', 'text', { max: 160, example: 'محاضرة تجريبية' }), c('kind_type', 'النوع', 'enum', { to: 'kind', options: { pdf: ['ملف PDF'], video: ['فيديو'], slides: ['عرض تقديمي'], assignment: ['تكليف'] }, default: 'pdf', example: 'ملف PDF' }), c('week_no', 'الأسبوع', 'int', { min: 1, max: 60, default: 1, example: 1 }), req('instructor_name', 'المدرّس', 'text', { max: 100, example: 'د. مثال تجريبي' }), c('content_url', 'الرابط', 'latin', { max: 300, pattern: /^(https?:\/\/|\/)\S*$/, patternMsg: 'رابط يبدأ بـ https:// أو /' }), c('summary', 'الملخص', 'text', { max: 400 }), bool('published', 'منشور', { default: 1, example: 'نعم' })] },
+    desc: 'بيانات المحاضرات وروابطها والجهة المستهدفة. الملفات نفسها لا تُرفع من هنا.',
+    columns: [c('target_faculty', 'الكلية المستهدفة', 'text', { max: 120 }), req('course_code', 'رمز المقرر', 'code', { max: 30, example: 'SMPL-101' }), req('course_name', 'اسم المقرر', 'text', { max: 100, example: 'مقرر تجريبي' }), req('title', 'العنوان', 'text', { max: 160, example: 'محاضرة تجريبية' }), c('kind_type', 'النوع', 'enum', { to: 'kind', options: { pdf: ['ملف PDF'], video: ['فيديو'], slides: ['عرض تقديمي'], assignment: ['تكليف'] }, default: 'pdf', example: 'ملف PDF' }), c('week_no', 'الأسبوع', 'int', { min: 1, max: 60, default: 1, example: 1 }), req('instructor_name', 'المدرّس', 'text', { max: 100, example: 'د. مثال تجريبي' }), c('content_url', 'الرابط', 'latin', { max: 300, pattern: /^(https?:\/\/|\/)\S*$/, patternMsg: 'رابط يبدأ بـ https:// أو /' }), c('summary', 'الملخص', 'text', { max: 400 }), bool('published', 'منشور', { default: 1, example: 'نعم' })] },
   { kind: 'lms_quizzes', table: 'lms_quizzes', title: 'اختبارات التعلم الإلكتروني', group: 'misc', perm: 'import:misc', risk: 'low', key: ['course_code', 'title'], stamp: NOW,
     desc: 'بنك الأسئلة. الأسئلة قائمة JSON وكل سؤال فيه q وoptions وans (رقم الخيار الصحيح من الصفر).',
     columns: [req('course_code', 'رمز المقرر', 'code', { max: 30, example: 'SMPL-101' }), req('course_name', 'اسم المقرر', 'text', { max: 100, example: 'مقرر تجريبي' }), req('title', 'العنوان', 'text', { max: 150, example: 'اختبار تجريبي' }), c('duration_min', 'المدة بالدقائق', 'int', { min: 1, max: 600, default: 30, example: 30 }), c('total_marks', 'الدرجة الكلية', 'int', { min: 1, max: 1000, default: 20, example: 20 }), req('questions', 'الأسئلة', 'questions', { to: 'questions_json', answerKey: 'ans', example: '[{"q":"سؤال تجريبي","options":["أ","ب"],"ans":0}]' }), bool('published', 'منشور', { default: 1, example: 'نعم' })] },
+  { kind: 'lms_quiz_questions', table: 'lms_quiz_questions', title: 'أسئلة الاختبارات', group: 'misc', perm: 'import:misc', risk: 'low', key: ['quiz_id', 'position'], deps: ['lms_quizzes'],
+    desc: 'أسئلة الاختبار سطراً لكل سؤال. الخيارات تفصل بينها العلامة | والإجابة الصحيحة رقم الخيار من 1، وللمتعدد أرقام بفاصلة. السؤال النظري بلا خيارات.',
+    derive: (v, row, ctx, side) => {
+      const options = String(side.options ?? '').split('|').map((s) => s.trim()).filter(Boolean);
+      const correct = String(side.correct ?? '').split(/[,،]/).map((s) => Number(s.trim()) - 1).filter((n) => n >= 0);
+      if (v.type === 'essay') { v.options_json = '[]'; v.correct_json = '[]'; return; }
+      if (options.length < 2) fail('أضف خيارين على الأقل تفصل بينهما العلامة |');
+      if (!correct.length || correct.some((n) => n >= options.length)) fail('رقم الإجابة الصحيحة خارج الخيارات.');
+      if (v.type === 'single' && correct.length !== 1) fail('اختيار واحد يعني إجابة صحيحة واحدة.');
+      v.options_json = JSON.stringify(options); v.correct_json = JSON.stringify(correct);
+    },
+    columns: [req('quiz_title', 'عنوان الاختبار', 'fk', { to: 'quiz_id', fk: { table: 'lms_quizzes', by: ['title'], hint: 'عنوان الاختبار' }, example: 'اختبار تجريبي' }), req('position', 'رقم السؤال', 'int', { min: 1, max: 500, example: 1 }), req('type', 'النوع', 'enum', { options: { single: ['اختيار واحد'], multi: ['اختيار متعدد'], essay: ['نظري'] }, example: 'اختيار واحد' }), req('text', 'نص السؤال', 'text', { max: 2000, example: 'سؤال تجريبي' }), c('options', 'الخيارات', 'text', { max: 2000, sideOnly: true, example: 'أ|ب|ج' }), c('correct', 'الإجابة الصحيحة', 'text', { max: 40, sideOnly: true, example: '1' }), req('marks', 'العلامة', 'num', { min: 0.25, max: 1000, example: 2 })] },
 ];
 
 export const IMPORT_GROUPS = { academic: 'الأكاديمي والهيكل', students: 'الطلاب والقبول', procurement: 'المشتريات والمخزون', finance: 'المالية', hr: 'الموارد البشرية', student_fin: 'مالية الطلاب', misc: 'متفرقات' };

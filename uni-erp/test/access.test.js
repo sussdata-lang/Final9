@@ -93,7 +93,7 @@ test('دور مخصّص: ينشئه المدير ويُسنَد لحساب فت�
   const l = await loginAs('log1', 'Temp#Pass2026x');
   assert.equal(l.user.mustChange, true);                                                                  // كلمة مؤقتة: يُلزَم بتغييرها
   assert.equal(l.user.roleLabel, 'مسؤول لوجستي'); assert.equal(l.user.unit.name, 'القسم اللوجستي');
-  assert.deepEqual([...l.user.permissions].sort(), ['request:decide', 'request:forward', 'request:read_unit', 'stats:read']);
+  assert.deepEqual([...l.user.permissions].sort(), ['request:decide', 'request:forward', 'request:read_unit', 'staffatt:self', 'stats:read']);
   assert.equal((await api('POST', '/api/auth/change-password', { cookie: l.cookie, body: { current: 'Temp#Pass2026x', next: 'Fresh#Pass2026y' } })).status, 200);
   const l2 = await loginAs('log1', 'Fresh#Pass2026y');
   for (const [m, u] of [['GET', '/api/admin/access'], ['GET', '/api/students'], ['GET', '/api/audit'], ['GET', '/api/admin/users']]) assert.equal((await api(m, u, { cookie: l2.cookie })).status, 403, u);
@@ -231,7 +231,7 @@ test('تعديل الدور المخصّص يسري فوراً على جلسات
   assert.ok(!l2.user.permissions.includes('request:decide'));
   assert.equal((await api('DELETE', '/api/admin/roles/logistics_officer', { cookie: admin })).status, 409);
   assert.equal((await api('PUT', '/api/admin/roles/logistics_officer', { cookie: admin, body: { active: false } })).status, 200);
-  assert.deepEqual((await loginAs('log2')).user.permissions, []);                                                                     // دور معطَّل = بلا صلاحيات
+  assert.deepEqual((await loginAs('log2')).user.permissions, ['staffatt:self']);                                                                     // دور معطَّل = تسجيل الحضور فقط
   assert.equal((await api('PUT', '/api/admin/roles/admin', { cookie: admin, body: { label: 'x' } })).status, 404);                    // الأساسية ثابتة
   assert.equal((await api('POST', '/api/admin/roles', { cookie: admin, body: { key: 'empty_role', label: 'فارغ', permissions: ['stats:read'] } })).status, 201);
   assert.equal((await api('DELETE', '/api/admin/roles/empty_role', { cookie: admin })).status, 200);

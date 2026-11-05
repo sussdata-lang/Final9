@@ -1,1 +1,0 @@
-INSERT INTO smart_schedule_slots (course_code, course_name, faculty_name, instructor_name, hall_code, day_name, time_slot, section_code, enrolled_count, capacity, status) VALUES ('SMPL-101', 'مقرر تجريبي', 'كلية تجريبية', 'د. مثال تجريبي', 'H-1', 'الأحد', '09:00 - 11:00', NULL, NULL, NULL, NULL);

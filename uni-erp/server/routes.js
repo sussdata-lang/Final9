@@ -1,3 +1,5 @@
+import { registerHousingRoutes } from './services/housing.js';
+import { IDEMPOTENT_ROUTES, withIdempotency } from './services/idempotency.js';
 import { log } from './lib/logger.js';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -24,7 +26,7 @@ import { deskSummary } from './services/desk.js';
 import { listSettings, saveSettings, resetSettings, publicLimits } from './services/settings.js';
 import { punch, myAttendance, dayReport, exportMonth, listBalances, setEntitlement, getHrSettings, saveHrSettings } from './services/staffatt.js';
 import { IMPORT_PERM } from './services/importer.js';
-import { cardOptions, cardStudents, listCardBatches, createCardBatch, cardBatchDetail, cardBatchXlsx, markCardReceived, undoCardReceived } from './services/cards.js';
+import { cardOptions, cardStudents, listCardBatches, createCardBatch, cardBatchDetail, cardBatchXlsx, markCardReceived, undoCardReceived, cardCertificates } from './services/cards.js';
 import { stagedImport, stagedRequestsImport } from './services/import_staged.js';
 import { importCatalog, checkImport, commitImport, cancelImport, listBatches, undoBatch, importTemplate } from './services/import_engine.js';
 import { addStudentFile, listStudentFiles, deleteStudentFile, streamStudentFile } from './services/studentfiles.js';
@@ -43,10 +45,10 @@ import { documentPdf } from './services/docpdf.js';
 import { issueEnrollmentCertificate, certFor, certSummary, readCertPdf, verifyEnrollment, verifyByHash, publicBase } from './services/enrollcert.js';
 import { qrSvg } from './qr.js';
 import { overview, createRole, updateRole, deleteRole, createUnit, updateUnit, deleteUnit, createLink, deleteLink, linkedTargets, matrixXlsx } from './services/access.js';
-import { registrationOptions, registerStudent, listStudents, listStudentsTable, getStudent, updateStudent, resetStudentPassword, myProfile, updateOwnContact, listPrograms, addProgram, toggleProgram, listFaculties, addFaculty, toggleFaculty, updateFaculty, deleteFaculty, updateProgram, deleteProgram, deleteStudent } from './services/students.js';
+import { registrationOptions, registerStudent, listStudents, listStudentsTable, getStudent, updateStudent, resetStudentPassword, myProfile, updateOwnContact, listPrograms, addProgram, toggleProgram, listFaculties, addFaculty, toggleFaculty, updateFaculty, deleteFaculty, updateProgram, deleteProgram, deleteStudent, assertStudentInScope } from './services/students.js';
 import { listCourses, listGradesTable, createCourse, toggleCourse, updateCourse, deleteCourse, myGrades, gradesFor, enterGrade, deleteGrade, listNews, createNews, updateNews, deleteNews, createComplaint, listComplaints, respondComplaint, deleteComplaint } from './services/academics.js';
 import { transitionGrades, gradeHistory, workflowOn, setWorkflow, myCourseGrades } from './services/workflow.js';
-import { getSlots, setSlots, detectScheduleConflicts, studentTimetable, DAYS } from './services/schedule.js';
+import { getSlots, setSlots, addSlot, detectScheduleConflicts, studentTimetable, DAYS } from './services/schedule.js';
 import { getUnifiedStudentRecord } from './services/record360.js';
 import { expandFields, requesterKind, createRequest, listRequests, getRequest, decide, forwardRequest, stats, readAttachment } from './services/requests.js';
 import { getDocument, verifyPublic } from './services/documents.js';
@@ -60,6 +62,9 @@ const needAny = (ctx, ...perms) => { if (!perms.some((p) => ctx.user.can(p))) th
 export async function buildRouter(deps) {
   const { db, cfg, limiter } = deps;
   const r = new Router();
+  // حساب نطاقه كلية لا يصل إلى طالب من خارجها في أي مسار على ملف الطالب
+  const addRoute = r.add.bind(r);
+  r.add = (method, pattern, rawHandler, opts, handler = IDEMPOTENT_ROUTES.has(`${method} ${pattern}`) ? withIdempotency(db, rawHandler) : rawHandler) => addRoute(method, pattern, pattern.startsWith('/api/students/:id') ? (c) => { assertStudentInScope(deps, c.user, c.params.id); return handler(c); } : handler, opts);
   const cookie = (token, maxAge) => `sid=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${cfg.cookieSecure ? '; Secure' : ''}`;
 
   // ---- الهوية ----
@@ -68,6 +73,7 @@ export async function buildRouter(deps) {
     c.json(200, { user: out.user, token: out.token }, { 'Set-Cookie': cookie(out.token, out.maxAge) });
   }, { auth: false });
   registerStudentGroupRoutes(r, deps);
+  registerHousingRoutes(r, deps, { need, needAny });
   // تبديل الحساب للتجربة المحلية: لا يُسجَّل إلا مع DEMO_MODE=1 وخادم مربوط بعنوان محلي.
   // لا تضعه تحت /api/dev/: جدار الحماية يعدّ /dev/ مسار اختراق ويحظر العنوان.
   if (devSwitchEnabled(cfg.host)) {
@@ -133,6 +139,7 @@ export async function buildRouter(deps) {
   r.add('POST', '/api/grades/workflow-setting', (c) => { need(c, 'grade:approve'); c.json(200, setWorkflow(deps, c.user, !!c.body?.enabled, c.ip)); });
   r.add('GET', '/api/courses/:id/schedule', (c) => { need(c, 'course:manage'); c.json(200, { slots: getSlots(db, c.params.id), days: DAYS }); });
   r.add('PUT', '/api/courses/:id/schedule', (c) => { need(c, 'course:manage'); c.json(200, setSlots(deps, c.user, c.params.id, c.body?.slots, c.ip)); });
+  r.add('POST', '/api/courses/:id/schedule/slots', (c) => { needAny(c, 'course:manage', 'attendance:manage'); c.json(201, addSlot(deps, c.user, c.params.id, c.body, c.ip)); });
   r.add('GET', '/api/me/timetable', (c) => { c.json(200, { slots: c.user.role === 'student' ? studentTimetable(db, c.user.id) : [] }); });
   r.add('GET', '/api/students/:id/schedule-conflicts', (c) => {
     if (!c.user.can('student:read') && c.params.id !== String(c.user.id)) throw new HttpError(403, 'لا تملك صلاحية هذا الإجراء.', 'forbidden');
@@ -159,7 +166,7 @@ export async function buildRouter(deps) {
   // ---- تسجيل الطلاب (شؤون الطلاب) ----
   r.add('GET', '/api/registration/options', (c) => { need(c, 'student:register'); c.json(200, registrationOptions(db, c.user.can('program:manage'))); });
   r.add('POST', '/api/students', async (c) => { need(c, 'student:register'); c.json(201, await registerStudent(deps, c.user, c.body, c.ip)); });
-  r.add('GET', '/api/students', (c) => { need(c, 'student:read'); c.json(200, listStudents(deps, c.query)); });
+  r.add('GET', '/api/students', (c) => { needAny(c, 'student:read', 'student:lookup'); c.json(200, listStudents(deps, c.query, { user: c.user, lookupOnly: !c.user.can('student:read') })); });
   r.add('POST', '/api/attendance/scan', (c) => { need(c, 'attendance:manage'); c.json(200, hallScan(deps, c.user, c.body, c.ip)); });
   r.add('GET', '/api/attendance', (c) => { need(c, 'attendance:manage'); c.json(200, listLogs(deps, c.query)); });
   r.add('GET', '/api/attendance/open', (c) => { need(c, 'attendance:manage'); c.json(200, { logs: openLogs(deps) }); });
@@ -181,7 +188,7 @@ export async function buildRouter(deps) {
   });
   r.add('POST', '/api/admin/backups/:name/verify', async (c) => { need(c, 'backup:manage'); c.json(200, await deps.heavy.run('verifyBackup', c, [c.params.name, c.ip], { writes: true })); });
   r.add('DELETE', '/api/admin/backups/:name', (c) => { need(c, 'backup:manage'); deleteBackup(deps, c.user, c.params.name, c.ip); c.json(200, { ok: true }); });
-  r.add('GET', '/api/students-table', (c) => { need(c, 'student:read'); c.json(200, listStudentsTable(deps, c.query)); });
+  r.add('GET', '/api/students-table', (c) => { need(c, 'student:read'); c.json(200, listStudentsTable(deps, c.query, { user: c.user })); });
   r.add('GET', '/api/students/:id/files', (c) => { need(c, 'student:read'); getStudent(deps, c.params.id); c.json(200, { files: listStudentFiles(db, c.params.id) }); });
   r.add('POST', '/api/students/:id/files', (c) => {
     if (!c.user.can('student:register') && !c.user.can('student:update')) throw new HttpError(403, 'لا تملك صلاحية هذا الإجراء.', 'forbidden');
@@ -223,10 +230,11 @@ export async function buildRouter(deps) {
     const b = c.body || {};
     const s = getStudent(deps, sid);
     const method = b.method === 'barcode' ? 'barcode' : 'nfc';
-    const eventType = b.eventType || 'check_in';
-    const locName = b.locationName || 'البوابة الرئيسية — الحرم المركزي';
-    const locCode = b.locationCode || 'GATE-MAIN-01';
-    const terminalId = b.terminalId || (method === 'nfc' ? 'TRM-NFC-A1' : 'SCAN-BC-04');
+    const eventType = ['check_in', 'check_out', 'denied'].includes(b.eventType) ? b.eventType : null;
+    const locName = String(b.locationName ?? '').trim().slice(0, 120);
+    const locCode = String(b.locationCode ?? '').trim().slice(0, 40);
+    if (!eventType || !locName || !locCode) throw new HttpError(400, 'نوع الحركة والموقع مطلوبان.', 'validation');
+    const terminalId = String(b.terminalId ?? '').trim().slice(0, 40) || 'MANUAL';
     const status = b.status === 'denied' ? 'denied' : 'granted';
     const reason = b.reason || (status === 'granted' ? 'تصريح دخول نظامي ساري المفعول' : 'محاولة دخول غير مصرحة');
     const now = Date.now();
@@ -263,6 +271,7 @@ export async function buildRouter(deps) {
   // تصدير البطاقات دفعة واحدة وجدول استلامها
   r.add('GET', '/api/cards/options', (c) => { need(c, 'student:read'); c.json(200, cardOptions(db)); });
   r.add('GET', '/api/cards/students', (c) => { need(c, 'student:read'); c.json(200, cardStudents(deps, c.query)); });
+  r.add('POST', '/api/cards/certificates', async (c) => { need(c, 'student:read'); need(c, 'student:reset_password'); c.json(200, await cardCertificates(deps, c.user, c.body, c.ip)); });
   r.add('GET', '/api/cards/batches', (c) => { need(c, 'student:read'); c.json(200, { batches: listCardBatches(deps) }); });
   r.add('POST', '/api/cards/batches', async (c) => { need(c, 'student:update'); c.json(201, await deps.heavy.run('createCardBatch', c, [c.body, c.ip], { writes: true })); });
   r.add('GET', '/api/cards/batches/:id', (c) => { need(c, 'student:read'); c.json(200, cardBatchDetail(deps, c.params.id)); });

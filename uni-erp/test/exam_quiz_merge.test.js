@@ -6,6 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { createApp } from '../server/app.js';
 import { hashPassword } from '../server/security.js';
+import { audit, verifyAuditChain, purgeAuditLog } from '../server/audit.js';
+import { getSetting } from '../server/services/settings.js';
 
 const PW = 'Merge#Pass12345';
 let app, base, adm, stud;
@@ -36,7 +38,7 @@ test('الاختبارات في جدول واحد، ولكل طالب محاول
 
   const forStudent = await (await call(stud, 'GET', '/api/lms/overview')).json();
   assert.ok(!forStudent.quizzes.some((q) => q.title === 'مغلق'), 'المغلق لا يظهر للطالب');
-  assert.ok(forStudent.quizzes.every((q) => q.questions.every((x) => !('ans' in x)) && !q.questions_json), 'لا إجابات للطالب');
+  assert.ok(forStudent.quizzes.every((q) => q.questions.every((x) => !('correct' in x)) && !q.questions_json), 'لا إجابات للطالب');
 
   // السؤال المتروك لا يُحسب صحيحاً حتى لو كان الجواب الصحيح هو الخيار الأول
   const r = await (await call(stud, 'POST', `/api/lms/quizzes/${openId}/submit`, { answers: [null, 1] })).json();
@@ -126,4 +128,152 @@ test('رقم جامعي غير موجود يعيد رسالة مفهومة لا 
   const r = await call(adm, 'POST', '/api/expansions/office-bookings', { faculty_name: 'د', student_name: 'ط', student_no: 'NO-SUCH', topic: 'ت' });
   assert.equal(r.status, 400);
   assert.match((await r.json()).message, /الرقم الجامعي/);
+});
+
+test('المنح والجدول الدراسي في جدول واحد لكل منهما', async () => {
+  for (const t of ['scholarships', 'smart_schedule_slots']) assert.equal(app.db.prepare('SELECT to_regclass(?) AS t').get(`public.${t}`).t, null, t);
+  assert.equal((await call(adm, 'POST', '/api/expansions/scholarships', { student_no: 'MERGE-1' })).status, 404);
+  assert.equal((await call(adm, 'POST', '/api/enterprise/schedule', {})).status, 404);
+});
+
+test('إضافة موعد تمنع تضارب القاعة والمدرّس، ويظهر في الجدول الموحد', async () => {
+  const prog = app.db.prepare('SELECT id FROM programs ORDER BY id LIMIT 1').get().id;
+  const course = (code, instructor) => Number(app.db.prepare('INSERT INTO courses (program_id, level, semester, name, code, instructor) VALUES (?, 1, 1, ?, ?, ?)').run(prog, code, code, instructor).lastInsertRowid);
+  const a = course('SL-A', 'د. أ'), b = course('SL-B', 'د. ب'), c = course('SL-C', 'د. أ');
+  const add = (id, hall) => call(adm, 'POST', `/api/courses/${id}/schedule/slots`, { day: 2, start: '09:00', end: '11:00', hall });
+  assert.equal((await add(a, 'SL-H1')).status, 201);
+  const clash = await add(b, 'SL-H1');
+  assert.equal(clash.status, 409);
+  assert.match((await clash.json()).message, /قاعة/);
+  const teacher = await add(c, 'SL-H2');
+  assert.equal(teacher.status, 409);
+  assert.match((await teacher.json()).message, /مدرّس/);
+  assert.equal((await add(b, 'SL-H3')).status, 201);
+  assert.equal((await call(stud, 'POST', `/api/courses/${a}/schedule/slots`, { day: 3, start: '09:00', end: '10:00' })).status, 403);
+  const ov = await (await call(adm, 'GET', '/api/enterprise/overview')).json();
+  const row = ov.scheduleSlots.find((s) => s.course_code === 'SL-A');
+  assert.equal(row.hall_code, 'SL-H1');
+  assert.equal(row.time_slot, '09:00 - 11:00');
+  assert.equal(row.day_name, 'الاثنين');
+  assert.ok(ov.scheduleCourses.some((x) => x.code === 'SL-C'));
+});
+
+test('حامل البحث وحده يجد الاسم والرقم فقط، ولا يفتح الملف', async () => {
+  const hash = await hashPassword(PW, app.cfg.scryptN);
+  app.db.prepare("INSERT INTO users (username, display_name, password_hash, role, custom_permissions_json, access_mode, active, must_change_password, created_at) VALUES ('lk_user', 'بحث', ?, 'staff', ?, 'custom', 1, 0, ?)").run(hash, JSON.stringify(['student:lookup']), Date.now());
+  const prog = app.db.prepare('SELECT id, faculty FROM programs ORDER BY id LIMIT 1').get();
+  const sid = Number(app.db.prepare("SELECT id FROM users WHERE student_no = 'MERGE-1'").get().id);
+  app.db.prepare("INSERT INTO student_profiles (user_id, first_name, father_name, last_name, mother_name, national_id, gender, birth_date, birth_place, nationality, phone, email, governorate, city, address, hs_type, hs_year, hs_score, program_id, admission_type, enroll_year, enroll_term, study_level, status, guardian_name, guardian_relation, guardian_phone, created_by, created_at, updated_at) VALUES (?, 'مرج', 'أب', 'طالب', 'أم', '09988776655', 'ذكر', '2005-01-01', 'دمشق', 'سورية', '0944556677', 'm@x.y', 'دمشق', 'م', 'ع', 'علمي', 2025, 2000, ?, 'عام', 2026, 'الفصل الأول', 1, 'active', 'أب', 'أب', '0944000000', 1, ?, ?)").run(sid, prog.id, Date.now(), Date.now());
+  const lk = await login('lk_user');
+  const r = await (await call(lk, 'GET', '/api/students?q=MERGE-1')).json();
+  assert.equal(r.students.length, 1);
+  assert.equal(r.students[0].studentNo, 'MERGE-1');
+  assert.ok(!('nationalId' in r.students[0]) && !('phone' in r.students[0]) && !('national_id' in r.students[0]), JSON.stringify(r.students[0]));
+  assert.equal((await (await call(lk, 'GET', '/api/students?q=0944556677')).json()).students.length, 0, 'لا بحث بالهاتف');
+  assert.equal((await call(lk, 'GET', `/api/students/${sid}`)).status, 403);
+
+  // حساب نطاقه كلية يرى طلابها فقط
+  app.db.prepare("INSERT INTO users (username, display_name, password_hash, role, custom_permissions_json, access_mode, data_scope, scope_faculty, active, must_change_password, created_at) VALUES ('fac_same', 'ك', ?, 'staff', ?, 'custom', 'faculty', ?, 1, 0, ?)").run(hash, JSON.stringify(['student:read']), prog.faculty, Date.now());
+  app.db.prepare("INSERT INTO users (username, display_name, password_hash, role, custom_permissions_json, access_mode, data_scope, scope_faculty, active, must_change_password, created_at) VALUES ('fac_other', 'ك', ?, 'staff', ?, 'custom', 'faculty', 'كلية أخرى', 1, 0, ?)").run(hash, JSON.stringify(['student:read']), Date.now());
+  const same = await login('fac_same'), other = await login('fac_other');
+  assert.equal((await call(same, 'GET', `/api/students/${sid}`)).status, 200);
+  assert.equal((await call(other, 'GET', `/api/students/${sid}`)).status, 404);
+  assert.equal((await call(other, 'GET', `/api/students/${sid}/grades`)).status, 404);
+  assert.ok((await (await call(same, 'GET', '/api/students')).json()).students.some((s) => s.studentNo === 'MERGE-1'));
+  assert.equal((await (await call(other, 'GET', '/api/students')).json()).students.length, 0);
+  assert.equal((await (await call(other, 'GET', '/api/students-table')).json()).rows?.length ?? 0, 0);
+});
+
+test('قسيمة الراتب موقعة فعلياً، وأي تعديل يبطل توقيعها', async () => {
+  const r = await (await call(adm, 'POST', '/api/enterprise/payslips/issue', { employee_name: 'موظف', basic_salary: 1000.5, overload_pay: 10 })).json();
+  assert.match(r.digital_signature, /^RSA-SHA256:/);
+  const v = await (await call(adm, 'GET', `/api/enterprise/payslips/${r.payslip_code}/verify`)).json();
+  assert.equal(v.valid, true);
+  app.db.prepare('UPDATE hr_signed_payslips SET net_salary = 999999 WHERE payslip_code = ?').run(r.payslip_code);
+  assert.equal((await (await call(adm, 'GET', `/api/enterprise/payslips/${r.payslip_code}/verify`)).json()).valid, false);
+  assert.equal((await call(adm, 'GET', '/api/enterprise/payslips/NO-SUCH/verify')).status, 404);
+  assert.equal((await call(stud, 'GET', `/api/enterprise/payslips/${r.payslip_code}/verify`)).status, 403);
+});
+
+test('الإشعار يُحصى بعدد الأجهزة المشتركة فعلاً', async () => {
+  const j = await (await call(adm, 'POST', '/api/enterprise/notifications/broadcast', { title: 'NOTE-S', body: 'x', audience: 'students' })).json();
+  assert.equal(j.devices, 0);
+  const row = app.db.prepare("SELECT channels, target_audience FROM multi_channel_notifications WHERE title = 'NOTE-S'").get();
+  assert.doesNotMatch(row.channels, /Telegram|WhatsApp|Email/);
+  assert.equal(row.target_audience, 'كافة الطلاب');
+});
+
+test('سجل التدقيق بمفتاح: يُكشف العبث، ومدة الاحتفاظ تحذف القديم وتبقي السلسلة صحيحة', () => {
+  const { db } = app;
+  assert.equal(verifyAuditChain(db).ok, true);
+  const old = Date.now() - 5 * 365.25 * 24 * 3600_000;
+  assert.equal(getSetting(db, 'audit.retention_years'), 3);
+  const r0 = purgeAuditLog(db, 3, Date.now() + 10 * 365.25 * 24 * 3600_000 + old - old);
+  assert.ok(r0.removed > 0, 'يحذف ما تجاوز المدة');
+  audit(db, null, 'بعد الحذف', 'x');
+  const v = verifyAuditChain(db);
+  assert.equal(v.ok, true, JSON.stringify(v));
+  assert.throws(() => db.prepare('DELETE FROM audit_log').run(), /append-only|audit/i, 'منع الحذف عاد');
+});
+
+test('منشئ الاختبار: إعداد ثم اعتماد ثم نشر، وأسئلة نظرية ومتعددة، وتصحيح يدوي', async () => {
+  const body = { course_code: 'QB-1', course_name: 'م', title: 'اختبار المنشئ', instructor_name: 'د', duration_min: 30, questions: [
+    { type: 'single', q: 'س1', options: ['أ', 'ب'], correct: [1], marks: 2 },
+    { type: 'multi', q: 'س2', options: ['أ', 'ب', 'ج'], correct: [0, 2], marks: 3 },
+    { type: 'essay', q: 'س3', marks: 5 },
+  ] };
+  assert.equal((await call(stud, 'POST', '/api/lms/quizzes', body)).status, 403);
+  assert.equal((await call(adm, 'POST', '/api/lms/quizzes', { ...body, questions: [] })).status, 400);
+  const { id } = await (await call(adm, 'POST', '/api/lms/quizzes', body)).json();
+  const seen = async () => (await (await call(stud, 'GET', '/api/lms/overview')).json()).quizzes.some((q) => q.id === id);
+  assert.equal(await seen(), false, 'المسودة لا تظهر للطالب');
+  assert.equal((await call(adm, 'POST', `/api/lms/quizzes/${id}/request-approval`, {})).status, 200);
+  assert.equal(await seen(), false, 'قبل الاعتماد');
+  assert.equal((await call(adm, 'POST', `/api/lms/quizzes/${id}/decide`, { approve: true })).status, 200);
+  assert.equal(await seen(), true);
+  const start = await (await call(stud, 'POST', `/api/lms/quizzes/${id}/start`, {})).json();
+  assert.equal(start.questions.length, 3);
+  assert.ok(start.questions.every((q) => !('correct' in q)), 'لا إجابات للطالب');
+  const r = await (await call(stud, 'POST', `/api/lms/quizzes/${id}/submit`, { answers: [1, [0, 2], 'جواب'] })).json();
+  assert.equal(r.score, 5);
+  assert.equal(r.pendingEssays, 1);
+  const subs = await (await call(adm, 'GET', `/api/lms/quizzes/${id}/submissions`)).json();
+  const essay = subs.questions.find((q) => q.type === 'essay');
+  assert.equal((await call(adm, 'POST', `/api/lms/quiz-submissions/${subs.submissions[0].id}/grade`, { marks: { [essay.id]: 99 } })).status, 400);
+  assert.equal((await (await call(adm, 'POST', `/api/lms/quiz-submissions/${subs.submissions[0].id}/grade`, { marks: { [essay.id]: 4 } })).json()).score, 9);
+  assert.equal((await call(adm, 'DELETE', `/api/lms/quizzes/${id}`)).status, 409, 'لا يُحذف بعد التقديم');
+  // موعد نشر مستقبلي
+  const later = await (await call(adm, 'POST', '/api/lms/quizzes', { ...body, title: 'لاحق', publish_at: new Date(Date.now() + 3600e3).toISOString() })).json();
+  await call(adm, 'POST', `/api/lms/quizzes/${later.id}/request-approval`, {});
+  await call(adm, 'POST', `/api/lms/quizzes/${later.id}/decide`, { approve: true });
+  assert.equal((await call(stud, 'POST', `/api/lms/quizzes/${later.id}/start`, {})).status, 409);
+});
+
+test('المحاضرة تظهر لجمهورها فقط', async () => {
+  const prog = app.db.prepare('SELECT g.faculty AS f FROM users u JOIN student_profiles p ON p.user_id = u.id JOIN programs g ON g.id = p.program_id WHERE u.student_no = ?').get('MERGE-1').f;
+  const add = (title, target_faculty) => call(adm, 'POST', '/api/lms/lectures', { course_code: 'L1', course_name: 'م', title, target_faculty });
+  assert.equal((await add('لكليتي', prog)).status, 201);
+  await add('لغيري', 'جهة أخرى');
+  const titles = (await (await call(stud, 'GET', '/api/lms/overview')).json()).lectures.map((l) => l.title);
+  assert.ok(titles.includes('لكليتي'));
+  assert.ok(!titles.includes('لغيري'));
+});
+
+test('السكن: هيكلية جاهزة، وتسكين بقيود القسم والسعة، ومواد مسلمة من القائمة', async () => {
+  const o = await (await call(adm, 'GET', '/api/housing/overview')).json();
+  for (const n of ['المبنى A', 'المبنى B', 'المبنى C']) assert.equal(o.rooms.filter((r) => r.building_name === n).length, 50, n);
+  const male = o.rooms.find((r) => r.gender === 'ذكور'), female = o.rooms.find((r) => r.gender === 'إناث');
+  assert.equal((await call(adm, 'POST', '/api/housing/allocations', { student_no: 'MERGE-1', room_id: female.id })).status, 400, 'قسم الإناث');
+  const a = await (await call(adm, 'POST', '/api/housing/allocations', { student_no: 'MERGE-1', room_id: male.id })).json();
+  assert.ok(a.id);
+  assert.equal((await call(adm, 'POST', '/api/housing/allocations', { student_no: 'MERGE-1', room_id: male.id })).status, 400, 'لا تسكين مرتين');
+  assert.equal((await call(adm, 'PUT', `/api/housing/rooms/${male.id}`, { room_no: male.room_no, capacity: 0 })).status, 400);
+  const h = await call(adm, 'POST', '/api/housing/handouts', { student_no: 'MERGE-1', items: [{ name: 'سرير' }, { name: 'كمبيوتر محمول', qty: 1, serial: 'SN-1' }] });
+  assert.equal(h.status, 201);
+  assert.equal((await call(adm, 'POST', '/api/housing/handouts', { student_no: 'MERGE-1', items: [{ name: 'ليست في القائمة' }] })).status, 400);
+  const mine = await (await call(stud, 'GET', '/api/housing/overview')).json();
+  assert.equal(mine.allocations.length, 1);
+  assert.equal(mine.handouts[0].room_label.includes(male.room_no), true);
+  assert.equal((await call(stud, 'POST', '/api/housing/handouts', { student_no: 'MERGE-1', items: [{ name: 'سرير' }] })).status, 403);
+  assert.equal((await call(adm, 'DELETE', `/api/housing/allocations/${a.id}`)).status, 200);
 });

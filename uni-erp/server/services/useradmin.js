@@ -121,6 +121,7 @@ const view = (db, u) => {
     locked: u.locked_until > Date.now(),
     accessMode: u.access_mode ?? 'role',
     dataScope: u.data_scope ?? 'unit',
+    scopeFaculty: u.scope_faculty ?? '',
     moduleAccess: safeJsonParse(u.module_access_json, {}),
     derivedModuleAccess: profile.moduleAccess,
     customPermissions: safeJsonParse(u.custom_permissions_json, []),
@@ -223,10 +224,18 @@ export async function createUser({ db, cfg }, actor, input, ip) {
         JSON.stringify(moduleAccess),
         JSON.stringify(hiddenTabs)
       );
+    setScopeFaculty(db, Number(r.lastInsertRowid), dataScope, input?.scopeFaculty);
     audit(db, actor, `إنشاء حساب إداري (${rk.role_key ?? rk.role} · ${accessMode})`, username, ip);
     return Number(r.lastInsertRowid);
   });
   return { id, username, tempPassword: rawPassword, user: view(db, db.prepare('SELECT * FROM users WHERE id = ?').get(id)) };
+}
+
+// نطاق الكلية بلا كلية محددة لا يقيّد شيئاً، فيُرفض بدل أن يوهم بالتقييد
+function setScopeFaculty(db, id, dataScope, faculty) {
+  const name = dataScope === 'faculty' ? String(faculty ?? '').trim() : '';
+  if (dataScope === 'faculty' && !db.prepare('SELECT 1 AS x FROM programs WHERE faculty = ? LIMIT 1').get(name)) throw bad('اكتب اسم الكلية أو المعهد كما هو في البرامج الدراسية.', 'validation');
+  db.prepare('UPDATE users SET scope_faculty = ? WHERE id = ?').run(name || null, id);
 }
 
 export function updateUser({ db }, actor, id, input, ip) {
@@ -296,6 +305,7 @@ export function updateUser({ db }, actor, id, input, ip) {
       JSON.stringify(hiddenTabs),
       u.id
     );
+    if (input?.scopeFaculty !== undefined || input?.dataScope !== undefined) setScopeFaculty(db, u.id, dataScope, input?.scopeFaculty ?? u.scope_faculty);
     // لا نُنهي جلسة المستخدم عند تغيير صلاحياته: تُحسب الصلاحيات من قاعدة البيانات عند كل طلب وكاش الجلسات يُمسح تلقائياً
     // عند أي تعديل على users/roles/org_units، فيسري التغيير فوراً (رفعاً أو خفضاً) دون إجبار أحد على تسجيل الدخول من جديد.
     audit(db, actor, permsChanged ? `تحديث صلاحيات وحساب موظف (${rk.role_key ?? rk.role} · ${accessMode})` : 'تعديل حساب إداري', u.username, ip);

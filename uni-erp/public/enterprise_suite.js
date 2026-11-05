@@ -12,7 +12,7 @@
    9. بوابة الدفع الإلكتروني وتقسيط الرسوم (E-Payment & Installments)
    10. مركز الإشعارات الفورية متعدد القنوات (Multi-Channel Notification Hub)
    11. نافذة الأوامر والبحث الشامل الفوري (Command Palette Ctrl+\`)
-   12. وضع اللجان الامتحانية دون اتصال والمزامنة الفورية (Offline Exam Queue & Sync)
+   12. رصد حضور اللجان الامتحانية
    13. منشئ التقارير المخصص والتصدير الفوري (Custom Report Builder CSV/Print)
    14. لوحة مؤشرات الأداء الاستراتيجية لرئاسة الجامعة (Executive KPIs)
    15. النسخ الاحتياطي المجدول والمشفر والاسترجاع الزمني (AES-256-GCM Snapshots)
@@ -84,17 +84,6 @@
   UA.loaders.enterprise = async () => {
     E.data = await api('GET', '/api/enterprise/overview');
     if (window.UA) window.UA.enterpriseData = E.data;
-    if (!E.gpaResult) {
-      E.gpaResult = await api('POST', '/api/enterprise/gpa-simulate', {
-        currentGpa: 88.4,
-        completedHours: 72,
-        upcomingCourses: [
-          { code: 'CYB-301', credits: 4, expectedScore: 94 },
-          { code: 'CYB-304', credits: 3, expectedScore: 91 },
-          { code: 'CYB-308', credits: 3, expectedScore: 90 },
-        ],
-      });
-    }
   };
 
   function ensureEnterpriseDataLoaded() {
@@ -114,7 +103,7 @@
     ['academics', '1. الجدولة والاختبارات والإرشاد (1–3)'],
     ['student_pki', '2. التسجيل الذاتي والبطاقة والتحقق (4–6)'],
     ['hr_finance', '3. قسائم الرواتب والعبء والأقساط (7–9)'],
-    ['ux_offline', '4. الإشعارات واللجان بدون اتصال (10–12)'],
+    ['ux_offline', '4. الإشعارات وحضور اللجان (10–12)'],
     ['exec_devops', '5. مؤشرات الرئاسة (14)'],
   ];
 
@@ -159,52 +148,10 @@
 
   /* ---------- التبويب 1: الشؤون الأكاديمية والامتحانات (1-3) ---------- */
   function viewAcademics(D) {
-    const slots = D.scheduleSlots || [];
     const plan = D.advisingPlan || [];
     const gpa = E.gpaResult;
 
     return `
-      <div class="es-grid2">
-        <!-- 1. المولد الذكي للجداول الدراسية ومنع التضارب -->
-        <section class="es-card">
-          <h2><span>📅 المولد الذكي للجداول الدراسية ومنع التضارب</span><span class="es-num">ميزة #1</span></h2>
-          <p class="sub">خوارزمية فورية تمنع تضارب القاعات وأوقات الأساتذة والشُعب تلقائياً قبل الحفظ.</p>
-          <form id="es-schedule-form" class="inline-form" style="margin-bottom:14px">
-            <label>رمز المقرر<input id="es-sc-code" placeholder="CYB-310" required></label>
-            <label>اسم المقرر<input id="es-sc-name" placeholder="تحليل البرمجيات الخبيثة" required></label>
-            <label>الأستاذ المحاضر<input id="es-sc-inst" required></label>
-            <label>القاعة / المدرج<select id="es-sc-hall">
-              <option value="مدرج الفارابي A1">مدرج الفارابي A1</option>
-              <option value="مخبر السيبراني L2">مخبر السيبراني L2</option>
-              <option value="قاعة الخوارزمي C3" selected>قاعة الخوارزمي C3</option>
-              <option value="مدرج ابن خلدون B1">مدرج ابن خلدون B1</option>
-            </select></label>
-            <label>اليوم<select id="es-sc-day">
-              <option>الأحد</option><option selected>الإثنين</option><option>الثلاثاء</option><option>الأربعاء</option><option>الخميس</option>
-            </select></label>
-            <label>الفترة الزمنية<select id="es-sc-time">
-              <option>08:30 - 10:30</option><option selected>10:30 - 12:30</option><option>12:30 - 14:30</option>
-            </select></label>
-            <button class="btn pri" type="submit">فحص التضارب وإدراج بالجدول</button>
-          </form>
-          <div class="tbl-wrap">
-            <table>
-              <thead><tr><th>المقرر</th><th>المحاضر</th><th>القاعة</th><th>اليوم والتوقيت</th><th>الحالة</th></tr></thead>
-              <tbody>
-                ${slots.map((s) => `<tr>
-                  <td><b>${esc(s.course_code)}</b> — ${esc(s.course_name)}</td>
-                  <td>${esc(s.instructor_name)}</td>
-                  <td>${esc(s.hall_code)}</td>
-                  <td>${esc(s.day_name)} · <span class="mono">${esc(s.time_slot)}</span></td>
-                  <td><span class="pill p-approved">${esc(s.status)}</span></td>
-                </tr>`).join('')}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-      </div>
-
       <!-- 3. شجرة الإرشاد الأكاديمي التفاعلي ومحاكي المعدل التراكمي -->
       <section class="es-card">
         <h2><span>🎓 شجرة الإرشاد الأكاديمي التفاعلي ومحاكي المعدل التراكمي (GPA Simulator)</span><span class="es-num">ميزة #3</span></h2>
@@ -230,13 +177,13 @@
             <h3 style="font-size:14px;margin:0 0 10px">محاكي المعدل التراكمي المتوقع (Interactive GPA Simulator)</h3>
             <form id="es-gpa-form" class="form" style="background:rgba(14,102,85,.04);padding:14px;border-radius:12px;border:1px solid var(--line,#dce3dd)">
               <div class="inline-form">
-                <label>المعدل التراكمي الحالي (%)<input id="gpa-cur" type="number" step="0.1" value="88.4" required></label>
-                <label>الساعات المنجزة<input id="gpa-hrs" type="number" value="72" required></label>
+                <label>المعدل التراكمي الحالي (%)<input id="gpa-cur" type="number" step="0.1" required></label>
+                <label>الساعات المنجزة<input id="gpa-hrs" type="number" required></label>
               </div>
               <div class="inline-form" style="margin-top:8px">
-                <label>توقع CYB-301 (4 س)<input id="gpa-c1" type="number" min="0" max="100" value="95"></label>
-                <label>توقع CYB-304 (3 س)<input id="gpa-c2" type="number" min="0" max="100" value="92"></label>
-                <label>توقع CYB-308 (3 س)<input id="gpa-c3" type="number" min="0" max="100" value="90"></label>
+                <label>علامة المقرر الأول (4 س)<input id="gpa-c1" type="number" min="0" max="100"></label>
+                <label>علامة المقرر الثاني (3 س)<input id="gpa-c2" type="number" min="0" max="100"></label>
+                <label>علامة المقرر الثالث (3 س)<input id="gpa-c3" type="number" min="0" max="100"></label>
               </div>
               <button class="btn pri" type="submit" style="margin-top:10px">حساب المعدل التراكمي المتوقع</button>
             </form>
@@ -275,7 +222,7 @@
             <div style="padding:14px;border-radius:12px;background:rgba(16,185,129,.1);border:1px solid #10b981">
               <strong style="color:#065f46;display:block;margin-bottom:4px">✓ وثيقة رسمية صحيحة وموقعة رقمياً (PKI Verified)</strong>
               <div class="small">الرمز: <span class="mono">${esc(E.verifyResult.code)}</span> · الجهة المصدرة: الجامعة السورية للعلوم الأمنية · الحالة: معتمدة وسارية</div>
-              <div class="small">بصمة التحقق: <span class="mono">${esc(E.verifyResult.sig)}</span></div>
+              <div class="small">نتيجة التحقق: <span class="mono">${esc(E.verifyResult.sig)}</span></div>
             </div>
           ` : `
             <div style="padding:12px;border-radius:10px;background:rgba(14,102,85,.05);font-size:12.5px">
@@ -328,11 +275,7 @@
         <h2><span>📚 بوابة التسجيل الذاتي للمقررات الدراسية (Self-Enrollment)</span><span class="es-num">ميزة #5</span></h2>
         <p class="sub">تسجيل مباشر للمقررات مع التحقق الآلي من الساعات المعتمدة والمتطلبات السابقة وبراءة الذمة المالية.</p>
         <form id="es-enroll-form" class="inline-form" style="margin-bottom:14px">
-          <label>المقرر المتاح للتسجيل<select id="es-enr-course">
-            <option value="CYB-401|أمن الأنظمة السحابية والبنية التحتية|4|CYB-301">CYB-401 — أمن الأنظمة السحابية والبنية التحتية (4 ساعات · متطلب: CYB-301)</option>
-            <option value="CYB-312|الذكاء الاصطناعي في كشف التسلل|3|CYB-201">CYB-312 — الذكاء الاصطناعي في كشف التسلل (3 ساعات · متطلب: CYB-201)</option>
-            <option value="LAW-305|التشريعات السيبرانية وحماية البيانات|2|—">LAW-305 — التشريعات السيبرانية وحماية البيانات (ساعتان · متطلب: —)</option>
-          </select></label>
+          <label>المقرر المتاح للتسجيل<select id="es-enr-course" required>${(D.enrollableCourses || []).length ? (D.enrollableCourses || []).map((c) => `<option value="${esc(c.code)}">${esc(c.code)} — ${esc(c.name)} (${c.hours} س)</option>`).join('') : '<option value="">لا توجد مقررات متاحة</option>'}</select></label>
           <button class="btn pri" type="submit">تسجيل المقرر في الفصل الحالي</button>
         </form>
         <div class="tbl-wrap">
@@ -364,18 +307,18 @@
       <div class="es-grid2">
         <!-- 7. توليد قسائم الرواتب -->
         <section class="es-card">
-          <h2><span>🧾 قسائم الرواتب الشهرية (بصمة تحقق، بلا توقيع رقمي)</span><span class="es-num">ميزة #7</span></h2>
+          <h2><span>🧾 قسائم الرواتب الشهرية الموقعة رقمياً</span><span class="es-num">ميزة #7</span></h2>
           <p class="sub">إصدار قسائم رواتب رسمية موقعة بشهادة PKI تتضمن الراتب الأساسي، الساعات الإضافية، التعويضات، والحسميات.</p>
           <form id="es-payslip-form" class="inline-form" style="margin-bottom:12px">
-            <label>اسم الموظف / عضو الهيئة التدريسية<input id="es-ps-name" value="د. رامي الشامي" required></label>
-            <label>القسم / الكلية<input id="es-ps-dept" value="كلية هندسة الأمن السيبراني" required></label>
-            <label>الراتب الأساسي<input id="es-ps-basic" type="number" value="3400000" required></label>
-            <label>علاوة العبء الإضافي<input id="es-ps-ov" type="number" value="510000"></label>
+            <label>اسم الموظف / عضو الهيئة التدريسية<input id="es-ps-name" required></label>
+            <label>القسم / الكلية<input id="es-ps-dept" required></label>
+            <label>الراتب الأساسي<input id="es-ps-basic" type="number" required></label>
+            <label>علاوة العبء الإضافي<input id="es-ps-ov" type="number"></label>
             <button class="btn pri" type="submit">إصدار قسيمة راتب</button>
           </form>
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th>رمز القسيمة</th><th>الموظف</th><th>الأساسي</th><th>العبء الإضافي</th><th>الصافي</th><th>بصمة التحقق (غير موقعة رقمياً)</th></tr></thead>
+              <thead><tr><th>رمز القسيمة</th><th>الموظف</th><th>الأساسي</th><th>العبء الإضافي</th><th>الصافي</th><th>التوقيع الرقمي</th></tr></thead>
               <tbody>
                 ${payslips.map((p) => `<tr>
                   <td class="mono"><b>${esc(p.payslip_code)}</b></td>
@@ -383,7 +326,7 @@
                   <td>${nf(p.basic_salary)}</td>
                   <td>${nf(p.overload_pay)}</td>
                   <td><b style="color:#0e6655">${nf(p.net_salary)} ل.س</b></td>
-                  <td class="mono small">${esc(p.digital_signature)}</td>
+                  <td class="mono small">${esc(String(p.digital_signature).slice(0, 26))}…</td>
                 </tr>`).join('')}
               </tbody>
             </table>
@@ -395,12 +338,12 @@
           <h2><span>⚖️ الحساب الآلي للعبء التدريسي الإضافي (Faculty Overload)</span><span class="es-num">ميزة #8</span></h2>
           <p class="sub">ربط النصاب التدريسي والاشراف العلمي بمسير الرواتب لحساب تعويض الساعات الإضافية تلقائياً.</p>
           <form id="es-overload-form" class="inline-form" style="margin-bottom:12px">
-            <label>عضو الهيئة التدريسية<input id="es-ov-name" value="د. طارق زيدان" required></label>
+            <label>عضو الهيئة التدريسية<input id="es-ov-name" required></label>
             <label>الرتبة العلمية<select id="es-ov-rank"><option>أستاذ دكتور</option><option selected>أستاذ مساعد</option><option>مدرّس</option></select></label>
-            <label>النصاب القانوني (س)<input id="es-ov-q" type="number" value="10" required></label>
-            <label>ساعات التدريس الفعلية<input id="es-ov-act" type="number" value="15" required></label>
-            <label>ساعات الإشراف<input id="es-ov-sup" type="number" value="3" required></label>
-            <label>أجر الساعة (ل.س)<input id="es-ov-rate" type="number" value="100000" required></label>
+            <label>النصاب القانوني (س)<input id="es-ov-q" type="number" required></label>
+            <label>ساعات التدريس الفعلية<input id="es-ov-act" type="number" required></label>
+            <label>ساعات الإشراف<input id="es-ov-sup" type="number" required></label>
+            <label>أجر الساعة (ل.س)<input id="es-ov-rate" type="number" required></label>
             <button class="btn pri" type="submit">احتساب وترحيل للرواتب</button>
           </form>
           <div class="tbl-wrap">
@@ -464,31 +407,26 @@
           <p class="sub">بث فوري للتنبيهات عبر المتصفح (Web Push)، البريد الرسمي، وقنوات Telegram / WhatsApp.</p>
           <form id="es-notif-form" class="form" style="margin-bottom:14px">
             <div class="inline-form">
-              <label style="flex:1">عنوان الإشعار<input id="es-nf-title" value="صدور نتائج أعمال الفصل لمقررات الأمن السيبراني" required></label>
+              <label style="flex:1">عنوان الإشعار<input id="es-nf-title" required></label>
               <label>الجمهور المستهدف<select id="es-nf-aud">
-                <option>كافة الطلاب (جميع الكليات)</option>
-                <option>طلاب كلية هندسة الأمن السيبراني</option>
-                <option>أعضاء الهيئة التدريسية والإدارية</option>
-              </select></label>
-              <label>القنوات<select id="es-nf-ch">
-                <option>Web Push + Telegram + WhatsApp + Email</option>
-                <option>Web Push + البوابة الداخلية</option>
+                <option value="students">كافة الطلاب</option>
+                <option value="staff">الهيئة التدريسية والإدارية</option>
               </select></label>
             </div>
-            <label style="margin-top:8px">نص الإشعار<input id="es-nf-body" value="يمكنكم الاطلاع على درجات أعمال الفصل عبر بوابة الطالب أو تطبيق الجوال." required></label>
+            <label style="margin-top:8px">نص الإشعار<input id="es-nf-body" required></label>
             <div class="actions" style="margin:8px 0 0">
-              <button class="btn pri" type="submit">تسجيل الإشعار (الإرسال الخارجي غير مفعّل)</button>
+              <button class="btn pri" type="submit">إرسال الإشعار عبر البوابة والمتصفح</button>
             </div>
           </form>
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th>الإشعار</th><th>الجمهور</th><th>القنوات</th><th>الإرسال</th><th>الوقت</th></tr></thead>
+              <thead><tr><th>الإشعار</th><th>الجمهور</th><th>القنوات</th><th>الأجهزة المستلمة</th><th>الوقت</th></tr></thead>
               <tbody>
                 ${notifs.map((n) => `<tr>
                   <td><b>${esc(n.title)}</b><div class="small">${esc(n.body)}</div></td>
                   <td>${esc(n.target_audience)}</td>
                   <td><span class="mono small">${esc(n.channels)}</span></td>
-                  <td><span class="small">لم يُرسل، سجل داخلي فقط</span></td>
+                  <td><b>${nf(n.delivery_count)}</b></td>
                   <td>${dt(n.created_at)}</td>
                 </tr>`).join('')}
               </tbody>
@@ -498,18 +436,18 @@
 
         <!-- 12. وضع العمل دون اتصال للجان الامتحانية -->
         <section class="es-card">
-          <h2><span>📴 وضع اللجان الامتحانية دون اتصال (Offline Exam Queue & Sync)</span><span class="es-num">ميزة #12</span></h2>
-          <p class="sub">حفظ محلي لرصد الحضور والدرجات داخل القاعات عند انقطاع الشبكة ومزامنتها دفعة واحدة بضغطة زر.</p>
+          <h2><span>📋 رصد حضور اللجان الامتحانية</span><span class="es-num">ميزة #12</span></h2>
+          <p class="sub">إدخال أرقام الطلاب الحاضرين؛ تُسجَّل في سجل القاعات مباشرة. يتطلب اتصالًا بالخادم.</p>
           <form id="es-offline-form" class="inline-form" style="margin-bottom:14px">
-            <label>اللجنة الامتحانية<input id="es-of-comm" value="اللجنة الامتحانية الثانية - الأمن السيبراني" required></label>
-            <label>القاعة<input id="es-of-hall" value="مدرج الفارابي A1" required></label>
-            <label>المقرر<input id="es-of-course" value="CYB-304" required></label>
-            <label>عدد دفاتر الامتحان المرصودة محلياً<input id="es-of-cnt" type="number" value="42" required></label>
-            <button class="btn ok" type="submit">مزامنة الدفعة المحلية مع الخادم الآن</button>
+            <label>اللجنة الامتحانية<input id="es-of-comm" required></label>
+            <label>القاعة<input id="es-of-hall" required></label>
+            <label>رمز المقرر<input id="es-of-course" required></label>
+            <label style="flex-basis:100%">الأرقام الجامعية للحاضرين (رقم في كل سطر)<textarea id="es-of-students" rows="4" dir="ltr" required></textarea></label>
+            <button class="btn ok" type="submit">حفظ الحضور</button>
           </form>
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th>رمز الدفعة</th><th>اللجنة والقاعة</th><th>المقرر</th><th>السجلات المزامنة</th><th>تاريخ المزامنة</th></tr></thead>
+              <thead><tr><th>رمز الدفعة</th><th>اللجنة والقاعة</th><th>المقرر</th><th>عدد الحاضرين</th><th>تاريخ المزامنة</th></tr></thead>
               <tbody>
                 ${batches.map((b) => `<tr>
                   <td class="mono"><b>${esc(b.batch_code)}</b></td>
@@ -737,13 +675,11 @@
 
   Object.assign(UA.forms, {
     'es-schedule-form': async () => {
-      await api('POST', '/api/enterprise/schedule', {
-        course_code: document.getElementById('es-sc-code').value,
-        course_name: document.getElementById('es-sc-name').value,
-        instructor_name: document.getElementById('es-sc-inst').value,
-        hall_code: document.getElementById('es-sc-hall').value,
-        day_name: document.getElementById('es-sc-day').value,
-        time_slot: document.getElementById('es-sc-time').value,
+      await api('POST', `/api/courses/${document.getElementById('es-sc-course').value}/schedule/slots`, {
+        day: Number(document.getElementById('es-sc-day').value),
+        start: document.getElementById('es-sc-start').value,
+        end: document.getElementById('es-sc-end').value,
+        hall: document.getElementById('es-sc-hall').value,
       });
       await UA.loaders.enterprise();
       render();
@@ -754,9 +690,9 @@
         currentGpa: Number(document.getElementById('gpa-cur').value),
         completedHours: Number(document.getElementById('gpa-hrs').value),
         upcomingCourses: [
-          { code: 'CYB-301', credits: 4, expectedScore: Number(document.getElementById('gpa-c1').value) },
-          { code: 'CYB-304', credits: 3, expectedScore: Number(document.getElementById('gpa-c2').value) },
-          { code: 'CYB-308', credits: 3, expectedScore: Number(document.getElementById('gpa-c3').value) },
+          { code: 'C1', credits: 4, expectedScore: Number(document.getElementById('gpa-c1').value) },
+          { code: 'C2', credits: 3, expectedScore: Number(document.getElementById('gpa-c2').value) },
+          { code: 'C3', credits: 3, expectedScore: Number(document.getElementById('gpa-c3').value) },
         ],
       });
       render();
@@ -764,24 +700,16 @@
     },
     'es-verify-form': async () => {
       const code = document.getElementById('es-v-code').value.trim();
-      const ps = (E.data?.signedPayslips || []).find((p) => p.payslip_code.toUpperCase() === code.toUpperCase());
-      if (ps) {
-        E.verifyResult = { code: ps.payslip_code, sig: ps.digital_signature };
-      } else {
-        E.verifyResult = { code, sig: 'SIG-PKI-VERIFIED-' + code.slice(0, 8).toUpperCase() };
-      }
+      E.verifyResult = null;
+      try {
+        const r = await api('GET', `/api/enterprise/payslips/${encodeURIComponent(code)}/verify`);
+        if (r.valid) E.verifyResult = { code: r.code, sig: r.certificateTrusted ? 'توقيع صحيح بشهادة موثوقة' : 'توقيع صحيح بشهادة الجامعة الداخلية' };
+        toast(r.valid ? '✓ التوقيع صحيح' : 'التوقيع غير صحيح: القسيمة عُدّلت أو وُقّعت بمفتاح آخر');
+      } catch (e) { if (!e.status) throw e; toast(e.message); }
       render();
-      toast('✓ الوثيقة موجودة في السجل');
     },
     'es-enroll-form': async () => {
-      const raw = document.getElementById('es-enr-course').value;
-      const [course_code, course_name, credits, prerequisite_code] = raw.split('|');
-      await api('POST', '/api/enterprise/self-enroll', {
-        course_code,
-        course_name,
-        credits: Number(credits || 3),
-        prerequisite_code,
-      });
+      await api('POST', '/api/enterprise/self-enroll', { course_code: document.getElementById('es-enr-course').value });
       await UA.loaders.enterprise();
       render();
       toast(`✓ تم تسجيل مقرر ${course_name} (${course_code}) بنجاح`);
@@ -814,25 +742,22 @@
       await api('POST', '/api/enterprise/notifications/broadcast', {
         title: document.getElementById('es-nf-title').value,
         body: document.getElementById('es-nf-body').value,
-        target_audience: document.getElementById('es-nf-aud').value,
-        channels: document.getElementById('es-nf-ch').value,
+        audience: document.getElementById('es-nf-aud').value,
       });
       await UA.loaders.enterprise();
       render();
-      toast('✓ سُجّل الإشعار داخلياً، ولم يُرسل عبر القنوات الخارجية');
+      toast('✓ أُرسل الإشعار إلى الأجهزة المشتركة');
     },
     'es-offline-form': async () => {
-      const cnt = Number(document.getElementById('es-of-cnt').value || 30);
-      const records = Array.from({ length: cnt }, (_, i) => ({ student_idx: i + 1, status: 'حاضر' }));
       const r = await api('POST', '/api/enterprise/offline-sync', {
         committee_name: document.getElementById('es-of-comm').value,
         hall_code: document.getElementById('es-of-hall').value,
         course_code: document.getElementById('es-of-course').value,
-        records,
+        student_nos: document.getElementById('es-of-students').value.split(/\s+/).filter(Boolean),
       });
       await UA.loaders.enterprise();
       render();
-      toast(`✓ تمت مزامنة الدفعة ${r.batch_code} (${r.synced_count} سجل امتحاني)`);
+      toast(`سُجل حضور ${r.recorded_count} طالب (${r.batch_code})`);
     },
   });
 

@@ -96,8 +96,8 @@ test('الصيغ: xlsx (ورقة لكل سنة وفصل)، csv بـ BOM وتحي
 
   const z = await raw('/api/export/file?dataset=all&format=csv', staff);
   assert.match(z.headers.get('content-type'), /zip/);
-  assert.deepEqual([...readZip(z.buf).keys()].sort(), ['attendance.csv', 'complaints.csv', 'courses.csv', 'grades.csv', 'holds.csv', 'requests.csv', 'students.csv']);
-  const all = readXlsx((await raw('/api/export/file?dataset=all&format=xlsx', staff)).buf); assert.equal(all.sheets.length, 7);
+  assert.deepEqual([...readZip(z.buf).keys()].sort(), ['attendance.csv', 'complaints.csv', 'courses.csv', 'grades.csv', 'handouts.csv', 'holds.csv', 'housing.csv', 'lectures.csv', 'quizzes.csv', 'requests.csv', 'students.csv']);
+  const all = readXlsx((await raw('/api/export/file?dataset=all&format=xlsx', staff)).buf); assert.equal(all.sheets.length, 11);
 
   assert.equal((await api('GET', '/api/export/file?dataset=grades&format=exe', { cookie: staff })).status, 400);
 });

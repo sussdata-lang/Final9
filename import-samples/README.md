@@ -28,63 +28,63 @@
 | 06 | `course_schedules` | جدول المحاضرات الأسبوعي | الأكاديمي والهيكل | low | courses | متطابقة | 1 / 0 |
 | 07 | `course_prerequisites` | المتطلبات السابقة للمقررات | الأكاديمي والهيكل | low | courses | متطابقة | 1 / 0 |
 | 08 | `exam_schedules` | جدول الامتحانات | الأكاديمي والهيكل | low | — | متطابقة | 1 / 0 |
-| 09 | `smart_schedule_slots` | فترات الجدولة الذكية | الأكاديمي والهيكل | low | — | متطابقة | 1 / 0 |
-| 10 | `hr_lookups` | قوائم الموارد البشرية | الموارد البشرية | low | — | متطابقة | 1 / 0 |
-| 11 | `hr_employees` | الموظفون | الموارد البشرية | medium | org_units، hr_lookups | متطابقة | 1 / 0 |
-| 12 | `hr_contracts` | عقود الموظفين | الموارد البشرية | medium | hr_employees | متطابقة | 1 / 0 |
-| 13 | `hr_salaries` | سجلات الرواتب | الموارد البشرية | high | hr_employees | متطابقة | 1 / 0 |
-| 14 | `hr_advances` | السلف المالية | الموارد البشرية | high | hr_employees | متطابقة | 1 / 0 |
-| 15 | `hr_leaves` | الإجازات | الموارد البشرية | medium | hr_employees | متطابقة | 1 / 0 |
-| 16 | `leave_entitlements` | أرصدة الإجازات السنوية | الموارد البشرية | low | — | متطابقة | 1 / 0 |
-| 17 | `hr_absences` | الغيابات | الموارد البشرية | medium | hr_employees | متطابقة | 1 / 0 |
-| 18 | `hr_monthly_attendance` | الحضور الشهري | الموارد البشرية | medium | hr_employees | متطابقة | 1 / 0 |
-| 19 | `staff_attendance` | بصمة الحضور اليومية | الموارد البشرية | medium | — | متطابقة | 1 / 0 |
-| 20 | `hr_biometric_devices` | أجهزة البصمة | الموارد البشرية | low | — | متطابقة | 1 / 0 |
-| 21 | `hr_trainings` | الدورات التدريبية | الموارد البشرية | low | — | متطابقة | 1 / 0 |
-| 22 | `hr_appraisals` | تقييم الأداء | الموارد البشرية | medium | — | متطابقة | 1 / 0 |
-| 23 | `faculty_promotions` | ترفيع أعضاء الهيئة | الموارد البشرية | low | — | متطابقة | 1 / 0 |
-| 24 | `faculty_overload` | سجلات النصاب والزيادة | الموارد البشرية | low | — | متطابقة | 1 / 0 |
-| 25 | `student_groups` | فئات الطلاب | الطلاب والقبول | low | — | متطابقة | 1 / 0 |
-| 26 | `student_group_members` | أعضاء فئات الطلاب | الطلاب والقبول | low | — | متطابقة | 1 / 0 |
-| 27 | `proc_categories` | تصنيفات المشتريات | المشتريات والمخزون | low | — | متطابقة | 1 / 0 |
-| 28 | `proc_warehouses` | المستودعات | المشتريات والمخزون | low | — | متطابقة | 1 / 0 |
-| 29 | `proc_suppliers` | الموردون | المشتريات والمخزون | low | — | متطابقة | 1 / 0 |
-| 30 | `proc_items` | أصناف المخزون | المشتريات والمخزون | low | proc_categories، proc_warehouses | متطابقة | 1 / 0 |
-| 31 | `proc_assets` | الأصول الثابتة | المشتريات والمخزون | medium | proc_suppliers، proc_warehouses | متطابقة | 1 / 0 |
-| 32 | `fin_currencies` | العملات | المالية | low | — | متطابقة | 1 / 0 |
-| 33 | `fin_years` | السنوات المالية | المالية | medium | — | متطابقة | 1 / 0 |
-| 34 | `fin_cost_centers` | مراكز التكلفة | المالية | low | org_units | متطابقة | 1 / 0 |
-| 35 | `fin_accounts` | دليل الحسابات | المالية | medium | — | متطابقة | 1 / 0 |
-| 36 | `fin_fee_types` | أنواع الرسوم الدراسية | المالية | medium | fin_accounts | متطابقة | 1 / 0 |
-| 37 | `fin_parties` | الأطراف المالية | المالية | low | fin_accounts | متطابقة | 1 / 0 |
-| 38 | `corr_templates` | قوالب المراسلات | متفرقات | low | — | متطابقة | 1 / 0 |
-| 39 | `news` | الأخبار | متفرقات | low | — | متطابقة | 1 / 0 |
-| 40 | `proc_requests` | طلبات الشراء | المشتريات والمخزون | medium | proc_warehouses، proc_items | متطابقة | 1 / 0 |
-| 41 | `proc_orders` | أوامر الشراء | المشتريات والمخزون | high | proc_suppliers، proc_requests، proc_items | متطابقة | 1 / 0 |
-| 42 | `proc_receipts` | استلام البضائع | المشتريات والمخزون | high | proc_orders، proc_items | متطابقة | 1 / 0 |
-| 43 | `proc_issues` | صرف المخزون | المشتريات والمخزون | high | proc_warehouses، proc_items | متطابقة | 1 / 0 |
-| 44 | `proc_asset_moves` | حركات الأصول | المشتريات والمخزون | high | proc_assets، proc_warehouses | متطابقة | 1 / 0 |
-| 45 | `fin_entries` | القيود اليومية | المالية | critical | fin_accounts، fin_cost_centers، fin_parties | متطابقة | 1 / 0 |
-| 46 | `sa_applicants` | المتقدمون للقبول | الطلاب والقبول | medium | programs | متطابقة | 1 / 0 |
-| 47 | `student_holds` | ذمم وموانع الطلاب | الطلاب والقبول | medium | students | متطابقة | 1 / 0 |
-| 48 | `sa_credit_equivalences` | معادلة المقررات | الطلاب والقبول | medium | students، courses | متطابقة | 1 / 0 |
-| 49 | `sa_advising_warnings` | الإنذارات الإرشادية | الطلاب والقبول | medium | students | متطابقة | 1 / 0 |
-| 50 | `sa_lifecycle_movements` | حركات القيد | الطلاب والقبول | high | students | متطابقة | 1 / 0 |
-| 51 | `student_self_enrollments` | التسجيل الذاتي في المقررات | الطلاب والقبول | medium | students | متطابقة | 1 / 0 |
-| 52 | `grade_appeals` | تظلمات العلامات | الطلاب والقبول | medium | students | متطابقة | 1 / 0 |
-| 53 | `office_hour_bookings` | حجوزات الساعات المكتبية | الطلاب والقبول | low | students | متطابقة | 1 / 0 |
-| 54 | `student_fee_installments` | أقساط الرسوم | مالية الطلاب | high | students | متطابقة | 1 / 0 |
-| 55 | `fin_charges` | المستحقات المالية | مالية الطلاب | high | students، fin_fee_types | متطابقة | 1 / 0 |
-| 56 | `fin_payments` | إيصالات القبض | مالية الطلاب | high | students | متطابقة | 1 / 0 |
-| 57 | `sa_scholarships` | المنح المعتمدة | مالية الطلاب | high | students، fin_fee_types | متطابقة | 1 / 0 |
-| 58 | `scholarships` | سجل المنح الإداري | مالية الطلاب | medium | students | متطابقة | 1 / 0 |
-| 59 | `alumni_records` | سجل الخريجين | متفرقات | low | — | متطابقة | 1 / 0 |
-| 60 | `career_jobs` | فرص التوظيف | متفرقات | low | — | متطابقة | 1 / 0 |
-| 61 | `career_applications` | طلبات التوظيف | متفرقات | low | career_jobs | متطابقة | 1 / 0 |
-| 62 | `postgrad_theses` | رسائل الدراسات العليا | متفرقات | low | — | متطابقة | 1 / 0 |
-| 63 | `research_projects` | المشاريع البحثية | متفرقات | low | — | متطابقة | 1 / 0 |
-| 64 | `student_activities` | الأنشطة الطلابية | متفرقات | low | — | متطابقة | 1 / 0 |
-| 65 | `dorm_rooms` | غرف السكن | متفرقات | low | — | متطابقة | 1 / 0 |
+| 09 | `hr_lookups` | قوائم الموارد البشرية | الموارد البشرية | low | — | متطابقة | 1 / 0 |
+| 10 | `hr_employees` | الموظفون | الموارد البشرية | medium | org_units، hr_lookups | متطابقة | 1 / 0 |
+| 11 | `hr_contracts` | عقود الموظفين | الموارد البشرية | medium | hr_employees | متطابقة | 1 / 0 |
+| 12 | `hr_salaries` | سجلات الرواتب | الموارد البشرية | high | hr_employees | متطابقة | 1 / 0 |
+| 13 | `hr_advances` | السلف المالية | الموارد البشرية | high | hr_employees | متطابقة | 1 / 0 |
+| 14 | `hr_leaves` | الإجازات | الموارد البشرية | medium | hr_employees | متطابقة | 1 / 0 |
+| 15 | `leave_entitlements` | أرصدة الإجازات السنوية | الموارد البشرية | low | — | متطابقة | 1 / 0 |
+| 16 | `hr_absences` | الغيابات | الموارد البشرية | medium | hr_employees | متطابقة | 1 / 0 |
+| 17 | `hr_monthly_attendance` | الحضور الشهري | الموارد البشرية | medium | hr_employees | متطابقة | 1 / 0 |
+| 18 | `staff_attendance` | بصمة الحضور اليومية | الموارد البشرية | medium | — | متطابقة | 1 / 0 |
+| 19 | `hr_biometric_devices` | أجهزة البصمة | الموارد البشرية | low | — | متطابقة | 1 / 0 |
+| 20 | `hr_trainings` | الدورات التدريبية | الموارد البشرية | low | — | متطابقة | 1 / 0 |
+| 21 | `hr_appraisals` | تقييم الأداء | الموارد البشرية | medium | — | متطابقة | 1 / 0 |
+| 22 | `faculty_promotions` | ترفيع أعضاء الهيئة | الموارد البشرية | low | — | متطابقة | 1 / 0 |
+| 23 | `faculty_overload` | سجلات النصاب والزيادة | الموارد البشرية | low | — | متطابقة | 1 / 0 |
+| 24 | `student_groups` | فئات الطلاب | الطلاب والقبول | low | — | متطابقة | 1 / 0 |
+| 25 | `student_group_members` | أعضاء فئات الطلاب | الطلاب والقبول | low | — | متطابقة | 1 / 0 |
+| 26 | `proc_categories` | تصنيفات المشتريات | المشتريات والمخزون | low | — | متطابقة | 1 / 0 |
+| 27 | `proc_warehouses` | المستودعات | المشتريات والمخزون | low | — | متطابقة | 1 / 0 |
+| 28 | `proc_suppliers` | الموردون | المشتريات والمخزون | low | — | متطابقة | 1 / 0 |
+| 29 | `proc_items` | أصناف المخزون | المشتريات والمخزون | low | proc_categories، proc_warehouses | متطابقة | 1 / 0 |
+| 30 | `proc_assets` | الأصول الثابتة | المشتريات والمخزون | medium | proc_suppliers، proc_warehouses | متطابقة | 1 / 0 |
+| 31 | `fin_currencies` | العملات | المالية | low | — | متطابقة | 1 / 0 |
+| 32 | `fin_years` | السنوات المالية | المالية | medium | — | متطابقة | 1 / 0 |
+| 33 | `fin_cost_centers` | مراكز التكلفة | المالية | low | org_units | متطابقة | 1 / 0 |
+| 34 | `fin_accounts` | دليل الحسابات | المالية | medium | — | متطابقة | 1 / 0 |
+| 35 | `fin_fee_types` | أنواع الرسوم الدراسية | المالية | medium | fin_accounts | متطابقة | 1 / 0 |
+| 36 | `fin_parties` | الأطراف المالية | المالية | low | fin_accounts | متطابقة | 1 / 0 |
+| 37 | `corr_templates` | قوالب المراسلات | متفرقات | low | — | متطابقة | 1 / 0 |
+| 38 | `news` | الأخبار | متفرقات | low | — | متطابقة | 1 / 0 |
+| 39 | `proc_requests` | طلبات الشراء | المشتريات والمخزون | medium | proc_warehouses، proc_items | متطابقة | 1 / 0 |
+| 40 | `proc_orders` | أوامر الشراء | المشتريات والمخزون | high | proc_suppliers، proc_requests، proc_items | متطابقة | 1 / 0 |
+| 41 | `proc_receipts` | استلام البضائع | المشتريات والمخزون | high | proc_orders، proc_items | متطابقة | 1 / 0 |
+| 42 | `proc_issues` | صرف المخزون | المشتريات والمخزون | high | proc_warehouses، proc_items | متطابقة | 1 / 0 |
+| 43 | `proc_asset_moves` | حركات الأصول | المشتريات والمخزون | high | proc_assets، proc_warehouses | متطابقة | 1 / 0 |
+| 44 | `fin_entries` | القيود اليومية | المالية | critical | fin_accounts، fin_cost_centers، fin_parties | متطابقة | 1 / 0 |
+| 45 | `sa_applicants` | المتقدمون للقبول | الطلاب والقبول | medium | programs | متطابقة | 1 / 0 |
+| 46 | `student_holds` | ذمم وموانع الطلاب | الطلاب والقبول | medium | students | متطابقة | 1 / 0 |
+| 47 | `sa_credit_equivalences` | معادلة المقررات | الطلاب والقبول | medium | students، courses | متطابقة | 1 / 0 |
+| 48 | `sa_advising_warnings` | الإنذارات الإرشادية | الطلاب والقبول | medium | students | متطابقة | 1 / 0 |
+| 49 | `sa_lifecycle_movements` | حركات القيد | الطلاب والقبول | high | students | متطابقة | 1 / 0 |
+| 50 | `student_self_enrollments` | التسجيل الذاتي في المقررات | الطلاب والقبول | medium | students | متطابقة | 1 / 0 |
+| 51 | `grade_appeals` | تظلمات العلامات | الطلاب والقبول | medium | students | متطابقة | 1 / 0 |
+| 52 | `office_hour_bookings` | حجوزات الساعات المكتبية | الطلاب والقبول | low | students | متطابقة | 1 / 0 |
+| 53 | `student_fee_installments` | أقساط الرسوم | مالية الطلاب | high | students | متطابقة | 1 / 0 |
+| 54 | `fin_charges` | المستحقات المالية | مالية الطلاب | high | students، fin_fee_types | متطابقة | 1 / 0 |
+| 55 | `fin_payments` | إيصالات القبض | مالية الطلاب | high | students | متطابقة | 1 / 0 |
+| 56 | `sa_scholarships` | المنح المعتمدة | مالية الطلاب | high | students، fin_fee_types | متطابقة | 1 / 0 |
+| 57 | `alumni_records` | سجل الخريجين | متفرقات | low | — | متطابقة | 1 / 0 |
+| 58 | `career_jobs` | فرص التوظيف | متفرقات | low | — | متطابقة | 1 / 0 |
+| 59 | `career_applications` | طلبات التوظيف | متفرقات | low | career_jobs | متطابقة | 1 / 0 |
+| 60 | `postgrad_theses` | رسائل الدراسات العليا | متفرقات | low | — | متطابقة | 1 / 0 |
+| 61 | `research_projects` | المشاريع البحثية | متفرقات | low | — | متطابقة | 1 / 0 |
+| 62 | `student_activities` | الأنشطة الطلابية | متفرقات | low | — | متطابقة | 1 / 0 |
+| 63 | `dorm_buildings` | مباني السكن | متفرقات | low | — | متطابقة | 1 / 0 |
+| 64 | `housing_handouts` | مواد السكن المسلمة | متفرقات | low | students | متطابقة | 1 / 0 |
+| 65 | `dorm_rooms` | غرف السكن | متفرقات | low | dorm_buildings | متطابقة | 1 / 0 |
 | 66 | `dorm_allocations` | إسكان الطلاب | متفرقات | low | dorm_rooms، students | متطابقة | 1 / 0 |
 | 67 | `library_books` | كتب المكتبة | متفرقات | low | — | متطابقة | 1 / 0 |
 | 68 | `library_loans` | إعارات المكتبة | متفرقات | low | library_books | متطابقة | 1 / 0 |
@@ -93,7 +93,7 @@
 | 71 | `qa_accreditations` | الاعتماد الأكاديمي | متفرقات | low | — | متطابقة | 1 / 0 |
 | 72 | `lms_lectures` | المحاضرات الإلكترونية | متفرقات | low | — | متطابقة | 1 / 0 |
 | 73 | `lms_quizzes` | اختبارات التعلم الإلكتروني | متفرقات | low | — | متطابقة | 1 / 0 |
-| 74 | `online_quizzes` | الاختبارات الإلكترونية | متفرقات | medium | — | متطابقة | 1 / 0 |
+| 74 | `lms_quiz_questions` | أسئلة الاختبارات | متفرقات | low | lms_quizzes | متطابقة | 1 / 0 |
 
 ## ما لم ينجح
 

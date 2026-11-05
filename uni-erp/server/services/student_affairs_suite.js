@@ -1,9 +1,10 @@
-import { docNo } from '../lib/doc_no.js';
+import { docNo, academicYear } from '../lib/doc_no.js';
 import { SOD_SENSITIVE_PERMISSIONS } from '../permissions.js';
 import { audit } from '../audit.js';
 import { HttpError } from '../http.js';
 import { registerStudent, STATUS_LABEL } from './students.js';
 import { createCharge } from './finance/fees.js';
+import { ready as readyFinance } from './finance/core.js';
 import { getSetting } from './settings.js';
 
 /* ============================================================================
@@ -926,46 +927,20 @@ export function grantStudentScholarship(deps, actor, body, ip) {
 
   const discountPercent = body?.discountPercent ? Number(body.discountPercent) : calc.discountPercent;
   const amount = body?.amount ? Number(body.amount) : Math.round((baseTuition * discountPercent) / 100);
+  if (!(discountPercent > 0 && discountPercent <= 100)) throw new HttpError(400, 'نسبة الحسم يجب أن تكون بين 1 و100.', 'validation');
+  if (!Number.isFinite(amount) || amount <= 0) throw new HttpError(400, 'مبلغ المنحة يجب أن يكون أكبر من صفر.', 'validation');
+
+  readyFinance(db);
+  const discountFeeType = db.prepare("SELECT id FROM fin_fee_types WHERE kind = 'discount' AND active = 1 ORDER BY id LIMIT 1").get();
+  if (!discountFeeType) throw new HttpError(409, 'لا يوجد نوع رسم خصم نشط في المالية؛ عرّفه أو فعّله أولاً ليُسجَّل قيد المنحة.', 'conflict');
+
   const nextId = (db.prepare('SELECT COALESCE(MAX(id), 0) + 1 AS n FROM sa_scholarships').get()?.n) || 1;
   const grantNo = `SCH-${new Date().getFullYear()}-${String(nextId).padStart(3, '0')}`;
-
-  // محاولة قيد الخصم آلياً في جدول fin_charges ودفتر الأستاذ في وحدة المالية
-  let finChargeId = null;
-  try {
-    let discountFeeType = db.prepare("SELECT * FROM fin_fee_types WHERE kind = 'discount' AND active = 1 ORDER BY id LIMIT 1").get();
-    if (!discountFeeType) {
-      const anyAcc = db.prepare('SELECT id FROM fin_accounts WHERE active = 1 AND postable = 1 ORDER BY id DESC LIMIT 1').get();
-      if (anyAcc) {
-        const ftId = db
-          .prepare("INSERT INTO fin_fee_types (code, name, kind, account_id, default_amount, active) VALUES ('SCH-DISC', 'حسم ومنح طلابية', 'discount', ?, 0, 1)")
-          .run(anyAcc.id).lastInsertRowid;
-        discountFeeType = { id: Number(ftId) };
-      }
-    }
-    if (discountFeeType) {
-      const chargeRes = createCharge(
-        deps,
-        actor,
-        {
-          studentId,
-          feeTypeId: discountFeeType.id,
-          amount,
-          dueDay: new Date().toISOString().slice(0, 10),
-          academicYear: String(new Date().getFullYear()),
-          note: `${calc.label} (${discountPercent}%) — رقم المنحة ${grantNo}`,
-        },
-        ip
-      );
-      finChargeId = chargeRes.id;
-    }
-  } catch (err) {
-    console.warn('[student_affairs_suite] finance auto-posting fallback:', err.message);
-  }
 
   const info = db
     .prepare(`
       INSERT INTO sa_scholarships (grant_no, student_id, scholarship_type, discount_percent, amount, academic_year, gpa_at_grant, fin_charge_id, status, approved_by, note, created_at)
-      VALUES (?, ?, ?, ?, ?, '2025-2026', ?, ?, 'active', ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, '${academicYear()}', ?, NULL, 'active', ?, ?, ?)
     `)
     .run(
       grantNo,
@@ -974,14 +949,36 @@ export function grantStudentScholarship(deps, actor, body, ip) {
       discountPercent,
       amount,
       gpa,
-      finChargeId,
       actor.display_name || actor.name || 'لجنة المنح والرعاية الطلابية',
       String(body?.note || calc.label).slice(0, 200),
       Date.now()
     );
+  const scholarshipId = Number(info.lastInsertRowid);
+
+  // createCharge يفتح معاملته الخاصة، لذا تُحذف المنحة إن فشل قيدها فلا تبقى منحة بلا خصم
+  let finChargeId;
+  try {
+    finChargeId = createCharge(
+      deps,
+      actor,
+      {
+        studentId,
+        feeTypeId: discountFeeType.id,
+        amount,
+        dueDay: new Date().toISOString().slice(0, 10),
+        academicYear: academicYear(),
+        note: `${calc.label} (${discountPercent}%) — رقم المنحة ${grantNo}`,
+      },
+      ip
+    ).id;
+  } catch (err) {
+    db.prepare('DELETE FROM sa_scholarships WHERE id = ?').run(scholarshipId);
+    throw err;
+  }
+  db.prepare('UPDATE sa_scholarships SET fin_charge_id = ? WHERE id = ?').run(finChargeId, scholarshipId);
 
   audit(db, actor, 'منح إعفاء/حسم طلابي وربطه بالمالية', `${grantNo} — ${amount} ل.س`, ip);
-  return { id: Number(info.lastInsertRowid), grantNo, amount, discountPercent, finChargeId };
+  return { id: scholarshipId, grantNo, amount, discountPercent, finChargeId };
 }
 
 /* ---------- 6. مكتب خدمة الطالب الموحد وحجز المواعيد والدور الذكي ---------- */

@@ -24,7 +24,19 @@
 
   const U = UA.uxState;
   const { ensureExamCoursesLoaded, syncExamDomToState, generateExamSchedulePdf } = UA.examBuilder;
-  const { CARD_LOGS_STORAGE_KEY, getCardLogs, saveCardLogs, formatCardLogTime } = UA.cardLogs;
+  const { getCardLogs, loadCardLogs, formatCardLogTime } = UA.cardLogs;
+  async function recordCardEvent(eventType, status, reason) {
+    const stList = (S.stList && S.stList.students) || [];
+    const st = S.stSel || stList[0];
+    if (!st) { toast('لا يوجد طالب محدد.'); return null; }
+    const locEl = document.getElementById('card-sim-loc');
+    const methodEl = document.getElementById('card-sim-method');
+    const locationCode = locEl.value;
+    const locationName = locEl.options[locEl.selectedIndex].text.replace(/^[^\s]+\s*/, '');
+    await api('POST', `/api/students/${st.id}/card-activity`, { method: methodEl.value, eventType, locationName, locationCode, status, reason });
+    await loadCardLogs(st.id);
+    return locationName;
+  }
 
   /* ==========================================================================
      1. دمج «مكتبي» و«لوحة التحكم» باسم «اللوحة الرئيسية»
@@ -149,7 +161,6 @@
           <div class="idc-bc" style="background:#fff;padding:8px 12px;border-radius:8px;display:inline-block;width:100%;max-width:380px" title="تكويد الباركود الأمني الفريد المضاد للتزوير">
             ${UA.code128 ? UA.code128(secureBarcode) : ''}
           </div>
-          <div style="font-size:10px;color:#fde68a;margin-top:4px;font-family:monospace">رمز التكويد الآمن المعتمد: ${esc(secureBarcode)}</div>
         </div>
       </div>`;
   };
@@ -244,10 +255,7 @@
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
         <div>
           <h2 style="margin:0">منظومة البصمة وأجهزة الحضور الحيوي (مدمجة في شؤون الموظفين)</h2>
-          <p class="hint" style="margin:4px 0 0">ربط مباشر مع أجهزة البصمة البيومترية (بصمة الإصبع والوجه) ومزامنتها تلقائياً مع سجل الدوام ومسيرات الرواتب.</p>
-        </div>
-        <div class="actions" style="margin:0">
-          <button type="button" class="btn pri" data-act="biosync">🔄 مزامنة فورية مع أجهزة البصمة</button>
+          <p class="hint" style="margin:4px 0 0">سجل الأجهزة. الربط الفعلي والمزامنة يُفعَّلان بعد تحديد نوع الجهاز المستخدم.</p>
         </div>
       </div>
       <div class="stats" style="margin-top:14px">
@@ -305,11 +313,11 @@
     if (!hrFull) U.hrSection = 'att_leaves';
     const sections = hrFull ? [
       ['payroll', 'ملفات الموظفين والعقود والرواتب (10 أقسام)'],
-      ['att_leaves', 'الحضور والانصراف والإجازات الموحدة'],
+      ['att_leaves', 'الحضور والإجازات'],
       ['biometrics', 'البصمة وأجهزة الحضور الحيوي'],
       ['appraisals', 'تقييم الموظفين والأداء الوظيفي (KPIs)'],
       ['enterprise_hr', 'التطوير المؤسسي للموارد البشرية والعبء التدريسي'],
-    ] : [['att_leaves', 'الحضور والانصراف والإجازات الموحدة']];
+    ] : [['att_leaves', 'الحضور والإجازات']];
     const topBar = `<div class="sub-tabs no-print" role="tablist" style="margin-bottom:14px">
       ${sections.map((s) => `<button class="chip" role="tab" data-act="hrunified" data-t="${s[0]}" aria-pressed="${U.hrSection === s[0]}">${esc(s[1])}</button>`).join('')}
     </div>`;
@@ -317,7 +325,7 @@
     if (U.hrSection === 'att_leaves') {
       return topBar + `<section class="card" style="margin-bottom:14px;background:#f0fdf4;border-color:#86efac">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
-          <div><b>وحدة الحضور والانصراف والإجازات الموحدة (شؤون الموظفين)</b><div class="small">تم دمج واجهات الحضور والانصراف وطلبات الإجازات وأرصدتها ضمن تبويب واحد متكامل تحت شؤون الموظفين.</div></div>
+          <div><b>وحدة الحضور والإجازات (شؤون الموظفين)</b><div class="small">تم دمج واجهات الحضور والانصراف وطلبات الإجازات وأرصدتها ضمن تبويب واحد متكامل تحت شؤون الموظفين.</div></div>
           <button type="button" class="btn sm" data-act="goexport" data-ds="attendance">تصدير التقارير من صفحة التصدير الموحدة ←</button>
         </div>
       </section>` + (origHrView ? origHrView() : '');
@@ -755,17 +763,17 @@
       { cat: 'شؤون الطلاب', title: '🎓 شؤون الطلاب · سجل الطلاب والبحث', view: 'affairs', act: 'sttab', val: 'list' },
       { cat: 'شؤون الطلاب', title: '➕ شؤون الطلاب · تسجيل طالب جديد', view: 'affairs', act: 'sttab', val: 'new' },
       { cat: 'شؤون الطلاب', title: '🪪 شؤون الطلاب · البطاقة الجامعية الرقمية', view: 'affairs', act: 'sttab', val: 'digital_card' },
-      { cat: 'شؤون الطلاب', title: '🏫 شؤون الطلاب · القبول والمفاضلة والمعادلة', view: 'affairs', act: 'sttab', val: 'admissions' },
+      { cat: 'شؤون الطلاب', title: '🏫 شؤون الطلاب · القبول والمفاضلة والمعادلة', view: 'labtools', act: 'labtab', val: 'admissions' },
       { cat: 'شؤون الطلاب', title: '🧭 شؤون الطلاب · الخطة التفاعلية والإرشاد والإنذار', view: 'affairs', act: 'sttab', val: 'advising' },
       { cat: 'شؤون الطلاب', title: '🔁 شؤون الطلاب · حركات القيد والانضباط', view: 'affairs', act: 'sttab', val: 'lifecycle' },
-      { cat: 'شؤون الطلاب', title: '⚖️ شؤون الطلاب · اللجنة التأديبية والمخالفات', view: 'affairs', act: 'sttab', val: 'disciplinary' },
+      { cat: 'شؤون الطلاب', title: '⚖️ شؤون الطلاب · اللجنة التأديبية والمخالفات', view: 'affairs', act: 'sttab', val: 'lifecycle' },
       { cat: 'شؤون الطلاب', title: '🎁 شؤون الطلاب · المنح والإعفاءات', view: 'affairs', act: 'sttab', val: 'scholarships' },
       { cat: 'شؤون الطلاب', title: '🎟️ شؤون الطلاب · مكتب خدمة الطالب والدور', view: 'affairs', act: 'sttab', val: 'desk_queue' },
       { cat: 'التقارير', title: '📈 الإحصاءات والتقارير', view: 'dashboard' },
       { cat: 'الشؤون الأكاديمية', title: '👨‍🏫 الشؤون الأكاديمية · أعضاء هيئة التدريس', view: 'academics', act: 'acadtab', val: 'members' },
       { cat: 'الشؤون الأكاديمية', title: '🚪 سجل القاعات', view: 'attendance' },
       { cat: 'الشؤون الأكاديمية', title: '📅 الامتحانات والتقييم', view: 'expansions' },
-      { cat: 'الشؤون الطلابية', title: '🏠 السكن والساعات المكتبية', view: 'student_life' },
+      { cat: 'الشؤون الطلابية', title: '🏠 السكن الجامعي', view: 'student_life' },
       { cat: 'المنظومة الأكاديمية', title: '💻 التعلم الإلكتروني والمكتبة', view: 'lms' },
       { cat: 'المنظومة الأكاديمية', title: '🔬 البحث والدراسات العليا', view: 'research' },
       { cat: 'المنظومة الأكاديمية', title: '🎓 الخريجون والتوظيف', view: 'alumni' },
@@ -1336,133 +1344,17 @@
         window.print();
       }
     },
-    certifydigicard: () => {
-      toast('✓ تم تصديق البطاقة الجامعية رقمياً بمفتاح X.509 وتوليد رمز الحماية المضاد للتزوير');
-    },
     simcardcheckin: async () => {
-      const stList = (S.stList && S.stList.students) || [];
-      const st = S.stSel || stList[0];
-      if (!st) { toast('لا يوجد طالب محدد.'); return; }
-      const locEl = document.getElementById('card-sim-loc');
-      const methodEl = document.getElementById('card-sim-method');
-      const locCode = (locEl && locEl.value) || 'GATE-MAIN-01';
-      const locName = (locEl && locEl.options && locEl.options[locEl.selectedIndex] && locEl.options[locEl.selectedIndex].text.replace(/^[^\s]+\s*/, '')) || 'البوابة الرئيسية — الحرم المركزي';
-      const method = (methodEl && methodEl.value) || 'nfc';
-      const termId = method === 'nfc' ? (locCode === 'GATE-MAIN-01' ? 'TRM-NFC-A1' : locCode === 'LIB-ENTRANCE' ? 'LIB-DESK-NFC-2' : locCode === 'LAB-CYB-03' ? 'TRM-NFC-L3' : 'NFC-GATE-04') : (locCode === 'GATE-MAIN-01' ? 'SCAN-BC-01' : 'SCAN-BC-04');
-      const pkiHash = '0x' + Math.floor(Math.random() * 0xffffffff).toString(16).padStart(8, '0');
-      const newEntry = {
-        id: 'LOG-' + Date.now().toString().slice(-6),
-        studentId: st.id,
-        studentNo: st.studentNo,
-        studentName: st.name,
-        eventType: 'check_in',
-        locationName: locName,
-        locationCode: locCode,
-        method: method,
-        terminalId: termId,
-        status: 'granted',
-        reason: 'تصريح دخول نظامي ساري المفعول (بطاقة ذكية معتمدة)',
-        pkiHash: pkiHash,
-        timestamp: Date.now(),
-      };
-      const logs = getCardLogs();
-      logs.unshift(newEntry);
-      saveCardLogs(logs);
-
-      try {
-        api('POST', `/api/students/${st.id}/card-activity`, {
-          method,
-          eventType: 'check_in',
-          locationName: locName,
-          locationCode: locCode,
-          terminalId: termId,
-          status: 'granted',
-          reason: newEntry.reason,
-          pkiHash,
-        }).catch(() => {});
-      } catch {}
-
-      toast(`✓ تم التحقق بنجاح من البطاقة (${method === 'nfc' ? 'شريحة NFC' : 'مسح الباركود'}): تسجيل دخول في ${locName}`);
-      UA.render();
+      const where = await recordCardEvent('check_in', 'granted', 'تسجيل يدوي');
+      if (where) toast(`سُجل دخول في ${where}`);
     },
     simcardcheckout: async () => {
-      const stList = (S.stList && S.stList.students) || [];
-      const st = S.stSel || stList[0];
-      if (!st) { toast('لا يوجد طالب محدد.'); return; }
-      const locEl = document.getElementById('card-sim-loc');
-      const methodEl = document.getElementById('card-sim-method');
-      const locCode = (locEl && locEl.value) || 'GATE-MAIN-01';
-      const locName = (locEl && locEl.options && locEl.options[locEl.selectedIndex] && locEl.options[locEl.selectedIndex].text.replace(/^[^\s]+\s*/, '')) || 'البوابة الرئيسية — الحرم المركزي';
-      const method = (methodEl && methodEl.value) || 'nfc';
-      const termId = method === 'nfc' ? (locCode === 'GATE-MAIN-01' ? 'TRM-NFC-A1' : 'NFC-GATE-04') : 'SCAN-BC-02';
-      const pkiHash = '0x' + Math.floor(Math.random() * 0xffffffff).toString(16).padStart(8, '0');
-      const newEntry = {
-        id: 'LOG-' + Date.now().toString().slice(-6),
-        studentId: st.id,
-        studentNo: st.studentNo,
-        studentName: st.name,
-        eventType: 'check_out',
-        locationName: locName,
-        locationCode: locCode,
-        method: method,
-        terminalId: termId,
-        status: 'granted',
-        reason: 'خروج نظامي موثق ومطابق لسجلات الحضور',
-        pkiHash: pkiHash,
-        timestamp: Date.now(),
-      };
-      const logs = getCardLogs();
-      logs.unshift(newEntry);
-      saveCardLogs(logs);
-
-      try {
-        api('POST', `/api/students/${st.id}/card-activity`, {
-          method,
-          eventType: 'check_out',
-          locationName: locName,
-          locationCode: locCode,
-          terminalId: termId,
-          status: 'granted',
-          reason: newEntry.reason,
-          pkiHash,
-        }).catch(() => {});
-      } catch {}
-
-      toast(`✓ تم التحقق بنجاح من البطاقة (${method === 'nfc' ? 'شريحة NFC' : 'مسح الباركود'}): تسجيل خروج من ${locName}`);
-      UA.render();
+      const where = await recordCardEvent('check_out', 'granted', 'تسجيل يدوي');
+      if (where) toast(`سُجل خروج من ${where}`);
     },
     simcarddenied: async () => {
-      const stList = (S.stList && S.stList.students) || [];
-      const st = S.stSel || stList[0];
-      if (!st) { toast('لا يوجد طالب محدد.'); return; }
-      const locEl = document.getElementById('card-sim-loc');
-      const methodEl = document.getElementById('card-sim-method');
-      const locCode = (locEl && locEl.value) || 'GATE-MAIN-01';
-      const locName = (locEl && locEl.options && locEl.options[locEl.selectedIndex] && locEl.options[locEl.selectedIndex].text.replace(/^[^\s]+\s*/, '')) || 'البوابة الرئيسية — الحرم المركزي';
-      const method = (methodEl && methodEl.value) || 'nfc';
-      const termId = method === 'nfc' ? 'TRM-NFC-SEC' : 'SCAN-BC-SEC';
-      const pkiHash = '0x' + Math.floor(Math.random() * 0xffffffff).toString(16).padStart(8, '0');
-      const newEntry = {
-        id: 'LOG-' + Date.now().toString().slice(-6),
-        studentId: st.id,
-        studentNo: st.studentNo,
-        studentName: st.name,
-        eventType: 'denied',
-        locationName: locName,
-        locationCode: locCode,
-        method: method,
-        terminalId: termId,
-        status: 'denied',
-        reason: 'محاولة تحقق غير مصرحة — تجاوز ساعات الدوام المصرحة للمرفق',
-        pkiHash: pkiHash,
-        timestamp: Date.now(),
-      };
-      const logs = getCardLogs();
-      logs.unshift(newEntry);
-      saveCardLogs(logs);
-
-      toast(`⚠️ محاكاة تحقق مرفوضة (Access Denied) في ${locName}`);
-      UA.render();
+      const where = await recordCardEvent('denied', 'denied', 'تسجيل يدوي لمحاولة مرفوضة');
+      if (where) toast(`سُجلت محاولة مرفوضة في ${where}`);
     },
     cardfilterevent: (el) => {
       if (!U.cardActivity) U.cardActivity = {};
@@ -1548,17 +1440,10 @@
         window.print();
       }
     },
-    resetcardlogs: () => {
-      try {
-        localStorage.removeItem(CARD_LOGS_STORAGE_KEY);
-      } catch {}
-      toast('✓ تم مسح سجل النشاط المحلي للبطاقات');
-      UA.render();
-    },
     exmautodates: () => {
       syncExamDomToState();
       const start = new Date(U.examSchedule.startDate || Date.now() + 86400000);
-      const halls = ((S.limits && S.limits.dropdowns && S.limits.dropdowns.halls) || ['المدرج الكبير A1', 'المدرج الثاني A2', 'قاعة الامتحانات المركزية B1']);
+      const halls = ((S.limits && S.limits.dropdowns && S.limits.dropdowns.halls) || []);
       let dayOffset = 0;
       (U.examSchedule.courses || []).forEach((c, idx) => {
         const d = new Date(start.getTime() + dayOffset * 86400000);
@@ -1572,7 +1457,7 @@
         row.date = d.toISOString().slice(0, 10);
         row.time = idx % 2 === 0 ? '09:00' : '12:30';
         row.duration = 120;
-        row.hall = halls[idx % halls.length] || 'المدرج الكبير A1';
+        row.hall = halls[idx % halls.length] || '';
       });
       toast('تم توزيع تواريخ وأوقات وقاعات الفحص تلقائياً على كافة المواد (مع استثناء أيام العطل)');
       if (S.view === 'expansions') {
@@ -1591,7 +1476,7 @@
       const E = U.examSchedule;
       const items = selected.map((c) => {
         const r = E.rows[c.id] || {}, start = r.time || '09:00';
-        return { course_code: c.code, course_name: c.name, program_name: c.program || c.programName || c.faculty || '', exam_date: r.date || E.startDate, start_time: start, end_time: endOf(start, r.duration || 120), hall_name: r.hall || 'المدرج الكبير A1', capacity: Number(r.capacity) || 0, proctor_name: r.proctor || c.instructor || 'لجنة المراقبة', group_id: r.groupId || null };
+        return { course_code: c.code, course_name: c.name, program_name: c.program || c.programName || c.faculty || '', exam_date: r.date || E.startDate, start_time: start, end_time: endOf(start, r.duration || 120), hall_name: r.hall || '', capacity: Number(r.capacity) || 0, proctor_name: r.proctor || c.instructor || 'لجنة المراقبة', group_id: r.groupId || null };
       });
       try {
         const out = await api('POST', '/api/expansions/exams/bulk', { exam_type: E.examType, academic_year: E.academicYear, semester: E.semester, items });

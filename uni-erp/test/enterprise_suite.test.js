@@ -4,9 +4,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { openDb } from '../server/db.js';
+import { findSlotConflict } from '../server/services/schedule.js';
 import {
   calculateSimulatedGpa,
-  detectTimetableConflict,
   computeFacultyOverloadPay,
   buildEnterpriseSuiteOverview,
   enterpriseOverviewFor,
@@ -27,35 +27,15 @@ test('Pure Logic: GPA Simulator calculates weighted GPA and academic standing ac
 });
 
 test('Pure Logic: Timetable conflict detector catches hall and instructor collisions', () => {
-  const existing = [
-    { course_name: 'التشفير المتقدم', instructor_name: 'أ.د. مازن الحسن', hall_code: 'مدرج الفارابي A1', day_name: 'الأحد', time_slot: '08:30 - 10:30' },
-  ];
-  const hallClash = detectTimetableConflict(existing, {
-    course_name: 'أمن الشبكات',
-    instructor_name: 'د. رامي الشامي',
-    hall_code: 'مدرج الفارابي A1',
-    day_name: 'الأحد',
-    time_slot: '08:30 - 10:30',
-  });
-  assert.equal(hallClash.conflict, true);
-
-  const instClash = detectTimetableConflict(existing, {
-    course_name: 'أمن الشبكات',
-    instructor_name: 'أ.د. مازن الحسن',
-    hall_code: 'مخبر السيبراني L2',
-    day_name: 'الأحد',
-    time_slot: '08:30 - 10:30',
-  });
-  assert.equal(instClash.conflict, true);
-
-  const validSlot = detectTimetableConflict(existing, {
-    course_name: 'أمن الشبكات',
-    instructor_name: 'د. رامي الشامي',
-    hall_code: 'مخبر السيبراني L2',
-    day_name: 'الأحد',
-    time_slot: '08:30 - 10:30',
-  });
-  assert.equal(validSlot.conflict, false);
+  const others = [{ course_id: 1, course_name: 'التشفير المتقدم', day: 1, start_min: 510, end_min: 630, hall: 'A1', member_id: 7, instructor: 'أ.د. مازن' }];
+  const course = (o) => ({ id: 2, member_id: null, instructor: '', ...o });
+  assert.match(findSlotConflict(others, course({}), { day: 1, a: 600, b: 700, hall: 'A1' }), /قاعة/);
+  assert.match(findSlotConflict(others, course({ member_id: 7 }), { day: 1, a: 510, b: 630, hall: 'L2' }), /مدرّس/);
+  assert.match(findSlotConflict(others, course({ instructor: 'أ.د. مازن' }), { day: 1, a: 510, b: 630, hall: 'L2' }), /مدرّس/);
+  assert.equal(findSlotConflict(others, course({}), { day: 1, a: 510, b: 630, hall: 'L2' }), null, 'قاعة أخرى ومدرّس آخر');
+  assert.equal(findSlotConflict(others, course({}), { day: 2, a: 510, b: 630, hall: 'A1' }), null, 'يوم آخر');
+  assert.equal(findSlotConflict(others, course({}), { day: 1, a: 630, b: 700, hall: 'A1' }), null, 'يبدأ حين ينتهي الآخر');
+  assert.equal(findSlotConflict(others, { id: 1, member_id: 7, instructor: '' }, { day: 1, a: 510, b: 630, hall: 'A1' }), null, 'المقرر نفسه');
 });
 
 test('Pure Logic: Faculty Overload Payroll calculator computes extra hours and compensation', () => {

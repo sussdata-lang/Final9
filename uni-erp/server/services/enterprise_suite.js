@@ -1,5 +1,8 @@
 import { docNo, academicYear } from '../lib/doc_no.js';
 import { listQuizzes, withoutAnswers, submitQuiz } from './quizzes.js';
+import { listAllSlots, DAYS } from './schedule.js';
+import { notify } from './push.js';
+import { loadIdentity } from './pki.js';
 import { createCharge, createPayment } from './finance/fees.js';
 import { ready as financeReady } from './finance/core.js';
 import { tx } from '../db.js';
@@ -28,20 +31,6 @@ export function calculateSimulatedGpa(currentGpa, completedHours, upcomingCourse
   const projectedGpa = totalHours > 0 ? Math.round((totalWeighted / totalHours) * 100) / 100 : 0;
   const letter = projectedGpa >= 90 ? 'ممتاز (A+)' : projectedGpa >= 80 ? 'جيد جداً (B+)' : projectedGpa >= 70 ? 'جيد (C+)' : projectedGpa >= 60 ? 'مقبول (D)' : 'إنذار أكاديمي (F)';
   return { projectedGpa, totalHours, letter, delta: Math.round((projectedGpa - curGpa) * 100) / 100 };
-}
-
-export function detectTimetableConflict(existingSlots = [], candidate) {
-  for (const s of existingSlots) {
-    if (s.day_name === candidate.day_name && s.time_slot === candidate.time_slot) {
-      if (s.hall_code === candidate.hall_code) {
-        return { conflict: true, reason: `تضارب قاعة: القاعة ${s.hall_code} محجوزة لمقرر "${s.course_name}" في نفس التوقيت.` };
-      }
-      if (s.instructor_name === candidate.instructor_name) {
-        return { conflict: true, reason: `تضارب أستاذ: المحاضر "${s.instructor_name}" لديه محاضرة "${s.course_name}" في نفس التوقيت.` };
-      }
-    }
-  }
-  return { conflict: false, reason: null };
 }
 
 export function computeFacultyOverloadPay(quorumHours, actualTeachingHours, supervisionHours, hourlyRate) {
@@ -91,8 +80,13 @@ function executiveKpisFrom(db) {
   };
 }
 
+// ما يغطيه توقيع القسيمة: أي تعديل لاحق في هذه القيم يبطله
+const money2 = (v) => Number(v).toFixed(2);
+export const payslipPayload = (p) => Buffer.from([p.payslip_code, p.employee_code ?? '', p.employee_name, p.month_label, money2(p.basic_salary), money2(p.overload_pay), money2(p.allowances), money2(p.deductions), money2(p.net_salary)].join('|'), 'utf8');
+
 export function buildEnterpriseSuiteOverview(db) {
-  const scheduleSlots = db.prepare('SELECT * FROM smart_schedule_slots ORDER BY id DESC').all();
+  const scheduleSlots = listAllSlots(db);
+  const scheduleCourses = db.prepare('SELECT id, code, name, instructor FROM courses WHERE active = 1 ORDER BY name').all();
   const quizzes = listQuizzes(db);
   const quizSubmissions = db.prepare('SELECT * FROM lms_quiz_submissions ORDER BY submitted_at DESC LIMIT 30').all();
   const selfEnrollments = db.prepare('SELECT * FROM student_self_enrollments ORDER BY registered_at DESC').all();
@@ -105,6 +99,8 @@ export function buildEnterpriseSuiteOverview(db) {
 
   return {
     scheduleSlots,
+    scheduleCourses,
+    scheduleDays: DAYS,
     quizzes,
     quizSubmissions,
     selfEnrollments,
@@ -130,6 +126,9 @@ export function enterpriseOverviewFor(db, user) {
   return {
     ...ov,
     advisingPlan: user.role === 'student' ? advisingPlanFor(db, user.id) : [],
+    enrollableCourses: user.role === 'student'
+      ? db.prepare('SELECT c.code, c.name, c.hours FROM courses c JOIN student_profiles sp ON sp.program_id = c.program_id WHERE sp.user_id = ? AND c.active = 1 AND c.code IS NOT NULL ORDER BY c.level, c.semester, c.name').all(user.id)
+      : db.prepare('SELECT code, name, hours FROM courses WHERE active = 1 AND code IS NOT NULL ORDER BY name LIMIT 500').all(),
     quizzes: canAny(user, 'course:manage', 'grade:manage') ? ov.quizzes : ov.quizzes.filter((q) => user.role !== 'student' || q.open).map(withoutAnswers),
     quizSubmissions: seesAcademic ? ov.quizSubmissions : own(ov.quizSubmissions),
     selfEnrollments: seesAcademic || user.can('student:read') ? ov.selfEnrollments : own(ov.selfEnrollments),
@@ -150,38 +149,6 @@ export function registerEnterpriseSuiteRoutes(r, deps) {
     c.json(200, enterpriseOverviewFor(db, c.user));
   });
 
-  // 1. إضافة حصة في الجدول الذكي مع فحص التضارب الآلي
-  r.add('POST', '/api/enterprise/schedule', (c) => {
-    needAny(c, 'course:manage', 'attendance:manage');
-    const b = c.body || {};
-    if (!b.course_code || !b.course_name || !b.instructor_name || !b.hall_code || !b.day_name || !b.time_slot) {
-      throw new HttpError(400, 'جميع حقول المقرر والقاعة والمحاضر والتوقيت مطلوبة.');
-    }
-    const existing = db.prepare('SELECT * FROM smart_schedule_slots WHERE day_name = ? AND time_slot = ?').all(b.day_name, b.time_slot);
-    const check = detectTimetableConflict(existing, b);
-    if (check.conflict) {
-      throw new HttpError(409, check.reason, 'schedule_conflict');
-    }
-    const info = db.prepare(`
-      INSERT INTO smart_schedule_slots (course_code, course_name, faculty_name, instructor_name, hall_code, day_name, time_slot, section_code, enrolled_count, capacity, status, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'معتمد بلا تضارب', ?)
-    `).run(
-      String(b.course_code).trim(),
-      String(b.course_name).trim(),
-      String(b.faculty_name || '').trim(),
-      String(b.instructor_name).trim(),
-      String(b.hall_code).trim(),
-      String(b.day_name).trim(),
-      String(b.time_slot).trim(),
-      String(b.section_code || 'شعبة 1').trim(),
-      Number(b.enrolled_count || 0),
-      Number(b.capacity || 0),
-      Date.now()
-    );
-    c.json(201, { ok: true, id: Number(info.lastInsertRowid) });
-  });
-
-  // 2. تقديم اختبار إلكتروني وتصحيح فوري آلي (Online Quiz Auto-Grading)
   // 3. محاكي المعدل التراكمي (GPA Simulator)
   r.add('POST', '/api/enterprise/gpa-simulate', (c) => {
     const b = c.body || {};
@@ -192,7 +159,7 @@ export function registerEnterpriseSuiteRoutes(r, deps) {
   // 4. التسجيل الذاتي للمقررات (Self-Enrollment)
   r.add('POST', '/api/enterprise/self-enroll', (c) => {
     const b = c.body || {};
-    if (!b.course_code || !b.course_name) throw new HttpError(400, 'يرجى تحديد رمز واسم المقرر للتسجيل.');
+    if (!b.course_code) throw new HttpError(400, 'يرجى اختيار المقرر.');
     // الطالب يسجّل لنفسه فقط؛ وتحديد طالب آخر يتطلب صلاحية إدارية
     const self = Boolean(c.user.student_no);
     if (!self) needAny(c, 'course:manage', 'student:register');
@@ -219,10 +186,14 @@ export function registerEnterpriseSuiteRoutes(r, deps) {
       }
     }
 
-    const dup = db.prepare('SELECT id FROM student_self_enrollments WHERE student_no = ? AND course_code = ?').get(studentNo, b.course_code);
+    // بيانات المقرر من السجل، لا مما يرسله المتصفح
+    const course = db.prepare('SELECT code, name, hours FROM courses WHERE code = ? AND active = 1 ORDER BY id LIMIT 1').get(String(b.course_code));
+    if (!course) throw new HttpError(404, 'المقرر غير موجود أو غير مفعل.', 'not_found');
+
+    const dup = db.prepare('SELECT id FROM student_self_enrollments WHERE student_no = ? AND course_code = ?').get(studentNo, course.code);
     if (dup) throw new HttpError(409, 'أنت مسجل مسبقاً في هذا المقرر لهذا الفصل.');
 
-    const newCredits = Math.max(1, Number(b.credits || 3));
+    const newCredits = Number(course.hours);
     const currentCreditsRow = db.prepare('SELECT COALESCE(SUM(credits), 0) AS total FROM student_self_enrollments WHERE student_no = ?').get(studentNo);
     const currentCredits = Number(currentCreditsRow?.total || 0);
     if (currentCredits + newCredits > 18) {
@@ -241,23 +212,10 @@ export function registerEnterpriseSuiteRoutes(r, deps) {
       }
     }
 
-    // التحقق من المتطلب السابق (Prerequisite) إن وجد
-    const prereqCode = String(b.prerequisite_code || '').trim();
-    if (prereqCode && prereqCode !== 'مستوفى' && prereqCode !== 'لا يوجد' && prereqCode !== 'NONE' && studentId) {
-      const prereqCourse = db.prepare('SELECT id, name FROM courses WHERE code = ? OR name = ? LIMIT 1').get(prereqCode, prereqCode);
-      if (prereqCourse) {
-        const passed = db.prepare("SELECT id FROM grades WHERE student_id = ? AND (course_id = ? OR course = ?) AND mark >= 60 AND workflow_status = 'approved' LIMIT 1")
-          .get(studentId, prereqCourse.id, prereqCourse.name);
-        if (!passed) {
-          throw new HttpError(400, `لم يتم استيفاء المتطلب السابق للمقرر (${prereqCode}).`, 'prerequisite_not_met');
-        }
-      }
-    }
-
     db.prepare(`
       INSERT INTO student_self_enrollments (student_no, student_name, course_code, course_name, credits, semester, prerequisite_code, status, registered_at)
       VALUES (?, ?, ?, ?, ?, 'الفصل الأول ${academicYear()}', ?, 'مسجل ومعتمد آلياً', ?)
-    `).run(studentNo, studentName, b.course_code, b.course_name, newCredits, b.prerequisite_code || 'مستوفى', Date.now());
+    `).run(studentNo, studentName, course.code, course.name, newCredits, '', Date.now());
     c.json(201, { ok: true });
   });
 
@@ -287,6 +245,15 @@ export function registerEnterpriseSuiteRoutes(r, deps) {
     c.json(201, { ok: true, ...calc });
   });
 
+  r.add('GET', '/api/enterprise/payslips/:code/verify', (c) => {
+    if (!canAny(c.user, ...SEES_PAYROLL, 'audit:read')) throw new HttpError(403, 'لا تملك صلاحية التحقق من قسائم الرواتب.', 'forbidden');
+    const row = db.prepare('SELECT * FROM hr_signed_payslips WHERE upper(payslip_code) = upper(?)').get(String(c.params.code));
+    if (!row) throw new HttpError(404, 'لا توجد قسيمة بهذا الرمز.', 'not_found');
+    const sig = String(row.digital_signature ?? ''), id = loadIdentity(deps.cfg);
+    const valid = sig.startsWith('RSA-SHA256:') && crypto.verify('sha256', payslipPayload(row), crypto.createPublicKey(id.key), Buffer.from(sig.slice(11), 'base64'));
+    c.json(200, { valid, code: row.payslip_code, employee: row.employee_name, month: row.month_label, certificateTrusted: id.trusted });
+  });
+
   r.add('POST', '/api/enterprise/payslips/issue', (c) => {
     if (!c.user || (c.user.role !== 'admin' && !c.user.can?.('hr:manage') && !c.user.can?.('hr_payroll:approve'))) {
       throw new HttpError(403, 'يتطلب إصدار قسائم الرواتب الموقعة صلاحية إدارة الموارد البشرية والرواتب (hr:manage / hr_payroll:approve).', 'forbidden');
@@ -305,13 +272,13 @@ export function registerEnterpriseSuiteRoutes(r, deps) {
     const net = basic + overload + allow - ded;
     const issued = new Date();
     const code = docNo(`PAY-${issued.getFullYear()}${String(issued.getMonth() + 1).padStart(2, '0')}`);
-    // بصمة تحقق بلا مفتاح، وليست توقيعاً رقمياً
-    const sig = 'SHA256-' + crypto.createHash('sha256').update(`${code}:${b.employee_name}:${net}`).digest('hex').slice(0, 20).toUpperCase();
+    const month = b.month_label || issued.toLocaleDateString('ar-SY-u-nu-latn', { month: 'long', year: 'numeric' });
+    const sig = 'RSA-SHA256:' + crypto.sign('sha256', payslipPayload({ payslip_code: code, employee_code: b.employee_code || '', employee_name: b.employee_name, month_label: month, basic_salary: basic, overload_pay: overload, allowances: allow, deductions: ded, net_salary: net }), loadIdentity(deps.cfg).key).toString('base64');
 
     db.prepare(`
       INSERT INTO hr_signed_payslips (payslip_code, employee_code, employee_name, department, month_label, basic_salary, overload_pay, allowances, deductions, net_salary, digital_signature, issued_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(code, b.employee_code || '', b.employee_name, b.department || '', b.month_label || issued.toLocaleDateString('ar-SY-u-nu-latn', { month: 'long', year: 'numeric' }), basic, overload, allow, ded, net, sig, Date.now());
+    `).run(code, b.employee_code || '', b.employee_name, b.department || '', month, basic, overload, allow, ded, net, sig, Date.now());
     c.json(201, { ok: true, payslip_code: code, net_salary: net, digital_signature: sig });
   });
 
@@ -350,42 +317,45 @@ export function registerEnterpriseSuiteRoutes(r, deps) {
     needAny(c, 'news:manage');
     const b = c.body || {};
     if (!b.title || !b.body) throw new HttpError(400, 'عنوان ونص الإشعار مطلوبان.');
+    // الإرسال الفعلي: إشعارات المتصفح لمن اشترك من الجمهور. القنوات الأخرى غير مربوطة، فلا تُعرض
+    const toStaff = b.audience === 'staff';
+    const ids = db.prepare(toStaff ? "SELECT id FROM users WHERE role <> 'student' AND active = 1" : "SELECT u.id FROM users u JOIN student_profiles p ON p.user_id = u.id WHERE u.role = 'student' AND u.active = 1 AND p.status = 'active'").all().map((u) => u.id);
+    const devices = ids.length ? Number(db.prepare(`SELECT COUNT(*) AS c FROM push_subscriptions WHERE user_id IN (${ids.map(() => '?').join(',')})`).get(...ids).c) : 0;
     db.prepare(`
       INSERT INTO multi_channel_notifications (title, body, target_audience, channels, priority, delivery_count, sender_name, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      b.title,
-      b.body,
-      b.target_audience || 'جميع الطلاب والعاملين',
-      b.channels || 'Web Push + Telegram + WhatsApp + Email',
-      b.priority || 'عاجل',
-      0, // الإشعار يُسجَّل فقط، ولا إرسال خارجي فعلي
-      c.user?.display_name || 'إدارة الجامعة',
-      Date.now()
-    );
-    c.json(201, { ok: true });
+    `).run(b.title, b.body, toStaff ? 'الهيئة التدريسية والإدارية' : 'كافة الطلاب', 'البوابة الداخلية + إشعارات المتصفح', b.priority || 'عاجل', devices, c.user?.display_name || 'إدارة الجامعة', Date.now());
+    if (ids.length) notify(deps, ids, { title: b.title, body: b.body, tag: 'broadcast' });
+    audit(db, c.user, 'إرسال إشعار عام', String(b.title).slice(0, 80), c.ip);
+    c.json(201, { ok: true, devices });
   });
 
   // 9. مزامنة دفعة حضور وعلامات اللجان الامتحانية دون اتصال (Offline Exam Sync)
   r.add('POST', '/api/enterprise/offline-sync', (c) => {
     needAny(c, 'grade:manage', 'attendance:manage');
     const b = c.body || {};
-    const records = Array.isArray(b.records) ? b.records : [];
-    const code = docNo('SYNC-OFF');
-    db.prepare(`
-      INSERT INTO offline_sync_batches (batch_code, committee_name, hall_code, course_code, records_count, payload_json, synced_by, synced_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      code,
-      b.committee_name || 'اللجنة الامتحانية المركزية',
-      b.hall_code || 'مدرج الفارابي A1',
-      b.course_code || 'CYB-301',
-      records.length || 1,
-      JSON.stringify(records),
-      c.user?.display_name || 'رئيس القاعة الامتحانية',
-      Date.now()
-    );
-    c.json(201, { ok: true, batch_code: code, synced_count: records.length || 1 });
+    const committee = String(b.committee_name ?? '').trim().slice(0, 120);
+    const hall = String(b.hall_code ?? '').trim().slice(0, 60);
+    const courseCode = String(b.course_code ?? '').trim().slice(0, 40);
+    if (!committee || !hall || !courseCode) throw new HttpError(400, 'اللجنة والقاعة والمقرر مطلوبة.', 'validation');
+    const course = db.prepare('SELECT id, code, name FROM courses WHERE code = ? AND active = 1 ORDER BY id LIMIT 1').get(courseCode);
+    if (!course) throw new HttpError(404, `المقرر ${courseCode} غير موجود.`, 'not_found');
+    const numbers = [...new Set((Array.isArray(b.student_nos) ? b.student_nos : []).map((n) => String(n ?? '').trim()).filter(Boolean))];
+    if (!numbers.length) throw new HttpError(400, 'أدخل الرقم الجامعي لطالب واحد على الأقل.', 'validation');
+    const find = db.prepare("SELECT id, student_no FROM users WHERE role = 'student' AND student_no = ?");
+    const students = numbers.map((n) => find.get(n));
+    const missing = numbers.filter((_, i) => !students[i]);
+    if (missing.length) throw new HttpError(400, `أرقام جامعية غير موجودة: ${missing.slice(0, 10).join('، ')}`, 'validation');
+    const code = docNo('EXAM-ATT');
+    const now = Date.now();
+    tx(db, () => {
+      const ins = db.prepare("INSERT INTO hall_logs (student_id, kind, course_id, subject, hall, entered_at, exited_at, method, recorded_by, note) VALUES (?, 'exam', ?, ?, ?, ?, ?, 'manual', ?, ?)");
+      for (const st of students) ins.run(st.id, course.id, course.name, hall, now, now, c.user.id, `${committee} — ${code}`);
+      db.prepare(`INSERT INTO offline_sync_batches (batch_code, committee_name, hall_code, course_code, records_count, payload_json, synced_by, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(code, committee, hall, course.code, students.length, JSON.stringify(numbers), c.user.display_name || '', now);
+    });
+    audit(db, c.user, 'رصد حضور لجنة امتحانية', `${code} — ${course.code} — ${students.length} طالب`, c.ip);
+    c.json(201, { ok: true, batch_code: code, recorded_count: students.length });
   });
 
   // 10. البحث الشامل الفوري (Command Palette Search API)

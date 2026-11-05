@@ -1,3 +1,4 @@
+import { setAuditKey } from './audit.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -73,6 +74,17 @@ export function loadConfig(overrides = {}) {
     const pgOrMem = /^postgres(ql)?:\/\//i.test(String(cfg.dbPath || '')) || cfg.dbPath === ':memory:';
     if (!cfg.dataDir) cfg.dataDir = pgOrMem ? DEFAULT_DATA_DIR : path.dirname(cfg.dbPath);
     if (!overrides.backupDir && !env.BACKUP_DIR) cfg.backupDir = path.join(cfg.dataDir, 'backups');
+  }
+  // مفتاح سلسلة التدقيق: AUDIT_KEY، وإلا يُولَّد مرة واحدة بجوار مفتاح التوقيع. مستقل عنه، فتبديل مفتاح التوقيع لا يكسر السلسلة
+  {
+    const auditKeyFile = path.join(path.dirname(signingKeyFile(cfg)), 'audit.key');
+    if (env.AUDIT_KEY) cfg.auditKey = env.AUDIT_KEY;
+    else {
+      fs.mkdirSync(path.dirname(auditKeyFile), { recursive: true, mode: 0o700 });
+      if (!fs.existsSync(auditKeyFile)) fs.writeFileSync(auditKeyFile, crypto.randomBytes(32).toString('hex'), { mode: 0o600 });
+      cfg.auditKey = fs.readFileSync(auditKeyFile, 'utf8').trim();
+    }
+    setAuditKey(cfg.auditKey);
   }
   if (!cfg.signingKey) {
     // مفتاح التوقيع: يُولَّد مرة واحدة ويُحفظ بصلاحيات مقيّدة (0o700 للمجلد و0o600 للملف).

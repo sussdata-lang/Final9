@@ -724,7 +724,7 @@
             <label>الرصيد الدفتري الحالي<input value="${num(cur.qtyOnHand)} ${esc(cur.unit)}" disabled></label>
             <label>الرصيد الفعلي بعد الجرد<input id="padj-qty" type="number" value="${cur.qtyOnHand}"></label>
             <label>متوسط التكلفة للوحدة (ل.س)<input id="padj-cost" type="number" value="${cur.avgCost || 0}"></label>
-            <label>سبب التسوية / رقم محضر الجرد<input id="padj-reason" value="مطابقة جرد دوري للجنة المخازن"></label>
+            <label>سبب التسوية / رقم محضر الجرد<input id="padj-reason"></label>
           </div>
           <div class="row-end"><button class="btn" data-act="proc-close-modal">إلغاء</button><button class="btn pri" data-act="proc-do-adjust" data-id="${cur.id}">اعتماد التسوية الجردية</button></div>`);
       }
@@ -900,7 +900,7 @@
             <label>الصنف المستلم للمخزن<select id="prc-item">${P.items.map((i) => `<option value="${i.id}" ${firstLine.itemId === i.id ? 'selected' : ''}>${esc(i.code)} · ${esc(i.name)}</option>`).join('')}</select></label>
             <label>الكمية المقبولة فعلياً<input id="prc-qty" type="number" value="${firstLine.qty || 10}"></label>
             <label>سعر التكلفة للوحدة (ل.س)<input id="prc-cost" type="number" value="${firstLine.unitCost || 25000}"></label>
-            <label style="grid-column:1/-1">ملاحظة لجنة الفحص والاستلام<input id="prc-note" value="تم الفحص الفني والمطابقة وأُدخل للمستودع أصولاً"></label>
+            <label style="grid-column:1/-1">ملاحظة لجنة الفحص والاستلام<input id="prc-note"></label>
           </div>
           <div class="row-end"><button class="btn" data-act="proc-close-modal">إلغاء</button><button class="btn pri" data-act="proc-save-receipt">اعتماد الاستلام وتحديث الرصيد</button></div>`);
       }

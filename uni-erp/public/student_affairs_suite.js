@@ -185,7 +185,7 @@
               <label>الرقم الوطني<input id="sa-app-nid" dir="ltr" placeholder="01010099881"></label>
               <label>الهاتف<input id="sa-app-phone" dir="ltr" placeholder="0944123456"></label>
               <label>الفرع الثانوي<select id="sa-app-hstype"><option value="علمي">علمي</option><option value="أدبي">أدبي</option><option value="معلوماتية">معلوماتية</option></select></label>
-              <label>مجموع الثانوية (من 240)<input id="sa-app-score" type="number" step="0.5" min="100" max="240" value="218"></label>
+              <label>مجموع الثانوية (من 240)<input id="sa-app-score" type="number" step="0.5" min="100" max="240"></label>
               <label>فئة المفاضلة<select id="sa-app-cat">
                 <option value="general">مفاضلة عامة</option>
                 <option value="parallel">تعليم موازي</option>
@@ -258,11 +258,11 @@
 
           <div class="inline-form" style="margin-bottom:14px;background:rgba(53,108,138,0.06);padding:12px;border-radius:10px">
             ${studentField('sa-eq-student', 'الطالب المحول', d.targetStudent)}
-            <label>الجامعة المصدر<input id="sa-eq-uni" placeholder="مثال: جامعة دمشق — كلية الحقوق" value="جامعة دمشق"></label>
-            <label>رمز المقرر الخارجي<input id="sa-eq-code" dir="ltr" placeholder="LAW204" value="CS202-DU"></label>
+            <label>الجامعة المصدر<input id="sa-eq-uni" placeholder="مثال: جامعة دمشق — كلية الحقوق"></label>
+            <label>رمز المقرر الخارجي<input id="sa-eq-code" dir="ltr" placeholder="LAW204"></label>
             <label>اسم المقرر الخارجي<input id="sa-eq-name" placeholder="مثال: أمن نظم التشغيل"></label>
-            <label>الساعات<input id="sa-eq-hrs" type="number" min="1" max="6" value="3"></label>
-            <label>العلامة (من 100)<input id="sa-eq-mark" type="number" min="60" max="100" value="82"></label>
+            <label>الساعات<input id="sa-eq-hrs" type="number" min="1" max="6"></label>
+            <label>العلامة (من 100)<input id="sa-eq-mark" type="number" min="60" max="100"></label>
             <label>المقرر المقابل في جامعتنا<select id="sa-eq-course">${courses.map((c) => `<option value="${c.id}">${esc(c.name)} (سنة ${c.level} · ${c.hours} س)</option>`).join('')}</select></label>
             <button class="btn pri" type="button" data-act="sa-add-eq" data-testid="sa-add-eq-btn">اعتماد المعادلة وإدراج العلامة</button>
           </div>
@@ -357,7 +357,7 @@
           ${UA.can('course:manage') || UA.can('sa_advising:edit') ? `<form id="sa-link-form" class="inline-form" style="margin-bottom:14px;padding:12px;background:var(--surface2,#f8fafc);border:1px solid var(--line,#e2e8f0);border-radius:10px;gap:10px;align-items:flex-end">
             <label style="flex:2;min-width:200px">المقرر<select id="sa-link-course" data-no-other="1" required>${tree.nodes.map((n) => `<option value="${n.id}">${esc(n.code)} — ${esc(n.name)} (س${n.level})</option>`).join('')}</select></label>
             <label style="flex:2;min-width:200px">يتطلب اجتياز<select id="sa-link-prereq" data-no-other="1" required>${tree.nodes.map((n) => `<option value="${n.id}">${esc(n.code)} — ${esc(n.name)} (س${n.level})</option>`).join('')}</select></label>
-            <label style="width:110px">علامة الاجتياز<input id="sa-link-mark" type="number" min="0" max="100" value="60"></label>
+            <label style="width:110px">علامة الاجتياز<input id="sa-link-mark" type="number" min="0" max="100"></label>
             <button class="btn pri" type="submit">ربط المقررين</button>
           </form>` : ''}
           <div id="sa-plan-nodes" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px">
@@ -423,7 +423,7 @@
               <option value="probation">إنذار أكاديمي رسمي (Probation)</option>
               <option value="critical">خطر فصل / استنفاد فرص</option>
             </select></label>
-            <label>المرشد الأكاديمي<input id="sa-adv-advisor" value="د. سامر الرفاعي"></label>
+            <label>المرشد الأكاديمي<input id="sa-adv-advisor"></label>
             <label class="wide">خطة المعالجة والتوصية الإرشادية<input id="sa-adv-plan" placeholder="مثال: تحديد العبء بـ 12 ساعة وإلزام الطالب بحضور الساعات المكتبية الأسبوعية"></label>
             <button class="btn pri" type="button" data-act="sa-add-advising" data-testid="sa-add-advising-btn">توثيق جلسة الإرشاد والإنذار</button>
           </div>
@@ -505,7 +505,7 @@
               <option value="withdrawal">انسحاب نهائي وطي قيد</option>
             </select></label>
             <label>البرنامج الجديد (عند التحويل)<select id="sa-mov-prog">${progs.map((p) => `<option value="${p.id}">${esc(p.faculty)} — ${esc(p.name)}</option>`).join('')}</select></label>
-            <label>رقم القرار الإداري<input id="sa-mov-dec" placeholder="قرار مجلس كلية #450" value="قرار مجلس الكلية #450"></label>
+            <label>رقم القرار الإداري<input id="sa-mov-dec" placeholder="قرار مجلس كلية #450"></label>
             <label class="wide">السبب الموثق<input id="sa-mov-reason" placeholder="مثال: ظروف صحية موثقة / رغبة الطالب بالتحويل واستيفاء شرط المعدل"></label>
             <button class="btn pri" type="button" data-act="sa-exec-movement" data-testid="sa-exec-movement-btn">تنفيذ الحركة وتحديث قيد الطالب فوراً</button>
           </div>
@@ -551,7 +551,7 @@
 
           <div class="inline-form" style="margin-bottom:14px;background:rgba(179,38,30,0.06);padding:12px;border-radius:10px">
             ${studentField('sa-disc-student', 'الطالب')}
-            <label>رقم قرار لجنة الانضباط<input id="sa-disc-dec" dir="ltr" value="DISC-2026-34"></label>
+            <label>رقم قرار لجنة الانضباط<input id="sa-disc-dec" dir="ltr"></label>
             <label>تصنيف المخالفة<select id="sa-disc-cat">
               <option value="exam_misconduct">مخالفة تعليمات امتحانية</option>
               <option value="attendance_breach">إخلال بنظام الدوام والانضباط</option>
@@ -562,7 +562,7 @@
               <option value="exam_zero">إلغاء علامة مقرر امتحاني</option>
               <option value="term_suspension">حرمان فصل دراسي</option>
             </select></label>
-            <label>تاريخ انتهاء الحجب<input id="sa-disc-exp" type="date" value="2026-12-31"></label>
+            <label>تاريخ انتهاء الحجب<input id="sa-disc-exp" type="date"></label>
             <label class="wide">تفاصيل القرار والمخالفة<input id="sa-disc-note" placeholder="مثال: قرار لجنة الانضباط بحجب الوثائق غير العاجلة لنهاية الفصل"></label>
             <button class="btn bad" type="button" data-act="sa-add-disc" data-testid="sa-add-disc-btn">تسجيل العقوبة وتفعيل حجب الوثائق</button>
           </div>
@@ -638,8 +638,8 @@
               <option value="sibling_discount">حسم الإخوة المسجلين بالجامعة (20%)</option>
               <option value="social_aid">إعفاء صندوق التكافل الاجتماعي (40%)</option>
             </select></label>
-            <label>القسط الفصلي الأساسي (ل.س)<input id="sa-sch-tuition" type="number" step="50000" value="1500000"></label>
-            <label>معدل الطالب الحالي (GPA %)<input id="sa-sch-gpa" type="number" step="0.1" min="50" max="100" value="89.5"></label>
+            <label>القسط الفصلي الأساسي (ل.س)<input id="sa-sch-tuition" type="number" step="50000"></label>
+            <label>معدل الطالب الحالي (GPA %)<input id="sa-sch-gpa" type="number" step="0.1" min="50" max="100"></label>
             <label class="wide">ملاحظة قرار المنح<input id="sa-sch-note" placeholder="مثال: تفوق أكاديمي — المرتبة الأولى في السنة الدراسية"></label>
             <button class="btn pri" type="button" data-act="sa-grant-sch" data-testid="sa-grant-sch-btn">اعتماد المنحة وترحيل الخصم للمالية</button>
           </div>
@@ -721,7 +721,7 @@
             <option value="">— مراجعة عامة / استلام وثيقة —</option>
             ${reqs.map((r) => `<option value="${r.id}">${esc(r.no)} — ${esc(r.service.label)} (${esc(r.student ? r.student.name : '')})</option>`).join('')}
           </select></label>
-          <label>الغرض من الموعد<input id="sa-q-purpose" value="استلام وثيقة رسمية مصدقة ومطابقة الأصل"></label>
+          <label>الغرض من الموعد<input id="sa-q-purpose"></label>
           <label>التاريخ<input id="sa-q-date" type="date" value="${new Date().toISOString().slice(0, 10)}"></label>
           <label>الفترة الزمنية<select id="sa-q-slot">
             <option value="09:00 - 09:30">09:00 - 09:30</option>
@@ -816,7 +816,7 @@
               <option value="">— استلام وثيقة / مراجعة شؤون الطلاب —</option>
               ${(reqs || []).map((r) => `<option value="${r.id}">${esc(r.no)} — ${esc(r.service.label)}</option>`).join('')}
             </select></label>
-            <label>الغرض<input id="stu-q-purpose" value="استلام الوثيقة الرسمية المصدقة"></label>
+            <label>الغرض<input id="stu-q-purpose"></label>
             <label>التاريخ<input id="stu-q-date" type="date" value="${new Date().toISOString().slice(0, 10)}"></label>
             <label>الفترة الزمنية<select id="stu-q-slot">
               <option value="10:00 - 10:30">10:00 - 10:30</option>

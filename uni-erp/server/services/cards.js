@@ -1,4 +1,7 @@
 // تصدير البطاقات الجامعية دفعة واحدة بفلاتر الكلية والبرنامج والسنة، وجدول يوضح استلام كل بطاقة.
+import { hashPassword, tempPassword as newTempPassword } from '../security.js';
+import { certFor, certSummary, publicBase } from './enrollcert.js';
+import { qrSvg } from '../qr.js';
 import { tx } from '../db.js';
 import { audit } from '../audit.js';
 import { HttpError } from '../http.js';
@@ -18,11 +21,12 @@ function filterOf(q) {
     where.push("(u.student_no LIKE ? ESCAPE '\\' OR u.display_name LIKE ? ESCAPE '\\' OR (p.first_name || ' ' || p.father_name || ' ' || p.last_name) LIKE ? ESCAPE '\\')");
     args.push(like, like, like);
   }
+  if (Number(q.id) > 0) eq('u.id', Number(q.id));
   if (Number(q.faculty) > 0) eq('f.id', Number(q.faculty));
   if (Number(q.program) > 0) eq('g.id', Number(q.program));
   if (Number(q.level) > 0) eq('p.study_level', Number(q.level));
   if (Number(q.enrollYear) > 0) eq('p.enroll_year', Number(q.enrollYear));
-  eq('p.status', ['active', 'suspended', 'graduated', 'withdrawn'].includes(q.status) ? q.status : 'active');
+  if (!(Number(q.id) > 0)) eq('p.status', ['active', 'suspended', 'graduated', 'withdrawn'].includes(q.status) ? q.status : 'active');
   return { sql: where.map((w) => ` AND ${w}`).join(''), args };
 }
 
@@ -55,6 +59,28 @@ export function cardStudents({ db }, q = {}) {
       photoUrl: r.photo_id ? `/api/student-files/${r.photo_id}` : null, receivedAt: r.received_at ? Number(r.received_at) : null,
     })),
   };
+}
+
+// بيانات شهادة التسجيل المطبوعة. كلمة المرور مخزنة بصمة ولا تُقرأ، فتُصدر مؤقتة جديدة لمن لم يدخل بعد فقط
+export async function cardCertificates({ db, cfg }, actor, body, ip) {
+  const ids = Array.isArray(body?.studentIds) ? body.studentIds.map(Number).filter((n) => n > 0).slice(0, MAX_BATCH) : null;
+  const list = ids ? ids.flatMap((id) => cardStudents({ db }, { ...(body.filters ?? {}), id }).students) : cardStudents({ db }, body?.filters ?? {}).students;
+  const rows = list.length ? db.prepare(`SELECT id, must_change_password FROM users WHERE id IN (${list.map(() => '?').join(',')})`).all(...list.map((s) => s.id)) : [];
+  const pending = new Set(rows.filter((r) => Number(r.must_change_password)).map((r) => r.id));
+  const out = [];
+  let reissued = 0;
+  for (const s of list) {
+    let tempPassword = null;
+    if (pending.has(s.id)) {
+      tempPassword = newTempPassword();
+      db.prepare('UPDATE users SET password_hash = ?, must_change_password = 1 WHERE id = ?').run(await hashPassword(tempPassword, cfg.scryptN), s.id);
+      reissued++;
+    }
+    const ce = certFor(db, s.id), url = ce && `${publicBase(cfg)}/?verify=${ce.code}`;
+    out.push({ ...s, tempPassword, cert: ce ? { ...certSummary(ce), payloadSha256: ce.payload_sha256, signer: ce.cert_subject, url, qrSvg: qrSvg(url) } : null });
+  }
+  audit(db, actor, 'طباعة شهادات تسجيل وإصدار كلمات مؤقتة', `${out.length} شهادة، ${reissued} كلمة جديدة`, ip);
+  return { students: out };
 }
 
 export function createCardBatch({ db }, actor, body, ip) {

@@ -17,6 +17,9 @@ import { ready as financeReady } from './services/finance/core.js';
 import { hashPassword } from './security.js';
 import { createHeavyPool } from './heavy.js';
 import { startLoopWatch } from './http.js';
+import { purgeAuditLog } from './audit.js';
+import { purgeIdempotencyKeys } from './services/idempotency.js';
+import { getSetting } from './services/settings.js';
 import { demoModeBlocked } from './services/dev_accounts.js';
 
 export async function createApp(overrides = {}) {
@@ -103,5 +106,9 @@ export async function createApp(overrides = {}) {
   timer.unref();
   const stopBackups = startBackupScheduler({ db, cfg });
   const stopLoopWatch = startLoopWatch();
-  return { server, db, cfg, limiter, router, close: async () => { clearInterval(timer); stopBackups(); stopLoopWatch(); await drainCertificates(db); await drainPush(); await heavy.close(); await new Promise((res) => server.close(() => { db.close(); res(); })); await closeLogger(); } };
+  // مدة الاحتفاظ بسجل التدقيق من الإعدادات العامة
+  const auditPurge = () => { try { purgeIdempotencyKeys(db); } catch (e) { console.warn('idempotency purge:', e.message); } try { const r = purgeAuditLog(db, getSetting(db, 'audit.retention_years')); if (r.removed) console.log(`سجل التدقيق: حُذف ${r.removed} صفاً تجاوز مدة الاحتفاظ.`); } catch (e) { console.error('audit purge:', e.message); } };
+  const purgeFirst = setTimeout(auditPurge, 120_000), purgeTimer = setInterval(auditPurge, 24 * 3600_000);
+  purgeFirst.unref(); purgeTimer.unref();
+  return { server, db, cfg, limiter, router, close: async () => { clearInterval(timer); clearTimeout(purgeFirst); clearInterval(purgeTimer); stopBackups(); stopLoopWatch(); await drainCertificates(db); await drainPush(); await heavy.close(); await new Promise((res) => server.close(() => { db.close(); res(); })); await closeLogger(); } };
 }

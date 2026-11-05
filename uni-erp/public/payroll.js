@@ -1122,7 +1122,7 @@
             </label>
             <label>عدد أيام الغياب *<input id="hab-days" type="number" min="1" max="30" value="1" required></label>
           </div>
-          <label>الشهر<input id="hab-month" value="يونيو"></label>
+          <label>الشهر<input id="hab-month"></label>
           <div class="actions">
             <button class="btn pri" type="submit">تسجيل الغياب واحتساب الخصم</button>
             <button class="btn" type="button" data-act="hrmclose">إلغاء</button>

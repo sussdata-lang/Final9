@@ -1,0 +1,1 @@
+INSERT INTO housing_handouts (handout_no, student_no, items, handed_day, returned_day, note, handed_by) VALUES ('HND-SMPL-1', 'SAMPLE-1', 'سرير، فرشة، كمبيوتر محمول', '2026-10-01', NULL, 'تسليم أولي', 'أمين السكن');

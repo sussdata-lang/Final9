@@ -52,7 +52,7 @@
     try { B.set = (await api('PUT', '/api/hr/settings', { leaveDefaultDays: Number(document.getElementById('hs-days').value), weekend: document.getElementById('hs-weekend').value })).settings; UA.render(); toast('حُفظت الإعدادات'); }
     catch (e) { if (!e.status) throw e; toast(e.message); }
   };
-  UA.views.hr = () => `<div class="sub-tabs no-print" role="tablist">${tabs().map((t) => `<button class="chip" role="tab" data-act="satab" data-t="${t[0]}" aria-pressed="${B.tab === t[0]}">${t[1]}</button>`).join('')}</div>${B.tab === 'me' ? me() : B.tab === 'report' ? report() : B.tab === 'set' ? settingsView() : bal()}`;
+  UA.views.hr = () => `${tabs().length > 1 ? `<div class="sub-tabs no-print" role="tablist">${tabs().map((t) => `<button class="chip" role="tab" data-act="satab" data-t="${t[0]}" aria-pressed="${B.tab === t[0]}">${t[1]}</button>`).join('')}</div>` : ''}${B.tab === 'me' ? me() : B.tab === 'report' ? report() : B.tab === 'set' ? settingsView() : bal()}`;
 
   const A = UA.actions;
   A.saleave = async () => { await UA.go('internal'); if (UA.actions.inpick) { UA.actions.inpick(null, { k: 'hr_leave' }); } };

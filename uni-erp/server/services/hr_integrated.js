@@ -475,7 +475,7 @@ export function buildHrProOverview(db, refDateStr = DEFAULT_REF_DATE, options = 
         { label: 'الطلاب المقيدون بالجامعة', value: safeVal('SELECT COUNT(*) FROM student_profiles'), unit: 'طالب' },
         { label: 'الطلبات والمعاملات الطلابية', value: safeVal("SELECT COUNT(*) FROM requests r JOIN users u ON u.id = r.student_id WHERE u.role = 'student'"), unit: 'معاملة' },
         { label: 'الوثائق الرسمية الموقعة', value: safeVal('SELECT COUNT(*) FROM documents'), unit: 'وثيقة' },
-        { label: 'المنح وتسكين السكن', value: `${safeVal('SELECT COUNT(*) FROM scholarships')} / ${safeVal('SELECT COUNT(*) FROM dorm_allocations')}`, unit: 'مستفيد' },
+        { label: 'المنح وتسكين السكن', value: `${safeVal('SELECT COUNT(*) FROM sa_scholarships')} / ${safeVal('SELECT COUNT(*) FROM dorm_allocations')}`, unit: 'مستفيد' },
         { label: 'الأنشطة الطلابية', value: safeVal('SELECT COUNT(*) FROM student_activities'), unit: 'نشاط' },
       ],
     },

@@ -18,6 +18,9 @@ export const PERMISSION_CATALOG = [
     group: 'شؤون الطلاب',
     items: [
       { key: 'student:read', label: 'عرض ملفات الطلاب وسجلهم الموحد 360°', op: 'view', module: 'student_affairs' },
+      { key: 'student:lookup', label: 'البحث عن طالب بالاسم أو الرقم الجامعي، دون فتح ملفه', op: 'view', module: 'student_affairs' },
+      { key: 'sa_quiz:write', label: 'إعداد الاختبارات الإلكترونية وأسئلتها ونشرها', op: 'write', module: 'student_affairs' },
+      { key: 'sa_quiz:approve', label: 'اعتماد الاختبارات الإلكترونية لمقررات المدرس وتصحيحها', op: 'approve', module: 'student_affairs' },
       { key: 'student:register', label: 'تسجيل طلاب جدد وتوليد بيانات دخولهم', op: 'write', module: 'student_affairs' },
       { key: 'student:update', label: 'تعديل ملفات الطلاب وحركات القيد النظامية', op: 'edit', module: 'student_affairs' },
       { key: 'student:reset_password', label: 'إعادة تعيين كلمات مرور الطلاب واعتماد حساباتهم', op: 'approve', module: 'student_affairs' },
@@ -176,7 +179,7 @@ export const PLATFORM_MODULES_MATRIX = [
     viewKeys: ['affairs', 'exchange'],
     views: ['affairs', 'exchange'],
     actions: {
-      view: { label: 'عرض الملفات والسجل', perms: ['student:read'] },
+      view: { label: 'عرض الملفات والسجل', perms: ['student:read', 'student:lookup'] },
       write: { label: 'تسجيل طلاب جدد', perms: ['student:register'] },
       edit: { label: 'تعديل البيانات وحركات القيد', perms: ['student:update'] },
       approve: { label: 'إدارة الذمم وكلمات المرور', perms: ['student:reset_password', 'holds:manage'] },
@@ -189,8 +192,8 @@ export const PLATFORM_MODULES_MATRIX = [
     label: 'القبول والمفاضلة والإرشاد والمنح الطلابية',
     department: 'مديرية القبول والإرشاد والمنح',
     description: 'المفاضلة الإلكترونية، معادلة المواد، الخطة التفاعلية، الإنذار المبكر، والمنح والإعفاءات',
-    viewKeys: ['affairs', 'student_life'],
-    views: ['affairs', 'student_life'],
+    viewKeys: ['affairs', 'student_life', 'labtools'],
+    views: ['affairs', 'student_life', 'labtools'],
     actions: {
       view: { label: 'عرض المفاضلة والإرشاد والمنح', perms: ['sa_admissions:view', 'sa_advising:view', 'sa_scholarships:view', 'sa_housing:view'] },
       write: { label: 'إدخال طلبات المفاضلة والمنح', perms: ['sa_admissions:write', 'sa_scholarships:write'] },
@@ -632,7 +635,8 @@ export const ALL_STAFF_VIEWS = [
   { key: 'academics', label: 'الشؤون الأكاديمية والعلامات وفحص الامتحان PDF', group: 'الطلاب والشؤون الأكاديمية' },
   { key: 'attendance', label: 'سجل القاعات والباركود', group: 'الطلاب والشؤون الأكاديمية' },
   { key: 'expansions', label: 'الامتحانات والتقييم', group: 'الطلاب والشؤون الأكاديمية' },
-  { key: 'student_life', label: 'السكن والساعات المكتبية', group: 'الطلاب والشؤون الأكاديمية' },
+  { key: 'student_life', label: 'السكن الجامعي', group: 'الطلاب والشؤون الأكاديمية' },
+  { key: 'labtools', label: 'أدوات تجريبية', group: 'الطلاب والشؤون الأكاديمية' },
   { key: 'lms', label: 'التعلم الإلكتروني والمكتبة', group: 'الطلاب والشؤون الأكاديمية' },
   { key: 'research', label: 'البحث العلمي والدراسات العليا', group: 'البحث والجودة والخريجون' },
   { key: 'alumni', label: 'الخريجون والتوظيف', group: 'البحث والجودة والخريجون' },
@@ -886,7 +890,8 @@ export function computeAllowedViews(effectivePerms = [], explicitAllowedViews = 
   if (has('attendance:manage')) out.push('attendance');
   if (has('exams_housing:view', 'exams_housing:write', 'exams_housing:edit', 'exams_housing:approve', 'academic:read', 'grade:manage', 'grade:approve', 'course:manage')) out.push('expansions');
   if (has('sa_housing:view', 'sa_housing:manage')) out.push('student_life');
-  if (has('lms_lib:view', 'lms_lib:write', 'lms_lib:edit', 'lms_lib:approve', 'academic:read', 'course:manage')) out.push('lms');
+  if (has('sa_admissions:view', 'sa_admissions:write', 'sa_admissions:approve', 'student:register', 'sa_housing:view', 'sa_housing:manage', 'faculty:manage', 'lms_lib:view', 'lms_lib:write', 'lms_lib:edit', 'lms_lib:approve', 'academic:read', 'course:manage')) out.push('labtools');
+  if (has('lms_lib:view', 'lms_lib:write', 'lms_lib:edit', 'lms_lib:approve', 'academic:read', 'course:manage', 'sa_quiz:write', 'sa_quiz:approve')) out.push('lms');
   if (has('research_grad:view', 'research_grad:write', 'research_grad:edit', 'research_grad:approve', 'faculty:manage')) out.push('research');
   if (has('alumni_career:view', 'alumni_career:write', 'alumni_career:edit')) out.push('alumni');
   if (has('qa_inst:view', 'qa_inst:edit', 'qa_inst:approve')) out.push('qa');
@@ -958,8 +963,16 @@ export const SOD_SENSITIVE_PERMISSIONS = new Set([
   'procurement:manage',
 ]);
 
-// الصلاحيات الفعّالة لمستخدم من صف قاعدة البيانات (مع تخزين مؤقت للأدوار والوحدات التنظيمية)
+// تسجيل الحضور الشخصي ثابت لكل موظف أيًا كان دوره، ولا يُسحب منه
+const EVERY_STAFF = 'staffatt:self';
 export function effective(db, u) {
+  const perms = permissionsFromRow(db, u);
+  if (!u || u.role === 'student' || perms.includes(EVERY_STAFF)) return perms;
+  return [...perms, EVERY_STAFF];
+}
+
+// الصلاحيات الفعّالة لمستخدم من صف قاعدة البيانات (مع تخزين مؤقت للأدوار والوحدات التنظيمية)
+function permissionsFromRow(db, u) {
   if (!u) return [];
   if (u.role === 'student') return studentPermsOf(db, PERMISSIONS.student);
 

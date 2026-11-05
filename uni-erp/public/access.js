@@ -368,6 +368,9 @@
             <option value="own"${bState.dataScope === 'own' ? ' selected' : ''}>👤 السجلات والمعاملات الشخصية فقط</option>
           </select>
         </label>
+        <label style="flex:1;min-width:200px">الكلية أو المعهد (لنطاق الكلية)
+          <input id="${isEdit ? 'xe-scope-fac' : 'xn-scope-fac'}" value="${esc(bState.scopeFaculty || '')}" maxlength="120" placeholder="كما هو في البرامج الدراسية">
+        </label>
         <div class="actions" style="margin:0;align-self:flex-end">
           <button type="button" class="btn sm" data-act="xbulk" data-target="${targetMode}" data-op="sync_role">🔄 مطابقة مع الدور والقسم</button>
           <button type="button" class="btn sm" data-act="xbulk" data-target="${targetMode}" data-op="read_all">👁️ عرض فقط لكل المنصة</button>
@@ -1113,6 +1116,7 @@
         roleKey: u.roleKey || u.role,
         accessMode: u.accessMode || 'role',
         dataScope: u.dataScope || 'unit',
+        scopeFaculty: u.scopeFaculty || '',
         customPerms: new Set(u.effectivePermissions || []),
         revokedPerms: new Set(u.revokedPermissions || []),
         allowedViews: new Set(u.explicitAllowedViews && u.explicitAllowedViews.length ? u.explicitAllowedViews : u.allowedViews || []),
@@ -1141,6 +1145,7 @@
         if (eb) {
           payload.accessMode = val('xe-mode') || eb.accessMode;
           payload.dataScope = val('xe-scope') || eb.dataScope;
+          payload.scopeFaculty = val('xe-scope-fac');
           payload.customPermissions = [...eb.customPerms];
           payload.revokedPermissions = [...eb.revokedPerms];
           payload.allowedViews = [...eb.allowedViews];
@@ -1290,6 +1295,7 @@
           password: tempPassword,
           accessMode,
           dataScope,
+          scopeFaculty: val('xn-scope-fac'),
           customPermissions: accessMode === 'role' ? [] : [...X.builder.customPerms],
           revokedPermissions: accessMode === 'role' ? [] : [...X.builder.revokedPerms],
           allowedViews: accessMode === 'role' ? [] : [...X.builder.allowedViews],

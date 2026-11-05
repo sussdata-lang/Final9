@@ -17,7 +17,7 @@
       U.examSchedule.groups = g.groups || [];
       U.examSchedule.courses = list;
       const baseDate = new Date(U.examSchedule.startDate || Date.now() + 7 * 86400000);
-      const halls = ((S.limits && S.limits.dropdowns && S.limits.dropdowns.halls) || ['المدرج الكبير A1', 'المدرج الثاني A2', 'قاعة الامتحانات المركزية B1', 'قاعة المحاضرات B2', 'مخبر الأمن السيبراني C1']);
+      const halls = ((S.limits && S.limits.dropdowns && S.limits.dropdowns.halls) || []);
       list.forEach((c, idx) => {
         if (!U.examSchedule.rows[c.id]) {
           const d = new Date(baseDate.getTime() + (idx % 14) * 86400000);
@@ -28,7 +28,7 @@
             date: d.toISOString().slice(0, 10),
             time: idx % 2 === 0 ? '09:00' : '12:00',
             duration: 120,
-            hall: halls[idx % halls.length] || 'المدرج الكبير A1',
+            hall: halls[idx % halls.length] || '',
             proctor: c.instructor || 'لجنة المراقبة الامتحانية',
             notes: 'امتحان رسمي موحد',
           };
@@ -201,15 +201,7 @@
       'سبر معلومات / مذاكرة',
       'أخرى',
     ]);
-    const halls = ((S.limits && S.limits.dropdowns && S.limits.dropdowns.halls) || [
-      'المدرج الكبير A1',
-      'المدرج الثاني A2',
-      'قاعة الامتحانات المركزية B1',
-      'قاعة المحاضرات B2',
-      'مخبر الأمن السيبراني C1',
-      'مخبر الشبكات والنظم C2',
-      'أخرى',
-    ]);
+    const halls = ((S.limits && S.limits.dropdowns && S.limits.dropdowns.halls) || []);
 
     const q = (U.examSchedule.filterQuery || '').trim().toLowerCase();
     const prog = U.examSchedule.filterProgram || '';
@@ -225,7 +217,7 @@
         date: U.examSchedule.startDate,
         time: '09:00',
         duration: 120,
-        hall: halls[idx % halls.length] || 'المدرج الكبير A1',
+        hall: halls[idx % halls.length] || '',
         proctor: c.instructor || 'لجنة المراقبة',
       };
       return `<tr data-exm-cid="${c.id}">
@@ -314,7 +306,6 @@
   UA.loaders.academics = async () => {
     await Promise.all([
       origAcadLoader ? origAcadLoader().catch(() => {}) : Promise.resolve(),
-      ensureExamCoursesLoaded(),
       UA.loaders.enterprise ? UA.loaders.enterprise().catch(() => {}) : Promise.resolve(),
       U.acadTab === 'members' && UA.loadFacultyMembers ? UA.loadFacultyMembers().catch(() => {}) : Promise.resolve(),
     ]);
@@ -393,7 +384,7 @@
     const tabs = [
       ...(UA.can('grade:approve_own') ? [['my_grades', 'علامات موادي']] : []),
       ['courses', 'دليل المواد والمقررات'],
-      ['grades', 'جدول العلامات والامتحانات'],
+      ['grades', 'جدول العلامات'],
       ['gpa_sim', '🎓 محاكي المعدل التراكمي (GPA Simulator)'],
     ];
     if (UA.can('faculty:manage')) tabs.push(['members', 'أعضاء هيئة التدريس']);

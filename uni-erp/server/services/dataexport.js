@@ -23,6 +23,10 @@ export const DATASETS = [
   { id: 'holds', label: 'العقوبات', hint: 'القائمة والمسوّاة' },
   { id: 'complaints', label: 'الشكاوى', hint: 'مع الردود وحالتها' },
   { id: 'attendance', label: 'سجل دخول وخروج القاعات', hint: 'الحضور والفحوص بالباركود: المادة والقاعة والدخول والخروج' },
+  { id: 'housing', label: 'السكن الجامعي', hint: 'الطلاب في السكن ومبانيهم وغرفهم' },
+  { id: 'handouts', label: 'مواد السكن المسلمة', hint: 'ما استلمه كل طالب' },
+  { id: 'quizzes', label: 'الاختبارات الإلكترونية', hint: 'الاختبارات وحالاتها وعدد المتقدمين' },
+  { id: 'lectures', label: 'المحاضرات والمحتوى الرقمي', hint: 'مع الجهة المستهدفة' },
   { id: 'all', label: 'كل البيانات معاً', hint: 'مصنّف واحد بكل ما سبق' },
 ];
 export const FORMATS = ['xlsx', 'csv', 'json', 'docx'];
@@ -126,7 +130,29 @@ function attendanceSet(db, f) {
     rows: rows.map((r) => [r.studentNo, r.studentName, r.faculty, r.kindLabel, r.subject, r.hall, fmtTime(r.enteredAt, f.tz), fmtTime(r.exitedAt, f.tz), r.minutes ?? '', { barcode: 'باركود', manual: 'يدوي', import: 'استيراد' }[r.method] ?? r.method, r.recordedBy, r.note]) };
 }
 
-const BUILD = { students: studentsSet, grades: gradesSet, courses: coursesSet, requests: requestsSet, holds: holdsSet, complaints: complaintsSet, attendance: attendanceSet };
+function housingSet(db) {
+  const rows = db.prepare(`SELECT a.*, r.building_name, r.room_no, r.capacity, b.gender FROM dorm_allocations a JOIN dorm_rooms r ON r.id = a.room_id LEFT JOIN dorm_buildings b ON b.name = r.building_name WHERE a.status = 'ساكن' ORDER BY r.building_name, r.room_no`).all();
+  return { id: 'housing', title: 'السكن الجامعي', textCols: [0], headers: ['الرقم الجامعي', 'الطالب', 'الكلية', 'المبنى', 'القسم', 'الغرفة', 'سعة الغرفة', 'تاريخ السكن', 'العام'],
+    rows: rows.map((r) => [r.student_no, r.student_name, r.faculty_name, r.building_name, r.gender ?? '', r.room_no, r.capacity, r.check_in_date, r.academic_year]) };
+}
+function handoutsSet(db) {
+  const rows = db.prepare('SELECT * FROM housing_handouts ORDER BY created_at DESC').all();
+  return { id: 'handouts', title: 'مواد السكن المسلمة', textCols: [0, 1], headers: ['رقم السجل', 'الرقم الجامعي', 'الطالب', 'الكلية', 'الغرفة', 'المواد', 'تاريخ التسليم', 'تاريخ الإرجاع', 'المسلِّم', 'ملاحظات'],
+    rows: rows.map((r) => [r.handout_no, r.student_no, r.student_name, r.faculty_name, r.room_label, JSON.parse(r.items_json || '[]').map((x) => `${x.name}${x.qty > 1 ? ` ×${x.qty}` : ''}${x.serial ? ` (${x.serial})` : ''}`).join('، '), r.handed_day, r.returned_day ?? '', r.handed_by, r.note]) };
+}
+function quizzesSet(db) {
+  const rows = db.prepare('SELECT q.*, (SELECT COUNT(*) FROM lms_quiz_questions x WHERE x.quiz_id = q.id) AS qcount, (SELECT COUNT(*) FROM lms_quiz_submissions s WHERE s.quiz_id = q.id) AS subs FROM lms_quizzes q ORDER BY q.created_at DESC').all();
+  const ST = { draft: 'مسودة', pending: 'بانتظار الاعتماد', approved: 'معتمد' };
+  return { id: 'quizzes', title: 'الاختبارات الإلكترونية', textCols: [0], headers: ['رمز المقرر', 'المقرر', 'العنوان', 'المدرس', 'الجهة', 'التاريخ', 'المدة', 'العلامة', 'عدد الأسئلة', 'الحالة', 'اعتمده', 'المتقدمون'],
+    rows: rows.map((r) => [r.course_code, r.course_name, r.title, r.instructor_name ?? '', r.faculty_name ?? '', r.exam_day ?? '', r.duration_min, r.total_marks, Number(r.qcount), ST[r.status] ?? r.status, r.approved_by ?? '', Number(r.subs)]) };
+}
+function lecturesSet(db) {
+  const rows = db.prepare('SELECT l.*, g.name AS group_name FROM lms_lectures l LEFT JOIN student_groups g ON g.id = l.target_group_id ORDER BY l.created_at DESC').all();
+  return { id: 'lectures', title: 'المحاضرات', textCols: [0], headers: ['رمز المقرر', 'المقرر', 'العنوان', 'الأسبوع', 'المدرس', 'الكلية المستهدفة', 'الفئة المستهدفة', 'المشاهدات'],
+    rows: rows.map((r) => [r.course_code, r.course_name, r.title, r.week_no, r.instructor_name, r.target_faculty || 'الكل', r.group_name ?? 'الكل', r.views_count]) };
+}
+
+const BUILD = { students: studentsSet, grades: gradesSet, courses: coursesSet, requests: requestsSet, holds: holdsSet, complaints: complaintsSet, attendance: attendanceSet, housing: housingSet, handouts: handoutsSet, quizzes: quizzesSet, lectures: lecturesSet };
 
 export function buildSets(db, dataset, filters) {
   const ids = dataset === 'all' ? Object.keys(BUILD) : [dataset];

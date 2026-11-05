@@ -125,27 +125,17 @@
     return `<section class="card" style="margin-top:0">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
         <h2 style="margin:0;display:flex;align-items:center;gap:8px">
-          <span>📅 المولد الذكي للجداول الدراسية ومنع التضارب</span>
+          <span>📅 الجدول الدراسي ومنع التضارب</span>
         </h2>
         <span style="background:#054239;color:#D5B65D;font-weight:800;font-size:11px;padding:3px 9px;border-radius:6px;font-family:monospace">ميزة #1 المنقولة</span>
       </div>
       <p class="sub" style="margin-top:0;color:#64748b;font-size:13px">خوارزمية فورية تمنع تضارب القاعات وأوقات الأساتذة والشُعب تلقائياً قبل الحفظ في سجل القاعات.</p>
       <form id="es-schedule-form" class="inline-form" style="margin-bottom:16px;background:rgba(14,102,85,.03);padding:14px;border-radius:10px;border:1px solid #cbd5e1;gap:10px;align-items:flex-end">
-        <label>رمز المقرر<input id="es-sc-code" placeholder="CYB-310" required></label>
-        <label>اسم المقرر<input id="es-sc-name" placeholder="تحليل البرمجيات الخبيثة" required></label>
-        <label>الأستاذ المحاضر<input id="es-sc-inst" required></label>
-        <label>القاعة / المدرج<select id="es-sc-hall">
-          <option value="مدرج الفارابي A1">مدرج الفارابي A1</option>
-          <option value="مخبر السيبراني L2">مخبر السيبراني L2</option>
-          <option value="قاعة الخوارزمي C3" selected>قاعة الخوارزمي C3</option>
-          <option value="مدرج ابن خلدون B1">مدرج ابن خلدون B1</option>
-        </select></label>
-        <label>اليوم<select id="es-sc-day">
-          <option>الأحد</option><option selected>الإثنين</option><option>الثلاثاء</option><option>الأربعاء</option><option>الخميس</option>
-        </select></label>
-        <label>الفترة الزمنية<select id="es-sc-time">
-          <option>08:30 - 10:30</option><option selected>10:30 - 12:30</option><option>12:30 - 14:30</option>
-        </select></label>
+        <label>المقرر<select id="es-sc-course" required>${(es.scheduleCourses || []).map((c) => `<option value="${c.id}">${esc(c.code || '')} — ${esc(c.name)}${c.instructor ? ` (${esc(c.instructor)})` : ''}</option>`).join('')}</select></label>
+        <label>القاعة / المدرج<input id="es-sc-hall" required maxlength="60" placeholder="مدرج الفارابي A1"></label>
+        <label>اليوم<select id="es-sc-day">${(es.scheduleDays || []).map((d, i) => `<option value="${i}"${i === 1 ? ' selected' : ''}>${esc(d)}</option>`).join('')}</select></label>
+        <label>من<input id="es-sc-start" type="time" value="08:30" required></label>
+        <label>إلى<input id="es-sc-end" type="time" value="10:30" required></label>
         <button class="btn pri" type="submit" style="height:38px;padding:0 16px">فحص التضارب وإدراج بالجدول</button>
       </form>
       <h3 style="font-size:14px;margin:14px 0 8px">جدول حجز وتوزيع القاعات المعتمد (خالٍ من أي تعارض)</h3>
@@ -166,7 +156,7 @@
     </section>`;
   }
 
-  UA.views.attendance = () => bar([['scan', 'مسح الدخول والخروج'], ['log', 'السجل'], ['smart_schedule', 'المولد الذكي للجداول ومنع التضارب']], A.tab, 'attab') + (A.tab === 'scan' ? scanTab() : A.tab === 'smart_schedule' ? smartScheduleTab() : logTab()) + modalHtml();
+  UA.views.attendance = () => bar([['scan', 'مسح الدخول والخروج'], ['log', 'السجل'], ['smart_schedule', 'الجدول الدراسي ومنع التضارب']], A.tab, 'attab') + (A.tab === 'scan' ? scanTab() : A.tab === 'smart_schedule' ? smartScheduleTab() : logTab()) + modalHtml();
 
   /* ---------- الأحداث ---------- */
   let timer = null;
@@ -218,7 +208,7 @@
 
   const modalDraft = () => { const g = (id) => { const el = document.getElementById(id); return el ? el.value : ''; }; return { no: g('am-no'), kind: g('am-kind'), hall: g('am-hall'), course: g('am-course'), subject: g('am-subject'), in: g('am-in'), out: g('am-out'), note: g('am-note') }; };
   Object.assign(UA.actions, {
-    attab: async (el, d) => { stopCam(); A.cam = false; A.tab = d.t; A.modal = null; if (d.t === 'log') await loadLogs(); else await loadOpen(); UA.render(); if (d.t === 'scan') focusScan(); },
+    attab: async (el, d) => { stopCam(); A.cam = false; A.tab = d.t; A.modal = null; if (d.t === 'smart_schedule' && UA.loaders.enterprise) await UA.loaders.enterprise(); if (d.t === 'log') await loadLogs(); else await loadOpen(); UA.render(); if (d.t === 'scan') focusScan(); },
     atrefresh: async () => { await loadOpen(); UA.render(); focusScan(); },
     atout: async (el, d) => { await doScan(d.no, 'out'); },
     atcam: async () => { if (A.cam) { stopCam(); A.cam = false; UA.render(); } else await startCam(); },

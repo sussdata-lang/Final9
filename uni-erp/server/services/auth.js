@@ -1,4 +1,4 @@
-import { hashPassword, verifyPassword, newToken, sha256, validatePasswordPolicy, createSessionFingerprint, verifySessionFingerprint } from '../security.js';
+import { hashPassword, verifyPassword, newToken, sha256, validatePasswordPolicy, createSessionFingerprint, verifySessionFingerprint, isTrustedIp } from '../security.js';
 import { log } from '../lib/logger.js';
 import { audit } from '../audit.js';
 import { HttpError } from '../http.js';
@@ -132,7 +132,8 @@ export function sessionUser(db, token) {
 
 export async function login({ db, cfg, limiter }, { username, password, ip, ua, req }) {
   if (typeof username !== 'string' || typeof password !== 'string' || !username || !password) throw new HttpError(400, 'أدخل اسم المستخدم وكلمة المرور.', 'bad_request');
-  if (!limiter.check(`login:${ip}`, 120, 60_000) || !limiter.check(`login:${username.trim().toLowerCase()}`, 30, 60_000))
+  // عنوان الجامعة الموثوق لا يوقف دخول الحرم صباحاً؛ حد الحساب الواحد يبقى
+  if ((!isTrustedIp(ip) && !limiter.check(`login:${ip}`, 120, 60_000)) || !limiter.check(`login:${username.trim().toLowerCase()}`, 30, 60_000))
     throw new HttpError(429, 'محاولات كثيرة؛ حاول بعد دقيقة.', 'rate_limited');
   username = username.trim();                                  // مسافات اللصق أو الإكمال التلقائي
   const u = db.prepare('SELECT * FROM users WHERE username = ? COLLATE NOCASE').get(username);   // admin وAdmin حساب واحد

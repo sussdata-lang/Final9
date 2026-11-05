@@ -275,10 +275,25 @@ export function myProfile({ db }, user) {
 }
 
 const like = (s) => '%' + s.replace(/[\\%_]/g, '\\$&') + '%';
-export function listStudents({ db }, query) {
+// حساب نطاقه كلية يرى طلابها فقط
+export const facultyScope = (user) => (user && user.role !== 'student' && user.data_scope === 'faculty' && user.scope_faculty ? user.scope_faculty : null);
+const SCOPE_SQL = 'p.program_id IN (SELECT id FROM programs WHERE faculty = ?)';
+export function assertStudentInScope({ db }, user, id) {
+  const faculty = facultyScope(user);
+  if (faculty && !db.prepare(`SELECT 1 AS x FROM student_profiles p WHERE p.user_id = ? AND ${SCOPE_SQL}`).get(Number(id), faculty)) throw new HttpError(404, 'الطالب غير موجود.', 'not_found');
+}
+const LOOKUP_FIELDS = ['id', 'studentNo', 'name', 'displayName', 'fullName', 'program', 'programName'];
+
+export function listStudents({ db }, query, { user = null, lookupOnly = false } = {}) {
   const where = [], args = [];
+  const faculty = facultyScope(user);
+  if (faculty) { where.push(SCOPE_SQL); args.push(faculty); }
   const q = String(query.q ?? '').trim().slice(0, 60);
-  if (q) {
+  if (q && lookupOnly) {
+    // البحث المحدود بالرقم الجامعي والاسم فقط: الهاتف والرقم الوطني يكشفان صاحبهما
+    where.push(`(u.student_no LIKE ? ESCAPE '\\' OR (p.first_name || ' ' || p.father_name || ' ' || p.last_name) LIKE ? ESCAPE '\\')`);
+    args.push(like(q), like(q));
+  } else if (q) {
     // استخدام prefix-search عندما الكلمة مستقيمة لتفادي full-table scan
     const isPrefix = /^[؀-ۿ\w\d]{3,}$/.test(q);
     const lk = isPrefix ? `${q}%` : like(q);
@@ -295,7 +310,8 @@ export function listStudents({ db }, query) {
   const total = db.prepare(`SELECT COUNT(*) c FROM student_profiles p JOIN users u ON u.id = p.user_id ${w}`).get(...args).c;
   const rows = db.prepare(`${SELECT} ${w} ORDER BY p.created_at DESC, p.user_id DESC LIMIT ? OFFSET ?`).all(...args, limit, offset);
   // view(full:false) لا تستدعي استعلامات إضافية - آمن للقوائم
-  return { total, students: rows.map((r) => view(db, r, { full: false })) };
+  const students = rows.map((r) => view(db, r, { full: false }));
+  return { total, students: lookupOnly ? students.map((s) => Object.fromEntries(LOOKUP_FIELDS.filter((k) => k in s).map((k) => [k, s[k]]))) : students };
 }
 
 export function updateStudent({ db }, actor, id, input, ip) {
@@ -522,8 +538,10 @@ export function deleteStudent({ db, cfg }, actor, id, ip) {
 const TSORT = { studentNo: 'u.student_no', name: 'p.first_name, p.father_name, p.last_name', faculty: 'g.faculty', program: 'g.name', level: 'p.study_level', status: 'p.status', gender: 'p.gender',
   birthDate: 'p.birth_date', governorate: 'p.governorate', hsScore: 'p.hs_score', enrollYear: 'p.enroll_year', admission: 'p.admission_type', createdAt: 'p.created_at' };
 
-export function listStudentsTable({ db }, q) {
+export function listStudentsTable({ db }, q, { user = null } = {}) {
   const where = [], args = [];
+  const faculty = facultyScope(user);
+  if (faculty) { where.push(SCOPE_SQL); args.push(faculty); }
   const term = String(q.q ?? '').replace(/\s+/g, ' ').trim().slice(0, 60);
   if (term) {
     const l = like(term), L = like(term.toUpperCase());

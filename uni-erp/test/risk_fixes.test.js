@@ -16,7 +16,7 @@ import { hashPassword } from '../server/security.js';
 import { deleteEmployee } from '../server/services/hr.js';
 import { idleExpired } from '../server/services/auth.js';
 import { revokePassword, rotateSigningMaterial } from '../server/services/credentials.js';
-import { verifyPassword } from '../server/security.js';
+import { verifyPassword, checkTieredRateLimit, checkIpCeiling, resetTieredRateLimit } from '../server/security.js';
 
 const actorWith = (...perms) => ({ id: 1, role: 'staff', can: (p) => perms.includes(p) });
 
@@ -199,4 +199,20 @@ test('تبديل المفتاح مرة لكل اسم، ويحذف النسخ غ�
     assert.equal(fs.readFileSync(path.join(dir, 'secret.key'), 'utf8'), key, 'بقاء المتغير لا يبدل المفتاح');
     assert.equal(rotateSigningMaterial({ db: app.db, cfg }, 'test-2').skipped, false);
   } finally { await app.close(); }
+});
+
+test('حد الطلبات لكل مستخدم: مستخدمان من عنوان واحد لا يوقف أحدهما الآخر', () => {
+  resetTieredRateLimit();
+  const req = { url: '/api/news', method: 'GET', ip: '203.0.113.9' };
+  for (let i = 0; i < 600; i++) assert.equal(checkTieredRateLimit(req, 1).limited, false);
+  assert.equal(checkTieredRateLimit(req, 1).limited, true, 'الأول تجاوز حده');
+  assert.equal(checkTieredRateLimit(req, 2).limited, false, 'الثاني من العنوان نفسه يعمل');
+  for (let i = 0; i < 600; i++) checkTieredRateLimit(req);
+  assert.equal(checkTieredRateLimit(req).limited, true, 'بلا جلسة: الحد على العنوان');
+  resetTieredRateLimit();
+  const flood = { url: '/x', method: 'GET', ip: '203.0.113.10' };
+  assert.equal(checkIpCeiling(flood, 2).limited, false);
+  assert.equal(checkIpCeiling(flood, 2).limited, false);
+  assert.equal(checkIpCeiling(flood, 2).limited, true, 'سقف العنوان يحمي من الإغراق');
+  resetTieredRateLimit();
 });
