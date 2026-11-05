@@ -131,10 +131,11 @@ export function studentStatement({ db }, studentId) {
   const stu = db.prepare("SELECT * FROM users WHERE id=? AND role='student'").get(Number(studentId)); if (!stu) throw bad('الطالب غير موجود.', 404, 'not_found');
   const charges = listCharges({ db }, { studentId: stu.id });
   const payments = listPayments({ db }, { studentId: stu.id });
-  const totalCharged = charges.filter((c) => c.status === 'open').reduce((s, c) => s + Math.round(c.amount * 100), 0);
+  const sumOpen = (kind) => charges.filter((c) => c.status === 'open' && c.kind === kind).reduce((s, c) => s + Math.round(c.amount * 100), 0);
+  const totalCharged = sumOpen('fee'), totalDiscounts = sumOpen('discount');
   const totalPaid = payments.filter((p) => p.status === 'ok').reduce((s, p) => s + Math.round(p.amount * 100), 0);
-  const balance = totalCharged - totalPaid;
-  return { student: { id: stu.id, name: stu.display_name }, charges, payments, totalCharged: fromMinor(totalCharged), totalPaid: fromMinor(totalPaid), balance: fromMinor(balance), side: balance > 0 ? 'مستحق' : balance < 0 ? 'رصيد دائن' : 'صفر' };
+  const balance = totalCharged - totalDiscounts - totalPaid;
+  return { student: { id: stu.id, name: stu.display_name }, charges, payments, totalCharged: fromMinor(totalCharged), totalDiscounts: fromMinor(totalDiscounts), totalPaid: fromMinor(totalPaid), balance: fromMinor(balance), side: balance > 0 ? 'مستحق' : balance < 0 ? 'رصيد دائن' : 'صفر' };
 }
 
 /* --------- قيد الرواتب ---------

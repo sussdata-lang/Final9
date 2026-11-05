@@ -47,7 +47,7 @@ const CHECKS = {
   max_per_year: ({ db, studentId, serviceCode }, p) => Number(db.prepare("SELECT COUNT(*) c FROM requests WHERE student_id = ? AND service_code = ? AND status <> 'rejected' AND created_at > ?").get(studentId, serviceCode, Date.now() - 365 * DAY).c) < p.max,
   request_cooldown: ({ db, studentId, serviceCode }, p) => { const last = db.prepare("SELECT MAX(created_at) AS t FROM requests WHERE student_id = ? AND service_code = ? AND status <> 'rejected'").get(studentId, serviceCode)?.t; return !last || Date.now() - Number(last) >= p.days * DAY; },
   no_financial_dues: ({ db, studentId }, p) => {
-    const charged = Number(db.prepare("SELECT COALESCE(SUM(amount), 0) AS v FROM fin_charges WHERE student_id = ? AND status = 'open'").get(studentId).v);
+    const charged = Number(db.prepare("SELECT COALESCE(SUM(CASE WHEN ft.kind = 'discount' THEN -c.amount ELSE c.amount END), 0) AS v FROM fin_charges c JOIN fin_fee_types ft ON ft.id = c.fee_type_id WHERE c.student_id = ? AND c.status = 'open'").get(studentId).v);
     const paid = Number(db.prepare("SELECT COALESCE(SUM(amount), 0) AS v FROM fin_payments WHERE student_id = ? AND status <> 'void'").get(studentId).v);
     return charged - paid <= Math.round(Number(p.max_due ?? 0) * 100);
   },

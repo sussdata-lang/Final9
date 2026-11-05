@@ -439,3 +439,52 @@ test('Idempotency-Key replays a financial operation instead of posting it twice'
   const other = await fetch(base + '/api/finance/vouchers', { method: 'POST', headers: { Cookie: finCookie, 'Content-Type': 'application/json', 'Idempotency-Key': 'key-aaaaaaaa' }, body: JSON.stringify(body) });
   assert.equal(other.headers.get('idempotency-replayed'), null);
 });
+
+// ── حسومات الرسوم ────────────────────────────────────────────────────────────
+test('POST /api/finance/discounts posts a real discount and lowers the balance', async () => {
+  const db = testApp.db;
+  const stuId = Number(db.prepare("INSERT INTO users (username, display_name, password_hash, role, student_no, created_at) VALUES ('disc1', 'طالب حسم', 'x', 'student', 'DSC-1', ?)").run(Date.now()).lastInsertRowid);
+  const post = (b) => req('POST', '/api/finance/discounts', { studentNo: 'DSC-1', academicYear: '2026/2027', kind: 'sibling', percent: 25, reason: 'قرار 12', ...b }, adminCookie);
+  const statement = async () => (await req('GET', `/api/finance/student-statement/${stuId}`, null, adminCookie)).body;
+
+  assert.equal((await post({ studentNo: 'NOPE' })).status, 404);
+  assert.equal((await post({ percent: 0 })).status, 400);
+  assert.equal((await post({ percent: 101 })).status, 400);
+  assert.equal((await post({ kind: 'oops' })).status, 400);
+  assert.equal((await post({ reason: ' ' })).status, 400);
+  assert.equal((await post({})).status, 409, 'لا رسوم في هذا العام');
+  assert.equal((await req('GET', '/api/finance/discounts', null, adminCookie)).body.discounts.length, 0);
+
+  const types = (await req('GET', '/api/finance/fee-types', null, adminCookie)).body;
+  const fee = (types.feeTypes ?? types.types ?? types).find((f) => f.kind === 'fee' && f.active);
+  const today = new Date().toISOString().slice(0, 10);
+  assert.equal((await req('POST', '/api/finance/charges', { studentId: stuId, feeTypeId: fee.id, amount: 1000, dueDay: today, academicYear: '2026/2027' }, adminCookie)).status, 201);
+  assert.equal((await statement()).balance, 1000);
+
+  const ok = await post({});
+  assert.equal(ok.status, 201, JSON.stringify(ok.body));
+  assert.equal(ok.body.amount, 250);
+  const after = await statement();
+  assert.equal(after.totalCharged, 1000);
+  assert.equal(after.totalDiscounts, 250);
+  assert.equal(after.balance, 750, 'الحسم يخفض الرصيد');
+
+  const row = (await req('GET', '/api/finance/discounts', null, adminCookie)).body.discounts[0];
+  assert.equal(row.studentNo, 'DSC-1');
+  assert.equal(row.academicYear, '2026/2027');
+  assert.equal(row.percent, 25);
+  assert.equal(row.reason, 'قرار 12');
+  const inv = (await req('GET', '/api/finance/student-invoices', null, adminCookie)).body.invoices.filter((i) => i.studentNo === 'DSC-1');
+  assert.equal(inv.length, 1, 'قيد الخصم ليس فاتورة');
+  assert.equal(inv[0].discountAmount, 250);
+  assert.equal(inv[0].netAmount, 750);
+
+  assert.equal((await post({ percent: 80 })).status, 409, 'لا يتجاوز مجموع الحسومات الرسوم');
+  assert.equal((await post({ percent: 75 })).status, 201);
+  assert.equal((await statement()).balance, 0);
+
+  // إلغاء قيد الخصم يخرجه من السجل ويعيد الرصيد
+  assert.equal((await req('POST', `/api/finance/charges/${ok.body.finChargeId}/void`, { reason: 'خطأ' }, adminCookie)).status, 200);
+  assert.equal((await statement()).balance, 250);
+  assert.equal((await req('GET', '/api/finance/discounts', null, adminCookie)).body.discounts.length, 1);
+});

@@ -31,7 +31,7 @@ Object.assign(window.UA, {
   }
 
   // عمليات المال: مفتاح واحد لكل عملية، يبقى عند انقطاع الشبكة فلا تتكرر عند إعادة الإرسال
-  const MONEY_POST = /^\/api\/(finance\/(journal|vouchers|invoices(\/\d+\/pay)?|charges|payments|payroll-entry|student-invoices(\/\d+\/pay)?)|enterprise\/(installments\/\d+\/pay|payslips\/issue)|student-affairs-suite\/scholarships)$/;
+  const MONEY_POST = /^\/api\/(finance\/(journal|vouchers|invoices(\/\d+\/pay)?|charges|discounts|payments|payroll-entry|student-invoices(\/\d+\/pay)?)|enterprise\/(installments\/\d+\/pay|payslips\/issue)|student-affairs-suite\/scholarships)$/;
   const moneyKeys = new Map();
   const moneyKeyFor = (id) => { if (!moneyKeys.has(id)) moneyKeys.set(id, crypto.randomUUID ? crypto.randomUUID() : Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('')); return moneyKeys.get(id); };
 

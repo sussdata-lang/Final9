@@ -643,7 +643,7 @@
         <div class="card">
           <h3 style="margin-top:0">🎖️ سجل المنح والإعفاءات والحسومات الطلابية</h3>
           <div class="tbl-wrap"><table class="tbl"><thead><tr><th>الطالب</th><th>العام الدراسي</th><th>النوع</th><th>النسبة / المبلغ</th><th>السبب والقرار</th></tr></thead><tbody>
-            ${F.discounts.map((d) => `<tr><td><b>${esc(d.studentName)}</b> (${esc(d.studentNo || '')})</td><td>${esc(d.academicYear)}</td><td>${d.kind === 'scholarship' ? 'منحة تفوق' : 'حسم اجتماعي'}</td><td><b>${d.percent > 0 ? d.percent + '%' : money(d.fixedAmount)}</b></td><td>${esc(d.reason)}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">لا توجد منح أو حسومات</td></tr>'}
+            ${F.discounts.map((d) => `<tr><td><b>${esc(d.studentName)}</b> (${esc(d.studentNo || '')})</td><td>${esc(d.academicYear)}</td><td>${esc(d.kindLabel)}</td><td><b>${d.percent}% · ${money(d.amount)}</b></td><td>${esc(d.reason)}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">لا توجد منح أو حسومات</td></tr>'}
           </tbody></table></div>
         </div>
       ` : `
@@ -1033,8 +1033,8 @@
       else if (act === 'fin-new-disc') {
         showModal(`<h3>🎖️ منح حسم أو منحة لطالب</h3>
           <div class="form-grid">
-            <label>معرّف الطالب (User ID)<input id="fd-stu" type="number" placeholder="4"></label>
-            <label>العام الدراسي<input id="fd-yr"></label>
+            <label>الرقم الجامعي<input id="fd-stu" dir="ltr" required></label>
+            <label>العام الدراسي (كما في فاتورة الرسوم)<input id="fd-yr" required></label>
             <label>النوع<select id="fd-kind"><option value="scholarship">منحة تفوق</option><option value="sibling">حسم أخوة</option><option value="social">إعفاء اجتماعي</option></select></label>
             <label>نسبة الحسم (%)<input id="fd-pct" type="number"></label>
             <label style="grid-column:1/-1">السبب ورقم القرار<input id="fd-rsn"></label>
@@ -1043,7 +1043,7 @@
       }
       else if (act === 'fin-save-disc') {
         await api('POST', '/api/finance/discounts', {
-          studentId: Number(document.getElementById('fd-stu').value),
+          studentNo: document.getElementById('fd-stu').value,
           academicYear: document.getElementById('fd-yr').value,
           kind: document.getElementById('fd-kind').value,
           percent: Number(document.getElementById('fd-pct').value),

@@ -915,7 +915,8 @@ export function grantStudentScholarship(deps, actor, body, ip) {
   const studentId = Number(body?.studentId);
   const scholarshipType = String(body?.scholarshipType || 'merit_top');
   const baseTuition = Number(body?.baseTuition || 1500000);
-  const gpa = Number(body?.gpa || 88);
+  const gpa = body?.gpa ? Number(body.gpa) : null;
+  const grantYear = String(body?.academicYear ?? '').trim() || academicYear();
 
   if (!studentId) throw new HttpError(400, 'يرجى اختيار الطالب المستفيد من المنحة أو الحسم.', 'validation');
 
@@ -940,7 +941,7 @@ export function grantStudentScholarship(deps, actor, body, ip) {
   const info = db
     .prepare(`
       INSERT INTO sa_scholarships (grant_no, student_id, scholarship_type, discount_percent, amount, academic_year, gpa_at_grant, fin_charge_id, status, approved_by, note, created_at)
-      VALUES (?, ?, ?, ?, ?, '${academicYear()}', ?, NULL, 'active', ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 'active', ?, ?, ?)
     `)
     .run(
       grantNo,
@@ -948,6 +949,7 @@ export function grantStudentScholarship(deps, actor, body, ip) {
       scholarshipType,
       discountPercent,
       amount,
+      grantYear,
       gpa,
       actor.display_name || actor.name || 'لجنة المنح والرعاية الطلابية',
       String(body?.note || calc.label).slice(0, 200),
@@ -966,7 +968,7 @@ export function grantStudentScholarship(deps, actor, body, ip) {
         feeTypeId: discountFeeType.id,
         amount,
         dueDay: new Date().toISOString().slice(0, 10),
-        academicYear: academicYear(),
+        academicYear: grantYear,
         note: `${calc.label} (${discountPercent}%) — رقم المنحة ${grantNo}`,
       },
       ip

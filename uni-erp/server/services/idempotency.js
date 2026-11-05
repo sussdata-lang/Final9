@@ -9,6 +9,7 @@ export const IDEMPOTENT_ROUTES = new Set([
   'POST /api/finance/invoices',
   'POST /api/finance/invoices/:id/pay',
   'POST /api/finance/charges',
+  'POST /api/finance/discounts',
   'POST /api/finance/payments',
   'POST /api/finance/payroll-entry',
   'POST /api/finance/student-invoices',

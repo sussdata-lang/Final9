@@ -5,6 +5,7 @@ import * as C from './core.js';
 import * as R from './reports.js';
 import * as F from './fees.js';
 import * as I from './invoices.js';
+import { listDiscounts, createDiscount } from './discounts.js';
 
 // helpers لكتابة الإكسل
 let xlsxLib = null; const xlsx = () => xlsxLib ?? (xlsxLib = import('../../lib/xlsx.js'));
@@ -277,22 +278,28 @@ export async function registerFinance(r, deps, { writeXlsx }) {
 
   r.add('GET', '/api/finance/student-invoices', fin('finance:read', () => {
     C.ready(db);
-    const charges = F.listCharges(deps);
+    const all = F.listCharges(deps);
+    const charges = all.filter((ch) => ch.kind === 'fee');
+    // حسومات الطالب في العام تُوزَّع على فواتيره حتى تنفد
+    const left = new Map();
+    for (const d of all) if (d.kind === 'discount' && d.status === 'open') { const k = `${d.studentId}|${d.academicYear}`; left.set(k, (left.get(k) || 0) + d.amount); }
+    const takeDiscount = (ch) => { if (ch.status !== 'open') return 0; const k = `${ch.studentId}|${ch.academicYear}`, use = Math.min(left.get(k) || 0, ch.amount); left.set(k, (left.get(k) || 0) - use); return use; };
+    const people = new Map(db.prepare("SELECT id, display_name, student_no FROM users WHERE role = 'student'").all().map((u) => [Number(u.id), u]));
     return {
-      invoices: charges.map((ch) => ({
+      invoices: charges.map((ch) => { const discount = takeDiscount(ch), who = people.get(Number(ch.studentId)); return {
         id: ch.id,
         no: `CHG-${ch.id}`,
-        studentName: 'طالب جامعي',
-        studentNo: `STU-${ch.studentId}`,
+        studentName: who?.display_name ?? '',
+        studentNo: who?.student_no ?? '',
         academicYear: ch.academicYear || '2025/2026',
         semester: 1,
         totalAmount: ch.amount,
-        discountAmount: 0,
-        netAmount: ch.amount,
+        discountAmount: discount,
+        netAmount: ch.amount - discount,
         paidAmount: ch.status === 'open' ? 0 : ch.amount,
         status: ch.status === 'open' ? 'unpaid' : 'paid',
         installments: [{ seq: 1, dueDay: ch.dueDay, amount: ch.amount, paidAmount: 0, status: ch.status }]
-      }))
+      }; })
     };
   }));
 
@@ -335,8 +342,8 @@ export async function registerFinance(r, deps, { writeXlsx }) {
     }, c.ip);
   }));
 
-  r.add('GET', '/api/finance/discounts', fin('finance:read', () => ({ discounts: [] })));
-  r.add('POST', '/api/finance/discounts', finC('finance:fees', () => ({ ok: true })));
+  r.add('GET', '/api/finance/discounts', fin('finance:read', () => ({ discounts: listDiscounts(deps) })));
+  r.add('POST', '/api/finance/discounts', finC('finance:fees', (c, b) => createDiscount(deps, c.user, b, c.ip)));
   r.add('GET', '/api/finance/fees/overdue', fin('finance:read', () => ({ installments: [] })));
 
   r.add('GET', '/api/payroll/runs', fin('finance:read', () => {
