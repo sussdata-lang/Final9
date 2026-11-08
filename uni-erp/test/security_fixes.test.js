@@ -146,13 +146,18 @@ test('مسارات الوحدات الموسعة وشؤون الطلاب وال�
     'POST /api/lms/quizzes/1/submit', 'POST /api/lms/quizzes/1/start', 'POST /api/enterprise/gpa-simulate', 'POST /api/enterprise/self-enroll', 'POST /api/student-affairs-suite/queue/book',
     // الإلغاء يمس ملفات المستخدم نفسه فقط، والمعرّف هنا ليس نوع استيراد؛ رفض الأنواع الفعلية في import_engine.test.js
     'POST /api/import-engine/cancel', 'POST /api/import-engine/1/check', 'POST /api/import-engine/1/commit',
+    // حلّ الطالب وإشعاراته هو
+    'PUT /api/lms/assignments/1/submission', 'POST /api/lms/assignments/1/submission/submit', 'POST /api/lms/assignments/1/submission/files', 'DELETE /api/lms/assignments/1/submission/files/1', 'POST /api/notifications/read',
+    // التصحيح محميّ بملكية التكليف (404 لغير المالك)؛ يُختبر على حل حقيقي في lms_assignments_flow.test.js
+    'POST /api/lms/assignments/submissions/1/grade', 'POST /api/lms/assignments/submissions/1/feedback-file',
   ]);
   const open = [];
   for (const r of app.router.routes) {
     if (r.method === 'GET' || r.opts.auth === false) continue;
-    const url = r.re.source.replace(/^\^/, '').replace(/\/\?\$$/, '').replace(/\\\//g, '/').replace(/\\$/, '').replace(/\(\[\^\/\]\+\)/g, String(otherId));
+    const route = r.re.source.replace(/^\^/, '').replace(/\/\?\$$/, '').replace(/\\\//g, '/').replace(/\\$/, ''), withParam = (v) => route.replace(/\(\[\^\/\]\+\)/g, String(v));
+    const url = withParam(otherId);
     if (/\/api\/auth\/|logout|password/.test(url)) continue;
-    const allowedKey = `${r.method} ${url.replace(String(otherId), '1')}`;
+    const allowedKey = `${r.method} ${withParam(1)}`;
     if (STUDENT_WRITES.has(allowedKey)) continue;
     const { status } = await c.call(r.method, url, { cookie: stu, body: {} });
     if (status !== 403) open.push(`${status} ${r.method} ${url}`);
