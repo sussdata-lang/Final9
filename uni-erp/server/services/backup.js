@@ -9,6 +9,7 @@ import { execFile, execFileSync } from 'node:child_process';
 // import { DatabaseSync } from 'node:sqlite'; // ← تم إزالته (PostgreSQL)
 import { Worker } from 'node:worker_threads';
 import { readZip } from '../lib/zip.js';
+import { LMS_ASSIGNMENTS_AREA } from '../lib/storage.js';
 import { encrypt } from '../lib/backup_crypto.js';
 import { audit } from '../audit.js';
 import { HttpError } from '../http.js';
@@ -56,6 +57,8 @@ function walk(dir, base, skip, out = []) {
   return out;
 }
 const inside = (child, parent) => { const r = path.relative(parent, child); return !!r && !r.startsWith('..') && !path.isAbsolute(r); };
+// النسخة تُجمَّع كلها في الذاكرة: حلول الطلاب ومرفقاتها تُنسخ مع القرص الدائم، والملفات قيد الرفع قد تختفي أثناء الجمع
+const notInBackup = (cfg, full) => full === path.join(cfg.uploadDir, LMS_ASSIGNMENTS_AREA) || full === path.join(cfg.uploadDir, '.incoming');
 
 /* ---------- التشفير الاختياري ---------- */
 export { encrypt };
@@ -86,9 +89,9 @@ export async function createBackup({ db, cfg }, { reason = 'auto', actor = null,
     await pgDump(pgUrl, tmp);
     // النسخة غير المشفرة لا تحمل مفتاح التوقيع ولا الشهادة، فمن يصل إليها لا يستطيع توقيع وثائق صحيحة
     const noSecrets = !cfg.backupPassphrase;
-    const skip = (full, e) => full === dir || inside(full, dir) || e.name.startsWith('.tmp-') || (noSecrets && (e.name === 'secret.key' || e.name === 'audit.key' || e.name === 'pki'));
+    const skip = (full, e) => full === dir || inside(full, dir) || e.name.startsWith('.tmp-') || (noSecrets && (e.name === 'secret.key' || e.name === 'audit.key' || e.name === 'pki')) || notInBackup(cfg, full);
     const extra = walk(dataDir, 'data', skip);
-    if (!inside(cfg.uploadDir, dataDir) && cfg.uploadDir !== dataDir) extra.push(...walk(cfg.uploadDir, 'uploads', () => false));
+    if (!inside(cfg.uploadDir, dataDir) && cfg.uploadDir !== dataDir) extra.push(...walk(cfg.uploadDir, 'uploads', (full) => notInBackup(cfg, full)));
     const name = `backup-${stamp}${reason === 'auto' ? '' : '-' + reason.replace(/[^a-z]/g, '')}.zip${cfg.backupPassphrase ? '.enc' : ''}`;
     const file = path.join(dir, name);
     const manifest = { app: 'uni-erp', format: 1, createdAt: now.toISOString(), reason, signingMaterial: !noSecrets, note: 'استعد بـ: node scripts/restore.js <الملف> — والخادم متوقف.' };

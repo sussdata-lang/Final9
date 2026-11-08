@@ -12,7 +12,7 @@
 ## الخطوات
 1. **GitHub:** أنشئ حساباً مجانياً، ثم New repository باسم مثل `uni-erp` (اجعله **Private**). اضغط «uploading an existing file» واسحب **محتويات** مجلد `uni-erp` (وليس المجلد نفسه) بحيث يظهر `package.json` في الجذر، ثم Commit.
 2. **Railway:** سجّل الدخول بحساب GitHub، ثم New Project ← Deploy from GitHub repo ← اختر المستودع. سيقرأ `railway.json` ويبني تلقائياً.
-3. **القرص الدائم (إلزامي):** افتح الخدمة ← Volumes (أو Add Volume) ← **Mount path: `/app/data`**. بدونه تضيع الحسابات والطلبات مع كل تحديث.
+3. **القرص الدائم (إلزامي):** افتح الخدمة ← Volumes (أو Add Volume) ← **Mount path: `/app/data`**. بدونه تضيع الحسابات والطلبات مع كل تحديث. ملفات الاختبارات والتكليفات (`uploads/lms_assignments`) محفوظة على هذا القرص لكنها **خارج النسخة الاحتياطية اليومية**، فلأنها تكبر مع كل تسليم يجب تفعيل نسخ القرص من الاستضافة أو نسخها دورياً.
 4. **النطاق:** الخدمة ← Settings ← Networking ← Generate Domain. ستحصل على عنوان مثل `https://xxxx.up.railway.app`.
 5. **المتغيرات:** الخدمة ← Variables، أضف:
    - `PUBLIC_URL` = عنوان النطاق الذي حصلت عليه (يُستخدم في رموز QR للتحقق من الوثائق)

@@ -625,7 +625,7 @@ Object.assign(window.UA, {
     restoreScrollAndFocus(snap);
   }
   /* ---------- ملفات الأقسام الكبيرة تُحمَّل عند فتحها ---------- */
-  const LAZY = { exchange: ['import.js', 'export.js'], import: ['import.js'], export: ['export.js'], finance: ['finance.js'], procurement: ['procurement.js'], access: ['access.js'], guidelines: ['guidelines.js'], lms: ['v12_views.js', 'quiz_builder.js'], research: ['v12_views.js'], alumni: ['v12_views.js'], qa: ['v12_views.js'], expansions: ['v12_views.js'], student_life: ['v12_views.js', 'housing.js'], labtools: ['v12_views.js', 'quiz_builder.js', 'housing.js'], ai: ['v12_views.js'], audit: ['v12_views.js'] };
+  const LAZY = { exchange: ['import.js', 'export.js'], import: ['import.js'], export: ['export.js'], finance: ['finance.js'], procurement: ['procurement.js'], access: ['access.js'], guidelines: ['guidelines.js'], lms: ['v12_views.js', 'quiz_builder.js', 'lms_assignments.js', 'lms_assignments_student.js'], research: ['v12_views.js'], alumni: ['v12_views.js'], qa: ['v12_views.js'], expansions: ['v12_views.js'], student_life: ['v12_views.js', 'housing.js'], labtools: ['v12_views.js', 'quiz_builder.js', 'housing.js'], ai: ['v12_views.js'], audit: ['v12_views.js'] };
   const ASSET_V = (document.currentScript && document.currentScript.src.split('?')[1]) || '';
   const scripts = new Map();
   function loadScript(file) {

@@ -73,6 +73,9 @@ import { importCatalog, checkImport, commitImport, cancelImport, listBatches, un
 import { addStudentFile, listStudentFiles, deleteStudentFile, streamStudentFile } from './services/studentfiles.js';
 import { studentFileView, saveStudentFileMeta } from './services/student_file.js';
 import { registerStudentGroupRoutes } from './services/student_groups.js';
+import { registerLmsAssignmentRoutes } from './services/lms_assignments.js';
+import { registerLmsSubmissionRoutes } from './services/lms_assignment_submissions.js';
+import { registerUserNotificationRoutes } from './services/lms_assignment_notify.js';
 import { devSwitchEnabled, isLocalRequest, devAccounts, prepareDevAccount } from './services/dev_accounts.js';
 import { createBackup, backupInfo, backupPath, deleteBackup, verifyBackup } from './services/backup.js';
 import { vapidKeys, subscribe as pushSubscribe, unsubscribe as pushUnsubscribe, subscriptionCount, notify, notifyNews, notifyGrade, notifyRequest, notifyComplaint } from './services/push.js';
@@ -113,6 +116,9 @@ export async function buildRouter(deps) {
     c.json(200, { user: out.user }, { 'Set-Cookie': cookie(out.token, out.maxAge) });
   }, { auth: false });
   registerStudentGroupRoutes(r, deps);
+  registerLmsAssignmentRoutes(r, deps);
+  registerLmsSubmissionRoutes(r, deps);
+  registerUserNotificationRoutes(r, deps);
   registerHousingRoutes(r, deps, { need, needAny });
   // تبديل الحساب للتجربة المحلية: لا يُسجَّل إلا مع DEMO_MODE=1 وخادم مربوط بعنوان محلي.
   // لا تضعه تحت /api/dev/: جدار الحماية يعدّ /dev/ مسار اختراق ويحظر العنوان.

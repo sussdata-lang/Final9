@@ -34,7 +34,8 @@ test('الحد الأدنى لكلمة المرور لا يقل عن 8 مهما 
 
 test('لا يُسمح بتضمين النظام إلا من نطاقه', () => {
   assert.match(SECURITY_HEADERS['Content-Security-Policy'], /frame-ancestors 'self';/);
-  assert.doesNotMatch(SECURITY_HEADERS['Content-Security-Policy'], /run\.app|google\.com/);
+  // المستثنى الوحيد: عرض فيديو Google Drive داخل النظام (frame-src)، وهو عكس تضمين النظام في موقع آخر
+  assert.doesNotMatch(SECURITY_HEADERS['Content-Security-Policy'].replace(' https://drive.google.com;', ';'), /run\.app|google\.com/);
 });
 
 test('أرقام المستندات لا تتكرر، والعام الدراسي يُحسب من التاريخ', () => {

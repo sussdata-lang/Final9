@@ -25,7 +25,7 @@ const staticRamCache = new Map();
 
 // ترويسات أمنية: لا سكربتات إلا من الموقع نفسه، ولا تضمين في إطارات، ولا تخمين لأنواع الملفات
 export const SECURITY_HEADERS = {
-  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' https:; frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com; frame-ancestors 'self'; base-uri 'none'; form-action 'self'",
+  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' https:; frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com https://drive.google.com; frame-ancestors 'self'; base-uri 'none'; form-action 'self'",
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'no-referrer',
   'Cross-Origin-Opener-Policy': 'same-origin',
@@ -373,6 +373,11 @@ export function makeHandler({ cfg, router, getUser }) {
       if (route.opts.auth !== false && !user) throw new HttpError(401, 'يلزم تسجيل الدخول.', 'unauthenticated');
       if (route.opts.auth !== false && user?.must_change_password && !route.opts.allowMustChange) throw new HttpError(403, 'يجب تغيير كلمة المرور المؤقتة أولاً.', 'password_change_required');
       if (route.opts.auth !== false && user?.mfa_setup_required && !route.opts.allowMustChange) throw new HttpError(403, 'فعّل التحقق بخطوتين أولًا.', 'mfa_setup_required');
+      // فحص الصلاحية والموعد قبل استلام أي بايت، فلا يملأ من لا يحق له القرص بملف سيُرفض
+      if (route.opts.upload && route.opts.preUpload) {
+        try { await route.opts.preUpload({ req, ip, params, query: Object.fromEntries(url.searchParams), cookies, user, cfg }); }
+        catch (e) { req.resume(); throw e; }
+      }
       const parsedBody = req.method === 'GET' ? {} : route.opts.upload ? await readUpload(req, route.opts.maxBody, cfg) : route.opts.raw ? await readRaw(req, route.opts.maxBody) : await readBody(req, route.opts.maxBody ?? 64 * 1024);
       // فحص WAF على الـ body بعد parse
       if (req._wafScanBody && typeof parsedBody === 'object' && !Buffer.isBuffer(parsedBody) && !route.opts.upload) {

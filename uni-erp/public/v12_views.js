@@ -175,6 +175,7 @@
   UA.views.lms = async function (el, _me, only) {
     let activeTab = only || (UA.gate ? UA.gate.firstTab('lms', 'lectures') : 'lectures');
     if (!only && activeTab === 'library') activeTab = 'lectures';
+    if (!only && (UA.lmsDeepLink || UA.lmsKeepTab)) activeTab = 'assignments';   // فتح اختبار من إشعار، أو البقاء في التبويب بعد إعادة الرسم
     let bookQ = '';
     async function render() {
       el.innerHTML = `${SHARED_CSS}<div class="v12-wrap"><p class="hint">جارٍ تحميل بوابة التعلم الإلكتروني والمكتبة الرقمية…</p></div>`;
@@ -200,6 +201,7 @@
           <div class="v12-tabs">
             <button class="v12-tab ${activeTab === 'lectures' ? 'active' : ''}" data-t="lectures">📚 المحاضرات والمحتوى الرقمي</button>
             <button class="v12-tab ${activeTab === 'quizzes' ? 'active' : ''}" data-t="quizzes">📝 بنك الأسئلة والاختبارات</button>
+            <button class="v12-tab ${activeTab === 'assignments' ? 'active' : ''}" data-t="assignments">🗂️ الاختبارات والتكليفات</button>
           </div>
           <div id="v12-lms-body"></div>
         </div>
@@ -213,6 +215,8 @@
 
     function renderBody(d) {
       const box = el.querySelector('#v12-lms-body');
+      UA.lmsKeepTab = activeTab === 'assignments';
+      if (activeTab === 'assignments') { UA.lmsAssignments.mount(box, { modal: openModal, notify, api }); return; }
       if (activeTab === 'lectures') {
         const KIND = { video: '🎬 محاضرة فيديو', pdf: '📄 ملف PDF', slides: '📊 عرض تقديمي', assignment: '✍️ تكليف عملي' };
         box.innerHTML = `

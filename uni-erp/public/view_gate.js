@@ -27,7 +27,7 @@
     expansions: [['v12:expansions', 'exams', 'جداول الامتحانات والتظلمات', EXAMS_READ.concat('grade:manage', 'grade:approve', 'course:manage')], ['v12:expansions', 'faculty', 'الترقيات العلمية', ['faculty:manage', ...HR_ANY]]],
     student_life: [['hstab', 'rooms', 'المباني والغرف', HOUSING], ['hstab', 'residents', 'الطلاب في السكن', HOUSING], ['hstab', 'supplies', 'المواد والاحتياجات', HOUSING]],
     labtools: [['labtab', 'admissions', 'القبول والمفاضلة والمعادلة', ['sa_admissions:view', 'sa_admissions:write', 'sa_admissions:approve', 'student:register']], ['labtab', 'office', 'حجوزات الساعات المكتبية والإرشاد', HOUSING.concat('faculty:manage')], ['labtab', 'library', 'المكتبة الرقمية والإعارة', LMS_READ], ['labtab', 'activities', 'الأندية والأنشطة الطلابية', HOUSING]],
-    lms: [['v12:lms', 'lectures', 'المحاضرات والمحتوى الرقمي', LMS_READ], ['v12:lms', 'quizzes', 'بنك الأسئلة والاختبارات', LMS_READ.concat('sa_quiz:write', 'sa_quiz:approve')]],
+    lms: [['v12:lms', 'lectures', 'المحاضرات والمحتوى الرقمي', LMS_READ], ['v12:lms', 'quizzes', 'بنك الأسئلة والاختبارات', LMS_READ.concat('sa_quiz:write', 'sa_quiz:approve')], ['v12:lms', 'assignments', 'الاختبارات والتكليفات', ['lms_lib:write', 'lms_lib:approve']]],
     research: [['v12:research', 'projects', 'المشاريع والأبحاث', RESEARCH], ['v12:research', 'theses', 'رسائل الدراسات العليا', RESEARCH]],
     alumni: [['v12:alumni', 'alumni', 'سجل الخريجين', ALUMNI], ['v12:alumni', 'jobs', 'معرض الوظائف والتدريب', ALUMNI]],
     qa: [['v12:qa', 'kpis', 'مؤشرات الأداء', QA], ['v12:qa', 'surveys', 'تقييم المقررات والتدريس', QA], ['v12:qa', 'acc', 'ملفات الاعتماد', QA]],
