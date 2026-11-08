@@ -115,7 +115,7 @@
       .es-wrap { display: grid; gap: 16px; }
       .es-banner { background: linear-gradient(135deg, #042f28 0%, #095246 100%); color: #fff; border-radius: 16px; padding: 20px 24px; border: 1px solid #D5B65D; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 14px; box-shadow: 0 10px 28px rgba(4,47,40,.18); }
       .es-banner h1 { margin: 0 0 6px; font-size: 20px; color: #fff; display: flex; align-items: center; gap: 10px; }
-      .es-banner p { margin: 0; font-size: 13px; color: #d1fae5; opacity: .92; }
+      .es-banner p { margin: 0; font-size: 13px; color: #A8D8BE; opacity: .92; }
       .es-badge { background: #D5B65D; color: #042f28; font-weight: 800; font-size: 11.5px; padding: 4px 10px; border-radius: 99px; }
       .es-tabs { display: flex; flex-wrap: wrap; gap: 8px; background: var(--surface, #fff); padding: 10px; border-radius: 14px; border: 1px solid var(--line, #dce3dd); }
       .es-tab { border: 1px solid transparent; background: rgba(14,102,85,.07); color: var(--ink, #16302a); padding: 9px 14px; border-radius: 10px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .15s; }
@@ -140,7 +140,7 @@
       .es-cmd-box { width: min(680px, 94vw); background: var(--surface, #fff); color: var(--ink, #16302a); border-radius: 16px; border: 2px solid #D5B65D; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,.4); }
       .es-cmd-input { width: 100%; border: 0; border-bottom: 1px solid var(--line, #dce3dd); padding: 16px 18px; font: inherit; font-size: 15px; background: rgba(14,102,85,.05); color: inherit; outline: none; }
       .es-cmd-list { max-height: 60vh; overflow-y: auto; padding: 12px; display: grid; gap: 6px; }
-      .es-cmd-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line, #e2e8f0); background: transparent; cursor: pointer; text-align: start; font: inherit; width: 100%; }
+      .es-cmd-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line, #DCE3DD); background: transparent; cursor: pointer; text-align: start; font: inherit; width: 100%; }
       .es-cmd-item:hover { background: rgba(14,102,85,.1); border-color: #0e6655; }
     `;
     document.head.appendChild(st);
@@ -191,7 +191,7 @@
               <div class="es-kpi"><small>المعدل التراكمي المتوقع</small><strong>${gpa ? `${gpa.projectedGpa}%` : '—'}</strong></div>
               <div class="es-kpi"><small>التقدير الجامعي</small><strong>${gpa ? esc(gpa.letter) : '—'}</strong></div>
               <div class="es-kpi"><small>إجمالي الساعات بعد الفصل</small><strong>${gpa ? `${gpa.totalHours} ساعة` : '—'}</strong></div>
-              <div class="es-kpi"><small>مقدار التحسن</small><strong style="color:#10b981">${gpa ? `${gpa.delta >= 0 ? '+' + gpa.delta : gpa.delta}%` : '—'}</strong></div>
+              <div class="es-kpi"><small>مقدار التحسن</small><strong style="color:#1B7F4B">${gpa ? `${gpa.delta >= 0 ? '+' + gpa.delta : gpa.delta}%` : '—'}</strong></div>
             </div>
           </div>
         </div>
@@ -219,8 +219,8 @@
             <button class="btn" type="button" data-act="view" data-v="verify">فتح شاشة التحقق العام</button>
           </form>
           ${E.verifyResult ? `
-            <div style="padding:14px;border-radius:12px;background:rgba(16,185,129,.1);border:1px solid #10b981">
-              <strong style="color:#065f46;display:block;margin-bottom:4px">✓ وثيقة رسمية صحيحة وموقعة رقمياً (PKI Verified)</strong>
+            <div style="padding:14px;border-radius:12px;background:rgba(27,127,75,.1);border:1px solid #1B7F4B">
+              <strong style="color:#054239;display:block;margin-bottom:4px">✓ وثيقة رسمية صحيحة وموقعة رقمياً (PKI Verified)</strong>
               <div class="small">الرمز: <span class="mono">${esc(E.verifyResult.code)}</span> · الجهة المصدرة: الجامعة السورية للعلوم الأمنية · الحالة: معتمدة وسارية</div>
               <div class="small">نتيجة التحقق: <span class="mono">${esc(E.verifyResult.sig)}</span></div>
             </div>
@@ -246,11 +246,11 @@
             <div class="es-idcard-body">
               <div>
                 <div style="font-size:18px;font-weight:800;margin-bottom:4px">${esc(stName)}</div>
-                <div style="font-size:13px;color:#d1fae5">الرقم الجامعي: <b class="mono">${esc(stNo)}</b></div>
-                <div style="font-size:12.5px;color:#d1fae5;margin-top:2px">الكلية: هندسة الأمن السيبراني · المستوى الثاني</div>
+                <div style="font-size:13px;color:#A8D8BE">الرقم الجامعي: <b class="mono">${esc(stNo)}</b></div>
+                <div style="font-size:12.5px;color:#A8D8BE;margin-top:2px">الكلية: هندسة الأمن السيبراني · المستوى الثاني</div>
                 <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
                   <span style="background:rgba(255,255,255,.15);padding:3px 8px;border-radius:6px;font-size:11px">NFC Чип: نشط</span>
-                  <span style="background:rgba(213,182,93,.25);color:#fde68a;padding:3px 8px;border-radius:6px;font-size:11px">براءة ذمة: مكتملة</span>
+                  <span style="background:rgba(213,182,93,.25);color:#E6CB84;padding:3px 8px;border-radius:6px;font-size:11px">براءة ذمة: مكتملة</span>
                 </div>
               </div>
               <div class="es-qrbox">

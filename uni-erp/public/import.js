@@ -72,7 +72,7 @@
   function renderEngineKind(K, s) {
     const info = engineKind(K), risk = RISK[info.risk] || RISK.low;
     const deps = info.deps.join('، ');
-    return `<div style="margin-top:14px;padding:16px;border:1px solid #e2e8f0;border-radius:12px;background:#fff">
+    return `<div style="margin-top:14px;padding:16px;border:1px solid #DCE3DD;border-radius:12px;background:#fff">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap"><h3 style="margin:0 0 6px;color:#054239">${esc(info.title)}</h3><span class="pill ${risk[1]}">الخطورة: ${risk[0]}</span></div>
       <p class="hint" style="margin-top:0">${esc(info.desc)}${deps ? ` يعتمد على: ${esc(deps)}.` : ''}</p>
       <div class="actions" style="margin:0 0 10px"><a class="btn sm" href="/api/import-engine/${esc(K)}/template" download>تحميل النموذج xlsx</a><a class="btn sm" href="/api/import-engine/${esc(K)}/template?format=csv" download>تحميل النموذج csv</a></div>
@@ -158,7 +158,7 @@
         <button class="btn sm" data-act="extab" data-t="export">الانتقال إلى صفحة التصدير الموحدة ←</button>
       </div>
 
-      <div class="inline-form" style="margin-top:14px;padding:14px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:12px">
+      <div class="inline-form" style="margin-top:14px;padding:14px;background:#F6F8F5;border:1px solid #DCE3DD;border-radius:12px">
         <label style="flex:1;min-width:160px"><b>بحث في الأنواع</b><input id="imp-kind-q" data-kindq="1" placeholder="مثال: موردون" autocomplete="off"></label>
         <label style="flex:2;min-width:260px"><b>1. اختر فئة الاستيراد في الفورم الموحد</b>
           <select id="imp-unified-kind" data-chg="impkind">${options}</select>
@@ -176,7 +176,7 @@
       </div>
       ${tabs}
 
-      ${curEngine ? renderEngineKind(st.activeKind, st[st.activeKind] ?? (st[st.activeKind] = {})) : `<div style="margin-top:14px;padding:16px;border:1px solid #e2e8f0;border-radius:12px;background:#fff">
+      ${curEngine ? renderEngineKind(st.activeKind, st[st.activeKind] ?? (st[st.activeKind] = {})) : `<div style="margin-top:14px;padding:16px;border:1px solid #DCE3DD;border-radius:12px;background:#fff">
         <h3 style="margin:0 0 6px;color:#054239">${esc(curK.title)}</h3>
         <p class="hint" style="margin-top:0">${esc(curK.desc)}</p>
         <div class="inline-form" style="margin-top:12px">

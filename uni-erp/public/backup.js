@@ -28,7 +28,7 @@
       </div>
       <p class="hint" style="margin-top:0">تضم النسخة قاعدة البيانات والمرفقات والشهادات ومفتاح التوقيع، مع بصمة SHA-256 لقاعدة البيانات يمكن فحصها في أي وقت.</p>
 
-      <div style="background:rgba(14,102,85,.05);padding:12px 16px;border-radius:10px;margin-bottom:16px;border:1px solid #cbd5e1">
+      <div style="background:rgba(14,102,85,.05);padding:12px 16px;border-radius:10px;margin-bottom:16px;border:1px solid #DCE3DD">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
           <div>
             <b>الجدولة التلقائية:</b> ${b.auto ? 'مفعَّلة يومياً نحو الساعة ' + b.hourUtc + ' UTC' : 'متوقفة'} ·
@@ -38,7 +38,7 @@
           ${lastStatus(b.last)}
         </div>
         ${b.encrypted ? '' : '<div class="err" role="alert" style="margin-top:6px">النسخ غير مشفرة وتحوي بيانات الطلاب ومفتاح التوقيع. اضبط BACKUP_PASSPHRASE على الخادم لتشفير النسخ الجديدة.</div>'}
-        <div class="small" style="margin-top:6px;color:#475569">${esc(b.persistentHint)}${b.remote ? ' (الرفع الخارجي مفعَّل.)' : ''}</div>
+        <div class="small" style="margin-top:6px;color:#566660">${esc(b.persistentHint)}${b.remote ? ' (الرفع الخارجي مفعَّل.)' : ''}</div>
       </div>
 
       <h3 style="margin:16px 0 8px;font-size:14px">النسخ المتاحة (${b.backups.length})</h3>
@@ -66,7 +66,7 @@
 
       <h3 class="sec-h" style="margin-top:20px">الاستعادة</h3>
       <p class="small">أوقف الخادم ثم نفّذ أمر الاستعادة:<br>
-      <span class="mono" dir="ltr" style="background:#f1f5f9;padding:4px 8px;border-radius:4px;display:inline-block;margin-top:4px">node scripts/restore.js data/backups/&lt;اسم_الملف&gt;</span><br>
+      <span class="mono" dir="ltr" style="background:#F6F8F5;padding:4px 8px;border-radius:4px;display:inline-block;margin-top:4px">node scripts/restore.js data/backups/&lt;اسم_الملف&gt;</span><br>
       يتحقق الأمر من البصمة قبل أي كتابة، ويحفظ نسخة من الوضع الحالي قبل الاستبدال.</p>
     </section>`;
   };

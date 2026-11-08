@@ -249,7 +249,7 @@
       title: 'نواب رئيس الجامعة (العلمي والإداري)',
       subtitle: 'الإشراف التنفيذي والأكاديمي والطلابي',
       rank: 'المستوى الثاني',
-      color: '#0e7490',
+      color: '#054239',
       scope: 'إدارة الشؤون العلمية والبحثية (النائب العلمي) والإشراف على الموارد البشرية والمالية والخدمات الطلابية (النائب الإداري وشؤون الطلاب).',
       authorities: ['اعتماد الجداول الامتحانية والخطط الدراسية', 'الموافقة على الترقيات والتعيينات الأكاديمية والإدارية', 'البت في المعاملات المحالة من عمادات الكليات', 'إدارة الأزمات والطوارئ الجامعية'],
       reportsTo: 'رئيس الجامعة',
@@ -273,7 +273,7 @@
       title: 'مدراء الإدارات المركزية (الطلاب، HR، المالية، IT، الجودة)',
       subtitle: 'الإدارة التنفيذية والخدمية للمنظومة الجامعية',
       rank: 'المستوى الرابع',
-      color: '#b45309',
+      color: '#8A6A1B',
       scope: 'تشغيل الأنظمة المركزية: قبول الطلاب والسجلات، الرواتب والدوام، المحاسبة والمشتريات، البنية التحتية والأمن السيبراني، وضمان الجودة.',
       authorities: ['اعتماد مسيرات الرواتب الشهرية والترحيل المحاسبي', 'إصدار الوثائق الرسمية والشهادات الموقعة رقمياً', 'البت في طلبات الشراء والصرف المخزني وفق الصلاحيات', 'إدارة صلاحيات المستخدمين وسجلات التدقيق والمراقبة'],
       reportsTo: 'نائب رئيس الجامعة للشؤون الإدارية والمالية',
@@ -285,7 +285,7 @@
       title: 'رؤساء الأقسام الأكاديمية',
       subtitle: 'الإشراف على البرامج وتوزيع المقررات',
       rank: 'المستوى الخامس',
-      color: '#4338ca',
+      color: '#0A5A4D',
       scope: 'توزيع المقررات على أعضاء التدريس، مراقبة العبء التدريسي، الإشراف على الامتحانات وتدقيق دفاتر وسجلات العلامات.',
       authorities: ['توزيع الساعات التدريسية والمقررات', 'تدقيق العلامات والامتحانات والاعتماد الأولي', 'البت في طلبات الأعذار الطبية والتظلمات الأكاديمية', 'اقتراح تطوير الخطط والمناهج الدراسية'],
       reportsTo: 'عميد الكلية',
@@ -297,7 +297,7 @@
       title: 'أعضاء الهيئة التدريسية والكادر الوظيفي',
       subtitle: 'التعليم المباشر والخدمات الإدارية والفنية',
       rank: 'المستوى السادس',
-      color: '#1d4ed8',
+      color: '#0A5A4D',
       scope: 'تدريس المقررات، إعداد ورصد الامتحانات، تقديم الخدمات الطلابية والإدارية، وتسجيل الحضور بالبصمة البيومترية.',
       authorities: ['رصد علامات المقررات والتقييم المستمر', 'حجز وتحديد الساعات المكتبية للطلاب', 'تقديم الطلبات الداخلية والإجازات عبر المنظومة', 'التوقيع والمصادقة على المعاملات المحالة إليهم'],
       reportsTo: 'رئيس القسم الأكاديمي / رئيس الدائرة المختصة',
@@ -309,7 +309,7 @@
       title: 'اللجان المتخصصة (الانضباط، الامتحانات، المشتريات)',
       subtitle: 'الهيئات الاستشارية والتنفيذية المدمجة',
       rank: 'المستوى السابع',
-      color: '#be123c',
+      color: '#B3261E',
       scope: 'التحقيق في المخالفات المسلكية وإصدار العقوبات، ضبط ومراقبة الامتحانات، وفحص العروض والبت في المشتريات.',
       authorities: ['إصدار قرارات العقوبات وفرض الحواجز الآلية (Holds)', 'البت في تظلمات العلامات وقبول الأعذار الاستثنائية', 'فحص عروض الأسعار واعتماد محاضر الاستلام الفني'],
       reportsTo: 'عميد الكلية / رئيس الجامعة',
@@ -321,7 +321,7 @@
       title: 'الطلاب والباحثون والمستفيدون الخارجيون',
       subtitle: 'محور العملية التعليمية والخدمية',
       rank: 'المستوى الثامن',
-      color: '#15803d',
+      color: '#0E4D2E',
       scope: 'تسجيل المقررات، متابعة العلامات، تقديم طلبات الخدمات وبراءة الذمة، والتحقق العام من صحة الوثائق الصادرة.',
       authorities: ['تقديم طلبات الخدمات الإلكترونية وإرفاق الثبوتيات', 'الاطلاع على السجل الأكاديمي 360° ومتابعة الحضور', 'استخراج الوثائق الموقعة رقمياً والتحقق من صحتها عبر QR'],
       reportsTo: 'المرشد الأكاديمي وعمادة شؤون الطلاب',
@@ -619,21 +619,21 @@
             <button type="button" class="btn sm pri" data-act="view" data-v="${esc(d.targetView)}" style="align-self:flex-start">انتقل للقسم مباشرة ←</button>
           </div>
 
-          <p style="margin:10px 0 0;font-size:13.5px;color:#334155;line-height:1.6"><b>الهدف الأكاديمي والتنظيمي:</b> ${esc(d.summary)}</p>
+          <p style="margin:10px 0 0;font-size:13.5px;color:#10211D;line-height:1.6"><b>الهدف الأكاديمي والتنظيمي:</b> ${esc(d.summary)}</p>
 
           <div style="margin-top:10px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
             <span class="small" style="font-weight:700;color:#054239">الأدوار والصلاحيات المعنية:</span>
-            ${d.roles.map((r) => `<span class="pill" style="background:#f1f5f9;color:#334155;font-size:11px">${esc(r)}</span>`).join('')}
+            ${d.roles.map((r) => `<span class="pill" style="background:#F6F8F5;color:#10211D;font-size:11px">${esc(r)}</span>`).join('')}
           </div>
 
-          <div style="margin-top:12px;background:#f8fafc;padding:14px 18px;border-radius:10px;border:1px solid #e2e8f0">
+          <div style="margin-top:12px;background:#F6F8F5;padding:14px 18px;border-radius:10px;border:1px solid #DCE3DD">
             <b style="color:#054239;display:block;margin-bottom:8px;font-size:13.5px">آلية العمل والخطوات المنهجية خطوة بخطوة:</b>
-            <ol style="margin:0;padding-inline-start:20px;line-height:1.8;font-size:13px;color:#0f172a">
+            <ol style="margin:0;padding-inline-start:20px;line-height:1.8;font-size:13px;color:#10211D">
               ${d.steps.map((st) => `<li style="margin-bottom:6px">${esc(st)}</li>`).join('')}
             </ol>
           </div>
 
-          <div style="margin-top:12px;padding:10px 14px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;font-size:12.5px;color:#92400e">
+          <div style="margin-top:12px;padding:10px 14px;background:#F6F8F5;border:1px solid #E6CB84;border-radius:8px;font-size:12.5px;color:#8A6A1B">
             <b>📌 ضوابط التدقيق والمراسلات والأثر القانوني:</b> ${esc(d.correspondenceNote)}
           </div>
         </section>
@@ -641,7 +641,7 @@
 
       modeContent = `
         <div style="margin-top:14px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-          <span class="small" style="font-weight:700;color:#475569">تصفية حسب القطاع:</span>
+          <span class="small" style="font-weight:700;color:#566660">تصفية حسب القطاع:</span>
           ${catChips}
         </div>
         ${cards || '<section class="card" style="margin-top:16px"><div class="empty">لا توجد أقسام مطابقة لعبارة البحث.</div></section>'}
@@ -657,13 +657,13 @@
       const tierCards = HIERARCHY_TIERS.map((node) => {
         const isCur = node.id === activeNode.id;
         return `
-          <div data-act="guidenode" data-id="${esc(node.id)}" style="cursor:pointer;padding:12px 14px;border-radius:12px;border:2px solid ${isCur ? node.color : '#e2e8f0'};background:${isCur ? '#f0fdf4' : '#fff'};transition:all .15s;position:relative">
+          <div data-act="guidenode" data-id="${esc(node.id)}" style="cursor:pointer;padding:12px 14px;border-radius:12px;border:2px solid ${isCur ? node.color : '#DCE3DD'};background:${isCur ? '#F6F8F5' : '#fff'};transition:all .15s;position:relative">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
               <span class="pill" style="font-size:10px;background:${node.color};color:#fff">${esc(node.rank)}</span>
               ${isCur ? '<span style="font-size:11px;font-weight:800;color:#054239">محدد حالياً ✓</span>' : ''}
             </div>
-            <div style="font-weight:800;color:#0f172a;font-size:14px">${esc(node.title)}</div>
-            <div class="small" style="color:#64748b;margin-top:2px">${esc(node.subtitle)}</div>
+            <div style="font-weight:800;color:#10211D;font-size:14px">${esc(node.title)}</div>
+            <div class="small" style="color:#566660;margin-top:2px">${esc(node.subtitle)}</div>
           </div>
         `;
       }).join('');
@@ -683,22 +683,22 @@
             <div>
               <span class="pill" style="background:${activeNode.color};color:#fff;font-size:11px">${esc(activeNode.rank)}</span>
               <h2 style="margin:6px 0 2px;color:${activeNode.color}">${esc(activeNode.title)}</h2>
-              <div class="small" style="color:#475569;font-weight:600">${esc(activeNode.subtitle)}</div>
+              <div class="small" style="color:#566660;font-weight:600">${esc(activeNode.subtitle)}</div>
             </div>
             <button type="button" class="btn pri sm" data-act="view" data-v="${esc(activeNode.systemView)}">فتح القسم المرتبط بهذا المستوى ←</button>
           </div>
 
-          <p style="margin:12px 0 0;font-size:14px;color:#1e293b;line-height:1.6"><b>نطاق المسؤوليات والاختصاص:</b> ${esc(activeNode.scope)}</p>
+          <p style="margin:12px 0 0;font-size:14px;color:#10211D;line-height:1.6"><b>نطاق المسؤوليات والاختصاص:</b> ${esc(activeNode.scope)}</p>
 
           <div class="grid2" style="margin-top:14px">
-            <div style="background:#f8fafc;padding:12px 16px;border-radius:10px;border:1px solid #e2e8f0">
+            <div style="background:#F6F8F5;padding:12px 16px;border-radius:10px;border:1px solid #DCE3DD">
               <b style="color:#054239;display:block;margin-bottom:8px">الصلاحيات والقرارات المصرح بها:</b>
-              <ul style="margin:0;padding-inline-start:18px;line-height:1.8;font-size:13px;color:#0f172a">
+              <ul style="margin:0;padding-inline-start:18px;line-height:1.8;font-size:13px;color:#10211D">
                 ${activeNode.authorities.map((a) => `<li>${esc(a)}</li>`).join('')}
               </ul>
             </div>
 
-            <div style="background:#f8fafc;padding:12px 16px;border-radius:10px;border:1px solid #e2e8f0">
+            <div style="background:#F6F8F5;padding:12px 16px;border-radius:10px;border:1px solid #DCE3DD">
               <b style="color:#054239;display:block;margin-bottom:8px">سلسلة الرفع والمساءلة الإدارية:</b>
               <dl class="kv" style="margin:0;font-size:13px">
                 <dt>الجهة المشرفة المباشرة</dt><dd><b>${esc(activeNode.reportsTo)}</b></dd>
@@ -726,12 +726,12 @@
         const isDone = st.num < curStep;
         const isCurrent = st.num === curStep;
         return `
-          <div data-act="guidestep" data-st="${st.num}" style="cursor:pointer;flex:1;min-width:140px;padding:10px 12px;border-radius:10px;border:2px solid ${isCurrent ? '#054239' : (isDone ? '#86efac' : '#e2e8f0')};background:${isCurrent ? '#f0fdf4' : (isDone ? '#f0fdf4' : '#fff')};transition:all .15s">
+          <div data-act="guidestep" data-st="${st.num}" style="cursor:pointer;flex:1;min-width:140px;padding:10px 12px;border-radius:10px;border:2px solid ${isCurrent ? '#054239' : (isDone ? '#A8D8BE' : '#DCE3DD')};background:${isCurrent ? '#F6F8F5' : (isDone ? '#F6F8F5' : '#fff')};transition:all .15s">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-              <span class="mono" style="font-weight:800;color:${isCurrent ? '#054239' : '#64748b'}">المرحلة ${st.num}</span>
+              <span class="mono" style="font-weight:800;color:${isCurrent ? '#054239' : '#566660'}">المرحلة ${st.num}</span>
               ${isDone ? '<span style="color:#059669;font-weight:800;font-size:11px">مكتملة ✓</span>' : (isCurrent ? '<span class="pill p-approved" style="font-size:10px">نشطة الآن</span>' : '')}
             </div>
-            <div style="font-weight:700;font-size:13px;color:#0f172a">${esc(st.title)}</div>
+            <div style="font-weight:700;font-size:13px;color:#10211D">${esc(st.title)}</div>
           </div>
         `;
       }).join('');
@@ -743,7 +743,7 @@
           <h2>محاكي دورة حياة كافة الطلبات والمعاملات ومصفوفة الاعتماد</h2>
           <p class="hint" style="margin-top:0">اختر نوع المعاملة الجامعية من القائمة لتشغيل المحاكي التفاعلي ومعاينة مراحل الفحص الآلي، مصفوفة التوقيع، والمهلة المعيارية (SLA).</p>
 
-          <div class="inline-form" style="margin-top:12px;background:#f8fafc;padding:12px;border-radius:10px;border:1px solid #cbd5e1">
+          <div class="inline-form" style="margin-top:12px;background:#F6F8F5;padding:12px;border-radius:10px;border:1px solid #DCE3DD">
             <label style="flex:1">اختر نوع المعاملة لتشغيل المحاكاة:
               <select id="guide-sim-sel" data-act="guidereq" style="background:#fff;font-weight:700;color:#054239">
                 ${reqOptions}
@@ -756,7 +756,7 @@
             ${stageBoxes}
           </div>
 
-          <div style="margin-top:16px;padding:16px;background:#f8fafc;border:1.5px solid #054239;border-radius:12px">
+          <div style="margin-top:16px;padding:16px;background:#F6F8F5;border:1.5px solid #054239;border-radius:12px">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
               <div>
                 <span class="pill p-approved">المرحلة ${activeStage.num} من 5</span>
@@ -767,26 +767,26 @@
                 <button type="button" class="btn sm pri" data-act="guidestep" data-st="${curStep + 1}" ${curStep >= 5 ? 'disabled' : ''}>المرحلة التالية ⏩</button>
               </div>
             </div>
-            <p style="margin:10px 0 0;font-size:14px;color:#1e293b;line-height:1.6"><b>الإجراء التنفيذي في هذه المرحلة:</b> ${esc(activeStage.desc)}</p>
+            <p style="margin:10px 0 0;font-size:14px;color:#10211D;line-height:1.6"><b>الإجراء التنفيذي في هذه المرحلة:</b> ${esc(activeStage.desc)}</p>
           </div>
 
           <div class="grid2" style="margin-top:16px">
-            <div style="background:#fff;padding:14px;border:1px solid #e2e8f0;border-radius:10px">
+            <div style="background:#fff;padding:14px;border:1px solid #DCE3DD;border-radius:10px">
               <h4 style="margin:0 0 8px;color:#054239">قواعد الفحص الآلي والشروط المسبقة</h4>
-              <ul style="margin:0;padding-inline-start:18px;line-height:1.8;font-size:13px;color:#334155">
+              <ul style="margin:0;padding-inline-start:18px;line-height:1.8;font-size:13px;color:#10211D">
                 ${activeSim.rulesChecked.map((r) => `<li>${esc(r)}</li>`).join('')}
               </ul>
-              <div style="margin-top:10px;font-size:12.5px;color:#475569">
-                <b>مهلة الإنجاز النظامية (SLA):</b> <span class="pill" style="background:#e0f2fe;color:#0369a1">${activeSim.slaHours} ساعة</span>
+              <div style="margin-top:10px;font-size:12.5px;color:#566660">
+                <b>مهلة الإنجاز النظامية (SLA):</b> <span class="pill" style="background:#E2EEE9;color:#0A5A4D">${activeSim.slaHours} ساعة</span>
               </div>
             </div>
 
-            <div style="background:#fff;padding:14px;border:1px solid #e2e8f0;border-radius:10px">
+            <div style="background:#fff;padding:14px;border:1px solid #DCE3DD;border-radius:10px">
               <h4 style="margin:0 0 8px;color:#054239">مصفوفة الاعتماد والأثر في النظام</h4>
-              <div style="font-size:13px;line-height:1.6;color:#1e293b;margin-bottom:8px">
+              <div style="font-size:13px;line-height:1.6;color:#10211D;margin-bottom:8px">
                 <b>مسار الاعتماد:</b><br><span style="color:#047857;font-weight:600">${esc(activeSim.approvalMatrix)}</span>
               </div>
-              <div style="font-size:12.5px;color:#475569;margin-top:8px">
+              <div style="font-size:12.5px;color:#566660;margin-top:8px">
                 <b>الأثر الآلي الفوري على قواعد البيانات:</b><br>${esc(activeSim.databaseImpact)}
               </div>
             </div>
@@ -805,9 +805,9 @@
           <p class="hint" style="margin-top:0">تخضع كافة المحررات الرسمية والتعاميم والمذكرات الصادرة عن الجامعة لضوابط الصياغة والترميز والتوقيع المشفر بموجب القواعد المعتمدة.</p>
 
           <div class="grid2" style="margin-top:16px">
-            <div style="background:#f8fafc;padding:14px;border:1px solid #e2e8f0;border-radius:10px">
+            <div style="background:#F6F8F5;padding:14px;border:1px solid #DCE3DD;border-radius:10px">
               <h3 style="margin:0 0 8px;color:#054239">1. أنواع المحررات الرسمية واستخداماتها</h3>
-              <ul style="margin:0;padding-inline-start:18px;line-height:1.8;font-size:13px;color:#334155">
+              <ul style="margin:0;padding-inline-start:18px;line-height:1.8;font-size:13px;color:#10211D">
                 <li><b>الكتاب الرسمي الصادر (Official Letter):</b> موجه للجهات الخارجية والوزارات أو بين الكليات؛ يحمل رقم ديوان عام وشعار الجامعة وختم X.509.</li>
                 <li><b>المذكرة الداخلية (Internal Memo):</b> تواصل إداري أو فني بين إدارات وأقسام الجامعة بمسار توقيع تسلسلي أو متوازٍ.</li>
                 <li><b>التعميم الإداري (Circular):</b> إعلان سياسات أو تعليمات عامة يصدر من الرئاسة أو العمادات ويوزع على صناديق كافة العاملين.</li>
@@ -815,9 +815,9 @@
               </ul>
             </div>
 
-            <div style="background:#f8fafc;padding:14px;border:1px solid #e2e8f0;border-radius:10px">
+            <div style="background:#F6F8F5;padding:14px;border:1px solid #DCE3DD;border-radius:10px">
               <h3 style="margin:0 0 8px;color:#054239">2. ضوابط مسار التواقيع الإلكترونية</h3>
-              <ul style="margin:0;padding-inline-start:18px;line-height:1.8;font-size:13px;color:#334155">
+              <ul style="margin:0;padding-inline-start:18px;line-height:1.8;font-size:13px;color:#10211D">
                 <li><b>التوقيع التسلسلي الإلزامي:</b> لا ينتقل المستند للمعتمد التالي في السلسلة إلا بعد اعتماد وتوقيع المعتمد الحالي رسمياً.</li>
                 <li><b>خيارات المعتمد النظامية:</b> (أ) توقيع واعتماد، (ب) إعادة للمنشئ لاستدراك الملاحظات، (ج) رفض مسبب مع تدوين السبب بالسجل.</li>
                 <li><b>قاعدة عدم التعديل:</b> لا يمكن تعديل نص الكتاب بعد توقيعه؛ التعديل يستوجب إعادة فتح رسمي يعيد دورة التواقيع لحماية الوثيقة.</li>
@@ -843,24 +843,24 @@
           <p class="hint" style="margin-top:0">تتيح المنظومة مرونة كاملة في تعديل القوائم المنسدلة وإضافة الخيارات الفورية مع إحكام أمني بمستوى التشفير والتدقيق المستمر.</p>
 
           <div class="grid2" style="margin-top:16px">
-            <div style="background:#f8fafc;padding:14px;border:1px solid #e2e8f0;border-radius:10px">
+            <div style="background:#F6F8F5;padding:14px;border:1px solid #DCE3DD;border-radius:10px">
               <h3 style="margin:0 0 8px;color:#054239">تعديل وإضافة جميع القوائم المنسدلة</h3>
-              <p style="font-size:13px;color:#334155;line-height:1.6">
+              <p style="font-size:13px;color:#10211D;line-height:1.6">
                 ادخل إلى «لوحة الإدارة المركزية ← الإعدادات العامة والقوائم المنسدلة». ستجد جميع القوائم المنسدلة في النظام مع أزرار لإضافة أي خيار جديد أو تعديل/حذف الخيارات الحالية فورياً دون برمجة.
               </p>
               <h4 style="margin:10px 0 4px;color:#054239">خيار «أخرى» والإدخال المخصص</h4>
-              <p style="font-size:13px;color:#334155;line-height:1.6">
+              <p style="font-size:13px;color:#10211D;line-height:1.6">
                 تحتوي القوائم المنسدلة على خيار <b>«أخرى (إدخال مخصص...)»</b>؛ بمجرد اختياره يظهر حقل نصي فوري لكتابة الخيار الخاص واعتماده فورياً بالنموذج.
               </p>
             </div>
 
-            <div style="background:#f8fafc;padding:14px;border:1px solid #e2e8f0;border-radius:10px">
+            <div style="background:#F6F8F5;padding:14px;border:1px solid #DCE3DD;border-radius:10px">
               <h3 style="margin:0 0 8px;color:#054239">آليات المراقبة وسلسلة التدقيق (SHA-256)</h3>
-              <p style="font-size:13px;color:#334155;line-height:1.6">
+              <p style="font-size:13px;color:#10211D;line-height:1.6">
                 يستخدم النظام سلسلة بصمات مشفرة غير قابلة للتعديل؛ أي محاولة لتغيير سجل سابق تكسر السلسلة فوراً وتطلق تنبيهاً أمنياً.
               </p>
               <h4 style="margin:10px 0 4px;color:#054239">البحث التلقائي والإكمال الفوري</h4>
-              <p style="font-size:13px;color:#334155;line-height:1.6">
+              <p style="font-size:13px;color:#10211D;line-height:1.6">
                 جميع حقول البحث في الجداول تدعم البحث التلقائي بمجرد كتابة الأحرف الأولى (Instant Search-As-You-Type) دون الحاجة للضغط على زر ودون فقدان التركيز.
               </p>
             </div>
@@ -893,7 +893,7 @@
         </div>
         <div class="inline-form" style="margin-top:16px">
           <label style="flex:1;color:#fff">بحث فوري ذكي في كامل دليل الإرشادات والأنظمة
-            <input id="guide-search-q" type="search" value="${esc(U.guideQuery)}" placeholder="ابحث عن أي قسم، معاملة، صلاحية، مراسلة، أو إجراء..." style="background:#fff;color:#0f172a;font-weight:600">
+            <input id="guide-search-q" type="search" value="${esc(U.guideQuery)}" placeholder="ابحث عن أي قسم، معاملة، صلاحية، مراسلة، أو إجراء..." style="background:#fff;color:#10211D;font-weight:600">
           </label>
         </div>
       </section>

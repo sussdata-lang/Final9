@@ -129,8 +129,8 @@
         </h2>
         <span style="background:#054239;color:#D5B65D;font-weight:800;font-size:11px;padding:3px 9px;border-radius:6px;font-family:monospace">ميزة #1 المنقولة</span>
       </div>
-      <p class="sub" style="margin-top:0;color:#64748b;font-size:13px">خوارزمية فورية تمنع تضارب القاعات وأوقات الأساتذة والشُعب تلقائياً قبل الحفظ في سجل القاعات.</p>
-      <form id="es-schedule-form" class="inline-form" style="margin-bottom:16px;background:rgba(14,102,85,.03);padding:14px;border-radius:10px;border:1px solid #cbd5e1;gap:10px;align-items:flex-end">
+      <p class="sub" style="margin-top:0;color:#566660;font-size:13px">خوارزمية فورية تمنع تضارب القاعات وأوقات الأساتذة والشُعب تلقائياً قبل الحفظ في سجل القاعات.</p>
+      <form id="es-schedule-form" class="inline-form" style="margin-bottom:16px;background:rgba(14,102,85,.03);padding:14px;border-radius:10px;border:1px solid #DCE3DD;gap:10px;align-items:flex-end">
         <label>المقرر<select id="es-sc-course" required>${(es.scheduleCourses || []).map((c) => `<option value="${c.id}">${esc(c.code || '')} — ${esc(c.name)}${c.instructor ? ` (${esc(c.instructor)})` : ''}</option>`).join('')}</select></label>
         <label>القاعة / المدرج<input id="es-sc-hall" required maxlength="60" placeholder="مدرج الفارابي A1"></label>
         <label>اليوم<select id="es-sc-day">${(es.scheduleDays || []).map((d, i) => `<option value="${i}"${i === 1 ? ' selected' : ''}>${esc(d)}</option>`).join('')}</select></label>

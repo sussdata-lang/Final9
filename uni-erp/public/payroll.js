@@ -59,11 +59,11 @@
 
   const badge = (text, tone) => {
     const map = {
-      ok: 'background:#dcfce7;color:#166534;border:1px solid #86efac',
-      warn: 'background:#fef3c7;color:#92400e;border:1px solid #fcd34d',
-      bad: 'background:#fee2e2;color:#991b1b;border:1px solid #fca5a5',
-      info: 'background:#e0f2fe;color:#075985;border:1px solid #7dd3fc',
-      neutral: 'background:#f1f5f9;color:#334155;border:1px solid #cbd5e1',
+      ok: 'background:#DDF3E6;color:#0E4D2E;border:1px solid #A8D8BE',
+      warn: 'background:#FBEBD0;color:#8A6A1B;border:1px solid #C9A24B',
+      bad: 'background:#FBE0DD;color:#B3261E;border:1px solid #F2B8B5',
+      info: 'background:#E2EEE9;color:#054239;border:1px solid #BFD8CF',
+      neutral: 'background:#F6F8F5;color:#10211D;border:1px solid #DCE3DD',
     };
     return `<span style="display:inline-block;padding:3px 10px;border-radius:6px;font-size:12px;font-weight:700;${map[tone] || map.neutral}">${esc(text)}</span>`;
   };
@@ -80,7 +80,7 @@
               <span style="background:#D5B65D;color:#054239;padding:2px 9px;border-radius:4px;font-size:11px;font-weight:800">HR ERP v12.5</span>
               <h2 style="margin:0;color:#fff;font-size:19px">${esc(tr('سيستم الموارد البشرية وشؤون الموظفين المتكامل'))}</h2>
             </div>
-            <p style="margin:4px 0 0;font-size:12.5px;color:#d1fae5">${esc(tr('إدارة متكاملة لبيانات الموظفين، الحضور والالتزام، الغياب، الإجازات، الرواتب، السلف، العقود، التحليلات، والتنبيهات الذكية'))}</p>
+            <p style="margin:4px 0 0;font-size:12.5px;color:#A8D8BE">${esc(tr('إدارة متكاملة لبيانات الموظفين، الحضور والالتزام، الغياب، الإجازات، الرواتب، السلف، العقود، التحليلات، والتنبيهات الذكية'))}</p>
           </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <button class="btn sm" style="background:${B.tab === 'analytics' ? '#D5B65D' : 'rgba(255,255,255,0.14)'};color:${B.tab === 'analytics' ? '#054239' : '#fff'};border:1px solid rgba(255,255,255,0.25);font-weight:700" data-act="hrtab" data-t="analytics">📊 ${esc(tr('لوحة التحليلات والإحصائيات'))}</button>
@@ -101,26 +101,26 @@
   function hubTab(D) {
     const k = D.kpis;
     const tiles = [
-      { t: 'emp', title: 'بيانات الموظفين', sub: `${k.totalEmployees} موظف مسجّل`, bg: '#111827', border: '#374151' },
-      { t: 'att', title: 'الحضور والانصراف', sub: `متوسط الالتزام ${k.avgCommitment}%`, bg: '#3f6212', border: '#65a30d' },
-      { t: 'abs', title: 'الغياب والخصومات', sub: `${k.totalAbsenceDays} يوم غياب مسجّل`, bg: '#b91c1c', border: '#ef4444' },
-      { t: 'leave', title: 'الإجازات والأرصدة', sub: `${k.totalLeaveDays} يوم إجازة`, bg: '#6b21a8', border: '#9333ea' },
-      { t: 'sal', title: 'الرواتب والحسابات', sub: `الصافي: ${nf(k.totalNetPayroll)}`, bg: '#c2410c', border: '#ea580c' },
-      { t: 'adv', title: 'إدارة السلف', sub: `إجمالي السلف: ${nf(k.totalAdvances)}`, bg: '#4b5563', border: '#6b7280' },
-      { t: 'contract', title: 'عقود الموظفين', sub: `${k.expiredContractsCount} منتهي · ${k.expiringSoonContractsCount} للتجديد`, bg: '#7f1d1d', border: '#b91c1c' },
-      { t: 'analytics', title: 'داشبورد التحليلات', sub: 'مخططات الأقسام والإجازات', bg: '#1d4ed8', border: '#3b82f6' },
-      { t: 'config', title: 'برمجة النظام والتنبيهات', sub: 'القوائم المرجعية وشروط العقود', bg: '#365314', border: '#4d7c0f' },
+      { t: 'emp', title: 'بيانات الموظفين', sub: `${k.totalEmployees} موظف مسجّل`, icon: 'users', tone: 'mint' },
+      { t: 'att', title: 'الحضور والانصراف', sub: `متوسط الالتزام ${k.avgCommitment}%`, icon: 'clock', tone: 'sand' },
+      { t: 'abs', title: 'الغياب والخصومات', sub: `${k.totalAbsenceDays} يوم غياب مسجّل`, icon: 'clipboard', tone: 'blue' },
+      { t: 'leave', title: 'الإجازات والأرصدة', sub: `${k.totalLeaveDays} يوم إجازة`, icon: 'calendar', tone: 'lav' },
+      { t: 'sal', title: 'الرواتب والحسابات', sub: `الصافي: ${nf(k.totalNetPayroll)}`, icon: 'wallet', tone: 'sand' },
+      { t: 'adv', title: 'إدارة السلف', sub: `إجمالي السلف: ${nf(k.totalAdvances)}`, icon: 'exchange', tone: 'mint' },
+      { t: 'contract', title: 'عقود الموظفين', sub: `${k.expiredContractsCount} منتهي · ${k.expiringSoonContractsCount} للتجديد`, icon: 'file', tone: 'blue' },
+      { t: 'analytics', title: 'داشبورد التحليلات', sub: 'مخططات الأقسام والإجازات', icon: 'bars', tone: 'lav' },
+      { t: 'config', title: 'برمجة النظام والتنبيهات', sub: 'القوائم المرجعية وشروط العقود', icon: 'settings', tone: 'mint' },
     ];
 
     const summaryCards = [
-      { label: 'إجمالي الموظفين', val: nf(k.totalEmployees), headBg: '#78350f' },
-      { label: 'الموظفون المتواجدون فعلياً', val: nf(k.activeEmployees), headBg: '#78350f' },
-      { label: 'عدد أيام الغياب', val: nf(k.totalAbsenceDays), headBg: '#78350f' },
-      { label: 'عدد أيام الإجازات', val: nf(k.totalLeaveDays), headBg: '#78350f' },
-      { label: 'إجمالي رواتب الموظفين', val: nf(k.totalGrossPayroll), headBg: '#991b1b' },
-      { label: 'إجمالي سلف الموظفين', val: nf(k.totalAdvances), headBg: '#991b1b' },
-      { label: 'انتهاء العقود (منتهي / قريباً)', val: `${k.expiredContractsCount} / ${k.expiringSoonContractsCount}`, headBg: '#991b1b' },
-      { label: 'متوسط الرواتب الأساسية', val: nf(k.avgSalary), headBg: '#991b1b' },
+      { label: 'إجمالي الموظفين', val: nf(k.totalEmployees), headBg: 'var(--accent-soft)' },
+      { label: 'الموظفون المتواجدون فعلياً', val: nf(k.activeEmployees), headBg: 'var(--accent-soft)' },
+      { label: 'عدد أيام الغياب', val: nf(k.totalAbsenceDays), headBg: 'var(--accent-soft)' },
+      { label: 'عدد أيام الإجازات', val: nf(k.totalLeaveDays), headBg: 'var(--accent-soft)' },
+      { label: 'إجمالي رواتب الموظفين', val: nf(k.totalGrossPayroll), headBg: 'var(--t-sand-bg)' },
+      { label: 'إجمالي سلف الموظفين', val: nf(k.totalAdvances), headBg: 'var(--t-sand-bg)' },
+      { label: 'انتهاء العقود (منتهي / قريباً)', val: `${k.expiredContractsCount} / ${k.expiringSoonContractsCount}`, headBg: 'var(--t-sand-bg)' },
+      { label: 'متوسط الرواتب الأساسية', val: nf(k.avgSalary), headBg: 'var(--t-sand-bg)' },
     ];
 
     const criticalAlerts = D.alerts.slice(0, 10);
@@ -129,24 +129,24 @@
     return `
       <section class="card" style="margin-bottom:14px">
         <div style="text-align:center;margin-bottom:16px">
-          <div style="display:inline-block;background:#d9ead3;color:#054239;border:2px solid #054239;padding:8px 36px;border-radius:8px;font-size:20px;font-weight:800">
+          <div style="display:inline-block;background:var(--accent-soft);color:var(--accent);border:1px solid var(--line);padding:8px 36px;border-radius:10px;font-size:20px;font-weight:800">
             ${esc(tr('سيستم الموارد البشرية المتكامل — بوابة التحكم السريع'))}
           </div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-bottom:20px">
           ${tiles.map((x) => `
-            <button type="button" data-act="hrtab" data-t="${x.t}" style="background:${x.bg};color:#fff;border:2px solid ${x.border};border-radius:8px;padding:16px 14px;text-align:center;cursor:pointer;transition:transform 0.15s">
-              <div style="font-size:17px;font-weight:800;margin-bottom:4px">${esc(tr(x.title))}</div>
-              <div style="font-size:12px;opacity:0.88">${esc(x.sub)}</div>
+            <button type="button" class="hr-tile" data-act="hrtab" data-t="${x.t}">
+              <span class="sx-ic sx-${x.tone}">${window.UA.sx.ico(x.icon, 24)}</span>
+              <span class="hr-tile-t"><b>${esc(tr(x.title))}</b><small>${esc(x.sub)}</small></span>
             </button>
           `).join('')}
         </div>
 
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
           ${summaryCards.map((c) => `
-            <div style="border:1.5px solid #334155;border-radius:6px;overflow:hidden;text-align:center;background:#fff">
-              <div style="background:${c.headBg};color:#fff;padding:7px 10px;font-size:13px;font-weight:700">${esc(c.label)}</div>
-              <div style="padding:10px;font-size:18px;font-weight:800;color:#0f172a;font-family:monospace">${esc(c.val)}</div>
+            <div style="border:1px solid var(--line);border-radius:10px;overflow:hidden;text-align:center;background:var(--surface)">
+              <div style="background:${c.headBg};color:var(--accent);padding:7px 10px;font-size:13px;font-weight:700">${esc(c.label)}</div>
+              <div style="padding:10px;font-size:20px;font-weight:800;color:var(--fg);font-variant-numeric:tabular-nums">${esc(c.val)}</div>
             </div>
           `).join('')}
         </div>
@@ -327,8 +327,8 @@
                     <td>
                       <div style="display:flex;align-items:center;gap:6px">
                         <span class="mono" style="font-weight:800">${a.commitmentRate}%</span>
-                        <div style="width:60px;height:7px;background:#e2e8f0;border-radius:4px;overflow:hidden">
-                          <div style="width:${a.commitmentRate}%;height:100%;background:${tone === 'ok' ? '#16a34a' : tone === 'info' ? '#0284c7' : '#dc2626'}"></div>
+                        <div style="width:60px;height:7px;background:#DCE3DD;border-radius:4px;overflow:hidden">
+                          <div style="width:${a.commitmentRate}%;height:100%;background:${tone === 'ok' ? '#1B7F4B' : tone === 'info' ? '#0A5A4D' : '#B3261E'}"></div>
                         </div>
                       </div>
                     </td>
@@ -383,7 +383,7 @@
                     <td>${esc(ab.reason)}</td>
                     <td class="mono"><b>${ab.absenceDays}</b></td>
                     <td class="mono">${nfMoney(ab.dailyRate)}</td>
-                    <td class="mono" style="color:${ab.totalDeduction > 0 ? '#b91c1c' : 'inherit'};font-weight:700">${nfMoney(ab.totalDeduction)}</td>
+                    <td class="mono" style="color:${ab.totalDeduction > 0 ? '#B3261E' : 'inherit'};font-weight:700">${nfMoney(ab.totalDeduction)}</td>
                     <td>${esc(ab.month)}</td>
                     <td>${badge(ab.statusNote, tone)}</td>
                     <td><button class="btn sm bad" data-act="hrabsdel" data-id="${ab.id}">حذف</button></td>
@@ -437,7 +437,7 @@
                   <td class="mono"><b>${l.days}</b></td>
                   <td class="mono">${l.annualQuota}</td>
                   <td class="mono"><b>${l.remainingAnnual}</b></td>
-                  <td class="mono" style="color:${l.unpaidDeduction > 0 ? '#b91c1c' : 'inherit'};font-weight:700">${nfMoney(l.unpaidDeduction)}</td>
+                  <td class="mono" style="color:${l.unpaidDeduction > 0 ? '#B3261E' : 'inherit'};font-weight:700">${nfMoney(l.unpaidDeduction)}</td>
                   <td class="mono">${esc(l.startDate)}</td>
                   <td class="mono">${esc(l.endDate)}</td>
                   <td>${badge(LEAVE_STATUS[l.status] || l.status, l.status === 'approved' ? 'ok' : l.status === 'pending' ? 'warn' : 'info')}${l.status === 'rejected' && l.notes ? `<div class="small">${esc(l.notes)}</div>` : ''}</td>
@@ -486,22 +486,22 @@
         <div class="tbl-wrap">
           <table class="grid-tbl" data-tf="off" style="font-size:11.5px;width:100%">
             <thead>
-              <tr style="background:#f8fafc">
+              <tr style="background:#F6F8F5">
                 <th style="padding:6px 4px">#</th>
                 <th style="padding:6px 6px">اسم الموظف</th>
                 <th style="padding:6px 5px">القسم</th>
                 <th style="padding:6px 4px">الأساسي</th>
                 <th style="padding:6px 4px">بدل سكن</th>
                 <th style="padding:6px 4px">بدل انتقال</th>
-                <th style="padding:6px 5px;background:#dcfce7;color:#166534">الاستحقاقات</th>
+                <th style="padding:6px 5px;background:#DDF3E6;color:#0E4D2E">الاستحقاقات</th>
                 <th style="padding:6px 4px">غياب</th>
                 <th style="padding:6px 4px">خصم غياب</th>
                 <th style="padding:6px 4px">إجازة بلا راتب</th>
                 <th style="padding:6px 4px">قسط سلفة</th>
                 <th style="padding:6px 4px">تأمينات</th>
                 <th style="padding:6px 4px">ضرائب</th>
-                <th style="padding:6px 5px;background:#fee2e2;color:#991b1b">الخصومات</th>
-                <th style="padding:6px 6px;background:#d1fae5;color:#054239">صافي الراتب</th>
+                <th style="padding:6px 5px;background:#FBE0DD;color:#B3261E">الخصومات</th>
+                <th style="padding:6px 6px;background:#A8D8BE;color:#054239">صافي الراتب</th>
                 <th class="no-print" style="padding:6px 4px">قسيمة</th>
               </tr>
             </thead>
@@ -514,33 +514,33 @@
                   <td class="mono" style="padding:5px 4px">${nfMoney(p.baseSalary)}</td>
                   <td class="mono" style="padding:5px 4px">${nfMoney(p.housingAllowance)}</td>
                   <td class="mono" style="padding:5px 4px">${nfMoney(p.transportAllowance)}</td>
-                  <td class="mono" style="padding:5px 5px;background:#f0fdf4;font-weight:800;color:#166534">${nfMoney(p.grossEarnings)}</td>
+                  <td class="mono" style="padding:5px 5px;background:#F6F8F5;font-weight:800;color:#0E4D2E">${nfMoney(p.grossEarnings)}</td>
                   <td class="mono" style="padding:5px 4px;text-align:center">${p.absenceDays}</td>
                   <td class="mono" style="padding:5px 4px">${nfMoney(p.absenceDeduction)}</td>
                   <td class="mono" style="padding:5px 4px">${nfMoney(p.unpaidLeaveDeduction)}</td>
                   <td class="mono" style="padding:5px 4px">${nfMoney(p.advanceInstallment)}</td>
                   <td class="mono" style="padding:5px 4px">${nfMoney(p.insurance)}</td>
                   <td class="mono" style="padding:5px 4px">${nfMoney(p.taxes)}</td>
-                  <td class="mono" style="padding:5px 5px;background:#fef2f2;font-weight:800;color:#991b1b">${nfMoney(p.totalDeductions)}</td>
-                  <td class="mono" style="padding:5px 6px;background:#ecfdf5;font-weight:900;color:#054239">${nfMoney(p.netSalary)}</td>
+                  <td class="mono" style="padding:5px 5px;background:#F6F8F5;font-weight:800;color:#B3261E">${nfMoney(p.totalDeductions)}</td>
+                  <td class="mono" style="padding:5px 6px;background:#F6F8F5;font-weight:900;color:#054239">${nfMoney(p.netSalary)}</td>
                   <td class="no-print" style="padding:5px 4px"><button class="btn sm" style="padding:3px 7px;font-size:11px" data-act="hrpayslip" data-id="${p.employeeId}">كشف</button></td>
                 </tr>
               `).join('')}
             </tbody>
             <tfoot>
-              <tr style="background:#f8fafc;font-weight:800">
+              <tr style="background:#F6F8F5;font-weight:800">
                 <td colspan="3" style="padding:6px">الإجمالي (${D.payroll.length} موظف)</td>
                 <td class="mono" style="padding:5px 4px">${nfMoney(totals.base)}</td>
                 <td class="mono" style="padding:5px 4px">${nfMoney(totals.housing)}</td>
                 <td class="mono" style="padding:5px 4px">${nfMoney(totals.transport)}</td>
-                <td class="mono" style="padding:5px 5px;color:#166534">${nfMoney(totals.gross)}</td>
+                <td class="mono" style="padding:5px 5px;color:#0E4D2E">${nfMoney(totals.gross)}</td>
                 <td class="mono" style="padding:5px 4px;text-align:center">${totals.absDays}</td>
                 <td class="mono" style="padding:5px 4px">${nfMoney(totals.absDed)}</td>
                 <td class="mono" style="padding:5px 4px">${nfMoney(totals.unpaidDed)}</td>
                 <td class="mono" style="padding:5px 4px">${nfMoney(totals.advInst)}</td>
                 <td class="mono" style="padding:5px 4px">${nfMoney(totals.ins)}</td>
                 <td class="mono" style="padding:5px 4px">${nfMoney(totals.tax)}</td>
-                <td class="mono" style="padding:5px 5px;color:#991b1b">${nfMoney(totals.totDed)}</td>
+                <td class="mono" style="padding:5px 5px;color:#B3261E">${nfMoney(totals.totDed)}</td>
                 <td class="mono" style="padding:5px 6px;color:#054239">${nfMoney(totals.net)}</td>
                 <td class="no-print"></td>
               </tr>
@@ -592,7 +592,7 @@
                     <td class="mono">${ad.installmentsCount} <span class="small">(سُدّد ${ad.paidInstallments})</span></td>
                     <td>${badge(ad.status, tone)}</td>
                     <td class="mono"><b>${nfMoney(ad.monthlyInstallment)}</b></td>
-                    <td class="mono" style="color:${ad.remainingAmount > 0 ? '#b91c1c' : '#166534'};font-weight:800">${nfMoney(ad.remainingAmount)}</td>
+                    <td class="mono" style="color:${ad.remainingAmount > 0 ? '#B3261E' : '#0E4D2E'};font-weight:800">${nfMoney(ad.remainingAmount)}</td>
                     <td class="nowrap">
                       ${ad.status !== 'مدفوعة' && ad.remainingAmount > 0
                         ? `<button class="btn sm pri" data-act="hradvpay" data-id="${ad.id}">تسديد قسط</button>`
@@ -670,7 +670,7 @@
                     <td class="mono">${esc(c.startDate)}</td>
                     <td class="mono">${esc(c.endDate)}</td>
                     <td class="mono">${nf(c.durationDays)}</td>
-                    <td class="mono" style="direction:ltr;text-align:center;font-weight:800;color:${c.remainingDays < 0 ? '#b91c1c' : c.remainingDays <= 60 ? '#b45309' : '#166534'}">${c.remainingDays}</td>
+                    <td class="mono" style="direction:ltr;text-align:center;font-weight:800;color:${c.remainingDays < 0 ? '#B3261E' : c.remainingDays <= 60 ? '#8A6A1B' : '#0E4D2E'}">${c.remainingDays}</td>
                     <td>${badge(c.renewalAlert, alertTone)}</td>
                     <td>${badge(c.contractStatus, statusTone)}</td>
                     <td><button class="btn sm pri" data-act="hrrenewopen" data-id="${c.id}">تجديد العقد</button></td>
@@ -689,7 +689,7 @@
     const k = D.kpis;
     const lvDist = D.analytics.leaveDistribution;
     const deptRows = D.analytics.departmentBreakdown;
-    const PAL = ['#3b82f6', '#b91c1c', '#84cc16', '#7c3aed', '#06b6d4', '#f97316'];
+    const PAL = ['#054239', '#C9A24B', '#4DB6A0', '#0A5A4D', '#8A6A1B', '#1B7F4B'];
 
     const me = UA.S && UA.S.me;
     const isAdmin = D.userRole === 'admin' || (me && me.role === 'admin');
@@ -713,7 +713,7 @@
     let scopeBanner = '';
     if (isAdmin) {
       scopeBanner = `
-        <div style="background:linear-gradient(135deg,#064e3b 0%,#065f46 100%);color:#fff;padding:14px 18px;border-radius:8px;margin-bottom:14px;border:1px solid #10b981;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+        <div style="background:linear-gradient(135deg,#032E28 0%,#054239 100%);color:#fff;padding:14px 18px;border-radius:8px;margin-bottom:14px;border:1px solid #1B7F4B;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
           <div>
             <div style="display:flex;align-items:center;gap:8px">
               <span style="background:#D5B65D;color:#054239;padding:3px 10px;border-radius:4px;font-size:11.5px;font-weight:800">👑 صلاحية الإدارة العليا (مدير النظام)</span>
@@ -724,18 +724,18 @@
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <button class="btn sm" style="background:${activeDeptFilter === 'all' ? '#D5B65D' : 'rgba(255,255,255,0.15)'};color:${activeDeptFilter === 'all' ? '#054239' : '#fff'};font-weight:800" data-act="hranalyticsdept" data-dept="all">كافة الأقسام (${entStats.totalEnterpriseEmployees || k.totalEmployees})</button>
             ${allDepts.map((dp) => `<button class="btn sm" style="background:${activeDeptFilter === dp ? '#D5B65D' : 'rgba(255,255,255,0.15)'};color:${activeDeptFilter === dp ? '#054239' : '#fff'};font-weight:700" data-act="hranalyticsdept" data-dept="${esc(dp)}">${esc(dp)}</button>`).join('')}
-            <button class="btn sm" style="background:#0284c7;color:#fff;font-weight:800;border:1px solid #38bdf8" data-act="hropenrecharts" data-tab="departments">📊 تحليلات الأقسام في صفحة الإحصاءات</button>
+            <button class="btn sm" style="background:#0A5A4D;color:#fff;font-weight:800;border:1px solid #4DB6A0" data-act="hropenrecharts" data-tab="departments">📊 تحليلات الأقسام في صفحة الإحصاءات</button>
           </div>
         </div>
       `;
     } else {
       scopeBanner = `
-        <div style="background:#fffbeb;border:1px solid #fde68a;color:#92400e;padding:12px 16px;border-radius:8px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+        <div style="background:#F6F8F5;border:1px solid #E6CB84;color:#8A6A1B;padding:12px 16px;border-radius:8px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
           <div style="display:flex;align-items:center;gap:10px">
             <span style="font-size:22px">🔒</span>
             <div>
               <div style="font-weight:800;font-size:14px">عرض الإحصائيات مقيّد بقسم: «${esc(myDept)}»</div>
-              <div class="small" style="color:#b45309">حسابك ينتمي إلى قسم (${esc(myDept)}). تم عزل بيانات الأقسام الأخرى تلقائياً وفق سياسة أمن وصلاحيات النظام. مدير النظام فقط يمتلك استعراض كافة الأقسام.</div>
+              <div class="small" style="color:#8A6A1B">حسابك ينتمي إلى قسم (${esc(myDept)}). تم عزل بيانات الأقسام الأخرى تلقائياً وفق سياسة أمن وصلاحيات النظام. مدير النظام فقط يمتلك استعراض كافة الأقسام.</div>
             </div>
           </div>
           <button class="btn sm" style="background:#054239;color:#D5B65D;font-weight:800" data-act="hropenrecharts" data-tab="departments">📊 تحليلات الأقسام في صفحة الإحصاءات</button>
@@ -748,19 +748,19 @@
       entGridHtml = `
         <div style="margin-bottom:18px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-            <h3 style="margin:0;font-size:15px;color:#0f172a">🏢 المؤشرات التشغيلية لكافة قطاعات وأقسام الجامعة الـ 9</h3>
+            <h3 style="margin:0;font-size:15px;color:#10211D">🏢 المؤشرات التشغيلية لكافة قطاعات وأقسام الجامعة الـ 9</h3>
             <span class="small hint">مؤشرات حية متزامنة مع كافة وحدات المنظومة</span>
           </div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px">
             ${entModules.map((m) => `
-              <div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px;background:#fff;border-top:3px solid #054239;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+              <div style="border:1px solid #DCE3DD;border-radius:8px;padding:12px;background:#fff;border-top:3px solid #054239;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
-                  <span style="font-size:11px;font-weight:800;color:#054239;background:#ecfdf5;padding:1px 6px;border-radius:4px">${esc(m.code)}</span>
-                  <span style="font-size:11px;color:#16a34a;font-weight:700">● ${esc(m.status)}</span>
+                  <span style="font-size:11px;font-weight:800;color:#054239;background:#F6F8F5;padding:1px 6px;border-radius:4px">${esc(m.code)}</span>
+                  <span style="font-size:11px;color:#1B7F4B;font-weight:700">● ${esc(m.status)}</span>
                 </div>
-                <div style="font-weight:800;font-size:13.5px;color:#1e293b;margin-bottom:4px">${esc(m.name)}</div>
+                <div style="font-weight:800;font-size:13.5px;color:#10211D;margin-bottom:4px">${esc(m.name)}</div>
                 <div class="small hint" style="margin-bottom:8px">${esc(m.scope)}</div>
-                <div style="background:#f8fafc;padding:6px 8px;border-radius:6px;font-size:11.5px;display:flex;justify-content:space-between;border:1px solid #f1f5f9">
+                <div style="background:#F6F8F5;padding:6px 8px;border-radius:6px;font-size:11.5px;display:flex;justify-content:space-between;border:1px solid #F6F8F5">
                   <span>${esc(m.kpi1Label)}: <b>${esc(m.kpi1Val)}</b></span>
                   <span>${esc(m.kpi2Label)}: <b>${esc(m.kpi2Val)}</b></span>
                 </div>
@@ -777,10 +777,10 @@
       ${entGridHtml}
 
       <section class="card" style="margin-bottom:14px">
-        <div style="background:#1e6b7b;color:#fff;padding:10px 18px;border-radius:6px;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div style="background:#054239;color:#fff;padding:10px 18px;border-radius:6px;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
           <div>
             <h2 style="margin:0;color:#fff;font-size:19px">لوحة تحليل بيانات الموارد البشرية والإحصائيات</h2>
-            <p class="small" style="margin:2px 0 0;color:#e0f2fe">
+            <p class="small" style="margin:2px 0 0;color:#DCE9E4">
               ${activeDeptFilter === 'all' ? 'عرض شامل لكافة موظفي الجامعة' : `عرض مخصص لقسم: «${esc(activeDeptFilter)}»`}
             </p>
           </div>
@@ -788,27 +788,27 @@
         </div>
 
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:18px">
-          <div style="border:1px solid #cbd5e1;border-radius:6px;overflow:hidden;text-align:center">
-            <div style="background:#1e4e68;color:#fff;padding:8px;font-weight:700">إجمالي الموظفين</div>
+          <div style="border:1px solid #DCE3DD;border-radius:6px;overflow:hidden;text-align:center">
+            <div style="background:#054239;color:#fff;padding:8px;font-weight:700">إجمالي الموظفين</div>
             <div style="padding:14px;font-size:24px;font-weight:900">${nf(k.totalEmployees)}</div>
           </div>
-          <div style="border:1px solid #cbd5e1;border-radius:6px;overflow:hidden;text-align:center">
-            <div style="background:#1e4e68;color:#fff;padding:8px;font-weight:700">نشط</div>
-            <div style="padding:14px;font-size:24px;font-weight:900;color:#166534">${nf(k.activeEmployees)}</div>
+          <div style="border:1px solid #DCE3DD;border-radius:6px;overflow:hidden;text-align:center">
+            <div style="background:#054239;color:#fff;padding:8px;font-weight:700">نشط</div>
+            <div style="padding:14px;font-size:24px;font-weight:900;color:#0E4D2E">${nf(k.activeEmployees)}</div>
           </div>
-          <div style="border:1px solid #cbd5e1;border-radius:6px;overflow:hidden;text-align:center">
-            <div style="background:#1e4e68;color:#fff;padding:8px;font-weight:700">متوسط الالتزام</div>
-            <div style="padding:14px;font-size:24px;font-weight:900;color:#0284c7">%${k.avgCommitment}</div>
+          <div style="border:1px solid #DCE3DD;border-radius:6px;overflow:hidden;text-align:center">
+            <div style="background:#054239;color:#fff;padding:8px;font-weight:700">متوسط الالتزام</div>
+            <div style="padding:14px;font-size:24px;font-weight:900;color:#0A5A4D">%${k.avgCommitment}</div>
           </div>
-          <div style="border:1px solid #cbd5e1;border-radius:6px;overflow:hidden;text-align:center">
-            <div style="background:#1e4e68;color:#fff;padding:8px;font-weight:700">إجمالي الاستحقاقات والرواتب</div>
+          <div style="border:1px solid #DCE3DD;border-radius:6px;overflow:hidden;text-align:center">
+            <div style="background:#054239;color:#fff;padding:8px;font-weight:700">إجمالي الاستحقاقات والرواتب</div>
             <div style="padding:14px;font-size:24px;font-weight:900;color:#054239">${nf(k.totalGrossPayroll)}</div>
           </div>
         </div>
 
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px">
           <!-- توزيع أيام الإجازات حسب النوع -->
-          <div style="border:1px solid #cbd5e1;border-radius:8px;padding:16px;background:#fff">
+          <div style="border:1px solid #DCE3DD;border-radius:8px;padding:16px;background:#fff">
             <h3 style="margin:0 0 14px;text-align:center">توزيع أيام الإجازات حسب النوع (${k.totalLeaveDays} يوم)</h3>
             <div style="display:flex;align-items:center;justify-content:center;gap:24px;flex-wrap:wrap">
               <div style="width:190px;height:190px;border-radius:50%;background:conic-gradient(${stops});display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,0.08)">
@@ -832,17 +832,17 @@
           </div>
 
           <!-- عدد الموظفين حسب القسم -->
-          <div style="border:1px solid #cbd5e1;border-radius:8px;padding:16px;background:#fff">
+          <div style="border:1px solid #DCE3DD;border-radius:8px;padding:16px;background:#fff">
             <h3 style="margin:0 0 14px;text-align:center">عدد الموظفين والرواتب حسب القسم</h3>
             <div style="display:flex;flex-direction:column;gap:9px">
               ${deptRows.map((d) => `
                 <div>
                   <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px">
                     <b>${esc(d.department)}</b>
-                    <span style="font-variant-numeric:tabular-nums;font-weight:600;color:#334155">${d.count} موظف · راتب ${nf(d.totalSalaries)} · التزام ${d.avgCommitment}%</span>
+                    <span style="font-variant-numeric:tabular-nums;font-weight:600;color:#10211D">${d.count} موظف · راتب ${nf(d.totalSalaries)} · التزام ${d.avgCommitment}%</span>
                   </div>
-                  <div style="height:10px;background:#f1f5f9;border-radius:5px;overflow:hidden">
-                    <div style="width:${Math.max(4, (d.count / maxDeptCount) * 100)}%;height:100%;background:#1e4e68;border-radius:5px"></div>
+                  <div style="height:10px;background:#F6F8F5;border-radius:5px;overflow:hidden">
+                    <div style="width:${Math.max(4, (d.count / maxDeptCount) * 100)}%;height:100%;background:#054239;border-radius:5px"></div>
                   </div>
                 </div>
               `).join('')}
@@ -884,7 +884,7 @@
             <div>
               <h4 style="margin:0 0 6px">حالة عقود الموظفين (${D.contracts.length} عقد)</h4>
               ${D.analytics.contractBreakdown.map((c) => `
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:6px">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border:1px solid #DCE3DD;border-radius:6px;margin-bottom:6px">
                   <span style="display:flex;align-items:center;gap:8px">
                     <i style="width:12px;height:12px;border-radius:50%;background:${c.color};display:inline-block"></i>
                     <b>${esc(c.label)}</b>
@@ -896,7 +896,7 @@
             <div>
               <h4 style="margin:0 0 6px">مستويات الالتزام بالحضور والانصراف</h4>
               ${D.analytics.commitmentBreakdown.map((c) => `
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:6px">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border:1px solid #DCE3DD;border-radius:6px;margin-bottom:6px">
                   <span style="display:flex;align-items:center;gap:8px">
                     <i style="width:12px;height:12px;border-radius:50%;background:${c.color};display:inline-block"></i>
                     <b>${esc(c.label)}</b>
@@ -928,7 +928,7 @@
       <section class="card" style="margin-bottom:14px">
         <div style="background:#054239;color:#fff;padding:10px 16px;border-radius:6px;margin-bottom:14px">
           <h2 style="margin:0;color:#fff;font-size:18px">🔔 إعدادات التنبيهات الذكية والسياسات المالية لشؤون الموظفين</h2>
-          <p class="small" style="margin:4px 0 0;color:#d1fae5">تحكّم بفترة التنبيه قبل انتهاء عقد الموظف، شروط تقييم الحضور والانصراف، حدود المراجعة الإدارية للغياب، ومعادلات الرواتب والبدلات</p>
+          <p class="small" style="margin:4px 0 0;color:#A8D8BE">تحكّم بفترة التنبيه قبل انتهاء عقد الموظف، شروط تقييم الحضور والانصراف، حدود المراجعة الإدارية للغياب، ومعادلات الرواتب والبدلات</p>
         </div>
 
         <form id="hr-alert-settings-form" class="form" style="border:0;margin:0;padding:0">
@@ -977,7 +977,7 @@
             </label>
           </div>
 
-          <div style="display:flex;gap:18px;flex-wrap:wrap;margin:14px 0;padding:10px 12px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0">
+          <div style="display:flex;gap:18px;flex-wrap:wrap;margin:14px 0;padding:10px 12px;background:#F6F8F5;border-radius:6px;border:1px solid #DCE3DD">
             <label style="display:flex;align-items:center;gap:6px;margin:0"><input type="checkbox" id="hs-en-ct" style="width:auto"${s.enable_contract_alerts !== '0' ? ' checked' : ''}> تفعيل تنبيهات انتهاء وتجديد العقود</label>
             <label style="display:flex;align-items:center;gap:6px;margin:0"><input type="checkbox" id="hs-en-att" style="width:auto"${s.enable_attendance_alerts !== '0' ? ' checked' : ''}> تفعيل تنبيهات التزام الحضور والغياب</label>
             <label style="display:flex;align-items:center;gap:6px;margin:0"><input type="checkbox" id="hs-en-adv" style="width:auto"${s.enable_advance_alerts !== '0' ? ' checked' : ''}> تفعيل تنبيهات أقساط السلف المستحقة</label>
@@ -991,7 +991,7 @@
       </section>
 
       <section class="card">
-        <div style="background:#65a30d;color:#fff;padding:9px 16px;border-radius:6px;text-align:center;margin-bottom:14px">
+        <div style="background:#0A5A4D;color:#fff;padding:9px 16px;border-radius:6px;text-align:center;margin-bottom:14px">
           <h2 style="margin:0;color:#fff;font-size:19px">برمجة السيستم — القوائم المرجعية للنظام</h2>
         </div>
         <p class="small" style="margin:0 0 12px">الأقسام لا تُضاف من هنا: تتبع هيكل الجامعة في لوحة الإدارة ← وحدات النظام، والكليات والمعاهد.</p>
@@ -1010,13 +1010,13 @@
 
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:10px">
           ${cats.map(([k, title]) => `
-            <div style="border:1px solid #cbd5e1;border-radius:6px;overflow:hidden;background:#fff">
-              <div style="background:#1e3a5f;color:#fff;padding:8px 10px;font-weight:700;text-align:center;font-size:13px">${esc(title)}</div>
+            <div style="border:1px solid #DCE3DD;border-radius:6px;overflow:hidden;background:#fff">
+              <div style="background:#054239;color:#fff;padding:8px 10px;font-weight:700;text-align:center;font-size:13px">${esc(title)}</div>
               <ul style="list-style:none;margin:0;padding:0">
                 ${(D.lookups[k] || []).map((item) => `
-                  <li style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-bottom:1px solid #f1f5f9;font-size:12.5px">
+                  <li style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-bottom:1px solid #F6F8F5;font-size:12.5px">
                     <span>${esc(item.label)}</span>
-                    <button type="button" class="link" style="color:#b91c1c;font-size:11px" data-act="hrlkdel" data-id="${item.id}" title="حذف">✕</button>
+                    <button type="button" class="link" style="color:#B3261E;font-size:11px" data-act="hrlkdel" data-id="${item.id}" title="حذف">✕</button>
                   </li>
                 `).join('')}
               </ul>
@@ -1231,30 +1231,30 @@
       const p = m.item;
       content = `
         <h2 id="mttl">قسيمة راتب تفصيلية — ${esc(p.name)}</h2>
-        <div style="border:1px solid #cbd5e1;border-radius:8px;padding:14px;margin-bottom:14px">
-          <div style="display:flex;justify-content:space-between;margin-bottom:10px;border-bottom:1px solid #e2e8f0;padding-bottom:8px">
+        <div style="border:1px solid #DCE3DD;border-radius:8px;padding:14px;margin-bottom:14px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:10px;border-bottom:1px solid #DCE3DD;padding-bottom:8px">
             <div><b>الموظف:</b> ${esc(p.name)} (#${esc(p.employeeNo)})</div>
             <div><b>القسم / الوظيفة:</b> ${esc(p.department)} — ${esc(p.position)}</div>
           </div>
           <div class="grid2">
             <div>
-              <h4 style="margin:0 0 6px;color:#166534">الاستحقاقات</h4>
+              <h4 style="margin:0 0 6px;color:#0E4D2E">الاستحقاقات</h4>
               <p class="small" style="margin:4px 0">الراتب الأساسي: <b class="mono">${nfMoney(p.baseSalary)}</b></p>
               <p class="small" style="margin:4px 0">بدل سكن: <b class="mono">${nfMoney(p.housingAllowance)}</b></p>
               <p class="small" style="margin:4px 0">بدل انتقال: <b class="mono">${nfMoney(p.transportAllowance)}</b></p>
-              <p style="margin:8px 0 0;color:#166534"><b>إجمالي الاستحقاقات: <span class="mono">${nfMoney(p.grossEarnings)}</span></b></p>
+              <p style="margin:8px 0 0;color:#0E4D2E"><b>إجمالي الاستحقاقات: <span class="mono">${nfMoney(p.grossEarnings)}</span></b></p>
             </div>
             <div>
-              <h4 style="margin:0 0 6px;color:#991b1b">الخصومات والاستقطاعات</h4>
+              <h4 style="margin:0 0 6px;color:#B3261E">الخصومات والاستقطاعات</h4>
               <p class="small" style="margin:4px 0">خصم الغياب (${p.absenceDays} يوم): <b class="mono">${nfMoney(p.absenceDeduction)}</b></p>
               <p class="small" style="margin:4px 0">خصم إجازة بدون راتب: <b class="mono">${nfMoney(p.unpaidLeaveDeduction)}</b></p>
               <p class="small" style="margin:4px 0">قسط السلفة الشهري: <b class="mono">${nfMoney(p.advanceInstallment)}</b></p>
               <p class="small" style="margin:4px 0">تأمينات اجتماعية: <b class="mono">${nfMoney(p.insurance)}</b></p>
               <p class="small" style="margin:4px 0">ضرائب: <b class="mono">${nfMoney(p.taxes)}</b></p>
-              <p style="margin:8px 0 0;color:#991b1b"><b>إجمالي الخصومات: <span class="mono">${nfMoney(p.totalDeductions)}</span></b></p>
+              <p style="margin:8px 0 0;color:#B3261E"><b>إجمالي الخصومات: <span class="mono">${nfMoney(p.totalDeductions)}</span></b></p>
             </div>
           </div>
-          <div style="margin-top:12px;padding:10px;background:#ecfdf5;border-radius:6px;text-align:center;font-size:18px;font-weight:900;color:#054239">
+          <div style="margin-top:12px;padding:10px;background:#F6F8F5;border-radius:6px;text-align:center;font-size:18px;font-weight:900;color:#054239">
             صافي الراتب المستحق للصرف: <span class="mono">${nfMoney(p.netSalary)}</span>
           </div>
         </div>

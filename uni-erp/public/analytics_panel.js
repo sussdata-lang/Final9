@@ -2,7 +2,7 @@
    تعرضها UA.views.dashboard عبر UA.analyticsPanel، وتقرأ من /api/devops/incidents و/api/hr-pro/overview. */
 (function () {
   const UA = window.UA = window.UA || {};
-  const PAL = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+  const PAL = ['#054239', '#C9A24B', '#4DB6A0', '#0A5A4D', '#8A6A1B', '#1B7F4B', '#E6CB84', '#566660'];
   const st = { tab: 'departments', dept: 'all', dev: null, hr: null, loading: false, err: '' };
   const prevReset = UA.reset;
   UA.reset = () => { if (prevReset) prevReset(); Object.assign(st, { dept: 'all', dev: null, hr: null, err: '' }); };
@@ -113,9 +113,9 @@
     </div>
     <div class="an-grid2">
       ${card('تواتر الأخطاء خلال آخر 7 أيام', lines(ts.map((x) => x.label), [
-        { name: 'الإجمالي', color: '#3b82f6', vals: ts.map((x) => x.totalErrors) },
-        { name: 'حرجة', color: '#ef4444', vals: ts.map((x) => x.criticalCount) },
-        { name: 'تمت معالجتها', color: '#10b981', vals: ts.map((x) => x.resolvedCount) },
+        { name: 'الإجمالي', color: '#0A5A4D', vals: ts.map((x) => x.totalErrors) },
+        { name: 'حرجة', color: '#B3261E', vals: ts.map((x) => x.criticalCount) },
+        { name: 'تمت معالجتها', color: '#1B7F4B', vals: ts.map((x) => x.resolvedCount) },
       ], { wide: true }), true)}
       ${card('حالة المعالجة', donut(d.statusBreakdown || [], 'بلاغ'))}
       ${card('طريقة إرسال البلاغات', donut(d.deliveryBreakdown || [], 'بلاغ'))}
@@ -135,7 +135,7 @@
     const sel = `<label class="an-sel">القسم: <select id="an-dept" data-no-other="1">${names.map((n) => `<option value="${esc(n)}"${n === st.dept ? ' selected' : ''}>${n === 'all' ? 'كافة الأقسام' : esc(n)}</option>`).join('')}</select></label>
       <span class="an-scope">${esc(sc.userName || '')}${sc.assignedDepartment ? ' · ' + esc(sc.assignedDepartment) : ''}</span>`;
     const ct = (a.contractBreakdown || []).map((c) => ({ name: c.label, value: c.count, color: c.color }));
-    const mods = (h.enterpriseModules || []).map((m) => `<div class="an-mod" style="border-top-color:${esc(m.color || '#10b981')}">
+    const mods = (h.enterpriseModules || []).map((m) => `<div class="an-mod" style="border-top-color:${esc(m.color || '#1B7F4B')}">
         <h4>${esc(m.icon || '')} ${esc(m.title || m.department)}</h4><small>${esc(m.department || '')}</small>
         <ul>${(m.metrics || []).map((x) => `<li><span>${esc(x.label)}</span><b>${typeof x.value === 'number' ? nf(x.value) : esc(x.value)} <em>${esc(x.unit || '')}</em></b></li>`).join('')}</ul></div>`).join('');
     return `<div class="an-bar">${sel}</div>
@@ -148,9 +148,9 @@
       ${kpi('تنبيهات نشطة', nf(k.alertsCount), k.alertsCount ? 'bad' : 'ok')}
     </div>
     <div class="an-grid2">
-      ${card('عدد العاملين حسب القسم', bars(depts.map((d) => ({ label: d.department, vals: [d.activeCount, Math.max(0, d.count - d.activeCount)] })), [{ name: 'على رأس العمل', color: '#10b981' }, { name: 'غير ذلك', color: '#94a3b8' }], { unit: 'موظف', wide: true }), true)}
-      ${card('الرواتب والاستحقاقات والخصومات', bars(depts.map((d) => ({ label: d.department, vals: [d.baseSalaries, d.totalAllowances, d.totalDeductions] })), [{ name: 'الأساسي', color: '#3b82f6' }, { name: 'البدلات', color: '#f59e0b' }, { name: 'الخصومات', color: '#ef4444' }], { wide: true }), true)}
-      ${card('نسبة الالتزام بالدوام %', hbars(depts.map((d) => ({ label: d.department, value: d.avgCommitment, color: d.avgCommitment < 85 ? '#f59e0b' : '#10b981' })), '%'))}
+      ${card('عدد العاملين حسب القسم', bars(depts.map((d) => ({ label: d.department, vals: [d.activeCount, Math.max(0, d.count - d.activeCount)] })), [{ name: 'على رأس العمل', color: '#1B7F4B' }, { name: 'غير ذلك', color: '#8B9591' }], { unit: 'موظف', wide: true }), true)}
+      ${card('الرواتب والاستحقاقات والخصومات', bars(depts.map((d) => ({ label: d.department, vals: [d.baseSalaries, d.totalAllowances, d.totalDeductions] })), [{ name: 'الأساسي', color: '#0A5A4D' }, { name: 'البدلات', color: '#C9A24B' }, { name: 'الخصومات', color: '#B3261E' }], { wide: true }), true)}
+      ${card('نسبة الالتزام بالدوام %', hbars(depts.map((d) => ({ label: d.department, value: d.avgCommitment, color: d.avgCommitment < 85 ? '#C9A24B' : '#1B7F4B' })), '%'))}
       ${card('توزيع الإجازات (أيام)', donut((a.leaveDistribution || []).filter((x) => x.days > 0).map((x) => ({ name: x.type, value: x.days })), 'يوم'))}
       ${card('حالة العقود', donut(ct, 'عقد'))}
       ${card('السلف المتبقية حسب القسم', hbars(depts.map((d) => ({ label: d.department, value: d.advancesRemaining })).filter((x) => x.value > 0)))}
@@ -161,9 +161,9 @@
   /* ---------- الهيكل والأحداث ---------- */
   const CSS = `
   .ua-an .an-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
-  .ua-an .an-kpi{background:var(--surface,#fff);border:1px solid var(--line,#DCE3DD);border-radius:12px;padding:12px 14px;display:grid;gap:3px;border-inline-start:4px solid #3b82f6}
+  .ua-an .an-kpi{background:var(--surface,#fff);border:1px solid var(--line,#DCE3DD);border-radius:12px;padding:12px 14px;display:grid;gap:3px;border-inline-start:4px solid #0A5A4D}
   .ua-an .an-kpi span{font-size:12px;opacity:.75}.ua-an .an-kpi strong{font-size:22px;line-height:1.2}.ua-an .an-kpi small{font-size:11px;opacity:.65}
-  .ua-an .an-kpi.ok{border-inline-start-color:#10b981}.ua-an .an-kpi.warn{border-inline-start-color:#f59e0b}.ua-an .an-kpi.bad{border-inline-start-color:#ef4444}
+  .ua-an .an-kpi.ok{border-inline-start-color:#1B7F4B}.ua-an .an-kpi.warn{border-inline-start-color:#C9A24B}.ua-an .an-kpi.bad{border-inline-start-color:#B3261E}
   .ua-an .an-grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px}
   .ua-an .an-card{background:var(--surface,#fff);border:1px solid var(--line,#DCE3DD);border-radius:14px;padding:14px;min-width:0}
   .ua-an .an-card.wide{grid-column:1/-1}
@@ -177,11 +177,11 @@
   .ua-an .an-ht{height:12px;border-radius:7px;background:rgba(127,127,127,.18);overflow:hidden}.ua-an .an-hf{height:100%;border-radius:7px}
   .ua-an .an-empty{padding:26px;text-align:center;opacity:.6;font-size:13px}
   .ua-an .an-bar{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:12px;font-size:13px}
-  .ua-an .an-sel select{font:inherit;padding:7px 10px;border-radius:8px;border:1px solid var(--line,#ccc);background:var(--surface,#fff);color:inherit}
+  .ua-an .an-sel select{font:inherit;padding:7px 10px;border-radius:8px;border:1px solid var(--line,#DCE3DD);background:var(--surface,#fff);color:inherit}
   .ua-an .an-scope{opacity:.7;font-size:12px}
   .ua-an .an-sec{margin:22px 0 10px;font-size:15px}
   .ua-an .an-mods{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
-  .ua-an .an-mod{background:var(--surface,#fff);border:1px solid var(--line,#DCE3DD);border-top:4px solid #10b981;border-radius:12px;padding:12px 14px}
+  .ua-an .an-mod{background:var(--surface,#fff);border:1px solid var(--line,#DCE3DD);border-top:4px solid #1B7F4B;border-radius:12px;padding:12px 14px}
   .ua-an .an-mod h4{margin:0 0 2px;font-size:13.5px}.ua-an .an-mod small{opacity:.6;font-size:11px}
   .ua-an .an-mod ul{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:6px}.ua-an .an-mod li{display:flex;justify-content:space-between;gap:8px;font-size:12.5px}.ua-an .an-mod em{font-style:normal;opacity:.65;font-weight:500}
   .ua-an .an-msg{padding:40px;text-align:center}

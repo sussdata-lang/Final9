@@ -102,7 +102,7 @@
   }
   const paintChoice = (input) => {
     const box = input.closest('label');
-    if (box) { box.style.borderColor = input.checked ? '#054239' : '#e2e8f0'; box.style.background = input.checked ? 'rgba(5,66,57,0.06)' : '#fff'; }
+    if (box) { box.style.borderColor = input.checked ? '#054239' : '#DCE3DD'; box.style.background = input.checked ? 'rgba(5,66,57,0.06)' : '#fff'; }
   };
   const keepHybrid = (bState, target) => {
     if (bState.accessMode !== 'role') return;
@@ -266,19 +266,19 @@
           return `<td style="text-align:center;vertical-align:middle">
             <label style="display:inline-flex;flex-direction:column;align-items:center;gap:3px;cursor:${canGrant ? 'pointer' : 'not-allowed'};opacity:${canGrant ? '1' : '0.45'}" title="${esc(actDef?.label || act.label)}: ${esc((actDef?.perms || []).join(', '))}">
               <input type="checkbox" data-act="xmodchk" data-target="${targetMode}" data-mod="${esc(mod.id)}" data-op="${act.key}" ${checked ? 'checked' : ''} ${canGrant ? '' : 'disabled'} style="width:17px;height:17px;accent-color:#054239">
-              <span class="small" style="font-size:11px;color:${checked ? '#054239' : '#64748b'};font-weight:${checked ? '700' : '400'}">${esc(actDef?.label || act.label)}</span>
+              <span class="small" style="font-size:11px;color:${checked ? '#054239' : '#566660'};font-weight:${checked ? '700' : '400'}">${esc(actDef?.label || act.label)}</span>
             </label>
           </td>`;
         }).join('');
 
         return `<tr style="background:${curLvl === 'none' ? 'transparent' : 'rgba(5,66,57,0.03)'}">
           <td>
-            <div style="font-weight:700;color:#0f172a">${esc(mod.title)}</div>
+            <div style="font-weight:700;color:#10211D">${esc(mod.title)}</div>
             <div class="small" style="color:#054239;font-weight:600">${esc(mod.department)}</div>
             <div class="small">${esc(mod.description)}</div>
           </td>
           <td style="white-space:nowrap;vertical-align:middle">
-            <select data-act="xmodlvl" data-target="${targetMode}" data-mod="${esc(mod.id)}" aria-label="مستوى وصول ${esc(mod.title)}" style="font-size:12px;padding:4px 8px;border-radius:6px;border:1px solid #cbd5e1;background:#fff">
+            <select data-act="xmodlvl" data-target="${targetMode}" data-mod="${esc(mod.id)}" aria-label="مستوى وصول ${esc(mod.title)}" style="font-size:12px;padding:4px 8px;border-radius:6px;border:1px solid #DCE3DD;background:#fff">
               <option value="none"${curLvl === 'none' ? ' selected' : ''}>🚫 بلا وصول</option>
               <option value="read"${curLvl === 'read' ? ' selected' : ''}>👁️ عرض واطلاع فقط</option>
               <option value="write"${curLvl === 'write' ? ' selected' : ''}>✍️ عرض + إضافة وكتابة</option>
@@ -305,8 +305,8 @@
               <span>${esc(label)}${owned ? '' : ' (بلا صلاحية)'}</span></label>`;
           })
           .join('');
-        return `<div style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;background:#fff">
-          <label class="perm" style="padding:6px 8px;border:1px solid ${isChecked ? '#054239' : '#e2e8f0'};border-radius:8px;background:${isChecked ? 'rgba(5,66,57,0.06)' : '#fff'}">
+        return `<div style="padding:8px 10px;border:1px solid #DCE3DD;border-radius:8px;background:#fff">
+          <label class="perm" style="padding:6px 8px;border:1px solid ${isChecked ? '#054239' : '#DCE3DD'};border-radius:8px;background:${isChecked ? 'rgba(5,66,57,0.06)' : '#fff'}">
             <input type="checkbox" data-act="xviewchk" data-target="${targetMode}" data-vk="${esc(v.key)}" ${isChecked ? 'checked' : ''}>
             <span><b>${esc(v.label)}</b> <span class="small">(${esc(v.group)})</span></span>
           </label>
@@ -330,8 +330,8 @@
           .join('')}</div>`
       : '';
 
-    return `<div class="stack" style="margin-top:14px;border:1px solid #cbd5e1;border-radius:12px;padding:16px;background:#f8fafc">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;border-bottom:1px solid #e2e8f0;padding-bottom:12px">
+    return `<div class="stack" style="margin-top:14px;border:1px solid #DCE3DD;border-radius:12px;padding:16px;background:#F6F8F5">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;border-bottom:1px solid #DCE3DD;padding-bottom:12px">
         <div>
           <h3 style="margin:0;color:#054239;font-size:16px">🛡️ مصفوفة تحديد الصلاحيات والسماحيات وآلية الوصول والتعديل (${isEdit ? 'تعديل الحساب' : 'عند تأسيس الحساب'})</h3>
           <p class="small" style="margin:4px 0 0">حدّد بدقة الأقسام التي يحق للموظف الوصول إليها، ومستوى السماحية في كل قسم (عرض، كتابة، تعديل، اعتماد، حذف/تصدير).</p>
@@ -345,14 +345,14 @@
       <!-- شريط ملخص السماحيات الخمس -->
       <div class="stats" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
         <div class="stat" style="padding:10px"><small>👁️ أقسام مسموح عرضها</small><b style="font-size:18px;color:#054239">${viewCnt} / ${modules.length}</b></div>
-        <div class="stat" style="padding:10px"><small>✍️ أقسام مسموح الكتابة فيها</small><b style="font-size:18px;color:#0284c7">${writeCnt} / ${modules.length}</b></div>
-        <div class="stat" style="padding:10px"><small>🛠️ أقسام مسموح تعديلها</small><b style="font-size:18px;color:#d97706">${editCnt} / ${modules.length}</b></div>
-        <div class="stat" style="padding:10px"><small>✅ أقسام مسموح الاعتماد فيها</small><b style="font-size:18px;color:#15803d">${approveCnt} / ${modules.length}</b></div>
-        <div class="stat" style="padding:10px"><small>🗑️ أقسام مسموح الحذف/التصدير</small><b style="font-size:18px;color:#b91c1c">${deleteCnt} / ${modules.length}</b></div>
+        <div class="stat" style="padding:10px"><small>✍️ أقسام مسموح الكتابة فيها</small><b style="font-size:18px;color:#0A5A4D">${writeCnt} / ${modules.length}</b></div>
+        <div class="stat" style="padding:10px"><small>🛠️ أقسام مسموح تعديلها</small><b style="font-size:18px;color:#8A6A1B">${editCnt} / ${modules.length}</b></div>
+        <div class="stat" style="padding:10px"><small>✅ أقسام مسموح الاعتماد فيها</small><b style="font-size:18px;color:#0E4D2E">${approveCnt} / ${modules.length}</b></div>
+        <div class="stat" style="padding:10px"><small>🗑️ أقسام مسموح الحذف/التصدير</small><b style="font-size:18px;color:#B3261E">${deleteCnt} / ${modules.length}</b></div>
       </div>
 
       <!-- إعدادات آلية الوصول ونطاق البيانات -->
-      <div class="inline-form" style="background:#fff;padding:12px;border-radius:10px;border:1px solid #e2e8f0">
+      <div class="inline-form" style="background:#fff;padding:12px;border-radius:10px;border:1px solid #DCE3DD">
         <label style="flex:1;min-width:220px">آلية تطبيق الصلاحيات على الحساب
           <select id="${isEdit ? 'xe-mode' : 'xn-mode'}" data-act="xmodechg" data-target="${targetMode}">
             <option value="hybrid"${bState.accessMode === 'hybrid' ? ' selected' : ''}>مدمج (يرث الدور والقسم + التخصيصات أدناه)</option>
@@ -380,13 +380,13 @@
       </div>
 
       <!-- قوالب الأقسام الجاهزة -->
-      <div style="background:#fff;padding:12px;border-radius:10px;border:1px solid #e2e8f0">
-        <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#0f172a">⚡ قوالب الصلاحيات الجاهزة حسب الأقسام (اضغط لتعبئة صلاحيات القسم فوراً):</div>
+      <div style="background:#fff;padding:12px;border-radius:10px;border:1px solid #DCE3DD">
+        <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#10211D">⚡ قوالب الصلاحيات الجاهزة حسب الأقسام (اضغط لتعبئة صلاحيات القسم فوراً):</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">${presetButtons}</div>
       </div>
 
       <!-- جدول مصفوفة الأقسام الـ 14 والعمليات الخمس -->
-      <div class="tbl-wrap" style="background:#fff;border-radius:10px;border:1px solid #e2e8f0">
+      <div class="tbl-wrap" style="background:#fff;border-radius:10px;border:1px solid #DCE3DD">
         <table>
           <thead>
             <tr>
@@ -419,7 +419,7 @@
       </div>
 
       <!-- تحديد الشاشات المسموح ظهورها في القائمة الجانبية -->
-      <details data-keep="views" ${X.viewsOpen ? 'open' : ''} style="background:#fff;padding:12px;border-radius:10px;border:1px solid #e2e8f0">
+      <details data-keep="views" ${X.viewsOpen ? 'open' : ''} style="background:#fff;padding:12px;border-radius:10px;border:1px solid #DCE3DD">
         <summary style="cursor:pointer;font-weight:700;color:#054239">🖥️ تخصيص الشاشات والتبويبات الظاهرة للموظف (<span data-views-count="${targetMode}">${bState.allowedViews.size || allViews.length}</span> شاشة مسموحة)</summary>
         <p class="small" style="margin:8px 0 0">التخصيص يُضيّق ما تتيحه صلاحيات الحساب ولا يوسّعه: الشاشة أو التبويب بلا صلاحية يبقى مخفياً مهما اخترت.</p>
         <div class="actions" style="margin:10px 0">
@@ -430,7 +430,7 @@
       </details>
 
       <!-- الفهرس التفصيلي لكافة الصلاحيات الفردية -->
-      <div style="background:#fff;padding:12px;border-radius:10px;border:1px solid #e2e8f0">
+      <div style="background:#fff;padding:12px;border-radius:10px;border:1px solid #DCE3DD">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
           <b>🔧 الفهرس التفصيلي للصلاحيات الفردية (${bState.customPerms.size} صلاحية مفعلة)</b>
           <button type="button" class="btn sm" data-act="xtoggleadv" data-target="${targetMode}">
@@ -646,7 +646,7 @@
     let side;
     if (X.rsel === 'new') {
       side = `<h2>إنشاء دور وظيفي جديد</h2>
-        <div style="margin-bottom:12px;padding:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px">
+        <div style="margin-bottom:12px;padding:10px;background:#F6F8F5;border:1px solid #DCE3DD;border-radius:8px">
           <div class="small" style="font-weight:700;margin-bottom:6px">تعبئة سريعة من قوالب الأقسام:</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">${presetOptions}</div>
         </div>
@@ -661,7 +661,7 @@
         </form>`;
     } else if (cur && cur.fixed) {
       const canEdit = UA.can('settings:manage');
-      const toggle = (item) => `<label class="perm" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:8px"><input type="checkbox" data-act="xstudtoggle" data-setting="${esc(item.setting)}"${item.enabled ? ' checked' : ''}${canEdit ? '' : ' disabled'}> <span>${esc(item.label)}</span></label>`;
+      const toggle = (item) => `<label class="perm" style="padding:6px 10px;border:1px solid #DCE3DD;border-radius:8px"><input type="checkbox" data-act="xstudtoggle" data-setting="${esc(item.setting)}"${item.enabled ? ' checked' : ''}${canEdit ? '' : ' disabled'}> <span>${esc(item.label)}</span></label>`;
       side = `<h2>${esc(cur.label)}</h2><p class="hint">${esc(cur.description)} الإعدادات هنا تسري على كل حسابات الطلاب.</p>
         <h3 style="margin:14px 0 8px">الشاشات التي يعرضها حساب الطالب</h3>
         <p class="small" style="margin:0 0 8px">«الرئيسية» و«الإرشادات» ظاهرتان دائماً.</p>

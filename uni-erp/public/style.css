@@ -497,17 +497,19 @@ table.xp{font-size:12.5px;white-space:nowrap}
 :root{
   --sx-side:#073C34; --sx-side-2:#116152; --sx-gold:#D8B75A; --sx-gold-2:#F1D585;
   --t-mint-fg:#0D6957; --t-mint-bg:#E1F2EC; --t-sand-fg:#9A6D20; --t-sand-bg:#F7EFD9;
-  --t-blue-fg:#356C8A; --t-blue-bg:#E4F0F5; --t-lav-fg:#6B618E; --t-lav-bg:#EEEAF7;
+  --t-blue-fg:#054239; --t-blue-bg:#E2EEE9; --t-lav-fg:#0A5A4D; --t-lav-bg:#E4F3EE;
   --sx-shadow:0 3px 14px rgba(25,60,52,.04);
 }
 :root[data-theme="dark"]{
   --t-mint-fg:#7FD6BC; --t-mint-bg:#14382F; --t-sand-fg:#E2C27A; --t-sand-bg:#3A2F14;
-  --t-blue-fg:#8CC3DD; --t-blue-bg:#12303C; --t-lav-fg:#B9AEE0; --t-lav-bg:#2A2542; --sx-shadow:none;
+  --t-blue-fg:#9FD9C6; --t-blue-bg:#16372F; --t-lav-fg:#7FD6BC; --t-lav-bg:#1A3F36; --sx-shadow:none;
+  --i1:#7FD6BC; --i2:#E2C27A; --i4:#2E8C78;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --t-mint-fg:#7FD6BC; --t-mint-bg:#14382F; --t-sand-fg:#E2C27A; --t-sand-bg:#3A2F14;
-    --t-blue-fg:#8CC3DD; --t-blue-bg:#12303C; --t-lav-fg:#B9AEE0; --t-lav-bg:#2A2542; --sx-shadow:none;
+    --t-blue-fg:#9FD9C6; --t-blue-bg:#16372F; --t-lav-fg:#7FD6BC; --t-lav-bg:#1A3F36; --sx-shadow:none;
+  --i1:#7FD6BC; --i2:#E2C27A; --i4:#2E8C78;
   }
 }
 body.sx-on{padding:0}
@@ -1105,7 +1107,8 @@ body.sx-grouped .sub-tabs{display:none}
 :root[data-theme="dark"] svg.ic .ac{stroke:var(--gold-2,#E6CB84)}
 :root[data-theme="dark"]{
     --t-mint-fg:#7FD6BC; --t-mint-bg:#14382F; --t-sand-fg:#E2C27A; --t-sand-bg:#3A2F14;
-    --t-blue-fg:#8CC3DD; --t-blue-bg:#12303C; --t-lav-fg:#B9AEE0; --t-lav-bg:#2A2542; --sx-shadow:none;
+    --t-blue-fg:#9FD9C6; --t-blue-bg:#16372F; --t-lav-fg:#7FD6BC; --t-lav-bg:#1A3F36; --sx-shadow:none;
+  --i1:#7FD6BC; --i2:#E2C27A; --i4:#2E8C78;
   }
 :root[data-theme="dark"] .tf-bar .tf-in{background:var(--surface2);color:var(--fg);border-color:var(--line)}
 :root[data-theme="dark"] .tf-bar .tf-count{color:var(--muted)}
@@ -2118,3 +2121,26 @@ tr.sx-row-click:hover>td{background:rgba(213,182,93,.08)}
 .ua-noperm{display:none!important}
 .mfa-qr{width:220px;max-width:100%;margin:10px auto;background:#fff;padding:8px;border-radius:8px}
 .mfa-qr svg{display:block;width:100%;height:auto}
+
+/* ===== الأيقونات المصمتة (بأسلوب العرض التعريفي) ===== */
+:root{--i1:#054239;--i2:#C9A24B;--i4:#4DB6A0}
+.fi{flex:none;display:block}
+.fi .a{fill:var(--i1)}.fi .b{fill:var(--i2)}.fi .d{fill:var(--i4)}.fi .c{fill:var(--i3,var(--surface))}
+/* القائمة الجانبية الداكنة: الفراغات بلون الخلفية */
+.sx-nav button{--i1:#B9D3CB;--i2:#D8B75A;--i4:#4DB6A0;--i3:#073A33}
+.sx-nav button:hover{--i1:#E2EEE9;--i3:#0D4038}
+.sx-nav button[aria-current="page"]{--i1:#FFFFFF;--i2:var(--sx-gold-2);--i3:var(--sx-side-2)}
+/* دوائر الإحصاء والخدمات: هالة دائرية كالرسوم، والفراغات بيضاء */
+.sx-ic,.sx-quick button>span,.wk-ic{border-radius:50%;--i3:#fff}
+.sx-ic .fi{width:24px;height:24px}
+:root[data-theme="dark"] .sx-ic,:root[data-theme="dark"] .sx-quick button>span,:root[data-theme="dark"] .wk-ic{--i3:var(--surface)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .sx-ic,:root:not([data-theme="light"]) .sx-quick button>span,:root:not([data-theme="light"]) .wk-ic{--i3:var(--surface)}}
+
+/* بوابة شؤون الموظفين: بطاقات الموقع بأيقونة في هالة */
+.hr-tile{display:flex;align-items:center;gap:14px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--fg);text-align:start;cursor:pointer;box-shadow:var(--sx-shadow);transition:border-color .18s ease,transform .18s ease}
+.hr-tile:hover{border-color:var(--accent);transform:translateY(-1px)}
+.hr-tile:focus-visible{outline:2px solid var(--sx-gold);outline-offset:2px}
+.hr-tile .sx-ic{flex:none}
+.hr-tile-t{display:grid;gap:3px;min-width:0}
+.hr-tile-t b{color:var(--accent);font-size:16px}
+.hr-tile-t small{color:var(--muted);font-size:12.5px}

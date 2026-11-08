@@ -22,7 +22,7 @@
     const val = (v, unit = '') => (v === null || v === undefined ? '—' : `${v}${unit}`);
     const nsRate = (x) => (x && (x.hits || x.misses) ? `${x.hitRatePercent}%` : '—');
 
-    return `<section class="card" style="border:2px solid #054239;background:linear-gradient(135deg,#f0fdf9 0%,#ffffff 100%)">
+    return `<section class="card" style="border:2px solid #054239;background:linear-gradient(135deg,#F6F8F5 0%,#ffffff 100%)">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
         <div>
           <span class="pill" style="background:#054239;color:#fff;font-weight:700">قياسات حية من الخادم</span>
@@ -49,12 +49,12 @@
         </div>
         <div class="stat">
           <small>الجلسات في الذاكرة المؤقتة</small>
-          <b style="color:#0369a1">${val(sess.cachedSessions)} جلسة</b>
+          <b style="color:#0A5A4D">${val(sess.cachedSessions)} جلسة</b>
           <div class="small">السقف: <b>${val(sess.maxCapacity)}</b> (ليس عدد المستخدمين الممكن) · الإصابة: <b>${val(sess.hitRatePercent, '%')}</b> · p50: <b>${val(http.p50Ms, ' ms')}</b></div>
         </div>
         <div class="stat">
           <small>اتصالات PostgreSQL</small>
-          <b style="color:#7c3aed">${val(dbInfo.openConnections)} مفتوح</b>
+          <b style="color:#0A5A4D">${val(dbInfo.openConnections)} مفتوح</b>
           <div class="small">الحد لكل مجمع: <b>${val(dbInfo.poolMax)}</b> · ${cache.redisConnected ? 'Redis متصل' : 'Redis غير مضبوط: التخزين في ذاكرة الخادم فقط'}</div>
         </div>
       </div>
@@ -68,58 +68,58 @@
           + `<p class="small" style="margin:8px 0 0">pg_stat_statements: ${pg.enabled ? 'مفعّل' : 'غير مفعّل على هذه القاعدة؛ القياس أعلاه من داخل النظام'}. مدة تشغيل العملية: ${val(t.uptimeSec, ' ثانية')}.</p>`;
       })()}
 
-      <div style="margin-top:14px;padding:12px 14px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px">
+      <div style="margin-top:14px;padding:12px 14px;background:#F6F8F5;border:1px solid #DCE3DD;border-radius:10px">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px">
           <b style="color:#054239;font-size:13px">نطاقات التخزين المؤقت (تُبطَل تلقائياً عند التعديل):</b>
-          <span class="pill" style="background:#e0f2fe;color:#0369a1;font-size:11px">عمليات الإبطال: ${val(cache.invalidations)}</span>
+          <span class="pill" style="background:#E2EEE9;color:#0A5A4D;font-size:11px">عمليات الإبطال: ${val(cache.invalidations)}</span>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;font-size:12px">
-          <div style="background:#fff;padding:8px 10px;border-radius:8px;border:1px solid #e2e8f0">
+          <div style="background:#fff;padding:8px 10px;border-radius:8px;border:1px solid #DCE3DD">
             <b>بيانات الهوية والأدوار (Identity)</b>
             <div class="small">الإصابة: <b>${nsRate(ns.identity)}</b> (${ns.identity?.hits ?? 0} إصابة / ${ns.identity?.size ?? 0} مفتاح)</div>
           </div>
-          <div style="background:#fff;padding:8px 10px;border-radius:8px;border:1px solid #e2e8f0">
+          <div style="background:#fff;padding:8px 10px;border-radius:8px;border:1px solid #DCE3DD">
             <b>الوحدات التنظيمية (Org Units)</b>
             <div class="small">الإصابة: <b>${nsRate(ns.org_units)}</b> (${ns.org_units?.hits ?? 0} إصابة / ${ns.org_units?.size ?? 0} مفتاح)</div>
           </div>
-          <div style="background:#fff;padding:8px 10px;border-radius:8px;border:1px solid #e2e8f0">
+          <div style="background:#fff;padding:8px 10px;border-radius:8px;border:1px solid #DCE3DD">
             <b>الإعدادات والحدود (Settings)</b>
             <div class="small">الإصابة: <b>${nsRate(ns.settings)}</b> (${ns.settings?.hits ?? 0} إصابة / ${ns.settings?.size ?? 0} مفتاح)</div>
           </div>
-          <div style="background:#fff;padding:8px 10px;border-radius:8px;border:1px solid #e2e8f0">
+          <div style="background:#fff;padding:8px 10px;border-radius:8px;border:1px solid #DCE3DD">
             <b>دليل الخدمات والنماذج (Catalog)</b>
             <div class="small">الإصابة: <b>${nsRate(ns.catalog)}</b> (${ns.catalog?.hits ?? 0} إصابة / ${ns.catalog?.size ?? 0} مفتاح)</div>
           </div>
-          <div style="background:#fff;padding:8px 10px;border-radius:8px;border:1px solid #e2e8f0">
+          <div style="background:#fff;padding:8px 10px;border-radius:8px;border:1px solid #DCE3DD">
             <b>اللوحة الرئيسية ومكتبي (Desk)</b>
             <div class="small">الإصابة: <b>${nsRate(ns.desk)}</b> (${ns.desk?.hits ?? 0} إصابة / ${ns.desk?.size ?? 0} مفتاح)</div>
           </div>
-          <div style="background:#fff;padding:8px 10px;border-radius:8px;border:1px solid #e2e8f0">
+          <div style="background:#fff;padding:8px 10px;border-radius:8px;border:1px solid #DCE3DD">
             <b>الإحصاءات والتقارير (Analytics)</b>
             <div class="small">الإصابة: <b>${nsRate(ns.analytics)}</b> (${ns.analytics?.hits ?? 0} إصابة / ${ns.analytics?.size ?? 0} مفتاح)</div>
           </div>
         </div>
       </div>
 
-      ${b ? `<div style="margin-top:16px;padding:16px;background:#f8fafc;border:1.5px solid #cbd5e1;border-radius:12px">
+      ${b ? `<div style="margin-top:16px;padding:16px;background:#F6F8F5;border:1.5px solid #DCE3DD;border-radius:12px">
         <h3 style="margin:0;color:#054239">نتيجة الاختبار الحي</h3>
         <p class="small" style="margin:4px 0 10px">${b.totalRequests} طلب قراءة حقيقي من داخل الخادم نفسه، خلال ${(b.durationMs / 1000).toFixed(1)} ثانية. يكشف بطء الخادم الآن، ولا يقيس عدد المستخدمين الممكن.</p>
-        <div class="tbl-wrap"><table><thead><tr><th>اتصالات متزامنة</th><th>طلب/ثانية</th><th>الوسيط</th><th>95% خلال</th><th>أخطاء</th></tr></thead><tbody>${b.stages.map((s) => `<tr><td>${s.concurrency}</td><td>${s.requestsPerSec}</td><td>${val(s.p50Ms, ' ms')}</td><td>${val(s.p95Ms, ' ms')}</td><td>${s.errors ? `<b style="color:#b91c1c">${s.errors}</b>` : 0}</td></tr>`).join('')}</tbody></table></div>
+        <div class="tbl-wrap"><table><thead><tr><th>اتصالات متزامنة</th><th>طلب/ثانية</th><th>الوسيط</th><th>95% خلال</th><th>أخطاء</th></tr></thead><tbody>${b.stages.map((s) => `<tr><td>${s.concurrency}</td><td>${s.requestsPerSec}</td><td>${val(s.p50Ms, ' ms')}</td><td>${val(s.p95Ms, ' ms')}</td><td>${s.errors ? `<b style="color:#B3261E">${s.errors}</b>` : 0}</td></tr>`).join('')}</tbody></table></div>
         <p class="small" style="margin:10px 0 0">الكتابة: ${b.writes.inserted} سجلاً في ${b.writes.durationMs} مللي ثانية (${val(b.writes.perSec)} سجل/ثانية داخل معاملة واحدة)، وأُلغيت كلها فلم يبقَ منها شيء.</p>
       </div>` : ''}
 
       <div class="grid2" style="margin-top:16px">
-        <div style="background:#fff;padding:14px;border:1px solid #e2e8f0;border-radius:10px">
+        <div style="background:#fff;padding:14px;border:1px solid #DCE3DD;border-radius:10px">
           <h4 style="margin:0 0 8px;color:#054239">التخزين المؤقت للهوية والوحدات التنظيمية</h4>
-          <ul style="margin:0;padding-inline-start:18px;line-height:1.8;font-size:13px;color:#334155">
+          <ul style="margin:0;padding-inline-start:18px;line-height:1.8;font-size:13px;color:#10211D">
             <li><b>كاش الهوية والصلاحيات (Identity Cache):</b> تخزين ملفات المستخدمين، الأدوار (<code>roles</code>)، الصلاحيات الفعالة، ودليل الموظفين في الذاكرة لتقليل استعلامات الجلسات والمراسلات والطلبات.</li>
             <li><b>كاش شجرة الوحدات التنظيمية (Org Units Hierarchy Cache):</b> حساب شجرة الوحدات الفرعية ومسارات الإحالة في الذاكرة بزمن <code>O(1)</code> بدلاً من استعلامات <code>WITH RECURSIVE</code> المتكررة.</li>
             <li><b>الإبطال الانتقائي الذكي (Table-Aware Cache Invalidation):</b> أي عملية كتابة على جدول تقوم بإبطال النطاق المرتبط به فقط دون مسح بقية الكاش.</li>
           </ul>
         </div>
-        <div style="background:#fff;padding:14px;border:1px solid #e2e8f0;border-radius:10px">
+        <div style="background:#fff;padding:14px;border:1px solid #DCE3DD;border-radius:10px">
           <h4 style="margin:0 0 8px;color:#054239">تحسين الاستعلامات وفهرسة الجداول عالية التردد (Query & Index Optimization)</h4>
-          <ul style="margin:0;padding-inline-start:18px;line-height:1.8;font-size:13px;color:#334155">
+          <ul style="margin:0;padding-inline-start:18px;line-height:1.8;font-size:13px;color:#10211D">
             <li><b>إلغاء استعلامات N+1 في اللوحة الرئيسية والمراسلات والطلبات:</b> استبدال الجلب الكامل لصفوف المراجعة في <code>deskSummary</code> باستعلام عدّ مفهرس فوري، وتجميع فئات العلامات في استعلام واحد.</li>
             <li><b>فهارس مركبة شاملة (031_high_frequency_table_indexes):</b> فهارس مركبة لجداول <code>users</code>، <code>org_units</code>، <code>requests</code>، <code>corr_docs</code>، <code>fin_entries</code>، <code>hr_employees</code>، <code>grades</code>، و<code>audit_log</code>.</li>
             <li><b>فهرسة PostgreSQL ومجمع الاتصالات:</b> تنفيذ الاستعلامات عبر مجمع اتصالات PostgreSQL (حتى 20 اتصالاً لكل عملية).</li>

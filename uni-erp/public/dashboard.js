@@ -1,7 +1,7 @@
 /* لوحة الإحصاءات: مؤشرات ومخططات SVG تفاعلية بنمط لوحات المعلومات، تحديث دوري، مرشحات (تحديد متقاطع)، وتصدير PDF / Word / Excel */
 (function () {
   const UA = window.UA, { S, api, esc, toast } = UA;
-  const PAL = ['#054239', '#C9A24B', '#0A8F7A', '#7A5C12', '#4DB6A0', '#2F6F9F', '#8C9A94', '#B3261E'];
+  const PAL = ['#054239', '#C9A24B', '#4DB6A0', '#0A5A4D', '#8A6A1B', '#1B7F4B', '#E6CB84', '#566660'];
   const D = { tab: '', data: null, faculty: '', year: '', timer: null, paused: false, loading: false, err: '', exporting: '' };
   const prevReset = UA.reset;
   UA.reset = () => { if (prevReset) prevReset(); stop(); Object.assign(D, { tab: '', data: null, faculty: '', year: '', paused: false, err: '', exporting: '' }); };

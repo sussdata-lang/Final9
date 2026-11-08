@@ -134,20 +134,20 @@
   function renderHeaderBanner() {
     const openYear = (F.years || []).find((y) => y.status === 'open');
     return `
-      <div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);color:#fff;border:1px solid #334155;padding:15px 18px">
+      <div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,#10211D 0%,#054239 100%);color:#fff;border:1px solid #10211D;padding:15px 18px">
         <div class="spread" style="flex-wrap:wrap;gap:10px">
           <div>
-            <div style="font-size:11px;color:#38bdf8;font-weight:700;letter-spacing:.4px">الإدارة المالية والمحاسبية · DOUBLE-ENTRY GENERAL LEDGER & TREASURY</div>
+            <div style="font-size:11px;color:#0A5A4D;font-weight:700;letter-spacing:.4px">الإدارة المالية والمحاسبية · DOUBLE-ENTRY GENERAL LEDGER & TREASURY</div>
             <div style="font-size:15px;font-weight:800;margin-top:2px">النظام المحاسبي الموحد والقوائم المالية الختامية للجامعة</div>
-            <div style="font-size:12px;color:#cbd5e1;margin-top:3px">
+            <div style="font-size:12px;color:#DCE3DD;margin-top:3px">
               السنة المالية الفعالة: <b>${esc(openYear?.code || '2026')}</b> (${esc(openYear?.startDay || '2026-01-01')} ← ${esc(openYear?.endDay || '2026-12-31')}) · قاعدة القيد المزدوج المتوازن مفعّلة إجبارياً
             </div>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             ${can('finance:post') ? `<button class="btn pri sm" data-act="fin-new-je">+ قيد يومية مزدوج</button>` : ''}
             ${can('finance:entry') ? `
-              <button class="btn sm" style="background:rgba(16,185,129,.2);color:#ecfdf5;border-color:rgba(16,185,129,.4)" data-act="fin-new-vch" data-kind="receipt">+ سند قبض</button>
-              <button class="btn sm" style="background:rgba(244,63,94,.2);color:#fff1f2;border-color:rgba(244,63,94,.4)" data-act="fin-new-vch" data-kind="payment">+ سند صرف</button>
+              <button class="btn sm" style="background:rgba(27,127,75,.2);color:#F6F8F5;border-color:rgba(27,127,75,.4)" data-act="fin-new-vch" data-kind="receipt">+ سند قبض</button>
+              <button class="btn sm" style="background:rgba(244,63,94,.2);color:#F6F8F5;border-color:rgba(244,63,94,.4)" data-act="fin-new-vch" data-kind="payment">+ سند صرف</button>
             ` : ''}
             <a class="btn sm" style="background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.2)" href="/api/finance/reports/trial-balance.xlsx" target="_blank">📥 ميزان المراجعة Excel</a>
           </div>
@@ -165,12 +165,12 @@
     return `
       ${renderHeaderBanner()}
       <div class="kpis" style="margin-bottom:14px">
-        <div class="kpi"><div class="k-num" style="color:#0284c7">${money(o.cashBalance)}</div><div class="k-lbl">السيولة النقدية والمصرفية</div></div>
+        <div class="kpi"><div class="k-num" style="color:#0A5A4D">${money(o.cashBalance)}</div><div class="k-lbl">السيولة النقدية والمصرفية</div></div>
         <div class="kpi"><div class="k-num" style="color:#0d9488">${money(o.receivables)}</div><div class="k-lbl">ذمم مدينة قيد التحصيل</div></div>
-        <div class="kpi"><div class="k-num" style="color:#d97706">${money(o.payables)}</div><div class="k-lbl">ذمم دائنة للموردين</div></div>
-        <div class="kpi"><div class="k-num" style="color:#16a34a">${money(o.totalRevenue)}</div><div class="k-lbl">إجمالي الإيرادات المحققة</div></div>
-        <div class="kpi"><div class="k-num" style="color:#dc2626">${money(o.totalExpense)}</div><div class="k-lbl">إجمالي المصروفات التشغيلية</div></div>
-        <div class="kpi" style="background:${(o.netIncome || 0) >= 0 ? '#f0fdf4' : '#fef2f2'}"><div class="k-num" style="color:${(o.netIncome || 0) >= 0 ? '#15803d' : '#b91c1c'}">${money(o.netIncome)}</div><div class="k-lbl">صافي الفائض / (العجز) المالي</div></div>
+        <div class="kpi"><div class="k-num" style="color:#8A6A1B">${money(o.payables)}</div><div class="k-lbl">ذمم دائنة للموردين</div></div>
+        <div class="kpi"><div class="k-num" style="color:#1B7F4B">${money(o.totalRevenue)}</div><div class="k-lbl">إجمالي الإيرادات المحققة</div></div>
+        <div class="kpi"><div class="k-num" style="color:#B3261E">${money(o.totalExpense)}</div><div class="k-lbl">إجمالي المصروفات التشغيلية</div></div>
+        <div class="kpi" style="background:${(o.netIncome || 0) >= 0 ? '#F6F8F5' : '#F6F8F5'}"><div class="k-num" style="color:${(o.netIncome || 0) >= 0 ? '#0E4D2E' : '#B3261E'}">${money(o.netIncome)}</div><div class="k-lbl">صافي الفائض / (العجز) المالي</div></div>
         <div class="kpi"><div class="k-num">${num(o.postedEntries)}</div><div class="k-lbl">قيود يومية مرحّلة</div></div>
         <div class="kpi"><div class="k-num">${num(o.draftEntries)}</div><div class="k-lbl">قيود مسودة قيد المراجعة</div></div>
       </div>
@@ -182,16 +182,16 @@
             <button class="btn sm" data-act="fin-go-rep" data-r="is">قائمة الدخل التفصيلية</button>
           </div>
           <div style="margin-bottom:12px">
-            <div class="spread" style="font-size:13px;margin-bottom:4px"><span>إجمالي الإيرادات</span><b style="color:#16a34a">${money(rev)}</b></div>
-            <div style="height:12px;background:#e2e8f0;border-radius:99px;overflow:hidden"><div style="width:${revPct}%;height:100%;background:linear-gradient(90deg,#16a34a,#22c55e)"></div></div>
+            <div class="spread" style="font-size:13px;margin-bottom:4px"><span>إجمالي الإيرادات</span><b style="color:#1B7F4B">${money(rev)}</b></div>
+            <div style="height:12px;background:#DCE3DD;border-radius:99px;overflow:hidden"><div style="width:${revPct}%;height:100%;background:linear-gradient(90deg,#1B7F4B,#1B7F4B)"></div></div>
           </div>
           <div style="margin-bottom:12px">
-            <div class="spread" style="font-size:13px;margin-bottom:4px"><span>إجمالي المصروفات</span><b style="color:#dc2626">${money(exp)}</b></div>
-            <div style="height:12px;background:#e2e8f0;border-radius:99px;overflow:hidden"><div style="width:${expPct}%;height:100%;background:linear-gradient(90deg,#dc2626,#ef4444)"></div></div>
+            <div class="spread" style="font-size:13px;margin-bottom:4px"><span>إجمالي المصروفات</span><b style="color:#B3261E">${money(exp)}</b></div>
+            <div style="height:12px;background:#DCE3DD;border-radius:99px;overflow:hidden"><div style="width:${expPct}%;height:100%;background:linear-gradient(90deg,#B3261E,#B3261E)"></div></div>
           </div>
           <div style="border-top:1px solid var(--bd);padding-top:10px;display:flex;justify-content:space-between;align-items:center">
             <span class="mut">صافي النتيجة المالية للفترة:</span>
-            <strong style="font-size:16px;color:${(o.netIncome || 0) >= 0 ? '#15803d' : '#b91c1c'}">${money(o.netIncome)}</strong>
+            <strong style="font-size:16px;color:${(o.netIncome || 0) >= 0 ? '#0E4D2E' : '#B3261E'}">${money(o.netIncome)}</strong>
           </div>
         </div>
 
@@ -289,7 +289,7 @@
           ${filtered.map((a) => {
             const depth = Math.max(0, String(a.code).length - 1);
             const isHeader = String(a.code).length <= 2;
-            return `<tr style="${isHeader ? 'background:#f8fafc;font-weight:700' : ''}">
+            return `<tr style="${isHeader ? 'background:#F6F8F5;font-weight:700' : ''}">
               <td><code>${esc(a.code)}</code></td>
               <td style="padding-inline-start:${depth * 14 + 10}px">${isHeader ? '📂 ' : '📄 '}<b>${esc(a.name)}</b></td>
               <td>${badge(TYPE_LBL, a.type)}</td>
@@ -362,7 +362,7 @@
             <td>
               <b>${esc(e.description)}</b>
               <div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px">
-                ${(e.lines || []).map((l) => `<span style="font-size:11px;background:#f1f5f9;padding:2px 6px;border-radius:4px"><code>${esc(l.accountCode)}</code> ${esc(l.accountName)}: ${l.debit > 0 ? `<b style="color:#0284c7">مدين ${money(l.debit)}</b>` : `<b style="color:#0d9488">دائن ${money(l.credit)}</b>`}</span>`).join('')}
+                ${(e.lines || []).map((l) => `<span style="font-size:11px;background:#F6F8F5;padding:2px 6px;border-radius:4px"><code>${esc(l.accountCode)}</code> ${esc(l.accountName)}: ${l.debit > 0 ? `<b style="color:#0A5A4D">مدين ${money(l.debit)}</b>` : `<b style="color:#0d9488">دائن ${money(l.credit)}</b>`}</span>`).join('')}
               </div>
             </td>
             <td><b>${money(e.totalDebit)}</b></td>
@@ -429,7 +429,7 @@
               <td>${esc(i.issueDay)}</td>
               <td><b>${money(i.total)}</b></td>
               <td>${money(i.paidAmount)}</td>
-              <td style="color:${i.total - i.paidAmount > 0 ? '#dc2626' : '#16a34a'}"><b>${money(i.total - i.paidAmount)}</b></td>
+              <td style="color:${i.total - i.paidAmount > 0 ? '#B3261E' : '#1B7F4B'}"><b>${money(i.total - i.paidAmount)}</b></td>
               <td>${badge(INV_ST, i.status)}</td>
               <td>
                 ${i.status === 'draft' && can('finance:entry') ? `<button class="btn pri sm" data-act="fin-iss-inv" data-id="${i.id}">إصدار وترحيل</button>` : ''}
@@ -508,21 +508,21 @@
           <h3 style="margin-top:0">📊 قائمة الدخل (الأرباح والخسائر - Income Statement)</h3>
           <div class="grid2">
             <div>
-              <h4 style="color:#16a34a">الإيرادات التشغيلية والأكاديمية</h4>
+              <h4 style="color:#1B7F4B">الإيرادات التشغيلية والأكاديمية</h4>
               <table class="tbl"><thead><tr><th>الرمز</th><th>الحساب</th><th>المبلغ</th></tr></thead><tbody>
                 ${is.revenues.map((x) => `<tr><td><code>${esc(x.code)}</code></td><td>${esc(x.name)}</td><td><b>${money(x.amount)}</b></td></tr>`).join('') || '<tr><td colspan="3" class="empty">لا توجد إيرادات</td></tr>'}
               </tbody><tfoot><tr><th colspan="2">إجمالي الإيرادات</th><th>${money(is.totalRevenue)}</th></tr></tfoot></table>
             </div>
             <div>
-              <h4 style="color:#dc2626">المصروفات والأعباء التشغيلية</h4>
+              <h4 style="color:#B3261E">المصروفات والأعباء التشغيلية</h4>
               <table class="tbl"><thead><tr><th>الرمز</th><th>الحساب</th><th>المبلغ</th></tr></thead><tbody>
                 ${is.expenses.map((x) => `<tr><td><code>${esc(x.code)}</code></td><td>${esc(x.name)}</td><td><b>${money(x.amount)}</b></td></tr>`).join('') || '<tr><td colspan="3" class="empty">لا توجد مصروفات</td></tr>'}
               </tbody><tfoot><tr><th colspan="2">إجمالي المصروفات</th><th>${money(is.totalExpense)}</th></tr></tfoot></table>
             </div>
           </div>
-          <div style="margin-top:14px;padding:12px 16px;background:#f8fafc;border:1px solid var(--bd);border-radius:8px" class="spread">
+          <div style="margin-top:14px;padding:12px 16px;background:#F6F8F5;border:1px solid var(--bd);border-radius:8px" class="spread">
             <strong>صافي الفائض / (العجز) عن الفترة المالية:</strong>
-            <strong style="font-size:18px;color:${is.netIncome >= 0 ? '#15803d' : '#b91c1c'}">${money(is.netIncome)}</strong>
+            <strong style="font-size:18px;color:${is.netIncome >= 0 ? '#0E4D2E' : '#B3261E'}">${money(is.netIncome)}</strong>
           </div>
         </div>
       ` : r === 'bs' ? `
@@ -533,13 +533,13 @@
           </div>
           <div class="grid2">
             <div>
-              <h4 style="color:#0284c7">الأصول (الموجودات)</h4>
+              <h4 style="color:#0A5A4D">الأصول (الموجودات)</h4>
               <table class="tbl"><thead><tr><th>الرمز</th><th>الحساب</th><th>الرصيد</th></tr></thead><tbody>
                 ${bs.assets.rows.map((x) => `<tr><td><code>${esc(x.code)}</code></td><td>${esc(x.name)}</td><td><b>${money(x.amount)}</b></td></tr>`).join('')}
               </tbody><tfoot><tr><th colspan="2">إجمالي الأصول</th><th>${money(bs.assets.total)}</th></tr></tfoot></table>
             </div>
             <div>
-              <h4 style="color:#d97706">الخصوم وحقوق الملكية (المطاليب)</h4>
+              <h4 style="color:#8A6A1B">الخصوم وحقوق الملكية (المطاليب)</h4>
               <table class="tbl"><thead><tr><th>الرمز</th><th>الحساب</th><th>الرصيد</th></tr></thead><tbody>
                 ${bs.liabilities.rows.map((x) => `<tr><td><code>${esc(x.code)}</code></td><td>${esc(x.name)} (خصوم)</td><td><b>${money(x.amount)}</b></td></tr>`).join('')}
                 ${bs.equity.rows.map((x) => `<tr><td><code>${esc(x.code)}</code></td><td>${esc(x.name)} (ملكية)</td><td><b>${money(x.amount)}</b></td></tr>`).join('')}
@@ -567,7 +567,7 @@
           <h3 style="margin-top:0">💵 دفتر الصندوق والمصرف — إجمالي السيولة المتاحة: ${money(cb.grandTotal)}</h3>
           ${cb.accounts.map((c) => `
             <div style="margin-bottom:14px">
-              <h4><code>${esc(c.account.code)}</code> ${esc(c.account.name)} — الرصيد: <span style="color:#0284c7">${money(c.closingBalance)}</span></h4>
+              <h4><code>${esc(c.account.code)}</code> ${esc(c.account.name)} — الرصيد: <span style="color:#0A5A4D">${money(c.closingBalance)}</span></h4>
               <div class="tbl-wrap"><table class="tbl"><thead><tr><th>التاريخ</th><th>القيد</th><th>البيان</th><th>مقبوضات (مدين)</th><th>مدفوعات (دائن)</th><th>الرصيد</th></tr></thead><tbody>
                 ${c.rows.map((x) => `<tr><td>${esc(x.entry_day)}</td><td><code>${esc(x.no)}</code></td><td>${esc(x.memo || x.description)}</td><td>${money(x.debit)}</td><td>${money(x.credit)}</td><td><b>${money(x.balance)}</b></td></tr>`).join('') || '<tr><td colspan="6" class="empty">لا توجد حركات</td></tr>'}
               </tbody></table></div>
@@ -589,7 +589,7 @@
             <button class="btn pri sm" data-act="fin-load-ps">عرض كشف الحساب</button>
           </div>
           ${F.ps ? `
-            <p><b>الطرف:</b> ${esc(F.ps.party.name)} · <b>إجمالي الفواتير:</b> ${money(F.ps.totalInvoiced)} · <b>إجمالي الدفعات:</b> ${money(F.ps.totalVoucher)} · <b>الرصيد المستحق:</b> <span style="color:#dc2626">${money(F.ps.outstanding)}</span></p>
+            <p><b>الطرف:</b> ${esc(F.ps.party.name)} · <b>إجمالي الفواتير:</b> ${money(F.ps.totalInvoiced)} · <b>إجمالي الدفعات:</b> ${money(F.ps.totalVoucher)} · <b>الرصيد المستحق:</b> <span style="color:#B3261E">${money(F.ps.outstanding)}</span></p>
           ` : '<div class="empty">اختر طرفاً مالياً لعرض كشف حسابه</div>'}
         </div>
       `}`;
@@ -602,11 +602,11 @@
     return `
       <div class="kpis" style="margin-bottom:14px">
         <div class="kpi"><div class="k-num">${num(o.invoicesCount)}</div><div class="k-lbl">فواتير الرسوم الطلابية</div></div>
-        <div class="kpi"><div class="k-num" style="color:#0284c7">${money(o.totalBilled)}</div><div class="k-lbl">صافي الرسوم المفوترة</div></div>
-        <div class="kpi"><div class="k-num" style="color:#16a34a">${money(o.totalCollected)}</div><div class="k-lbl">إجمالي المحصّل الفعلي</div></div>
-        <div class="kpi"><div class="k-num" style="color:#dc2626">${money(o.totalRemaining)}</div><div class="k-lbl">الذمم الطلابية المتبقية</div></div>
+        <div class="kpi"><div class="k-num" style="color:#0A5A4D">${money(o.totalBilled)}</div><div class="k-lbl">صافي الرسوم المفوترة</div></div>
+        <div class="kpi"><div class="k-num" style="color:#1B7F4B">${money(o.totalCollected)}</div><div class="k-lbl">إجمالي المحصّل الفعلي</div></div>
+        <div class="kpi"><div class="k-num" style="color:#B3261E">${money(o.totalRemaining)}</div><div class="k-lbl">الذمم الطلابية المتبقية</div></div>
         <div class="kpi"><div class="k-num">${o.collectionRate || 0}%</div><div class="k-lbl">نسبة التحصيل الأكاديمي</div></div>
-        <div class="kpi"><div class="k-num" style="color:#d97706">${num(o.overdueCount)}</div><div class="k-lbl">أقساط متأخرة السداد</div></div>
+        <div class="kpi"><div class="k-num" style="color:#8A6A1B">${num(o.overdueCount)}</div><div class="k-lbl">أقساط متأخرة السداد</div></div>
       </div>
 
       <div class="card" style="margin-bottom:14px;padding:12px 16px">
@@ -648,8 +648,8 @@
               <td>${money(i.totalAmount)}</td>
               <td>${money(i.discountAmount)}</td>
               <td><b>${money(i.netAmount)}</b></td>
-              <td style="color:#16a34a">${money(i.paidAmount)}</td>
-              <td style="color:${i.netAmount - i.paidAmount > 0 ? '#dc2626' : '#16a34a'}"><b>${money(i.netAmount - i.paidAmount)}</b></td>
+              <td style="color:#1B7F4B">${money(i.paidAmount)}</td>
+              <td style="color:${i.netAmount - i.paidAmount > 0 ? '#B3261E' : '#1B7F4B'}"><b>${money(i.netAmount - i.paidAmount)}</b></td>
               <td>${badge(INV_STATUS, i.status)}</td>
               <td>
                 <button class="btn sm" data-act="fin-view-stu-inv" data-id="${i.id}">الأقساط</button>
@@ -692,7 +692,7 @@
         <div class="card">
           <h3 style="margin-top:0">⚠️ الأقساط الطلابية المستحقة المتأخرة</h3>
           <div class="tbl-wrap"><table class="tbl"><thead><tr><th>الفاتورة</th><th>الطالب</th><th>القسط</th><th>تاريخ الاستحقاق</th><th>قيمة القسط</th><th>المدفوع</th><th>المتبقي</th></tr></thead><tbody>
-            ${F.overdue.map((x) => `<tr><td><code>${esc(x.invoiceNo)}</code></td><td><b>${esc(x.studentName)}</b> (${esc(x.studentNo || '')})</td><td>#${x.seq}</td><td>${esc(x.dueDay)}</td><td>${money(x.amount)}</td><td>${money(x.paidAmount)}</td><td><b style="color:#dc2626">${money(x.amount - x.paidAmount)}</b></td></tr>`).join('') || '<tr><td colspan="7" class="empty">لا توجد أقساط متأخرة</td></tr>'}
+            ${F.overdue.map((x) => `<tr><td><code>${esc(x.invoiceNo)}</code></td><td><b>${esc(x.studentName)}</b> (${esc(x.studentNo || '')})</td><td>#${x.seq}</td><td>${esc(x.dueDay)}</td><td>${money(x.amount)}</td><td>${money(x.paidAmount)}</td><td><b style="color:#B3261E">${money(x.amount - x.paidAmount)}</b></td></tr>`).join('') || '<tr><td colspan="7" class="empty">لا توجد أقساط متأخرة</td></tr>'}
           </tbody></table></div>
         </div>
       `}`;
@@ -1218,7 +1218,7 @@
       else if (act === 'fin-preview-payroll') {
         const p = await api('GET', `/api/finance/payroll-preview?month=${encodeURIComponent(b.dataset.month)}`);
         showModal(`<h3>رواتب شهر ${esc(p.month)}</h3>
-          <p>الإجمالي: <b>${money(p.total)}</b> · الموظفون: <b>${num(p.rows.length)}</b>${p.missing.length ? ` · <span style="color:#dc2626">بلا راتب مسجل: ${num(p.missing.length)}</span>` : ''}</p>
+          <p>الإجمالي: <b>${money(p.total)}</b> · الموظفون: <b>${num(p.rows.length)}</b>${p.missing.length ? ` · <span style="color:#B3261E">بلا راتب مسجل: ${num(p.missing.length)}</span>` : ''}</p>
           <div class="tbl-wrap"><table class="tbl"><thead><tr><th>الرقم</th><th>الموظف</th><th>الراتب</th></tr></thead><tbody>
             ${p.rows.map((x) => `<tr><td><code>${esc(x.employeeNo)}</code></td><td>${esc(x.name)}</td><td>${money(x.amount)}</td></tr>`).join('') || '<tr><td colspan="3" class="empty">لا توجد رواتب مسجلة</td></tr>'}
           </tbody></table></div>

@@ -110,15 +110,15 @@
           <small>متقدمو المفاضلة المقبولون</small>
           <b>${k.acceptedApplicants} <span class="small" style="font-weight:normal">/ ${k.totalApplicants}</span></b>
         </div>
-        <div class="stat" style="border-inline-start:4px solid #356C8A">
+        <div class="stat" style="border-inline-start:4px solid #0A5A4D">
           <small>مقررات معادلة معتمدة</small>
           <b>${k.approvedEquivalences}</b>
         </div>
-        <div class="stat" style="border-inline-start:4px solid #D97706">
+        <div class="stat" style="border-inline-start:4px solid #8A6A1B">
           <small>إنذارات أكاديمية قيد المتابعة</small>
           <b>${k.activeWarnings}</b>
         </div>
-        <div class="stat" style="border-inline-start:4px solid #7C3AED">
+        <div class="stat" style="border-inline-start:4px solid #0A5A4D">
           <small>حركات قيد وانضباط</small>
           <b>${k.lifecycleMovementsCount} <span class="small" style="font-weight:normal">(${k.activeHoldsCount} حجب)</span></b>
         </div>
@@ -126,7 +126,7 @@
           <small>المنح والإعفاءات الفعالة</small>
           <b>${k.activeScholarshipsCount} <span class="small" style="font-weight:normal">(${nf.format(k.totalScholarshipAmount)} ل.س)</span></b>
         </div>
-        <div class="stat" style="border-inline-start:4px solid #10B981">
+        <div class="stat" style="border-inline-start:4px solid #1B7F4B">
           <small>تذاكر الدور الذكي النشطة</small>
           <b>${k.servingTicketsCount + k.waitingTicketsCount} <span class="small" style="font-weight:normal">(${k.servingTicketsCount} يُخدم الآن)</span></b>
         </div>
@@ -319,10 +319,10 @@
     const atRisk = d.advising.autoDetectedAtRisk || [];
 
     const stateMeta = {
-      completed: { badge: 'منجز بنجاح ✅', cls: 'p-approved', border: '#10B981', bg: 'rgba(16,185,129,0.08)' },
-      in_progress: { badge: 'مسجل حالياً 📘', cls: 'p-review', border: '#3B82F6', bg: 'rgba(59,130,246,0.08)' },
+      completed: { badge: 'منجز بنجاح ✅', cls: 'p-approved', border: '#1B7F4B', bg: 'rgba(27,127,75,0.08)' },
+      in_progress: { badge: 'مسجل حالياً 📘', cls: 'p-review', border: '#0A5A4D', bg: 'rgba(59,130,246,0.08)' },
       available: { badge: 'متاح للتسجيل 🔓', cls: 'p-approved', border: '#D5B65D', bg: 'rgba(213,182,93,0.10)' },
-      locked: { badge: 'محجوب بمتطلب سابق 🔒', cls: 'p-rejected', border: '#EF4444', bg: 'rgba(239,68,68,0.06)' },
+      locked: { badge: 'محجوب بمتطلب سابق 🔒', cls: 'p-rejected', border: '#B3261E', bg: 'rgba(239,68,68,0.06)' },
     };
 
     const warnTypeLabel = {
@@ -354,7 +354,7 @@
             <div class="stat"><small>محجوب بمتطلب 🔒</small><b>${sm.lockedCount || 0} مقرر (${sm.lockedHours || 0} س)</b></div>
           </div>
 
-          ${UA.can('course:manage') || UA.can('sa_advising:edit') ? `<form id="sa-link-form" class="inline-form" style="margin-bottom:14px;padding:12px;background:var(--surface2,#f8fafc);border:1px solid var(--line,#e2e8f0);border-radius:10px;gap:10px;align-items:flex-end">
+          ${UA.can('course:manage') || UA.can('sa_advising:edit') ? `<form id="sa-link-form" class="inline-form" style="margin-bottom:14px;padding:12px;background:var(--surface2,#F6F8F5);border:1px solid var(--line,#DCE3DD);border-radius:10px;gap:10px;align-items:flex-end">
             <label style="flex:2;min-width:200px">المقرر<select id="sa-link-course" data-no-other="1" required>${tree.nodes.map((n) => `<option value="${n.id}">${esc(n.code)} — ${esc(n.name)} (س${n.level})</option>`).join('')}</select></label>
             <label style="flex:2;min-width:200px">يتطلب اجتياز<select id="sa-link-prereq" data-no-other="1" required>${tree.nodes.map((n) => `<option value="${n.id}">${esc(n.code)} — ${esc(n.name)} (س${n.level})</option>`).join('')}</select></label>
             <label style="width:110px">علامة الاجتياز<input id="sa-link-mark" type="number" min="0" max="100"></label>
@@ -385,7 +385,7 @@
                           ? `<span style="color:#0E6655">✓ المتطلب السابق مجتاز (${esc(n.prerequisites.map((p) => p.name).join('، '))})</span>`
                           : '<span class="hint">بدون متطلب سابق — متاح</span>'
                       }
-                      ${n.prerequisites.length ? `<div style="margin-top:6px">يتطلب: ${n.prerequisites.map((p) => `<span class="pill" style="font-size:11px">${esc(p.code)} (${p.minMark}%)${UA.can('course:manage') || UA.can('sa_advising:edit') ? ` <button type="button" class="link" data-act="sa-unlink" data-id="${p.linkId}" aria-label="إزالة الربط" style="color:#b91c1c;font-weight:700">×</button>` : ''}</span>`).join(' ')}</div>` : ''}
+                      ${n.prerequisites.length ? `<div style="margin-top:6px">يتطلب: ${n.prerequisites.map((p) => `<span class="pill" style="font-size:11px">${esc(p.code)} (${p.minMark}%)${UA.can('course:manage') || UA.can('sa_advising:edit') ? ` <button type="button" class="link" data-act="sa-unlink" data-id="${p.linkId}" aria-label="إزالة الربط" style="color:#B3261E;font-weight:700">×</button>` : ''}</span>`).join(' ')}</div>` : ''}
                       ${n.unlocks.length ? `<div style="margin-top:4px">يفتح: ${n.unlocks.map((u) => `<span class="mono small">${esc(u.code)}</span>`).join('، ')}</div>` : ''}
                     </div>
                   </article>
@@ -402,7 +402,7 @@
 
           ${
             atRisk.length
-              ? `<div class="reason" style="margin-bottom:14px;background:rgba(217,119,6,0.1);border-color:#D97706;color:inherit">
+              ? `<div class="reason" style="margin-bottom:14px;background:rgba(217,119,6,0.1);border-color:#8A6A1B;color:inherit">
                   <b>⚠️ رصد آلي من سجل العلامات (${d.advising.atRiskTotal ?? atRisk.length} طالباً بحاجة لمتابعة إرشادية${(d.advising.atRiskTotal ?? 0) > atRisk.length ? `؛ يُعرض أضعف ${atRisk.length}` : ''}):</b>
                   <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">
                     ${atRisk.map((r) => `<span class="pill p-review">${esc(r.name)} (${esc(r.studentNo)}) · المعدل: ${r.gpa ?? '—'}% · راسب: ${r.failedCount}</span>`).join('')}
@@ -505,7 +505,7 @@
               <option value="withdrawal">انسحاب نهائي وطي قيد</option>
             </select></label>
             <label>البرنامج الجديد (عند التحويل)<select id="sa-mov-prog">${progs.map((p) => `<option value="${p.id}">${esc(p.faculty)} — ${esc(p.name)}</option>`).join('')}</select></label>
-            <label>رقم القرار الإداري<input id="sa-mov-dec" placeholder="قرار مجلس كلية #450"></label>
+            <label>رقم القرار الإداري<input id="sa-mov-dec" placeholder="قرار مجلس كلية #0E4D2E"></label>
             <label class="wide">السبب الموثق<input id="sa-mov-reason" placeholder="مثال: ظروف صحية موثقة / رغبة الطالب بالتحويل واستيفاء شرط المعدل"></label>
             <button class="btn pri" type="button" data-act="sa-exec-movement" data-testid="sa-exec-movement-btn">تنفيذ الحركة وتحديث قيد الطالب فوراً</button>
           </div>

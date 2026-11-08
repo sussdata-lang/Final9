@@ -27,13 +27,13 @@
     if (!origCorrView) return '<section class="card"><p class="hint">الديوان والمراسلات</p></section>';
     return (origCorrView() || '')
       .replace(/<div class="sub-tabs[^"]*"[^>]*>[\s\S]*?<\/div>/, '')
-      .replace(/<section class="card no-print"[^>]*background:linear-gradient\(135deg,#0f172a[\s\S]*?<\/section>/, '');
+      .replace(/<section class="card no-print"[^>]*background:linear-gradient\(135deg,#10211D[\s\S]*?<\/section>/, '');
   }
 
   function getCleanInternalHtml() {
     if (!origInternalView) return '<section class="card"><p class="hint">بوابة الطلبات الداخلية</p></section>';
     return (origInternalView() || '')
-      .replace(/<section class="card no-print"[^>]*background:linear-gradient\(135deg,#0f172a[\s\S]*?<\/section>/, '');
+      .replace(/<section class="card no-print"[^>]*background:linear-gradient\(135deg,#10211D[\s\S]*?<\/section>/, '');
   }
 
   function renderUnifiedCorrespondenceHub() {
@@ -91,7 +91,7 @@
       <section class="card no-print" style="margin-bottom:14px;background:linear-gradient(135deg,#054239 0%,#0f332d 100%);color:#fff;border:1px solid #115e59;padding:18px;border-radius:14px">
         <div class="spread" style="flex-wrap:wrap;gap:12px;margin-bottom:14px">
           <div>
-            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(213,182,93,.2);color:#fde047;border:1px solid rgba(213,182,93,.4);padding:2px 10px;border-radius:20px;font-size:11.5px;font-weight:700">
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(213,182,93,.2);color:#C9A24B;border:1px solid rgba(213,182,93,.4);padding:2px 10px;border-radius:20px;font-size:11.5px;font-weight:700">
               <span>🏛️ المنظومة الإدارية الموحدة</span> · <span>CORRESPONDENCE & INTERNAL REQUESTS HUB</span>
             </div>
             <h1 style="margin:6px 0 2px;font-size:20px;font-weight:800;color:#fff">الديوان والمراسلات والطلبات والمعاملات الداخلية</h1>
@@ -106,20 +106,20 @@
 
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px">
           <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:10px 14px">
-            <div style="font-size:11.5px;color:#cbd5e1">المراسلات والكتب الرسمية</div>
+            <div style="font-size:11.5px;color:#DCE3DD">المراسلات والكتب الرسمية</div>
             <div style="font-size:20px;font-weight:800;color:#fff">${allDocs.length} <small style="font-size:11px;font-weight:400">كتاباً</small></div>
           </div>
           <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:10px 14px">
-            <div style="font-size:11.5px;color:#cbd5e1">الطلبات والمعاملات الداخلية</div>
+            <div style="font-size:11.5px;color:#DCE3DD">الطلبات والمعاملات الداخلية</div>
             <div style="font-size:20px;font-weight:800;color:#fff">${intList.length} <small style="font-size:11px;font-weight:400">طلباً</small></div>
           </div>
-          <div style="background:${totalPendingItems ? 'rgba(245,158,11,.22)' : 'rgba(255,255,255,.07)'};border:1px solid ${totalPendingItems ? '#f59e0b' : 'rgba(255,255,255,.12)'};border-radius:10px;padding:10px 14px">
-            <div style="font-size:11.5px;color:#fde68a;font-weight:700">بانتظار توقيعك وموافقتك الآن</div>
-            <div style="font-size:20px;font-weight:800;color:#fbbf24">${totalPendingItems} <small style="font-size:11px;font-weight:400">معاملة</small></div>
+          <div style="background:${totalPendingItems ? 'rgba(245,158,11,.22)' : 'rgba(255,255,255,.07)'};border:1px solid ${totalPendingItems ? '#C9A24B' : 'rgba(255,255,255,.12)'};border-radius:10px;padding:10px 14px">
+            <div style="font-size:11.5px;color:#E6CB84;font-weight:700">بانتظار توقيعك وموافقتك الآن</div>
+            <div style="font-size:20px;font-weight:800;color:#C9A24B">${totalPendingItems} <small style="font-size:11px;font-weight:400">معاملة</small></div>
           </div>
           <div style="background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.35);border-radius:10px;padding:10px 14px">
-            <div style="font-size:11.5px;color:#bbf7d0">الصادرة والمعتمدة رسمياً</div>
-            <div style="font-size:20px;font-weight:800;color:#4ade80">${allDocs.filter((d) => d.status === 'approved').length + intList.filter((r) => r.status === 'approved').length}</div>
+            <div style="font-size:11.5px;color:#A8D8BE">الصادرة والمعتمدة رسمياً</div>
+            <div style="font-size:20px;font-weight:800;color:#1B7F4B">${allDocs.filter((d) => d.status === 'approved').length + intList.filter((r) => r.status === 'approved').length}</div>
           </div>
         </div>
       </section>`;
@@ -128,7 +128,7 @@
     if (tab === 'pending_all') {
       const docRows = myTurnDocs.map((d) => `<tr>
         <td class="mono"><b>${esc(d.no || d.code || `COR-${d.id}`)}</b></td>
-        <td><b>${esc(d.title)}</b><div class="small" style="color:#64748b">من: ${esc(d.creator?.name || d.author?.name || 'زميل')} · ${fmt(d.createdAt)}</div></td>
+        <td><b>${esc(d.title)}</b><div class="small" style="color:#566660">من: ${esc(d.creator?.name || d.author?.name || 'زميل')} · ${fmt(d.createdAt)}</div></td>
         <td><span class="pill p-review">${esc(d.typeLabel || 'كتاب رسمي')}</span></td>
         <td><span class="pill p-review">دورك في التوقيع الآن</span></td>
         <td style="white-space:nowrap">
@@ -138,7 +138,7 @@
 
       const reqRows = myUnitPendingReqs.map((r) => `<tr>
         <td class="mono"><b>${esc(r.no)}</b></td>
-        <td><b>${esc(r.service?.label || 'طلب خدمة')}</b><div class="small" style="color:#64748b">مقدم من: ${esc(r.student?.name || r.requester?.name || 'موظف')} · ${fmt(r.createdAt)}</div></td>
+        <td><b>${esc(r.service?.label || 'طلب خدمة')}</b><div class="small" style="color:#566660">مقدم من: ${esc(r.student?.name || r.requester?.name || 'موظف')} · ${fmt(r.createdAt)}</div></td>
         <td>${r.unit ? esc(r.unit.name) : 'الوحدة المركزية'}</td>
         <td><span class="pill p-review">قيد المراجعة</span></td>
         <td style="white-space:nowrap">

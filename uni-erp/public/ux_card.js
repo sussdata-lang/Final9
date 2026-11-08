@@ -108,12 +108,12 @@
         </h2>
         <span style="background:#054239;color:#D5B65D;font-weight:800;font-size:11px;padding:3px 9px;border-radius:6px;font-family:monospace">ميزة #6 المحدثة والمطورة</span>
       </div>
-      <p class="sub" style="margin-top:0;color:#64748b;font-size:13px">إصدار وتصديق البطاقة الجامعية الذكية مع تكويد باركود فريد مشفر مضاد للتزوير وربط مباشر بسجل حركات التحقق (Check-in/Check-out) اللحظي عبر بوابات الحرم الجامعي.</p>
+      <p class="sub" style="margin-top:0;color:#566660;font-size:13px">إصدار وتصديق البطاقة الجامعية الذكية مع تكويد باركود فريد مشفر مضاد للتزوير وربط مباشر بسجل حركات التحقق (Check-in/Check-out) اللحظي عبر بوابات الحرم الجامعي.</p>
 
       <div class="inline-form" style="gap:12px;margin-bottom:16px;align-items:flex-end;flex-wrap:wrap">
         <label style="flex:1;min-width:240px">اختر الطالب لإصدار وتصديق بطاقته وعرض سجل نشاطه
           <input id="digicard-stu" data-student-picker value="${esc(st.studentNo)}" placeholder="اكتب اسم الطالب أو رقمه الجامعي" style="width:100%">
-          <small class="sp-name" style="display:block;margin-top:3px;color:var(--muted,#64748b);font-weight:600">👤 ${esc(st.name)}</small>
+          <small class="sp-name" style="display:block;margin-top:3px;color:var(--muted,#566660);font-weight:600">👤 ${esc(st.name)}</small>
         </label>
         ${UA.cardPrintModeHtml ? UA.cardPrintModeHtml() : ''}
         <button class="btn pri" type="button" data-act="printdigicard" style="height:38px;padding:0 18px">🖨️ طباعة البطاقة الذكية الرسمية</button>
@@ -125,23 +125,23 @@
       <!-- ==========================================================================
            واجهة سجل نشاط البطاقة الرقمية (Check-in / Check-out Activity Log)
            ========================================================================== -->
-      <div style="margin-top:24px;border-top:2px solid #e2e8f0;padding-top:20px" id="card-activity-log-interface">
+      <div style="margin-top:24px;border-top:2px solid #DCE3DD;padding-top:20px" id="card-activity-log-interface">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px">
           <div>
             <h3 style="margin:0;display:flex;align-items:center;gap:8px;font-size:16px;color:#042f28">
               <span>📋 سجل نشاط وحركات التحقق من البطاقة الرقمية (NFC / Barcode Activity & Gate Pass Log)</span>
             </h3>
-            <p style="margin:4px 0 0;font-size:12.5px;color:#64748b">تتبع وتوثيق عمليات التحقق الميداني (Check-in / Check-out) عبر بوابات الحرم الجامعي وقاعات الامتحانات والمكتبة.</p>
+            <p style="margin:4px 0 0;font-size:12.5px;color:#566660">تتبع وتوثيق عمليات التحقق الميداني (Check-in / Check-out) عبر بوابات الحرم الجامعي وقاعات الامتحانات والمكتبة.</p>
           </div>
           <div>
             ${isCurrentlyCheckedIn ? `
-              <span style="display:inline-flex;align-items:center;gap:6px;background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;padding:5px 12px;border-radius:99px;font-size:12px;font-weight:700">
-                <span style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block"></span>
+              <span style="display:inline-flex;align-items:center;gap:6px;background:#F6F8F5;color:#054239;border:1px solid #a7f3d0;padding:5px 12px;border-radius:99px;font-size:12px;font-weight:700">
+                <span style="width:8px;height:8px;border-radius:50%;background:#1B7F4B;display:inline-block"></span>
                 الحالة الحالية: متواجد داخل الحرم الجامعي
               </span>
             ` : `
-              <span style="display:inline-flex;align-items:center;gap:6px;background:#f8fafc;color:#475569;border:1px solid #cbd5e1;padding:5px 12px;border-radius:99px;font-size:12px;font-weight:700">
-                <span style="width:8px;height:8px;border-radius:50%;background:#94a3b8;display:inline-block"></span>
+              <span style="display:inline-flex;align-items:center;gap:6px;background:#F6F8F5;color:#566660;border:1px solid #DCE3DD;padding:5px 12px;border-radius:99px;font-size:12px;font-weight:700">
+                <span style="width:8px;height:8px;border-radius:50%;background:#8B9591;display:inline-block"></span>
                 الحالة الحالية: خارج الحرم الجامعي (مغادر)
               </span>
             `}
@@ -151,55 +151,55 @@
         <!-- بطاقات مؤشرات آخر عمليات التحقق (Check-in / Check-out) -->
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-bottom:18px">
           <!-- آخر عملية دخول Check-in -->
-          <div style="background:#fff;border:1px solid #cbd5e1;border-inline-start:4px solid #10b981;border-radius:12px;padding:14px;box-shadow:0 2px 6px rgba(0,0,0,.03)">
+          <div style="background:#fff;border:1px solid #DCE3DD;border-inline-start:4px solid #1B7F4B;border-radius:12px;padding:14px;box-shadow:0 2px 6px rgba(0,0,0,.03)">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-              <span style="font-size:12px;font-weight:700;color:#065f46;display:flex;align-items:center;gap:6px">
-                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#10b981"></span>
+              <span style="font-size:12px;font-weight:700;color:#054239;display:flex;align-items:center;gap:6px">
+                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#1B7F4B"></span>
                 آخر عملية تحقق ودخول (Check-in)
               </span>
-              ${latestCheckIn ? `<span style="background:#ecfdf5;color:#065f46;font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px">${latestCheckIn.method === 'nfc' ? '📳 شريحة NFC' : '📷 باركود مشفر'}</span>` : ''}
+              ${latestCheckIn ? `<span style="background:#F6F8F5;color:#054239;font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px">${latestCheckIn.method === 'nfc' ? '📳 شريحة NFC' : '📷 باركود مشفر'}</span>` : ''}
             </div>
             ${latestCheckIn ? `
               <strong style="display:block;font-size:14px;color:#042f28;margin-bottom:4px">${esc(latestCheckIn.locationName)}</strong>
-              <div style="font-size:12px;color:#64748b;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+              <div style="font-size:12px;color:#566660;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
                 <span>🕒 <b>${latestInTime.timeStr}</b> (${latestInTime.rel})</span>
                 <span>•</span>
-                <span class="mono" style="font-size:11px;background:#f1f5f9;padding:1px 5px;border-radius:4px">${esc(latestCheckIn.terminalId)}</span>
+                <span class="mono" style="font-size:11px;background:#F6F8F5;padding:1px 5px;border-radius:4px">${esc(latestCheckIn.terminalId)}</span>
               </div>
             ` : `
-              <div style="color:#94a3b8;font-size:13px;padding:6px 0">لا توجد حركات دخول مسجلة مؤخراً</div>
+              <div style="color:#8B9591;font-size:13px;padding:6px 0">لا توجد حركات دخول مسجلة مؤخراً</div>
             `}
           </div>
 
           <!-- آخر عملية خروج Check-out -->
-          <div style="background:#fff;border:1px solid #cbd5e1;border-inline-start:4px solid #3b82f6;border-radius:12px;padding:14px;box-shadow:0 2px 6px rgba(0,0,0,.03)">
+          <div style="background:#fff;border:1px solid #DCE3DD;border-inline-start:4px solid #0A5A4D;border-radius:12px;padding:14px;box-shadow:0 2px 6px rgba(0,0,0,.03)">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-              <span style="font-size:12px;font-weight:700;color:#1e40af;display:flex;align-items:center;gap:6px">
-                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#3b82f6"></span>
+              <span style="font-size:12px;font-weight:700;color:#0A5A4D;display:flex;align-items:center;gap:6px">
+                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#0A5A4D"></span>
                 آخر عملية تحقق وخروج (Check-out)
               </span>
-              ${latestCheckOut ? `<span style="background:#eff6ff;color:#1e40af;font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px">${latestCheckOut.method === 'nfc' ? '📳 شريحة NFC' : '📷 باركود مشفر'}</span>` : ''}
+              ${latestCheckOut ? `<span style="background:#F6F8F5;color:#0A5A4D;font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px">${latestCheckOut.method === 'nfc' ? '📳 شريحة NFC' : '📷 باركود مشفر'}</span>` : ''}
             </div>
             ${latestCheckOut ? `
               <strong style="display:block;font-size:14px;color:#042f28;margin-bottom:4px">${esc(latestCheckOut.locationName)}</strong>
-              <div style="font-size:12px;color:#64748b;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+              <div style="font-size:12px;color:#566660;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
                 <span>🕒 <b>${latestOutTime.timeStr}</b> (${latestOutTime.rel})</span>
                 <span>•</span>
-                <span class="mono" style="font-size:11px;background:#f1f5f9;padding:1px 5px;border-radius:4px">${esc(latestCheckOut.terminalId)}</span>
+                <span class="mono" style="font-size:11px;background:#F6F8F5;padding:1px 5px;border-radius:4px">${esc(latestCheckOut.terminalId)}</span>
               </div>
             ` : `
-              <div style="color:#94a3b8;font-size:13px;padding:6px 0">لا توجد حركات خروج مسجلة مؤخراً</div>
+              <div style="color:#8B9591;font-size:13px;padding:6px 0">لا توجد حركات خروج مسجلة مؤخراً</div>
             `}
           </div>
 
           <!-- إحصائيات التوزيع والاعتماد -->
-          <div style="background:#fff;border:1px solid #cbd5e1;border-inline-start:4px solid #D5B65D;border-radius:12px;padding:14px;box-shadow:0 2px 6px rgba(0,0,0,.03)">
-            <small style="color:#64748b;font-size:12px">إجمالي حركات البطاقة والوسيلة</small>
+          <div style="background:#fff;border:1px solid #DCE3DD;border-inline-start:4px solid #D5B65D;border-radius:12px;padding:14px;box-shadow:0 2px 6px rgba(0,0,0,.03)">
+            <small style="color:#566660;font-size:12px">إجمالي حركات البطاقة والوسيلة</small>
             <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:2px">
               <strong style="font-size:19px;color:#042f28">${totalLogsCount} عملية تحقق</strong>
-              <span style="background:#fef3c7;color:#92400e;font-size:11px;font-weight:700;padding:2px 6px;border-radius:4px">100% مصرح</span>
+              <span style="background:#FBEBD0;color:#8A6A1B;font-size:11px;font-weight:700;padding:2px 6px;border-radius:4px">100% مصرح</span>
             </div>
-            <div style="margin-top:6px;font-size:11.5px;color:#475569;display:flex;justify-content:space-between">
+            <div style="margin-top:6px;font-size:11.5px;color:#566660;display:flex;justify-content:space-between">
               <span>📳 NFC: <b>${nfcPercent}%</b> (${nfcCount})</span>
               <span>📷 باركود: <b>${barcodePercent}%</b> (${barcodeCount})</span>
             </div>
@@ -207,10 +207,10 @@
         </div>
 
         <!-- منصة محاكاة وتمرير البطاقة اللحظي (Interactive Card Scan Console) -->
-        <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:12px;padding:14px;margin-bottom:18px">
+        <div style="background:#F6F8F5;border:1px solid #DCE3DD;border-radius:12px;padding:14px;margin-bottom:18px">
           <div style="font-size:13px;font-weight:800;color:#042f28;margin-bottom:8px;display:flex;align-items:center;gap:6px">
             <span>⚡ منصة التحقق وتمرير البطاقة الميداني اللحظي (Live Card Tap Simulator)</span>
-            <small style="font-weight:normal;color:#64748b;font-size:11.5px">تسجيل يدوي لحركة البطاقة على الخادم، ولا يتصل بقارئ فعلي</small>
+            <small style="font-weight:normal;color:#566660;font-size:11.5px">تسجيل يدوي لحركة البطاقة على الخادم، ولا يتصل بقارئ فعلي</small>
           </div>
           <div class="inline-form" style="gap:10px;align-items:flex-end;flex-wrap:wrap">
             <label style="flex:2;min-width:200px">موقع البوابة / المرفق الأكاديمي
@@ -233,10 +233,10 @@
               <button class="btn pri" type="button" data-act="simcardcheckin" style="height:38px;padding:0 14px;background:#059669;color:#fff;font-weight:700">
                 🟢 تسجيل دخول (Check-in)
               </button>
-              <button class="btn pri" type="button" data-act="simcardcheckout" style="height:38px;padding:0 14px;background:#2563eb;color:#fff;font-weight:700">
+              <button class="btn pri" type="button" data-act="simcardcheckout" style="height:38px;padding:0 14px;background:#0A5A4D;color:#fff;font-weight:700">
                 🔵 تسجيل خروج (Check-out)
               </button>
-              <button class="btn" type="button" data-act="simcarddenied" style="height:38px;padding:0 12px;color:#dc2626;border-color:#fca5a5" title="محاكاة محاولة دخول غير مصرحة">
+              <button class="btn" type="button" data-act="simcarddenied" style="height:38px;padding:0 12px;color:#B3261E;border-color:#F2B8B5" title="محاكاة محاولة دخول غير مصرحة">
                 ⚠️ تسجيل رفض
               </button>
             </div>
@@ -247,7 +247,7 @@
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px">
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;flex:1">
             <!-- فلتر نوع الحركة -->
-            <select data-act="cardfilterevent" style="padding:6px 10px;border-radius:6px;border:1px solid #cbd5e1;font-size:12.5px;background:#fff">
+            <select data-act="cardfilterevent" style="padding:6px 10px;border-radius:6px;border:1px solid #DCE3DD;font-size:12.5px;background:#fff">
               <option value="all" ${filterEvent === 'all' ? 'selected' : ''}>كافة العمليات (دخول وخروج)</option>
               <option value="check_in" ${filterEvent === 'check_in' ? 'selected' : ''}>🟢 عمليات الدخول (Check-in)</option>
               <option value="check_out" ${filterEvent === 'check_out' ? 'selected' : ''}>🔵 عمليات الخروج (Check-out)</option>
@@ -255,14 +255,14 @@
             </select>
 
             <!-- فلتر التقنية -->
-            <select data-act="cardfiltermethod" style="padding:6px 10px;border-radius:6px;border:1px solid #cbd5e1;font-size:12.5px;background:#fff">
+            <select data-act="cardfiltermethod" style="padding:6px 10px;border-radius:6px;border:1px solid #DCE3DD;font-size:12.5px;background:#fff">
               <option value="all" ${filterMethod === 'all' ? 'selected' : ''}>كافة الوسائل (NFC و باركود)</option>
               <option value="nfc" ${filterMethod === 'nfc' ? 'selected' : ''}>📳 شريحة NFC الذكية</option>
               <option value="barcode" ${filterMethod === 'barcode' ? 'selected' : ''}>📷 مسح الباركود المشفر</option>
             </select>
 
             <!-- فلتر الموقع -->
-            <select data-act="cardfilterloc" style="padding:6px 10px;border-radius:6px;border:1px solid #cbd5e1;font-size:12.5px;background:#fff">
+            <select data-act="cardfilterloc" style="padding:6px 10px;border-radius:6px;border:1px solid #DCE3DD;font-size:12.5px;background:#fff">
               <option value="all" ${filterLocation === 'all' ? 'selected' : ''}>كافة المواقع والمرافق</option>
               <option value="gates" ${filterLocation === 'gates' ? 'selected' : ''}>🏛️ بوابات الحرم الخارجية</option>
               <option value="library" ${filterLocation === 'library' ? 'selected' : ''}>📚 المكتبة المركزية</option>
@@ -270,7 +270,7 @@
             </select>
 
             <!-- حقل البحث الفوري -->
-            <input type="text" data-act="cardlogsearch" placeholder="بحث بالموقع، الجهاز، أو البصمة..." value="${esc(searchQ)}" style="padding:6px 10px;border-radius:6px;border:1px solid #cbd5e1;font-size:12.5px;min-width:180px;background:#fff">
+            <input type="text" data-act="cardlogsearch" placeholder="بحث بالموقع، الجهاز، أو البصمة..." value="${esc(searchQ)}" style="padding:6px 10px;border-radius:6px;border:1px solid #DCE3DD;font-size:12.5px;min-width:180px;background:#fff">
           </div>
 
           <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -284,10 +284,10 @@
         </div>
 
         <!-- جدول سجل نشاط وتحقق البطاقة -->
-        <div class="tbl-wrap" style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;background:#fff" id="printable-card-logs-table">
+        <div class="tbl-wrap" style="border:1px solid #DCE3DD;border-radius:10px;overflow:hidden;background:#fff" id="printable-card-logs-table">
           <table style="width:100%;border-collapse:collapse;margin:0">
             <thead>
-              <tr style="background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:12px;color:#475569">
+              <tr style="background:#F6F8F5;border-bottom:1px solid #DCE3DD;font-size:12px;color:#566660">
                 <th style="padding:10px 12px;text-align:start">التاريخ والوقت</th>
                 <th style="padding:10px 12px;text-align:start">نوع الحركة</th>
                 <th style="padding:10px 12px;text-align:start">الموقع / المرفق الأكاديمي</th>
@@ -305,57 +305,57 @@
                 const isCheckOut = log.eventType === 'check_out';
                 const isDenied = log.eventType === 'denied' || log.status === 'denied';
 
-                return `<tr style="border-bottom:1px solid #f1f5f9;font-size:12.5px;transition:background .15s">
+                return `<tr style="border-bottom:1px solid #F6F8F5;font-size:12.5px;transition:background .15s">
                   <td style="padding:10px 12px;white-space:nowrap">
                     <strong style="color:#042f28">${tInfo.timeStr}</strong>
-                    <div style="font-size:11px;color:#64748b">${tInfo.dateStr} <span style="color:#D5B65D;font-weight:700">(${tInfo.rel})</span></div>
+                    <div style="font-size:11px;color:#566660">${tInfo.dateStr} <span style="color:#D5B65D;font-weight:700">(${tInfo.rel})</span></div>
                   </td>
                   <td style="padding:10px 12px;white-space:nowrap">
                     ${isCheckIn ? `
-                      <span style="background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:4px">
+                      <span style="background:#F6F8F5;color:#054239;border:1px solid #a7f3d0;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:4px">
                         🟢 دخول (Check-in)
                       </span>
                     ` : isCheckOut ? `
-                      <span style="background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:4px">
+                      <span style="background:#F6F8F5;color:#0A5A4D;border:1px solid #BFD8CF;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:4px">
                         🔵 خروج (Check-out)
                       </span>
                     ` : `
-                      <span style="background:#fef2f2;color:#991b1b;border:1px solid #fecaca;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:4px">
+                      <span style="background:#F6F8F5;color:#B3261E;border:1px solid #F2B8B5;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:4px">
                         🔴 مرفوض (Denied)
                       </span>
                     `}
                   </td>
                   <td style="padding:10px 12px">
-                    <strong style="color:#0f172a;display:block">${esc(log.locationName)}</strong>
-                    <span class="mono" style="font-size:10.5px;color:#64748b">${esc(log.locationCode)}</span>
+                    <strong style="color:#10211D;display:block">${esc(log.locationName)}</strong>
+                    <span class="mono" style="font-size:10.5px;color:#566660">${esc(log.locationCode)}</span>
                   </td>
                   <td style="padding:10px 12px;white-space:nowrap">
                     ${log.method === 'nfc' ? `
-                      <span style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700">📳 شريحة NFC</span>
+                      <span style="background:#F6F8F5;color:#0E4D2E;border:1px solid #A8D8BE;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700">📳 شريحة NFC</span>
                     ` : `
-                      <span style="background:#f8fafc;color:#334155;border:1px solid #cbd5e1;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700">📷 باركود مشفر</span>
+                      <span style="background:#F6F8F5;color:#10211D;border:1px solid #DCE3DD;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700">📷 باركود مشفر</span>
                     `}
                   </td>
                   <td style="padding:10px 12px;white-space:nowrap">
-                    <span class="mono" style="font-size:11.5px;background:#f1f5f9;padding:2px 6px;border-radius:4px;color:#334155">${esc(log.terminalId)}</span>
+                    <span class="mono" style="font-size:11.5px;background:#F6F8F5;padding:2px 6px;border-radius:4px;color:#10211D">${esc(log.terminalId)}</span>
                   </td>
                   <td style="padding:10px 12px;white-space:nowrap">
                     ${!isDenied ? `
                       <span style="color:#059669;font-weight:700;display:inline-flex;align-items:center;gap:4px">✓ مصرح به</span>
                     ` : `
-                      <span style="color:#dc2626;font-weight:700;display:inline-flex;align-items:center;gap:4px">✕ محظور / مرفوض</span>
+                      <span style="color:#B3261E;font-weight:700;display:inline-flex;align-items:center;gap:4px">✕ محظور / مرفوض</span>
                     `}
                   </td>
                   <td style="padding:10px 12px;white-space:nowrap">
-                    <code class="mono" style="font-size:11px;background:#f8fafc;border:1px solid #e2e8f0;padding:2px 6px;border-radius:4px;color:#042f28">${esc(log.pkiHash || '0x29ac88')}</code>
+                    <code class="mono" style="font-size:11px;background:#F6F8F5;border:1px solid #DCE3DD;padding:2px 6px;border-radius:4px;color:#042f28">${esc(log.pkiHash || '0x29ac88')}</code>
                   </td>
-                  <td style="padding:10px 12px;font-size:12px;color:#475569">
+                  <td style="padding:10px 12px;font-size:12px;color:#566660">
                     ${esc(log.reason || 'تحقق أمني نظامي')}
                   </td>
                 </tr>`;
               }).join('') : `
                 <tr>
-                  <td colspan="8" style="padding:24px;text-align:center;color:#94a3b8">
+                  <td colspan="8" style="padding:24px;text-align:center;color:#8B9591">
                     لا توجد حركات مطابقة للفلتر المحدد. يمكنك تسجيل أول حركة من النموذج أعلاه.
                   </td>
                 </tr>
@@ -363,7 +363,7 @@
             </tbody>
           </table>
         </div>
-        <div style="margin-top:8px;font-size:11.5px;color:#64748b;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap">
+        <div style="margin-top:8px;font-size:11.5px;color:#566660;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap">
           <span>تُحفظ كل حركة على الخادم مع بصمة SHA-256 للسجل، وهي ليست توقيعًا من البطاقة.</span>
           <span>عرض <b>${filteredLogs.length}</b> من أصل <b>${stLogs.length}</b> حركة للطالب</span>
         </div>
@@ -382,24 +382,24 @@
         </h2>
         <span style="background:#054239;color:#D5B65D;font-weight:800;font-size:11px;padding:3px 9px;border-radius:6px;font-family:monospace">نقلت إلى شؤون الطلاب</span>
       </div>
-      <p class="sub" style="margin-top:0;color:#64748b;font-size:13px">تسجيل قرارات اللجان الانضباطية والتأديبية، وفرض حواجز الحظر الفوري على المعاملات وبراءة الذمة مع التتبع الأكاديمي.</p>
+      <p class="sub" style="margin-top:0;color:#566660;font-size:13px">تسجيل قرارات اللجان الانضباطية والتأديبية، وفرض حواجز الحظر الفوري على المعاملات وبراءة الذمة مع التتبع الأكاديمي.</p>
 
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px">
-        <div style="background:#fff;border:1px solid #cbd5e1;border-inline-start:4px solid #ef4444;border-radius:10px;padding:12px">
-          <small style="color:#64748b">حالات الحظر النشطة</small>
-          <strong style="display:block;font-size:22px;color:#dc2626;margin-top:2px">${holdsList.filter(h => h.active).length} طالب</strong>
+        <div style="background:#fff;border:1px solid #DCE3DD;border-inline-start:4px solid #B3261E;border-radius:10px;padding:12px">
+          <small style="color:#566660">حالات الحظر النشطة</small>
+          <strong style="display:block;font-size:22px;color:#B3261E;margin-top:2px">${holdsList.filter(h => h.active).length} طالب</strong>
         </div>
-        <div style="background:#fff;border:1px solid #cbd5e1;border-inline-start:4px solid #f59e0b;border-radius:10px;padding:12px">
-          <small style="color:#64748b">إنذارات مسلكية وتأديبية</small>
-          <strong style="display:block;font-size:22px;color:#d97706;margin-top:2px">${holdsList.length} قرار</strong>
+        <div style="background:#fff;border:1px solid #DCE3DD;border-inline-start:4px solid #C9A24B;border-radius:10px;padding:12px">
+          <small style="color:#566660">إنذارات مسلكية وتأديبية</small>
+          <strong style="display:block;font-size:22px;color:#8A6A1B;margin-top:2px">${holdsList.length} قرار</strong>
         </div>
-        <div style="background:#fff;border:1px solid #cbd5e1;border-inline-start:4px solid #10b981;border-radius:10px;padding:12px">
-          <small style="color:#64748b">عقوبات تمت تسويتها</small>
-          <strong style="display:block;font-size:22px;color:#10b981;margin-top:2px">${holdsList.filter(h => !h.active).length} قرار</strong>
+        <div style="background:#fff;border:1px solid #DCE3DD;border-inline-start:4px solid #1B7F4B;border-radius:10px;padding:12px">
+          <small style="color:#566660">عقوبات تمت تسويتها</small>
+          <strong style="display:block;font-size:22px;color:#1B7F4B;margin-top:2px">${holdsList.filter(h => !h.active).length} قرار</strong>
         </div>
       </div>
 
-      <div class="inline-form" style="margin-bottom:16px;background:rgba(14,102,85,.03);padding:14px;border-radius:10px;border:1px solid #cbd5e1;gap:10px;align-items:flex-end;flex-wrap:wrap">
+      <div class="inline-form" style="margin-bottom:16px;background:rgba(14,102,85,.03);padding:14px;border-radius:10px;border:1px solid #DCE3DD;gap:10px;align-items:flex-end;flex-wrap:wrap">
         <label style="flex:1;min-width:180px">الرقم الجامعي للطالب<input id="h-no" placeholder="CYB-2026-0001" dir="ltr"></label>
         <label style="flex:1;min-width:160px">نوع العقوبة / الحجز
           <select id="h-type">

@@ -139,17 +139,17 @@
   function renderPipelineBanner(o) {
     if (!o) return '';
     const steps = [
-      { n: '1', title: 'طلب شراء (PRQ)', sub: `${num(o.pendingRequests)} قيد المراجعة`, tone: '#0284c7', tab: 'cycle', mode: 'requests' },
+      { n: '1', title: 'طلب شراء (PRQ)', sub: `${num(o.pendingRequests)} قيد المراجعة`, tone: '#0A5A4D', tab: 'cycle', mode: 'requests' },
       { n: '2', title: 'الاعتماد الإداري', sub: `${num(o.approvedRequests)} معتمد للتوريد`, tone: '#0d9488', tab: 'cycle', mode: 'requests' },
-      { n: '3', title: 'أمر توريد (PO)', sub: `${num(o.pendingOrders)} مرسل للموردين`, tone: '#d97706', tab: 'cycle', mode: 'orders' },
-      { n: '4', title: 'الفحص والاستلام', sub: `${num(o.totalReceipts || o.receivedOrders || 0)} مذكرة إدخال`, tone: '#16a34a', tab: 'movements', mode: 'receipts' },
-      { n: '5', title: 'الصرف والعهدة', sub: `${num(o.totalIssues || 0)} إذن صرف · ${num(o.totalAssets)} أصل`, tone: '#4f46e5', tab: 'movements', mode: 'issues' }
+      { n: '3', title: 'أمر توريد (PO)', sub: `${num(o.pendingOrders)} مرسل للموردين`, tone: '#8A6A1B', tab: 'cycle', mode: 'orders' },
+      { n: '4', title: 'الفحص والاستلام', sub: `${num(o.totalReceipts || o.receivedOrders || 0)} مذكرة إدخال`, tone: '#1B7F4B', tab: 'movements', mode: 'receipts' },
+      { n: '5', title: 'الصرف والعهدة', sub: `${num(o.totalIssues || 0)} إذن صرف · ${num(o.totalAssets)} أصل`, tone: '#0A5A4D', tab: 'movements', mode: 'issues' }
     ];
     return `
-      <div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);color:#fff;border:1px solid #334155;padding:16px">
+      <div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,#10211D 0%,#10211D 100%);color:#fff;border:1px solid #10211D;padding:16px">
         <div class="spread" style="margin-bottom:12px;flex-wrap:wrap;gap:8px">
           <div>
-            <div style="font-size:11px;color:#38bdf8;font-weight:700;letter-spacing:.4px">منظومة الإمداد المتكاملة · SUPPLY CHAIN & INVENTORY PIPELINE</div>
+            <div style="font-size:11px;color:#0A5A4D;font-weight:700;letter-spacing:.4px">منظومة الإمداد المتكاملة · SUPPLY CHAIN & INVENTORY PIPELINE</div>
             <div style="font-size:15px;font-weight:800;margin-top:2px">مسار الرقابة على المشتريات والمخازن والأصول الجامعية</div>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -162,11 +162,11 @@
           ${steps.map((s) => `
             <div data-act="proc-pipe-go" data-t="${s.tab}" data-mode="${s.mode}" style="cursor:pointer;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-inline-start:4px solid ${s.tone};border-radius:8px;padding:10px 12px;transition:background .15s">
               <div style="display:flex;align-items:center;justify-content:space-between">
-                <span style="font-size:11px;color:#94a3b8;font-weight:700">المرحلة ${s.n}</span>
-                <span style="font-size:11px;color:#38bdf8">انتقال ←</span>
+                <span style="font-size:11px;color:#8B9591;font-weight:700">المرحلة ${s.n}</span>
+                <span style="font-size:11px;color:#0A5A4D">انتقال ←</span>
               </div>
               <div style="font-weight:800;font-size:13px;margin:3px 0">${esc(s.title)}</div>
-              <div style="font-size:12px;color:#cbd5e1">${esc(s.sub)}</div>
+              <div style="font-size:12px;color:#DCE3DD">${esc(s.sub)}</div>
             </div>
           `).join('')}
         </div>
@@ -181,11 +181,11 @@
     return `
       ${renderPipelineBanner(o)}
       ${lowList.length ? `
-        <div class="card" style="margin-bottom:14px;background:#fffbeb;border:1px solid #f59e0b;border-inline-start:5px solid #d97706;padding:12px 16px">
+        <div class="card" style="margin-bottom:14px;background:#F6F8F5;border:1px solid #C9A24B;border-inline-start:5px solid #8A6A1B;padding:12px 16px">
           <div class="spread" style="flex-wrap:wrap;gap:8px">
             <div>
-              <strong style="color:#92400e;font-size:14px">⚠️ تنبيه الحد الأدنى للمخزون (${num(lowList.length)} أصناف بحاجة لإعادة طلب)</strong>
-              <div class="mut" style="font-size:12px;color:#b45309;margin-top:2px">الأصناف التالية وصلت أو انخفضت عن نقطة إعادة الطلب المحددة في بطاقة الصنف:</div>
+              <strong style="color:#8A6A1B;font-size:14px">⚠️ تنبيه الحد الأدنى للمخزون (${num(lowList.length)} أصناف بحاجة لإعادة طلب)</strong>
+              <div class="mut" style="font-size:12px;color:#8A6A1B;margin-top:2px">الأصناف التالية وصلت أو انخفضت عن نقطة إعادة الطلب المحددة في بطاقة الصنف:</div>
             </div>
             <div style="display:flex;gap:6px">
               ${can('procurement:request') ? `<button class="btn pri sm" data-act="proc-replenish-low">⚡ توليد طلب شراء للنواقص تلقائياً</button>` : ''}
@@ -194,7 +194,7 @@
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
             ${lowList.slice(0, 8).map((x) => `
-              <span style="background:#fef3c7;border:1px solid #fcd34d;color:#78350f;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600">
+              <span style="background:#FBEBD0;border:1px solid #C9A24B;color:#8A6A1B;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600">
                 <code>${esc(x.code)}</code> ${esc(x.name)} — المتاح: <b>${num(x.qtyOnHand)}</b> / الحد الأدنى: <b>${num(x.minStock)}</b> ${esc(x.unit || '')}
               </span>
             `).join('')}
@@ -205,12 +205,12 @@
       <div class="kpis" style="margin-bottom:14px">
         <div class="kpi"><div class="k-num">${num(o.warehouses)}</div><div class="k-lbl">المستودعات النشطة</div></div>
         <div class="kpi"><div class="k-num">${num(o.items)}</div><div class="k-lbl">الأصناف المخزنية المعرّفة</div></div>
-        <div class="kpi" style="${o.lowStock > 0 ? 'border-color:#f59e0b;background:#fffbeb' : ''}"><div class="k-num" style="color:${o.lowStock > 0 ? '#d97706' : 'inherit'}">${num(o.lowStock)}</div><div class="k-lbl">أصناف دون الحد الأدنى</div></div>
-        <div class="kpi"><div class="k-num" style="color:#0284c7">${money(o.totalStockValue)}</div><div class="k-lbl">القيمة الدفترية للمخزون</div></div>
-        <div class="kpi"><div class="k-num" style="color:#d97706">${num(o.pendingRequests)}</div><div class="k-lbl">طلبات شراء قيد الاعتماد</div></div>
+        <div class="kpi" style="${o.lowStock > 0 ? 'border-color:#C9A24B;background:#F6F8F5' : ''}"><div class="k-num" style="color:${o.lowStock > 0 ? '#8A6A1B' : 'inherit'}">${num(o.lowStock)}</div><div class="k-lbl">أصناف دون الحد الأدنى</div></div>
+        <div class="kpi"><div class="k-num" style="color:#0A5A4D">${money(o.totalStockValue)}</div><div class="k-lbl">القيمة الدفترية للمخزون</div></div>
+        <div class="kpi"><div class="k-num" style="color:#8A6A1B">${num(o.pendingRequests)}</div><div class="k-lbl">طلبات شراء قيد الاعتماد</div></div>
         <div class="kpi"><div class="k-num" style="color:#0d9488">${num(o.pendingOrders)}</div><div class="k-lbl">أوامر توريد قيد الاستلام</div></div>
         <div class="kpi"><div class="k-num">${num(o.totalAssets)}</div><div class="k-lbl">الأصول الثابتة العاملة</div></div>
-        <div class="kpi"><div class="k-num" style="color:#4f46e5">${money(o.assetsValue)}</div><div class="k-lbl">إجمالي قيمة الأصول الثابتة</div></div>
+        <div class="kpi"><div class="k-num" style="color:#0A5A4D">${money(o.assetsValue)}</div><div class="k-lbl">إجمالي قيمة الأصول الثابتة</div></div>
       </div>
 
       <div class="grid2" style="margin-bottom:14px">
@@ -240,7 +240,7 @@
             ${['available', 'in_use', 'maintenance', 'disposed'].map((stKey) => {
               const row = assetBrk.find((a) => a.status === stKey) || { count: 0, totalCost: 0 };
               const [label, cls] = ASSET_STATUS[stKey] || [stKey, 'b-mut'];
-              return `<div style="border:1px solid var(--bd);border-radius:8px;padding:10px 12px;background:#f8fafc">
+              return `<div style="border:1px solid var(--bd);border-radius:8px;padding:10px 12px;background:#F6F8F5">
                 <div class="spread"><span class="badge ${cls}">${esc(label)}</span><b style="font-size:16px">${num(row.count)}</b></div>
                 <div class="mut" style="font-size:12px;margin-top:6px">التكلفة: <b>${money(row.totalCost)}</b></div>
               </div>`;
@@ -296,13 +296,13 @@
           ${can('procurement:manage') ? `<button class="btn pri sm" data-act="proc-new-wh">+ إضافة مستودع جديد</button>` : ''}
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px">
-          <div data-act="proc-wh-filter" data-id="" style="cursor:pointer;border:2px solid ${!P.itemFilter.warehouse ? '#0284c7' : 'var(--bd)'};background:${!P.itemFilter.warehouse ? '#f0f9ff' : '#fff'};border-radius:8px;padding:10px 12px">
+          <div data-act="proc-wh-filter" data-id="" style="cursor:pointer;border:2px solid ${!P.itemFilter.warehouse ? '#0A5A4D' : 'var(--bd)'};background:${!P.itemFilter.warehouse ? '#F6F8F5' : '#fff'};border-radius:8px;padding:10px 12px">
             <div class="spread"><b>كل المستودعات</b><span class="badge b-info">${num(P.warehouses.length)}</span></div>
             <div class="mut" style="font-size:12px;margin-top:4px">عرض شامل لكافة الأصناف والأرصدة</div>
           </div>
           ${P.warehouses.map((w) => {
             const sel = String(P.itemFilter.warehouse) === String(w.id);
-            return `<div style="border:2px solid ${sel ? '#0284c7' : 'var(--bd)'};background:${sel ? '#f0f9ff' : '#fff'};border-radius:8px;padding:10px 12px">
+            return `<div style="border:2px solid ${sel ? '#0A5A4D' : 'var(--bd)'};background:${sel ? '#F6F8F5' : '#fff'};border-radius:8px;padding:10px 12px">
               <div class="spread" style="cursor:pointer" data-act="proc-wh-filter" data-id="${w.id}">
                 <div><code>${esc(w.code)}</code> <b>${esc(w.name)}</b></div>
                 <span class="badge ${w.active ? 'b-ok' : 'b-mut'}">${w.active ? 'نشط' : 'معطّل'}</span>
@@ -321,7 +321,7 @@
         <div class="spread" style="margin-bottom:12px;flex-wrap:wrap;gap:8px">
           <div>
             <h3 style="margin:0">📋 دليل الأصناف المخزنية وبطاقات الجرد (${num(P.items.length)} صنف)</h3>
-            <div class="mut" style="font-size:12px">إجمالي القيمة الدفترية للمعروض: <b>${money(totalVal)}</b> · أصناف دون الحد الأدنى: <b style="color:${lowCount ? '#d97706' : 'inherit'}">${num(lowCount)}</b></div>
+            <div class="mut" style="font-size:12px">إجمالي القيمة الدفترية للمعروض: <b>${money(totalVal)}</b> · أصناف دون الحد الأدنى: <b style="color:${lowCount ? '#8A6A1B' : 'inherit'}">${num(lowCount)}</b></div>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <a class="btn sm" href="/api/procurement/items.xlsx" target="_blank">📥 تصدير الجرد Excel</a>
@@ -340,13 +340,13 @@
         <div class="tbl-wrap"><table class="tbl"><thead><tr><th>الرمز</th><th>اسم الصنف</th><th>التصنيف</th><th>المستودع</th><th>الوحدة</th><th>الرصيد الفعلي</th><th>الحد الأدنى</th><th>متوسط التكلفة</th><th>القيمة الإجمالية</th><th>الحالة</th><th>إجراءات الجرد</th></tr></thead><tbody>
           ${P.items.map((x) => {
             const lineVal = Number(x.qtyOnHand || 0) * Number(x.avgCost || 0);
-            return `<tr style="${x.low ? 'background:#fffbeb' : ''}">
+            return `<tr style="${x.low ? 'background:#F6F8F5' : ''}">
               <td><code>${esc(x.code)}</code></td>
               <td><b>${esc(x.name)}</b>${x.notes ? `<div class="mut" style="font-size:11px">${esc(x.notes)}</div>` : ''}</td>
               <td>${esc(x.categoryName || '—')}</td>
               <td>${esc(x.warehouseName || '—')}</td>
               <td>${esc(x.unit)}</td>
-              <td><b style="font-size:14px;color:${x.low ? '#d97706' : '#0f172a'}">${num(x.qtyOnHand)}</b></td>
+              <td><b style="font-size:14px;color:${x.low ? '#8A6A1B' : '#10211D'}">${num(x.qtyOnHand)}</b></td>
               <td>${num(x.minStock)}</td>
               <td>${money(x.avgCost)}</td>
               <td><b>${money(lineVal)}</b></td>

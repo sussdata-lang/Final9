@@ -33,10 +33,10 @@
     if (it.type === 'select') return `<select id="${id}">${it.options.map((o) => `<option value="${esc(o.value)}"${o.value === v ? ' selected' : ''}>${esc(o.label)}</option>`).join('')}</select>`;
     if (it.type === 'bool') return `<input id="${id}" type="checkbox"${v ? ' checked' : ''}>`;
     const arr = Array.isArray(v) ? v : [];
-    const chips = arr.map((opt, idx) => `<span class="chip" style="display:inline-flex;align-items:center;gap:6px;margin:2px;background:#f0fdf4;border:1px solid #86efac;color:#065f46;font-size:12px;padding:3px 9px;border-radius:6px">
+    const chips = arr.map((opt, idx) => `<span class="chip" style="display:inline-flex;align-items:center;gap:6px;margin:2px;background:#F6F8F5;border:1px solid #A8D8BE;color:#054239;font-size:12px;padding:3px 9px;border-radius:6px">
       <span>${esc(opt)}</span>
       <button type="button" class="link" data-act="glistedit" data-k="${esc(it.key)}" data-i="${idx}" title="تعديل الخيار" style="color:#047857;font-weight:700;text-decoration:none">✎</button>
-      <button type="button" class="link" data-act="glistdel" data-k="${esc(it.key)}" data-i="${idx}" title="حذف الخيار" style="color:#b91c1c;font-weight:700;text-decoration:none">×</button>
+      <button type="button" class="link" data-act="glistdel" data-k="${esc(it.key)}" data-i="${idx}" title="حذف الخيار" style="color:#B3261E;font-weight:700;text-decoration:none">×</button>
     </span>`).join('');
     return `<div class="g-list-mgr" style="display:flex;flex-direction:column;gap:8px;width:100%">
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
@@ -44,7 +44,7 @@
         <button type="button" class="btn sm pri" data-act="glistadd" data-k="${esc(it.key)}">+ إضافة للقائمة</button>
         <button type="button" class="btn sm" data-act="glistother" data-k="${esc(it.key)}" title="تضمين خيار (أخرى) في هذه القائمة">+ خيار «أخرى»</button>
       </div>
-      <div style="display:flex;flex-wrap:wrap;gap:4px;padding:8px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;max-height:150px;overflow:auto">${chips || '<span class="small">لا توجد عناصر</span>'}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;padding:8px;background:#F6F8F5;border:1px dashed #DCE3DD;border-radius:8px;max-height:150px;overflow:auto">${chips || '<span class="small">لا توجد عناصر</span>'}</div>
       <details class="small"><summary style="cursor:pointer;font-weight:600;color:#054239">تحرير نصي مباشر (سطر لكل خيار — ${arr.length} خياراً حالياً)</summary>
         <textarea id="${id}" rows="${Math.min(12, Math.max(4, arr.length + 1))}" spellcheck="false" style="margin-top:6px;width:100%">${esc(arr.join('\n'))}</textarea>
       </details>
@@ -62,8 +62,8 @@
     const cards = tabs.map((t) => { const n = t.items.filter((i) => i.changed).length;
       return `<button class="g-card" data-act="gtab" data-t="${t.key}"><b>${esc(t.label)}</b><span class="small">${esc(t.desc)}</span><span class="small">${t.items.length} إعداداً${n ? ` · <em class="g-badge">${n} معدَّل</em>` : ''}</span></button>`; }).join('');
     const links = LINKS.map(([l, t, v]) => `<button class="link g-link" data-act="${t ? 'gadmin' : 'view'}" data-v="${v}"${t ? ` data-t="${t}"` : ''}>${esc(l)} ←</button>`).join('');
-    const quickLists = listItems.map((it) => `<div style="padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
-      <div><b>${esc(it.label)}</b> <span class="small">(${esc(it.tabLabel)} · ${(it.value || []).length} خياراً)</span><div class="small" style="color:#475569;margin-top:2px">${esc((it.value || []).slice(0, 6).join('، '))}${(it.value || []).length > 6 ? '…' : ''}</div></div>
+    const quickLists = listItems.map((it) => `<div style="padding:10px 12px;border:1px solid #DCE3DD;border-radius:10px;background:#fff;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+      <div><b>${esc(it.label)}</b> <span class="small">(${esc(it.tabLabel)} · ${(it.value || []).length} خياراً)</span><div class="small" style="color:#566660;margin-top:2px">${esc((it.value || []).slice(0, 6).join('، '))}${(it.value || []).length > 6 ? '…' : ''}</div></div>
       <button type="button" class="btn sm pri" data-act="gtab" data-t="${esc(it.tabKey)}">تعديل وإضافة خيارات</button>
     </div>`).join('');
     return `<section class="card"><h2>الإعدادات العامة وإدارة القوائم المنسدلة</h2><p class="hint">جميع القوائم المنسدلة وحدود النظام قابلة للتعديل والإضافة المباشرة من هنا. التغييرات تسري فوراً على كافة النماذج وتُسجَّل في سجل التدقيق.</p><div class="g-cards">${cards}</div></section>

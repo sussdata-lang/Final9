@@ -42,7 +42,7 @@
     const app = list.filter((r) => r.status === 'approved').length;
     const rej = list.filter((r) => r.status === 'rejected').length;
     return `
-      <section class="card no-print" style="margin-bottom:14px;background:linear-gradient(135deg,#0f172a 0%,#134e4a 100%);color:#fff;border:1px solid #115e59;padding:16px">
+      <section class="card no-print" style="margin-bottom:14px;background:linear-gradient(135deg,#10211D 0%,#134e4a 100%);color:#fff;border:1px solid #115e59;padding:16px">
         <div class="spread" style="flex-wrap:wrap;gap:10px;margin-bottom:12px">
           <div>
             <div style="font-size:11px;color:#5eead4;font-weight:700;letter-spacing:.4px">بوابة الخدمات الذاتية للعاملين · INTERNAL STAFF REQUESTS & SLA PORTAL</div>
@@ -56,24 +56,24 @@
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px">
           <div style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:8px 12px">
-            <div style="font-size:11px;color:#cbd5e1">النماذج الإدارية المتاحة</div>
+            <div style="font-size:11px;color:#DCE3DD">النماذج الإدارية المتاحة</div>
             <div style="font-size:18px;font-weight:800">${(B.svcs || []).length}</div>
           </div>
           <div style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:8px 12px">
-            <div style="font-size:11px;color:#cbd5e1">إجمالي طلباتي المقدمة</div>
+            <div style="font-size:11px;color:#DCE3DD">إجمالي طلباتي المقدمة</div>
             <div style="font-size:18px;font-weight:800">${list.length}</div>
           </div>
           <div style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.35);border-radius:8px;padding:8px 12px">
-            <div style="font-size:11px;color:#fde68a">قيد المراجعة والبت</div>
-            <div style="font-size:18px;font-weight:800;color:#fbbf24">${rev}</div>
+            <div style="font-size:11px;color:#E6CB84">قيد المراجعة والبت</div>
+            <div style="font-size:18px;font-weight:800;color:#C9A24B">${rev}</div>
           </div>
           <div style="background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.35);border-radius:8px;padding:8px 12px">
-            <div style="font-size:11px;color:#bbf7d0">تمت الموافقة عليها</div>
-            <div style="font-size:18px;font-weight:800;color:#4ade80">${app}</div>
+            <div style="font-size:11px;color:#A8D8BE">تمت الموافقة عليها</div>
+            <div style="font-size:18px;font-weight:800;color:#1B7F4B">${app}</div>
           </div>
           <div style="background:rgba(244,63,94,.15);border:1px solid rgba(244,63,94,.35);border-radius:8px;padding:8px 12px">
-            <div style="font-size:11px;color:#fecdd3">مرفوضة</div>
-            <div style="font-size:18px;font-weight:800;color:#fb7185">${rej}</div>
+            <div style="font-size:11px;color:#FBE0DD">مرفوضة</div>
+            <div style="font-size:18px;font-weight:800;color:#B3261E">${rej}</div>
           </div>
         </div>
       </section>`;
@@ -89,7 +89,7 @@
       }
       const groupKeys = Object.keys(groups).sort((a, b) => a.localeCompare(b, 'ar'));
 
-      return `<section class="card" style="margin-bottom:14px;border:2px solid #0d9488;background:linear-gradient(135deg,#f0fdf9 0%,#ffffff 100%)">
+      return `<section class="card" style="margin-bottom:14px;border:2px solid #0d9488;background:linear-gradient(135deg,#F6F8F5 0%,#ffffff 100%)">
         <div class="spread" style="margin-bottom:12px;flex-wrap:wrap;gap:8px">
           <div>
             <h2 style="margin:0;color:#0d9488">📑 دليل النماذج والطلبات الداخلية المعتمدة (قائمة منسدلة)</h2>
@@ -97,8 +97,8 @@
           </div>
         </div>
 
-        <div style="background:#fff;padding:16px;border-radius:12px;border:1px solid #cbd5e1;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
-          <label style="display:block;font-weight:700;font-size:14px;margin-bottom:8px;color:#0f172a">
+        <div style="background:#fff;padding:16px;border-radius:12px;border:1px solid #DCE3DD;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
+          <label style="display:block;font-weight:700;font-size:14px;margin-bottom:8px;color:#10211D">
             اختر النموذج المطلوب تعبئته من القائمة المنسدلة:
           </label>
           <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
@@ -110,18 +110,18 @@
             </select>
             <button type="button" class="btn pri" data-act="inpickselected" style="padding:10px 20px;font-weight:700">تعبئة النموذج المختار ←</button>
           </div>
-          <div id="in-svc-preview-box" style="margin-top:12px;padding:12px 14px;background:#f8fafc;border-radius:8px;border:1px dashed #cbd5e1;font-size:13px;color:#475569">
+          <div id="in-svc-preview-box" style="margin-top:12px;padding:12px 14px;background:#F6F8F5;border-radius:8px;border:1px dashed #DCE3DD;font-size:13px;color:#566660">
             ${(() => {
               const curCode = B.selectedSvcCode || (B.svcs && B.svcs[0] ? B.svcs[0].code : '');
               const cur = (B.svcs || []).find((x) => x.code === curCode);
               if (!cur) return '<span>اختر نموذجاً لعرض بطاقة الإرشادات والجهة المسؤولة ومهلة الإنجاز الرسمية.</span>';
               return `<div>
-                <b style="color:#0f172a;font-size:14px">📋 ${esc(cur.label)}</b>
+                <b style="color:#10211D;font-size:14px">📋 ${esc(cur.label)}</b>
                 <p style="margin:4px 0 6px">${esc(cur.description || 'نموذج طلب داخلي رسمي معتمد')}</p>
                 <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px">
                   <span style="color:#0d9488;font-weight:700">🏛️ الجهة المختصة بالبت: ${esc(cur.unit ? cur.unit.name : 'المديرية المعنية')}</span>
-                  ${cur.slaHours ? `<span style="color:#0369a1;font-weight:700">⏱ مهلة الإنجاز (SLA): ${cur.slaHours} ساعة</span>` : ''}
-                  <span style="color:#64748b">عدد الحقول: ${(cur.fields || []).length} حقول</span>
+                  ${cur.slaHours ? `<span style="color:#0A5A4D;font-weight:700">⏱ مهلة الإنجاز (SLA): ${cur.slaHours} ساعة</span>` : ''}
+                  <span style="color:#566660">عدد الحقول: ${(cur.fields || []).length} حقول</span>
                 </div>
               </div>`;
             })()}
@@ -138,7 +138,7 @@
         </div>
         <button class="btn sm" type="button" data-act="incancel">← العودة لدليل النماذج</button>
       </div>
-      ${s.instructions ? `<div class="hint" style="white-space:pre-line;background:#f0fdf4;border:1px solid #bbf7d0;padding:10px 12px;border-radius:8px;margin-bottom:10px">${esc(s.instructions)}</div>` : ''}
+      ${s.instructions ? `<div class="hint" style="white-space:pre-line;background:#F6F8F5;border:1px solid #A8D8BE;padding:10px 12px;border-radius:8px;margin-bottom:10px">${esc(s.instructions)}</div>` : ''}
       ${UA.formKit.render({
         id: 'inform',
         status: 'draft',
@@ -175,7 +175,7 @@
         <td>${fmt(r.createdAt)}</td>
         <td><button class="btn sm" data-act="inopen" data-id="${r.id}">${B.open === r.id ? 'إخفاء المسار' : 'التفاصيل والمسار'}</button></td>
       </tr>
-      ${B.open === r.id ? `<tr><td colspan="6" style="background:#f8fafc;padding:12px">${detail(r)}</td></tr>` : ''}`).join('');
+      ${B.open === r.id ? `<tr><td colspan="6" style="background:#F6F8F5;padding:12px">${detail(r)}</td></tr>` : ''}`).join('');
 
     return `<section class="card">
       <div class="spread" style="margin-bottom:12px;flex-wrap:wrap;gap:8px">
@@ -199,7 +199,7 @@
           const f = ((B.svcs || []).find((s) => s.code === r.service.code) || { fields: [] }).fields.find((x) => x.name === k);
           return `<dt>${esc(f ? f.label : k)}</dt><dd><b>${esc(v)}</b></dd>`;
         }).join('')}
-        ${r.rejectReason ? `<dt style="color:#dc2626">سبب الرفض</dt><dd style="color:#dc2626"><b>${esc(r.rejectReason)}</b></dd>` : ''}
+        ${r.rejectReason ? `<dt style="color:#B3261E">سبب الرفض</dt><dd style="color:#B3261E"><b>${esc(r.rejectReason)}</b></dd>` : ''}
         ${r.attachments.map((a) => `<dt>مرفق رسمي</dt><dd><a class="btn sm" href="/api/attachments/${a.id}" download>${esc(a.name)}</a></dd>`).join('')}
       </dl>
       <div>

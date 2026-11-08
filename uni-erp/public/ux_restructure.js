@@ -106,7 +106,7 @@
           ${dTabs}
         </div>
 
-        <div style="border:2px solid #054239;border-radius:14px;overflow:hidden;background:#0f172a;box-shadow:0 10px 30px rgba(5,66,57,0.14)">
+        <div style="border:2px solid #054239;border-radius:14px;overflow:hidden;background:#10211D;box-shadow:0 10px 30px rgba(5,66,57,0.14)">
           <iframe
             id="archify-diagram-frame"
             src="${esc(cur.htmlUrl)}"
@@ -136,10 +136,10 @@
         <div style="display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center">
           <div>
             <div style="font-size:19px;font-weight:800;margin-bottom:4px;color:#fff">${esc(st.name)}</div>
-            <div style="font-size:13px;color:#d1fae5">الرقم الجامعي: <b class="mono" style="color:#fde047;letter-spacing:1px">${esc(st.studentNo)}</b></div>
-            <div style="font-size:12.5px;color:#d1fae5;margin-top:2px">${esc((st.program && st.program.name) || (typeof st.program === 'string' ? st.program : ''))}${st.levelLabel ? ` · ${esc(st.levelLabel)}` : ''}</div>
+            <div style="font-size:13px;color:#A8D8BE">الرقم الجامعي: <b class="mono" style="color:#C9A24B;letter-spacing:1px">${esc(st.studentNo)}</b></div>
+            <div style="font-size:12.5px;color:#A8D8BE;margin-top:2px">${esc((st.program && st.program.name) || (typeof st.program === 'string' ? st.program : ''))}${st.levelLabel ? ` · ${esc(st.levelLabel)}` : ''}</div>
             <div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap">
-              ${st.statusLabel ? `<span style="background:rgba(16,185,129,.25);color:#a7f3d0;padding:3px 8px;border-radius:6px;font-size:11px">${esc(st.statusLabel)}</span>` : ''}
+              ${st.statusLabel ? `<span style="background:rgba(27,127,75,.25);color:#a7f3d0;padding:3px 8px;border-radius:6px;font-size:11px">${esc(st.statusLabel)}</span>` : ''}
             </div>
           </div>
           <div style="background:#fff;color:#042f28;padding:8px;border-radius:10px;text-align:center;width:96px">
@@ -289,7 +289,7 @@
     return `<section class="card">
       <h2>تقييم الموظفين ومؤشرات الأداء الوظيفي (KPIs — شؤون الموظفين)</h2>
       <p class="hint" style="margin-top:0">تم نقل ودمج قسم تقييم الموظفين ضمن شؤون الموظفين لربطه مباشرةً بالحوافز والترقيات وسجل الالتزام والدوام.</p>
-      <form id="hr-appraisal-form" class="inline-form" style="padding:14px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:12px">
+      <form id="hr-appraisal-form" class="inline-form" style="padding:14px;background:#F6F8F5;border:1px solid #DCE3DD;border-radius:12px">
         <label>اسم الموظف<input id="ap-name" required placeholder="مثال: أ. خالد العلي"></label>
         <label>القسم<select id="ap-dept" data-no-other="1">${depts.map((d) => `<option value="${esc(d)}">${esc(d)}</option>`).join('')}</select></label>
         <label>دورة التقييم<select id="ap-period"><option value="2025/2026 - نصف سنوي">2025/2026 - نصف سنوي</option><option value="2025/2026 - سنوي">2025/2026 - سنوي</option><option value="تقييم فترة تجربة">تقييم فترة تجربة</option><option value="أخرى">أخرى</option></select></label>
@@ -326,7 +326,7 @@
     </div>`;
 
     if (U.hrSection === 'att_leaves') {
-      return topBar + `<section class="card" style="margin-bottom:14px;background:#f0fdf4;border-color:#86efac">
+      return topBar + `<section class="card" style="margin-bottom:14px;background:#F6F8F5;border-color:#A8D8BE">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
           <div><b>وحدة الحضور والإجازات (شؤون الموظفين)</b><div class="small">تم دمج واجهات الحضور والانصراف وطلبات الإجازات وأرصدتها ضمن تبويب واحد متكامل تحت شؤون الموظفين.</div></div>
           <button type="button" class="btn sm" data-act="goexport" data-ds="attendance">تصدير التقارير من صفحة التصدير الموحدة ←</button>
@@ -398,7 +398,7 @@
             wrap = document.createElement('div');
             wrap.className = 'ua-other-custom-wrap';
             wrap.style.cssText = 'margin-top:6px;display:flex;gap:6px;align-items:center;width:100%';
-            wrap.innerHTML = `<input type="text" class="ua-other-custom-inp" placeholder="اكتب البيان المخصص لخيار (أخرى) هنا..." style="flex:1;border:1.5px solid #054239;background:#f0fdf4;padding:6px 10px;border-radius:8px;font-size:12.5px">`;
+            wrap.innerHTML = `<input type="text" class="ua-other-custom-inp" placeholder="اكتب البيان المخصص لخيار (أخرى) هنا..." style="flex:1;border:1.5px solid #054239;background:#F6F8F5;padding:6px 10px;border-radius:8px;font-size:12.5px">`;
             sel.insertAdjacentElement('afterend', wrap);
             const inp = wrap.querySelector('.ua-other-custom-inp');
             inp.addEventListener('input', () => {
@@ -1003,7 +1003,7 @@
       .sx-page .sub-tabs { position: relative; top: 0; margin-inline: 0; z-index: 6; flex-wrap: wrap; }
       .sx-page .card, .sx-page .sx-panel, .sx-page section.card { position: relative; isolation: isolate; min-width: 0; }
       .sx-page .tbl-wrap { position: relative; z-index: 0; isolation: isolate; overflow: auto; max-width: 100%; contain: layout; }
-      .sx-page .tbl-wrap table thead th, .sx-page table.sx-table thead th { position: sticky; top: 0 !important; z-index: 2; background: var(--surface2, #f1f5f9); box-shadow: 0 1px 0 var(--line); }
+      .sx-page .tbl-wrap table thead th, .sx-page table.sx-table thead th { position: sticky; top: 0 !important; z-index: 2; background: var(--surface2, #F6F8F5); box-shadow: 0 1px 0 var(--line); }
       .sx-page table { border-collapse: separate; border-spacing: 0; }
       .sx-page .grid2 > * { min-width: 0; }
       .sx-page h1, .sx-page h2, .sx-page h3 { position: static; overflow-wrap: anywhere; }
@@ -1415,16 +1415,16 @@
             <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #042f28;padding-bottom:12px;margin-bottom:18px">
               <div>
                 <h2 style="margin:0;color:#042f28;font-size:18px">الجامعة السورية للعلوم الأمنية</h2>
-                <h4 style="margin:4px 0 0;color:#475569;font-size:14px">سجل نشاط وحركات التحقق من البطاقة الجامعية الذكية (NFC / Barcode)</h4>
+                <h4 style="margin:4px 0 0;color:#566660;font-size:14px">سجل نشاط وحركات التحقق من البطاقة الجامعية الذكية (NFC / Barcode)</h4>
               </div>
-              <div style="text-align:left;font-size:12px;color:#64748b">
+              <div style="text-align:left;font-size:12px;color:#566660">
                 <div>تاريخ الطباعة: ${new Date().toLocaleDateString('ar-SY')}</div>
                 <div>الرقم الجامعي: <b>${esc(st.studentNo)}</b></div>
                 <div>الطالب: <b>${esc(st.name)}</b></div>
               </div>
             </div>
             ${tblEl.innerHTML}
-            <div style="margin-top:24px;display:flex;justify-content:space-between;border-top:1px dashed #cbd5e1;padding-top:16px;font-size:12px">
+            <div style="margin-top:24px;display:flex;justify-content:space-between;border-top:1px dashed #DCE3DD;padding-top:16px;font-size:12px">
               <div>توقيع مسؤول الأمن والسلامة: ______________</div>
               <div>ختم شؤون الطلاب والامتحانات: ______________</div>
             </div>

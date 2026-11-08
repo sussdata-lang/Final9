@@ -63,9 +63,9 @@
 /* ── الألوان حسب النوع ──────────────────────────────────────────*/
 /* Success */
 .notify-item--success {
-  background: #f0faf4;
-  border-color: #a3dab8;
-  color: #0f3d22;
+  background: #F6F8F5;
+  border-color: #A8D8BE;
+  color: #0E4D2E;
 }
 .notify-item--success .notify-icon { color: #1b7f4b; }
 .notify-item--success .notify-progress { background: #1b7f4b; }
@@ -73,9 +73,9 @@
 
 /* Error */
 .notify-item--error {
-  background: #fff2f1;
-  border-color: #f5b7b4;
-  color: #4a0e0b;
+  background: #F6F8F5;
+  border-color: #F2B8B5;
+  color: #8C1D18;
 }
 .notify-item--error .notify-icon { color: #b3261e; }
 .notify-item--error .notify-progress { background: #b3261e; }
@@ -83,43 +83,43 @@
 
 /* Warning */
 .notify-item--warning {
-  background: #fffbf0;
-  border-color: #f5d98a;
-  color: #3d2800;
+  background: #F6F8F5;
+  border-color: #E6CB84;
+  color: #8A6A1B;
 }
 .notify-item--warning .notify-icon { color: #9a5600; }
-.notify-item--warning .notify-progress { background: #c97a00; }
+.notify-item--warning .notify-progress { background: #8A6A1B; }
 .notify-item--warning .notify-label { color: #9a5600; }
 
 /* Info */
 .notify-item--info {
-  background: #f0f5ff;
-  border-color: #b3c8f5;
-  color: #0a1f4a;
+  background: #F6F8F5;
+  border-color: #BFD8CF;
+  color: #10211D;
 }
-.notify-item--info .notify-icon { color: #1a5abf; }
-.notify-item--info .notify-progress { background: #1a5abf; }
-.notify-item--info .notify-label { color: #1a5abf; }
+.notify-item--info .notify-icon { color: #0A5A4D; }
+.notify-item--info .notify-progress { background: #0A5A4D; }
+.notify-item--info .notify-label { color: #0A5A4D; }
 
 /* ── الوضع الليلي ───────────────────────────────────────────────*/
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .notify-item--success {
-    background: #0c2a18; border-color: #1d5c35; color: #c5f0d5;
+    background: #0E4D2E; border-color: #0E4D2E; color: #A8D8BE;
   }
   :root:not([data-theme="light"]) .notify-item--error {
-    background: #2a0d0c; border-color: #6b1c18; color: #ffd2cf;
+    background: #8C1D18; border-color: #8C1D18; color: #FBE0DD;
   }
   :root:not([data-theme="light"]) .notify-item--warning {
-    background: #2a1d00; border-color: #7a4f00; color: #ffe8b0;
+    background: #8A6A1B; border-color: #8A6A1B; color: #E6CB84;
   }
   :root:not([data-theme="light"]) .notify-item--info {
-    background: #0d1a36; border-color: #2a4a8a; color: #c5d8ff;
+    background: #10211D; border-color: #0A5A4D; color: #BFD8CF;
   }
 }
-:root[data-theme="dark"] .notify-item--success { background: #0c2a18; border-color: #1d5c35; color: #c5f0d5; }
-:root[data-theme="dark"] .notify-item--error   { background: #2a0d0c; border-color: #6b1c18; color: #ffd2cf; }
-:root[data-theme="dark"] .notify-item--warning { background: #2a1d00; border-color: #7a4f00; color: #ffe8b0; }
-:root[data-theme="dark"] .notify-item--info    { background: #0d1a36; border-color: #2a4a8a; color: #c5d8ff; }
+:root[data-theme="dark"] .notify-item--success { background: #0E4D2E; border-color: #0E4D2E; color: #A8D8BE; }
+:root[data-theme="dark"] .notify-item--error   { background: #8C1D18; border-color: #8C1D18; color: #FBE0DD; }
+:root[data-theme="dark"] .notify-item--warning { background: #8A6A1B; border-color: #8A6A1B; color: #E6CB84; }
+:root[data-theme="dark"] .notify-item--info    { background: #10211D; border-color: #0A5A4D; color: #BFD8CF; }
 
 /* ── الأيقونة ───────────────────────────────────────────────────*/
 .notify-icon {

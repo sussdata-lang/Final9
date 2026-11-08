@@ -302,15 +302,15 @@
    § تباين عالٍ (High Contrast)
    ────────────────────────────────────────────────────────────── */
 :root.high-contrast {
-  --line: #888;
-  --muted: #555;
-  --surface2: #F0F0F0;
+  --line: #566660;
+  --muted: #566660;
+  --surface2: #DCE3DD;
 }
 :root.high-contrast[data-theme="dark"],
 @media (prefers-color-scheme: dark) {
   :root.high-contrast:not([data-theme="light"]) {
-    --line: #AAA;
-    --muted: #BBB;
+    --line: #8B9591;
+    --muted: #8B9591;
     --surface2: #1A3830;
     --fg: #FFFFFF;
     --bg: #000000;

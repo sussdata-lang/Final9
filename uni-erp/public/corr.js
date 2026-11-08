@@ -58,10 +58,10 @@
     const approvedCount = allDocs.filter((d) => d.status === 'approved').length;
     const t = tabs();
     return `
-      <section class="card no-print" style="margin-bottom:14px;background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);color:#fff;border:1px solid #334155;padding:16px">
+      <section class="card no-print" style="margin-bottom:14px;background:linear-gradient(135deg,#10211D 0%,#054239 100%);color:#fff;border:1px solid #10211D;padding:16px">
         <div class="spread" style="flex-wrap:wrap;gap:10px;margin-bottom:12px">
           <div>
-            <div style="font-size:11px;color:#38bdf8;font-weight:700;letter-spacing:.4px">الديوان الإلكتروني والمراسلات الرسمية · INTERNAL CORRESPONDENCE & WORKFLOW</div>
+            <div style="font-size:11px;color:#0A5A4D;font-weight:700;letter-spacing:.4px">الديوان الإلكتروني والمراسلات الرسمية · INTERNAL CORRESPONDENCE & WORKFLOW</div>
             <div style="font-size:16px;font-weight:800;margin-top:2px">منظومة الكتب الرسمية والمذكرات الداخلية ومسارات التوقيع الإلكتروني</div>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -73,20 +73,20 @@
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px">
           <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px 12px">
-            <div style="font-size:11px;color:#cbd5e1">إجمالي المجلد الحالي</div>
+            <div style="font-size:11px;color:#DCE3DD">إجمالي المجلد الحالي</div>
             <div style="font-size:18px;font-weight:800">${allDocs.length}</div>
           </div>
           <div style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.35);border-radius:8px;padding:8px 12px">
-            <div style="font-size:11px;color:#fde68a">بانتظار توقيعك الآن</div>
-            <div style="font-size:18px;font-weight:800;color:#fbbf24">${myTurnCount}</div>
+            <div style="font-size:11px;color:#E6CB84">بانتظار توقيعك الآن</div>
+            <div style="font-size:18px;font-weight:800;color:#C9A24B">${myTurnCount}</div>
           </div>
           <div style="background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.3);border-radius:8px;padding:8px 12px">
-            <div style="font-size:11px;color:#bae6fd">قيد مسار الاعتماد</div>
-            <div style="font-size:18px;font-weight:800;color:#38bdf8">${pendingCount}</div>
+            <div style="font-size:11px;color:#BFD8CF">قيد مسار الاعتماد</div>
+            <div style="font-size:18px;font-weight:800;color:#0A5A4D">${pendingCount}</div>
           </div>
           <div style="background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);border-radius:8px;padding:8px 12px">
-            <div style="font-size:11px;color:#bbf7d0">معتمدة وصادرة رسمياً</div>
-            <div style="font-size:18px;font-weight:800;color:#4ade80">${approvedCount}</div>
+            <div style="font-size:11px;color:#A8D8BE">معتمدة وصادرة رسمياً</div>
+            <div style="font-size:18px;font-weight:800;color:#1B7F4B">${approvedCount}</div>
           </div>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -111,7 +111,7 @@
     const rows = filtered.map((d) => {
       const done = d.approvers.filter((a) => a.state === 'approved').length;
       const isSelected = B.doc && B.doc.id === d.id;
-      return `<tr class="row" tabindex="0" data-act="cropen" data-id="${d.id}" style="${isSelected ? 'background:#f0f9ff;' : ''}${d.mine.myTurn ? 'border-inline-start:4px solid #f59e0b;' : ''}">
+      return `<tr class="row" tabindex="0" data-act="cropen" data-id="${d.id}" style="${isSelected ? 'background:#F6F8F5;' : ''}${d.mine.myTurn ? 'border-inline-start:4px solid #C9A24B;' : ''}">
         <td class="mono"><b>${esc(d.no)}</b>${d.outNo ? `<div class="small" style="color:#0d9488">صادر: ${esc(d.outNo)}</div>` : ''}</td>
         <td>
           <b>${esc(d.title)}</b>
@@ -123,12 +123,12 @@
         </td>
         <td>
           ${pill(d.status)}
-          ${d.mine.myTurn ? ' <span class="pill p-review" style="background:#fef3c7;color:#92400e;border:1px solid #f59e0b">⚡ دورك بالتوقيع</span>' : ''}
+          ${d.mine.myTurn ? ' <span class="pill p-review" style="background:#FBEBD0;color:#8A6A1B;border:1px solid #C9A24B">⚡ دورك بالتوقيع</span>' : ''}
         </td>
         <td>
           <div style="display:flex;align-items:center;gap:6px">
             <span class="mono" style="font-weight:700">${done}/${d.approvers.length}</span>
-            <div style="width:50px;height:6px;background:#e2e8f0;border-radius:99px;overflow:hidden"><div style="width:${d.approvers.length ? Math.round((done / d.approvers.length) * 100) : 0}%;height:100%;background:#0d9488"></div></div>
+            <div style="width:50px;height:6px;background:#DCE3DD;border-radius:99px;overflow:hidden"><div style="width:${d.approvers.length ? Math.round((done / d.approvers.length) * 100) : 0}%;height:100%;background:#0d9488"></div></div>
           </div>
         </td>
         <td>${fmt(d.createdAt)}</td>
@@ -155,8 +155,8 @@
     const d = B.doc; if (!d) return '';
     const m = d.mine;
     const appr = d.approvers.map((a, idx) => `
-      <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 12px;border:1px solid ${a.turn && d.status === 'pending' ? '#f59e0b' : 'var(--line,#e2e8f0)'};background:${a.state === 'approved' ? '#f0fdf4' : a.turn && d.status === 'pending' ? '#fffbeb' : '#f8fafc'};border-radius:8px;margin-bottom:6px">
-        <span style="width:24px;height:24px;border-radius:50%;background:#0f172a;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">${idx + 1}</span>
+      <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 12px;border:1px solid ${a.turn && d.status === 'pending' ? '#C9A24B' : 'var(--line,#DCE3DD)'};background:${a.state === 'approved' ? '#F6F8F5' : a.turn && d.status === 'pending' ? '#F6F8F5' : '#F6F8F5'};border-radius:8px;margin-bottom:6px">
+        <span style="width:24px;height:24px;border-radius:50%;background:#10211D;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">${idx + 1}</span>
         <div style="flex:1">
           <div class="spread" style="flex-wrap:wrap;gap:6px">
             <div><b>${esc(a.name)}</b> <span class="small">${esc(a.unit ? '— ' + a.unit : '')}</span></div>
@@ -165,15 +165,15 @@
               ${a.at ? `<span class="small" style="margin-inline-start:6px">${fmt(a.at)}</span>` : ''}
             </div>
           </div>
-          ${a.note ? `<div class="small" style="margin-top:4px;color:#334155">💬 الملاحظة: ${esc(a.note)}</div>` : ''}
+          ${a.note ? `<div class="small" style="margin-top:4px;color:#10211D">💬 الملاحظة: ${esc(a.note)}</div>` : ''}
         </div>
       </div>`).join('');
 
     const actions = [];
     if (m.myTurn) {
       actions.push(`
-        <div style="background:#fffbeb;border:1px solid #f59e0b;border-radius:10px;padding:12px;margin:12px 0">
-          <strong style="color:#92400e;display:block;margin-bottom:6px">⚡ هذا الكتاب بانتظار توقيعك واعتمادك الإداري</strong>
+        <div style="background:#F6F8F5;border:1px solid #C9A24B;border-radius:10px;padding:12px;margin:12px 0">
+          <strong style="color:#8A6A1B;display:block;margin-bottom:6px">⚡ هذا الكتاب بانتظار توقيعك واعتمادك الإداري</strong>
           <label>الشرح / الحاشية (إلزامية في حال الرفض)<textarea id="cr-note" rows="2" maxlength="500" placeholder="أوافق على مضمونه ويُحال للتنفيذ..."></textarea></label>
           <div class="actions" style="margin-top:8px">
             <button class="btn pri" data-act="crapprove">✓ توقيع واعتماد الكتاب</button>
@@ -188,10 +188,10 @@
       actions.push(`<div class="actions" style="margin:10px 0"><button class="btn" data-act="crcancel">إلغاء الكتاب</button></div>`);
     }
 
-    return `<section class="card" style="border:2px solid #0284c7;margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;border-bottom:1px solid var(--line,#e2e8f0);padding-bottom:10px;margin-bottom:12px">
+    return `<section class="card" style="border:2px solid #0A5A4D;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;border-bottom:1px solid var(--line,#DCE3DD);padding-bottom:10px;margin-bottom:12px">
         <div>
-          <span class="mono" style="font-size:12px;color:#0284c7;font-weight:700">${esc(d.no)}</span>
+          <span class="mono" style="font-size:12px;color:#0A5A4D;font-weight:700">${esc(d.no)}</span>
           ${d.outNo ? ` · <span class="badge b-ok">رقم الصادر الرسمي: ${esc(d.outNo)}</span>` : ''}
           <h2 style="margin:4px 0 0">${esc(d.title)}</h2>
         </div>
@@ -202,15 +202,15 @@
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;background:#f8fafc;padding:10px 12px;border-radius:8px;margin-bottom:12px;font-size:13px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;background:#F6F8F5;padding:10px 12px;border-radius:8px;margin-bottom:12px;font-size:13px">
         <div><span class="small">الحالة:</span> ${pill(d.status)}</div>
         <div><span class="small">نمط السير:</span> <b>${d.mode === 'sequential' ? 'اعتماد تسلسلي تراتبي' : 'اعتماد متوازٍ'}</b></div>
         <div><span class="small">الجهة المنشئة:</span> <b>${esc(d.creator.name)}</b> ${d.creator.unit ? `(${esc(d.creator.unit)})` : ''}</div>
         <div><span class="small">تاريخ التحرير:</span> <b>${fmt(d.createdAt)}</b></div>
       </div>
 
-      ${d.subject ? `<div style="font-weight:700;margin-bottom:8px;padding:8px 12px;background:#f1f5f9;border-inline-start:4px solid #0f172a;border-radius:4px">الموضوع: ${esc(d.subject)}</div>` : ''}
-      <div style="white-space:pre-wrap;line-height:2;border:1px solid var(--line,#cbd5e1);background:#fff;border-radius:10px;padding:18px;margin:10px 0;font-size:14px">${esc(d.body) || '<span class="hint">لا يوجد نص للكتاب.</span>'}</div>
+      ${d.subject ? `<div style="font-weight:700;margin-bottom:8px;padding:8px 12px;background:#F6F8F5;border-inline-start:4px solid #10211D;border-radius:4px">الموضوع: ${esc(d.subject)}</div>` : ''}
+      <div style="white-space:pre-wrap;line-height:2;border:1px solid var(--line,#DCE3DD);background:#fff;border-radius:10px;padding:18px;margin:10px 0;font-size:14px">${esc(d.body) || '<span class="hint">لا يوجد نص للكتاب.</span>'}</div>
 
       ${d.files.length ? `<div style="margin:10px 0"><b>📎 المرفقات الرسمية (${d.files.length}):</b> ${d.files.map((f) => `<span class="file-chip"><a class="btn sm" href="/api/corr/files/${f.id}" download>${esc(f.name)}</a>${/^(application\/pdf|image\/(png|jpeg))$/.test(f.mime) ? ` <a class="btn sm" href="/api/corr/files/${f.id}?inline=1" target="_blank" rel="noopener">معاينة</a>` : ''}</span>`).join(' ')}</div>` : ''}
 
@@ -223,7 +223,7 @@
       ${actions.join('')}
 
       ${d.status !== 'draft' ? `
-        <div style="margin-top:14px;border-top:1px solid var(--line,#e2e8f0);padding-top:12px">
+        <div style="margin-top:14px;border-top:1px solid var(--line,#DCE3DD);padding-top:12px">
           <label style="display:block">إضافة حاشية أو تعليق إداري على الكتاب<textarea id="cr-comment" rows="2" maxlength="1000" placeholder="اكتب ملاحظتك أو توجيهك الإداري..."></textarea></label>
           <div class="actions" style="margin-top:6px"><button class="btn sm" data-act="crcomment">💬 إدراج التعليق في السجل</button></div>
         </div>` : ''}
@@ -260,7 +260,7 @@
         </div>
         <label>نص الكتاب والمضمون التفصيلي<textarea id="cf-body" rows="8" maxlength="8000" placeholder="السيد عميد الكلية / مدير المديرية المحترم...">${esc(f.body)}</textarea></label>
         <div class="grid2">
-          <div style="border:1px solid var(--line,#e2e8f0);border-radius:8px;padding:12px">
+          <div style="border:1px solid var(--line,#DCE3DD);border-radius:8px;padding:12px">
             <b>✒️ أصحاب الصلاحية في سلسلة الاعتماد *</b>
             <ol style="margin:8px 0">${sel || '<li class="hint">لم يُختر أي معتمد بعد.</li>'}</ol>
             <div style="display:flex;gap:6px">
@@ -268,7 +268,7 @@
               <button class="btn sm" type="button" data-act="cradd">+ إدراج</button>
             </div>
           </div>
-          <div style="border:1px solid var(--line,#e2e8f0);border-radius:8px;padding:12px">
+          <div style="border:1px solid var(--line,#DCE3DD);border-radius:8px;padding:12px">
             <b>📨 نسخة للاطلاع والعلم (CC)</b>
             <ul style="margin:8px 0">${ccSel || '<li class="hint">لا يوجد مستلمو نسخة.</li>'}</ul>
             <div style="display:flex;gap:6px">
@@ -314,7 +314,7 @@
       </div>
       <ul style="list-style:none;padding:0;margin:0">
         ${n.items.map((i) => `
-          <li style="padding:10px 12px;border-bottom:1px solid var(--line,#e4e9e7);background:${i.read ? 'transparent' : '#f0f9ff'};display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <li style="padding:10px 12px;border-bottom:1px solid var(--line,#DCE3DD);background:${i.read ? 'transparent' : '#F6F8F5'};display:flex;justify-content:space-between;align-items:center;gap:8px">
             <button class="link" data-act="cropen" data-id="${i.docId}" data-n="${i.id}" style="${i.read ? '' : 'font-weight:700'}">${esc(i.text)}</button>
             <span class="small">${fmt(i.at)}</span>
           </li>`).join('') || '<li class="hint">لا توجد إشعارات حالياً.</li>'}

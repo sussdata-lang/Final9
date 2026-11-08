@@ -32,7 +32,7 @@
     if (!d) return '';
     const q = C.q.trim(), rows = d.rows.filter((r) => !q || r.name.includes(q) || String(r.studentNo).includes(q));
     const done = d.rows.filter((r) => r.receivedAt).length;
-    return `<div style="margin-top:14px;padding:14px;border:1px solid var(--line,#e2e8f0);border-radius:10px">
+    return `<div style="margin-top:14px;padding:14px;border:1px solid var(--line,#DCE3DD);border-radius:10px">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
         <b>${esc(d.batch.label)} · استلم ${done} من ${d.rows.length}</b>
         <span style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn sm" href="/api/cards/batches/${d.batch.id}/export.xlsx" download>تصدير الجدول Excel</a><button type="button" class="btn sm" data-act="card-close">إغلاق</button></span>

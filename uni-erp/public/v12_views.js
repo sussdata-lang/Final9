@@ -34,7 +34,7 @@
       t.style.cssText = 'position:fixed;bottom:1.2rem;inset-inline-end:1.2rem;padding:.75rem 1.2rem;border-radius:10px;color:#fff;font-weight:700;z-index:9999;box-shadow:0 10px 25px rgba(0,0,0,.2)';
       document.body.appendChild(t);
     }
-    t.style.background = ok ? '#0f5132' : '#b91c1c';
+    t.style.background = ok ? '#0f5132' : '#B3261E';
     t.textContent = msg;
     t.style.display = 'block';
     clearTimeout(t._tm);
@@ -44,18 +44,18 @@
   const SHARED_CSS = `
     <style>
       .v12-wrap { }
-      .v12-hero { background: linear-gradient(135deg, #0d3b2e 0%, #14532d 60%, #1e3a2f 100%); color: #fff; border-radius: 16px; padding: 1.4rem 1.6rem; margin-bottom: 1.2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; box-shadow: 0 8px 24px rgba(13,59,46,.15); }
+      .v12-hero { background: linear-gradient(135deg, #0d3b2e 0%, #0E4D2E 60%, #1e3a2f 100%); color: #fff; border-radius: 16px; padding: 1.4rem 1.6rem; margin-bottom: 1.2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; box-shadow: 0 8px 24px rgba(13,59,46,.15); }
       .v12-hero h1 { margin: 0 0 .35rem 0; font-size: 1.35rem; color: #fff; }
       .v12-hero p { margin: 0; opacity: .88; font-size: .9rem; max-width: 680px; }
-      .v12-badge-gold { background: rgba(212,175,55,.22); border: 1px solid rgba(212,175,55,.55); color: #fde68a; padding: .25rem .7rem; border-radius: 999px; font-size: .78rem; font-weight: 700; display: inline-block; margin-bottom: .4rem; }
+      .v12-badge-gold { background: rgba(212,175,55,.22); border: 1px solid rgba(212,175,55,.55); color: #E6CB84; padding: .25rem .7rem; border-radius: 999px; font-size: .78rem; font-weight: 700; display: inline-block; margin-bottom: .4rem; }
       .v12-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: .85rem; margin-bottom: 1.2rem; }
-      .v12-kpi { background: var(--card-bg, #fff); border: 1px solid var(--border, #e2e8f0); border-radius: 12px; padding: 1rem 1.1rem; box-shadow: 0 2px 6px rgba(0,0,0,.03); }
-      .v12-kpi span { display: block; font-size: .8rem; color: var(--muted, #64748b); margin-bottom: .3rem; }
-      .v12-kpi strong { font-size: 1.45rem; color: var(--text, #0f172a); font-weight: 800; }
-      .v12-tabs { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1.1rem; border-bottom: 1px solid var(--border, #e2e8f0); padding-bottom: .65rem; }
-      .v12-tab { padding: .55rem 1rem; border-radius: 10px; border: 1px solid var(--border, #cbd5e1); background: var(--card-bg, #fff); color: var(--text, #334155); font-weight: 700; font-size: .86rem; cursor: pointer; transition: all .15s; }
+      .v12-kpi { background: var(--card-bg, #fff); border: 1px solid var(--border, #DCE3DD); border-radius: 12px; padding: 1rem 1.1rem; box-shadow: 0 2px 6px rgba(0,0,0,.03); }
+      .v12-kpi span { display: block; font-size: .8rem; color: var(--muted, #566660); margin-bottom: .3rem; }
+      .v12-kpi strong { font-size: 1.45rem; color: var(--text, #10211D); font-weight: 800; }
+      .v12-tabs { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1.1rem; border-bottom: 1px solid var(--border, #DCE3DD); padding-bottom: .65rem; }
+      .v12-tab { padding: .55rem 1rem; border-radius: 10px; border: 1px solid var(--border, #DCE3DD); background: var(--card-bg, #fff); color: var(--text, #10211D); font-weight: 700; font-size: .86rem; cursor: pointer; transition: all .15s; }
       .v12-tab.active { background: #0d3b2e; color: #fff; border-color: #0d3b2e; box-shadow: 0 4px 12px rgba(13,59,46,.2); }
-      .v12-card { background: var(--card-bg, #fff); border: 1px solid var(--border, #e2e8f0); border-radius: 14px; padding: 1.2rem; margin-bottom: 1rem; }
+      .v12-card { background: var(--card-bg, #fff); border: 1px solid var(--border, #DCE3DD); border-radius: 14px; padding: 1.2rem; margin-bottom: 1rem; }
       .v12-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .75rem; margin-bottom: 1rem; }
       .v12-bar h3 { margin: 0; font-size: 1.05rem; }
       .v12-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
@@ -64,14 +64,14 @@
       .v12-dlg::backdrop { background: rgba(15,23,42,.55); }
       .v12-dlg h3 { margin-top: 0; margin-bottom: 1rem; color: #0d3b2e; }
       .v12-dlg label { display: block; margin-bottom: .75rem; font-size: .85rem; font-weight: 700; }
-      .v12-dlg input, .v12-dlg select, .v12-dlg textarea { width: 100%; padding: .55rem .75rem; border-radius: 8px; border: 1px solid #cbd5e1; margin-top: .25rem; font-family: inherit; font-size: .9rem; box-sizing: border-box; }
-      .v12-prog { height: 8px; background: #e2e8f0; border-radius: 999px; overflow: hidden; margin-top: 6px; }
-      .v12-prog > div { height: 100%; background: linear-gradient(90deg, #10b981, #059669); border-radius: 999px; }
+      .v12-dlg input, .v12-dlg select, .v12-dlg textarea { width: 100%; padding: .55rem .75rem; border-radius: 8px; border: 1px solid #DCE3DD; margin-top: .25rem; font-family: inherit; font-size: .9rem; box-sizing: border-box; }
+      .v12-prog { height: 8px; background: #DCE3DD; border-radius: 999px; overflow: hidden; margin-top: 6px; }
+      .v12-prog > div { height: 100%; background: linear-gradient(90deg, #1B7F4B, #059669); border-radius: 999px; }
       .v12-viewer { max-width: 1100px; }
-      .v12-slide { position: relative; width: 100%; overflow: hidden; border: 1px solid #cbd5e1; border-radius: 8px; container-type: inline-size; color: #0f172a; }
+      .v12-slide { position: relative; width: 100%; overflow: hidden; border: 1px solid #DCE3DD; border-radius: 8px; container-type: inline-size; color: #10211D; }
       .v12-slide > * { position: absolute; box-sizing: border-box; }
       .v12-slide p { margin: 0 0 .25em; }
-      .v12-code { background: #0f172a; color: #e2e8f0; padding: 1rem; border-radius: 10px; font-family: monospace; font-size: .8rem; direction: ltr; text-align: left; max-height: 360px; overflow: auto; white-space: pre; }
+      .v12-code { background: #10211D; color: #DCE3DD; padding: 1rem; border-radius: 10px; font-family: monospace; font-size: .8rem; direction: ltr; text-align: left; max-height: 360px; overflow: auto; white-space: pre; }
     </style>
   `;
 
@@ -148,7 +148,7 @@
     dlg.querySelector('#v12-view-close').onclick = close;
     dlg.addEventListener('cancel', () => dlg.remove());
     const body = dlg.querySelector('#v12-view-body');
-    if (file.kind === 'pdf') body.innerHTML = `<iframe title="${esc(file.filename)}" src="/api/lms/files/${file.id}" style="width:100%;height:75vh;border:1px solid #cbd5e1;border-radius:8px"></iframe>`;
+    if (file.kind === 'pdf') body.innerHTML = `<iframe title="${esc(file.filename)}" src="/api/lms/files/${file.id}" style="width:100%;height:75vh;border:1px solid #DCE3DD;border-radius:8px"></iframe>`;
     else if (file.kind === 'video') body.innerHTML = `<video controls preload="metadata" src="/api/lms/files/${file.id}" style="width:100%;max-height:75vh;border-radius:8px;background:#000"></video>`;
     else {
       body.innerHTML = '<p class="hint">جارٍ تحميل الشرائح…</p>';
@@ -1109,8 +1109,8 @@
           </div>
           <div class="v12-kpis">
             <div class="v12-kpi"><span>إصدار محرك Node.js</span><strong class="mono">${esc(m.nodeVersion)}</strong></div>
-            <div class="v12-kpi"><span>بلاغات الأخطاء المفتوحة</span><strong style="color:${openCount > 0 ? '#ef4444' : '#10b981'}">${fmt(openCount)} بلاغاً</strong></div>
-            <div class="v12-kpi"><span>أخطاء حرجة غير محلولة</span><strong style="color:${critCount > 0 ? '#dc2626' : '#94a3b8'}">${fmt(critCount)}</strong></div>
+            <div class="v12-kpi"><span>بلاغات الأخطاء المفتوحة</span><strong style="color:${openCount > 0 ? '#B3261E' : '#1B7F4B'}">${fmt(openCount)} بلاغاً</strong></div>
+            <div class="v12-kpi"><span>أخطاء حرجة غير محلولة</span><strong style="color:${critCount > 0 ? '#B3261E' : '#8B9591'}">${fmt(critCount)}</strong></div>
             <div class="v12-kpi"><span>الذاكرة المستخدمة (Heap)</span><strong>${m.heapUsedMb} MB</strong></div>
             <div class="v12-kpi"><span>سجلات التدقيق</span><strong>${fmt(m.auditCount)}</strong></div>
           </div>
@@ -1121,7 +1121,7 @@
             </button>
             <button class="v12-tab ${activeTab === 'incidents' ? 'active' : ''}" data-t="incidents">
               🚨 بلاغات أخطاء استوديو الكود والبنية التحتية
-              ${openCount > 0 ? `<span style="margin-inline-start:6px;background:#ef4444;color:#fff;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:bold;">${openCount}</span>` : ''}
+              ${openCount > 0 ? `<span style="margin-inline-start:6px;background:#B3261E;color:#fff;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:bold;">${openCount}</span>` : ''}
             </button>
             <button class="v12-tab ${activeTab === 'infra' ? 'active' : ''}" data-t="infra">
               ⚙️ قاعدة البيانات والتخزين المؤقت
@@ -1161,24 +1161,24 @@
         box.innerHTML = `
           <!-- بطاقات مؤشرات التسليم والاعتمادية -->
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px;">
-            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:14px;border-top:3px solid #10b981;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
+            <div style="background:#fff;border:1px solid #DCE3DD;border-radius:8px;padding:14px;border-top:3px solid #1B7F4B;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
               <div class="small hint" style="font-weight:700">نسبة نجاح تسليم البلاغات</div>
-              <div style="font-size:26px;font-weight:900;color:#10b981;margin:4px 0">${a.delivery.successRate}%</div>
+              <div style="font-size:26px;font-weight:900;color:#1B7F4B;margin:4px 0">${a.delivery.successRate}%</div>
               <div class="small hint">تسليم مؤكد وموثق لوحدة DevOps</div>
             </div>
-            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:14px;border-top:3px solid #0284c7;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
+            <div style="background:#fff;border:1px solid #DCE3DD;border-radius:8px;padding:14px;border-top:3px solid #0A5A4D;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
               <div class="small hint" style="font-weight:700">تسليم مباشر فوري (Direct)</div>
-              <div style="font-size:26px;font-weight:900;color:#0284c7;margin:4px 0">${a.delivery.directDeliveryRate}%</div>
+              <div style="font-size:26px;font-weight:900;color:#0A5A4D;margin:4px 0">${a.delivery.directDeliveryRate}%</div>
               <div class="small hint">دون اللجوء لقنوات المعالجة البديلة</div>
             </div>
-            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:14px;border-top:3px solid #D5B65D;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
+            <div style="background:#fff;border:1px solid #DCE3DD;border-radius:8px;padding:14px;border-top:3px solid #D5B65D;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
               <div class="small hint" style="font-weight:700">نسبة معالجة وحل الأخطاء</div>
-              <div style="font-size:26px;font-weight:900;color:#b45309;margin:4px 0">${a.delivery.resolutionRate}%</div>
+              <div style="font-size:26px;font-weight:900;color:#8A6A1B;margin:4px 0">${a.delivery.resolutionRate}%</div>
               <div class="small hint">تم إغلاقها وتوثيق تصحيحها</div>
             </div>
-            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:14px;border-top:3px solid #8b5cf6;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
+            <div style="background:#fff;border:1px solid #DCE3DD;border-radius:8px;padding:14px;border-top:3px solid #4DB6A0;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
               <div class="small hint" style="font-weight:700">متوسط زمن الاستجابة والتسليم</div>
-              <div style="font-size:26px;font-weight:900;color:#8b5cf6;margin:4px 0">${a.delivery.avgLatencyMs} ms</div>
+              <div style="font-size:26px;font-weight:900;color:#4DB6A0;margin:4px 0">${a.delivery.avgLatencyMs} ms</div>
               <div class="small hint">زمن تأكيد التسليم بين الاستوديو والـ API</div>
             </div>
           </div>
@@ -1187,7 +1187,7 @@
           <div style="background:linear-gradient(135deg,#054239 0%,#095549 100%);color:#fff;padding:12px 18px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
             <div>
               <div style="font-weight:800;font-size:14.5px">لوحة تحليلات DevOps التفاعلية</div>
-              <div class="small" style="color:#d1fae5">رسوم بيانية مركبة (Composed & Area Charts) لتواتر الأعطال ونسب الإرسال على مدار الـ 7 أيام الماضية.</div>
+              <div class="small" style="color:#A8D8BE">رسوم بيانية مركبة (Composed & Area Charts) لتواتر الأعطال ونسب الإرسال على مدار الـ 7 أيام الماضية.</div>
             </div>
             <div style="display:flex;gap:8px;">
               <button class="btn sm" id="btn-launch-recharts" style="background:#D5B65D;color:#042f28;font-weight:800;cursor:pointer;">📊 فتح التحليلات في صفحة الإحصاءات</button>
@@ -1201,26 +1201,26 @@
                 <h3 style="margin:0;">تواتر الأخطاء المكتشفة بمرور الوقت (Error Frequency Timeline - 7 Days)</h3>
                 <p class="small hint" style="margin:2px 0 0;">تتبع إجمالي البلاغات المسجلة، الأخطاء الحرجة، وفشل عمليات حفظ الملفات يومياً.</p>
               </div>
-              <span class="small font-bold" style="background:#f1f5f9;padding:3px 8px;border-radius:4px;">تحديث مباشر</span>
+              <span class="small font-bold" style="background:#F6F8F5;padding:3px 8px;border-radius:4px;">تحديث مباشر</span>
             </div>
-            <div style="display:flex;align-items:flex-end;gap:12px;height:180px;padding:16px 10px 0;background:#fafafa;border-radius:6px;border:1px solid #f1f5f9;">
+            <div style="display:flex;align-items:flex-end;gap:12px;height:180px;padding:16px 10px 0;background:#F6F8F5;border-radius:6px;border:1px solid #F6F8F5;">
               ${ts.map((item) => {
                 const totalH = Math.max(8, (item.total / maxTs) * 130);
                 const critH = Math.min(totalH, Math.max(4, (item.critical / maxTs) * 130));
                 return `
                   <div style="flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;gap:6px;">
-                    <span style="font-size:11px;font-weight:800;color:#0f172a;">${item.total}</span>
-                    <div style="width:100%;max-width:38px;height:${totalH}px;background:#ef4444;border-radius:4px 4px 0 0;position:relative;display:flex;align-items:flex-end;overflow:hidden;" title="إجمالي: ${item.total} | حرج: ${item.critical} | فشل حفظ: ${item.saveFailures}">
-                      <div style="width:100%;height:${critH}px;background:#991b1b;"></div>
+                    <span style="font-size:11px;font-weight:800;color:#10211D;">${item.total}</span>
+                    <div style="width:100%;max-width:38px;height:${totalH}px;background:#B3261E;border-radius:4px 4px 0 0;position:relative;display:flex;align-items:flex-end;overflow:hidden;" title="إجمالي: ${item.total} | حرج: ${item.critical} | فشل حفظ: ${item.saveFailures}">
+                      <div style="width:100%;height:${critH}px;background:#B3261E;"></div>
                     </div>
-                    <span style="font-size:11px;font-weight:600;color:#64748b;white-space:nowrap;">${esc(item.label)}</span>
+                    <span style="font-size:11px;font-weight:600;color:#566660;white-space:nowrap;">${esc(item.label)}</span>
                   </div>
                 `;
               }).join('')}
             </div>
             <div style="display:flex;gap:16px;justify-content:center;margin-top:10px;font-size:12px;">
-              <span style="display:flex;align-items:center;gap:6px;"><i style="width:12px;height:12px;background:#ef4444;border-radius:2px;display:inline-block;"></i> إجمالي البلاغات</span>
-              <span style="display:flex;align-items:center;gap:6px;"><i style="width:12px;height:12px;background:#991b1b;border-radius:2px;display:inline-block;"></i> أخطاء حرجة (Critical)</span>
+              <span style="display:flex;align-items:center;gap:6px;"><i style="width:12px;height:12px;background:#B3261E;border-radius:2px;display:inline-block;"></i> إجمالي البلاغات</span>
+              <span style="display:flex;align-items:center;gap:6px;"><i style="width:12px;height:12px;background:#B3261E;border-radius:2px;display:inline-block;"></i> أخطاء حرجة (Critical)</span>
             </div>
           </div>
 
@@ -1235,8 +1235,8 @@
                       <b>${esc(op.label)}</b>
                       <span class="mono">${op.total} بلاغ (${percentage}%)</span>
                     </div>
-                    <div style="height:8px;background:#f1f5f9;border-radius:4px;overflow:hidden;">
-                      <div style="width:${Math.max(5, percentage)}%;height:100%;background:#0284c7;border-radius:4px;"></div>
+                    <div style="height:8px;background:#F6F8F5;border-radius:4px;overflow:hidden;">
+                      <div style="width:${Math.max(5, percentage)}%;height:100%;background:#0A5A4D;border-radius:4px;"></div>
                     </div>
                   </div>
                 `; }).join('')}
@@ -1252,7 +1252,7 @@
                       <b class="mono" dir="ltr">${esc(f.name)}</b>
                       <span class="mono" style="font-weight:700;">${f.count} بلاغ</span>
                     </div>
-                    <div style="height:8px;background:#f1f5f9;border-radius:4px;overflow:hidden;">
+                    <div style="height:8px;background:#F6F8F5;border-radius:4px;overflow:hidden;">
                       <div style="width:${Math.max(8, (f.count / (ts.reduce((s, x) => s + x.total, 0) || 1)) * 100)}%;height:100%;background:#D5B65D;border-radius:4px;"></div>
                     </div>
                   </div>
@@ -1320,10 +1320,10 @@
                     const isErr = inc.severity === 'error';
                     const isResolved = inc.status === 'resolved';
                     const sevBadge = isCrit
-                      ? '<span class="pill" style="background:#fee2e2;color:#991b1b;border:1px solid #f87171;">حرج (Critical)</span>'
+                      ? '<span class="pill" style="background:#FBE0DD;color:#B3261E;border:1px solid #B3261E;">حرج (Critical)</span>'
                       : isErr
-                      ? '<span class="pill" style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d;">خطأ (Error)</span>'
-                      : '<span class="pill" style="background:#e0f2fe;color:#075985;">تحذير / معلومة</span>';
+                      ? '<span class="pill" style="background:#FBEBD0;color:#8A6A1B;border:1px solid #C9A24B;">خطأ (Error)</span>'
+                      : '<span class="pill" style="background:#E2EEE9;color:#054239;">تحذير / معلومة</span>';
 
                     return `
                       <tr style="${isCrit && !isResolved ? 'background:rgba(239,68,68,0.04);' : ''}">
@@ -1337,8 +1337,8 @@
                         </td>
                         <td>${sevBadge}</td>
                         <td style="max-width:280px;">
-                          <div style="font-weight:600;color:${isCrit ? '#dc2626' : 'inherit'};">${esc(inc.error_message)}</div>
-                          ${inc.resolution_note ? `<div class="small hint" style="color:#16a34a;">الحل: ${esc(inc.resolution_note)}</div>` : ''}
+                          <div style="font-weight:600;color:${isCrit ? '#B3261E' : 'inherit'};">${esc(inc.error_message)}</div>
+                          ${inc.resolution_note ? `<div class="small hint" style="color:#1B7F4B;">الحل: ${esc(inc.resolution_note)}</div>` : ''}
                         </td>
                         <td class="small hint" style="white-space:nowrap;">
                           ${new Date(inc.created_at).toLocaleTimeString('ar-SY', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
@@ -1401,7 +1401,7 @@
                 </div>
                 <div style="margin-bottom:10px;">
                   <b>رسالة الخطأ:</b>
-                  <div style="color:#b91c1c;background:#fee2e2;padding:8px 12px;border-radius:6px;margin-top:4px;font-weight:600;">
+                  <div style="color:#B3261E;background:#FBE0DD;padding:8px 12px;border-radius:6px;margin-top:4px;font-weight:600;">
                     ${esc(inc.error_message)}
                   </div>
                 </div>
@@ -1520,9 +1520,9 @@
             </div>
           </div>
           <div class="v12-kpis">
-            <div class="v12-kpi"><span>حالات إنذار مبكر حرجة</span><strong style="color:#dc2626">${fmt(s.criticalCount)}</strong></div>
-            <div class="v12-kpi"><span>حالات متوسطة قيد المتابعة</span><strong style="color:#d97706">${fmt(s.mediumCount)}</strong></div>
-            <div class="v12-kpi"><span>حالات مستقرة وآمنة</span><strong style="color:#16a34a">${fmt(s.safeCount)}</strong></div>
+            <div class="v12-kpi"><span>حالات إنذار مبكر حرجة</span><strong style="color:#B3261E">${fmt(s.criticalCount)}</strong></div>
+            <div class="v12-kpi"><span>حالات متوسطة قيد المتابعة</span><strong style="color:#8A6A1B">${fmt(s.mediumCount)}</strong></div>
+            <div class="v12-kpi"><span>حالات مستقرة وآمنة</span><strong style="color:#1B7F4B">${fmt(s.safeCount)}</strong></div>
             <div class="v12-kpi"><span>مراسلات وشكاوى مصنفة آلياً</span><strong>${fmt(s.triageCount)}</strong></div>
             <div class="v12-kpi"><span>استشارات المرشد الذكي</span><strong>${fmt(s.chatsCount)}</strong></div>
           </div>
@@ -1591,7 +1591,7 @@
             <h3>🤖 المرشد الأكاديمي الذكي (مدرب على اللوائح والخطط الدراسية)</h3>
             <p class="small hint">اطرح أي سؤال حول شروط التخرج، نسب الغياب المسموحة، العبء التدريسي، أو توزيع المقررات.</p>
             <form id="form-ai-ask" style="display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap">
-              <input id="inp-ai-q" style="flex:1;min-width:240px;padding:.65rem .9rem;border-radius:10px;border:1px solid #cbd5e1" placeholder="مثال: ما شروط التخرج بمرتبة الشرف وما الحد الأقصى للغياب المسموح؟" required>
+              <input id="inp-ai-q" style="flex:1;min-width:240px;padding:.65rem .9rem;border-radius:10px;border:1px solid #DCE3DD" placeholder="مثال: ما شروط التخرج بمرتبة الشرف وما الحد الأقصى للغياب المسموح؟" required>
               <button type="submit" class="btn pri">إرسال للمرشد الذكي</button>
             </form>
             <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:1rem">
@@ -1601,9 +1601,9 @@
             </div>
             <div style="space-y:.75rem">
               ${d.chats.map((c) => `
-                <div style="border:1px solid #e2e8f0;border-radius:12px;padding:1rem;margin-bottom:.75rem;background:#f8fafc">
+                <div style="border:1px solid #DCE3DD;border-radius:12px;padding:1rem;margin-bottom:.75rem;background:#F6F8F5">
                   <div style="font-weight:700;color:#0d3b2e;margin-bottom:.4rem">سؤال (${esc(c.user_label)}): ${esc(c.question)}</div>
-                  <div style="line-height:1.65;color:#1e293b">${esc(c.answer)}</div>
+                  <div style="line-height:1.65;color:#10211D">${esc(c.answer)}</div>
                   <div class="small hint" style="margin-top:.35rem">المحرك: <span class="mono">${esc(c.model_used)}</span></div>
                 </div>
               `).join('') || '<p class="hint">لا توجد استشارات سابقة بعد. ابدأ بطرح سؤالك أعلاه.</p>'}

@@ -90,12 +90,12 @@
         <div id="es-rep-preview-mount">${UA.esReportPreview ? UA.esReportPreview() : ''}</div>
       </section>
 
-      <section class="card no-print" style="background:#f8fafc;border:1px solid #cbd5e1">
+      <section class="card no-print" style="background:#F6F8F5;border:1px solid #DCE3DD">
         <h3 style="margin:0 0 8px">صادرات تخصصية مدمجة (طلبات الخدمات Excel + دوام شؤون الموظفين)</h3>
         <div class="inline-form" style="gap:14px;align-items:flex-end;flex-wrap:wrap">
           <div style="flex:1;min-width:260px;display:grid;gap:4px">
             <label style="font-size:12px;font-weight:700;color:#0f766e">بحث وتصفية الخدمات
-              <input type="search" id="xp-svc-search" placeholder="اكتب اسم الخدمة للفلترة السريعة..." autocomplete="off" style="width:100%;padding:6px 10px;border-radius:6px;border:1px solid #cbd5e1;margin-top:2px;font-size:13px">
+              <input type="search" id="xp-svc-search" placeholder="اكتب اسم الخدمة للفلترة السريعة..." autocomplete="off" style="width:100%;padding:6px 10px;border-radius:6px;border:1px solid #DCE3DD;margin-top:2px;font-size:13px">
             </label>
             <label style="font-size:12px">تصدير طلبات خدمة محددة (Excel)
               <select id="xp-req-svc" style="width:100%">

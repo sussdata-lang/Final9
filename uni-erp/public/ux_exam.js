@@ -119,12 +119,12 @@
       <td>${esc(c.proctor || '—')}</td>
     </tr>`).join('');
 
-    const html = `<div class="doc" dir="rtl" style="max-width:980px;margin:0 auto;padding:28px;background:#fff;color:#0f172a;font-family:inherit;border:2px solid #054239;border-radius:12px">
+    const html = `<div class="doc" dir="rtl" style="max-width:980px;margin:0 auto;padding:28px;background:#fff;color:#10211D;font-family:inherit;border:2px solid #054239;border-radius:12px">
       <div class="doc-head" style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #054239;padding-bottom:14px">
         <div>
-          <div style="font-size:13px;color:#475569;font-weight:700">الجمهورية العربية السورية · وزارة الداخلية</div>
+          <div style="font-size:13px;color:#566660;font-weight:700">الجمهورية العربية السورية · وزارة الداخلية</div>
           <h2 style="margin:4px 0;color:#054239;font-size:22px">${esc(uni)}</h2>
-          <div style="font-size:14px;font-weight:700;color:#0f172a">رئاسة دائرة الامتحانات والشؤون الأكاديمية</div>
+          <div style="font-size:14px;font-weight:700;color:#10211D">رئاسة دائرة الامتحانات والشؤون الأكاديمية</div>
         </div>
         <img class="crest" src="/brand/crest.svg" alt="" width="64" height="74">
         <div style="text-align:left;font-size:12px" dir="ltr">
@@ -135,10 +135,10 @@
       </div>
 
       <div style="text-align:center;margin:18px 0">
-        <h3 style="margin:0;font-size:19px;color:#054239;background:#f0fdf4;display:inline-block;padding:6px 22px;border-radius:8px;border:1px solid #86efac">
+        <h3 style="margin:0;font-size:19px;color:#054239;background:#F6F8F5;display:inline-block;padding:6px 22px;border-radius:8px;border:1px solid #A8D8BE">
           جدول فحص الامتحانات الرسمي الشامل — ${esc(U.examSchedule.examType)}
         </h3>
-        <div style="margin-top:6px;font-size:13px;color:#334155;font-weight:600">
+        <div style="margin-top:6px;font-size:13px;color:#10211D;font-weight:600">
           العام الدراسي: ${esc(U.examSchedule.academicYear)} · ${esc(U.examSchedule.semester)} · إجمالي المقررات المجدولة: (${selected.length}) مقرر دراسي
         </div>
       </div>
@@ -159,7 +159,7 @@
         <tbody>${rowsHtml}</tbody>
       </table>
 
-      <div style="margin-top:18px;padding:12px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;font-size:12px">
+      <div style="margin-top:18px;padding:12px;background:#F6F8F5;border:1px solid #DCE3DD;border-radius:8px;font-size:12px">
         <b>تعليمات امتحانية إلزامية:</b>
         <ol style="margin:6px 0 0;padding-inline-start:20px">
           <li>يُطلب من جميع الطلاب الحضور إلى القاعة الامتحانية قبل (15) دقيقة من موعد بدء الفحص مصطحبين البطاقة الجامعية الذكية.</li>
@@ -168,18 +168,18 @@
         </ol>
       </div>
 
-      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:24px;padding-top:14px;border-top:1px dashed #94a3b8;font-size:13px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:24px;padding-top:14px;border-top:1px dashed #8B9591;font-size:13px">
         <div>
           <span class="stamp" style="display:inline-block;padding:4px 12px;border:2px solid #054239;color:#054239;font-weight:800;border-radius:6px">وثيقة امتحانية مصدّقة رقمياً (PDF)</span>
           <div style="margin-top:6px">رمز التحقق المرجعي: <span class="mono" dir="ltr">${esc(docCode)}</span></div>
         </div>
         <div style="text-align:center">
           <b>رئيس دائرة الامتحانات</b>
-          <div style="margin-top:24px;color:#64748b">التوقيع والختم الرسمي</div>
+          <div style="margin-top:24px;color:#566660">التوقيع والختم الرسمي</div>
         </div>
         <div style="text-align:center">
           <b>اعتماد رئاسة الجامعة</b>
-          <div style="margin-top:24px;color:#64748b">التوقيع والختم الرسمي</div>
+          <div style="margin-top:24px;color:#566660">التوقيع والختم الرسمي</div>
         </div>
       </div>
     </div>`;
@@ -251,7 +251,7 @@
         </div>
       </div>
 
-      <div class="inline-form" style="margin-top:14px;padding:14px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:12px">
+      <div class="inline-form" style="margin-top:14px;padding:14px;background:#F6F8F5;border:1px solid #DCE3DD;border-radius:12px">
         <label>نوع الفحص / الدورة الامتحانية
           <select id="exm-type">
             ${examTypes.map((t) => `<option value="${esc(t)}"${t === U.examSchedule.examType ? ' selected' : ''}>${esc(t)}</option>`).join('')}
@@ -323,7 +323,7 @@
         </h2>
         <span style="background:#054239;color:#D5B65D;font-weight:800;font-size:11px;padding:3px 9px;border-radius:6px;font-family:monospace">ميزة #3 المنقولة</span>
       </div>
-      <p class="sub" style="margin-top:0;color:#64748b;font-size:13px">خريطة الخطة الدراسية وترابط المتطلبات السابقة مع محاكاة فورية للمعدل التراكمي المتوقع نهاية الفصل.</p>
+      <p class="sub" style="margin-top:0;color:#566660;font-size:13px">خريطة الخطة الدراسية وترابط المتطلبات السابقة مع محاكاة فورية للمعدل التراكمي المتوقع نهاية الفصل.</p>
       
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;margin-top:14px">
         <div>
@@ -331,10 +331,10 @@
           ${plan.length ? '' : '<p class="hint">تظهر الخطة للطالب من مقررات برنامجه وعلاماته المعتمدة.</p>'}
           ${plan.map((item) => {
             const cls = item.status === 'منجز' ? 'p-approved' : item.status === 'مسجل حالياً' ? 'p-review' : '';
-            return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:10px;border:1px solid #cbd5e1;margin-bottom:8px;background:rgba(14,102,85,.02)">
+            return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:10px;border:1px solid #DCE3DD;margin-bottom:8px;background:rgba(14,102,85,.02)">
               <div>
                 <strong class="mono">${esc(item.code)}</strong> — <b>${esc(item.name)}</b>
-                <div class="small" style="color:#64748b">السنة ${item.year} · ${item.credits} ساعات معتمدة · المتطلب: <span class="mono">${esc(item.prereq)}</span></div>
+                <div class="small" style="color:#566660">السنة ${item.year} · ${item.credits} ساعات معتمدة · المتطلب: <span class="mono">${esc(item.prereq)}</span></div>
               </div>
               <div style="text-align:end">
                 <span class="pill ${cls}">${esc(item.status)}</span>
@@ -345,7 +345,7 @@
         </div>
         <div>
           <h3 style="font-size:14px;margin:0 0 10px">حاسبة ومحاكي المعدل التراكمي المتوقع (Interactive GPA Calculator)</h3>
-          <form id="gpa-sim-calc-form" class="form" style="background:rgba(14,102,85,.04);padding:14px;border-radius:12px;border:1px solid #cbd5e1">
+          <form id="gpa-sim-calc-form" class="form" style="background:rgba(14,102,85,.04);padding:14px;border-radius:12px;border:1px solid #DCE3DD">
             <div class="inline-form" style="gap:10px">
               <label>المعدل التراكمي الحالي (%)<input id="gpa-cur" type="number" step="0.1" value="${sim.curGpa}"></label>
               <label>الساعات المنجزة<input id="gpa-hrs" type="number" value="${sim.hrs}"></label>
@@ -357,21 +357,21 @@
             <button class="btn pri" type="button" data-act="calcgpasim" style="margin-top:12px;height:38px;width:100%">حساب وتوقع المعدل التراكمي</button>
           </form>
           <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:14px">
-            <div style="background:#fff;border:1px solid #cbd5e1;border-inline-start:4px solid #0e6655;border-radius:10px;padding:12px">
-              <small style="display:block;font-size:11.5px;color:#64748b">المعدل التراكمي المتوقع</small>
+            <div style="background:#fff;border:1px solid #DCE3DD;border-inline-start:4px solid #0e6655;border-radius:10px;padding:12px">
+              <small style="display:block;font-size:11.5px;color:#566660">المعدل التراكمي المتوقع</small>
               <strong style="font-size:22px;color:#054239;display:block;margin-top:2px">${sim.expGpa === null ? '—' : `${sim.expGpa}%`}</strong>
             </div>
-            <div style="background:#fff;border:1px solid #cbd5e1;border-inline-start:4px solid #0e6655;border-radius:10px;padding:12px">
-              <small style="display:block;font-size:11.5px;color:#64748b">التقدير الأكاديمي</small>
+            <div style="background:#fff;border:1px solid #DCE3DD;border-inline-start:4px solid #0e6655;border-radius:10px;padding:12px">
+              <small style="display:block;font-size:11.5px;color:#566660">التقدير الأكاديمي</small>
               <strong style="font-size:20px;color:#054239;display:block;margin-top:2px">${esc(sim.letter)}</strong>
             </div>
-            <div style="background:#fff;border:1px solid #cbd5e1;border-inline-start:4px solid #0e6655;border-radius:10px;padding:12px">
-              <small style="display:block;font-size:11.5px;color:#64748b">إجمالي الساعات بعد الفصل</small>
+            <div style="background:#fff;border:1px solid #DCE3DD;border-inline-start:4px solid #0e6655;border-radius:10px;padding:12px">
+              <small style="display:block;font-size:11.5px;color:#566660">إجمالي الساعات بعد الفصل</small>
               <strong style="font-size:20px;color:#054239;display:block;margin-top:2px">${sim.hrs === '' ? '—' : `${Number(sim.hrs) + 7} ساعة`}</strong>
             </div>
-            <div style="background:#fff;border:1px solid #cbd5e1;border-inline-start:4px solid #10b981;border-radius:10px;padding:12px">
-              <small style="display:block;font-size:11.5px;color:#64748b">مقدار التحسن المتوقع</small>
-              <strong style="font-size:20px;color:#10b981;display:block;margin-top:2px">${sim.delta}</strong>
+            <div style="background:#fff;border:1px solid #DCE3DD;border-inline-start:4px solid #1B7F4B;border-radius:10px;padding:12px">
+              <small style="display:block;font-size:11.5px;color:#566660">مقدار التحسن المتوقع</small>
+              <strong style="font-size:20px;color:#1B7F4B;display:block;margin-top:2px">${sim.delta}</strong>
             </div>
           </div>
         </div>
