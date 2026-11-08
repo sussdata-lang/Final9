@@ -458,7 +458,7 @@
       ${isRcv ? `
         <div class="card">
           <h3 style="margin-top:0">📥 سجل مذكرات الاستلام والفحص المخزني (${num(P.receipts.length)})</h3>
-          <div class="tbl-wrap"><table class="tbl"><thead><tr><th>رقم المذكرة</th><th>أمر التوريد (PO)</th><th>المورد</th><th>الأصناف المستلمة</th><th>التاريخ</th><th>ملاحظات الفحص</th></tr></thead><tbody>
+          <div class="tbl-wrap"><table class="tbl"><thead><tr><th>رقم المذكرة</th><th>أمر التوريد (PO)</th><th>المورد</th><th>الأصناف المستلمة</th><th>التاريخ</th><th>ملاحظات الفحص</th><th>طباعة</th></tr></thead><tbody>
             ${P.receipts.map((r) => `<tr>
               <td><code>RCV-${String(r.id).padStart(4, '0')}</code>${r.reversedAt ? ` <span class="pill p-rejected" title="${esc(fmt(r.reversedAt))}">معكوسة</span>` : ''}</td>
               <td><code>${esc(r.orderNo)}</code></td>
@@ -466,13 +466,14 @@
               <td>${(r.lines || []).map((l) => `<span class="badge b-ok" style="margin-inline-end:4px">${esc(l.itemName)}: ${num(l.qty)} × ${money(l.unitCost)}</span>`).join(' ')}</td>
               <td>${fmt(r.receivedAt)}</td>
               <td>${esc(r.note || '—')}</td>
-            </tr>`).join('') || '<tr><td colspan="6" class="empty">لا توجد مذكرات استلام مسجلة</td></tr>'}
+              <td>${UA.rowPrintBtn('مذكرة فحص واستلام مخزني', 'المشتريات والمخازن', 'أمين المستودع|لجنة الفحص والاستلام|مسؤول المشتريات')}</td>
+            </tr>`).join('') || '<tr><td colspan="7" class="empty">لا توجد مذكرات استلام مسجلة</td></tr>'}
           </tbody></table></div>
         </div>
       ` : `
         <div class="card">
           <h3 style="margin-top:0">📤 سجل أذونات الصرف المخزني للجهات والأقسام (${num(P.issues.length)})</h3>
-          <div class="tbl-wrap"><table class="tbl"><thead><tr><th>رقم إذن الصرف</th><th>المستودع المصدِّر</th><th>الجهة / الموظف المستلم</th><th>الغرض والبيان</th><th>الأصناف المصروفة</th><th>التاريخ</th></tr></thead><tbody>
+          <div class="tbl-wrap"><table class="tbl"><thead><tr><th>رقم إذن الصرف</th><th>المستودع المصدِّر</th><th>الجهة / الموظف المستلم</th><th>الغرض والبيان</th><th>الأصناف المصروفة</th><th>التاريخ</th><th>طباعة</th></tr></thead><tbody>
             ${P.issues.map((i) => `<tr>
               <td><code>${esc(i.no)}</code>${i.reversedAt ? ` <span class="pill p-rejected" title="${esc(fmt(i.reversedAt))}">معكوس</span>` : ''}</td>
               <td>${esc(i.warehouseName)}</td>
@@ -480,7 +481,8 @@
               <td>${esc(i.purpose || '—')}</td>
               <td>${(i.lines || []).map((l) => `<span class="badge b-info" style="margin-inline-end:4px">${esc(l.itemName)} (${num(l.qty)})</span>`).join(' ')}</td>
               <td>${fmt(i.issuedAt)}</td>
-            </tr>`).join('') || '<tr><td colspan="6" class="empty">لا توجد أذونات صرف مخزني</td></tr>'}
+              <td>${UA.rowPrintBtn('إذن صرف مخزني', 'المشتريات والمخازن', 'أمين المستودع|المستلم|مسؤول المشتريات')}</td>
+            </tr>`).join('') || '<tr><td colspan="7" class="empty">لا توجد أذونات صرف مخزني</td></tr>'}
           </tbody></table></div>
         </div>
       `}`;
@@ -517,6 +519,7 @@
             <td><b>${money(a.cost)}</b></td>
             <td>${stBadge(ASSET_STATUS, a.status)}</td>
             <td style="white-space:nowrap">
+              ${UA.rowPrintBtn('سند عهدة أصل ثابت', 'المشتريات والمخازن', 'أمين المستودع|مستلم العهدة|مدير الشؤون الإدارية')}
               ${can('procurement:assets') ? `
                 <button class="btn sm" data-act="proc-move-asset" data-id="${a.id}">🔄 نقل عهدة / حالة</button>
                 <button class="btn sm" data-act="proc-edit-asset" data-id="${a.id}">تعديل</button>
@@ -809,6 +812,7 @@
             ${r.lines.map((l) => `<tr><td>${esc(l.itemName || '—')}</td><td>${esc(l.description)}</td><td>${num(l.qty)}</td><td>${money(l.estCost)}</td><td><b>${money(l.qty * l.estCost)}</b></td></tr>`).join('')}
           </tbody><tfoot><tr><th colspan="4">الإجمالي التقديري</th><th>${money(total)}</th></tr></tfoot></table>
           <div class="row-end" style="margin-top:12px">
+            <button class="btn no-print" data-act="print">طباعة</button><span hidden data-doc-title="طلب شراء" data-doc-dept="المشتريات والمخازن" data-doc-signers="مقدم الطلب:${esc(r.requesterName || '')}|رئيس القسم|مسؤول المشتريات"></span>
             ${r.status === 'approved' && can('procurement:manage') ? `<button class="btn pri" data-act="proc-req-to-po" data-id="${r.id}">🚚 تحويل لأمر توريد (PO)</button>` : ''}
             <button class="btn" data-act="proc-close-modal">إغلاق</button>
           </div>`);
@@ -870,7 +874,7 @@
       }
       else if (act === 'proc-view-ord') {
         const { order: o } = await api('GET', `/api/procurement/orders/${b.dataset.id}`);
-        showModal(`<div class="spread"><h3>أمر توريد رقم ${esc(o.no)}</h3>${stBadge(ORD_STATUS, o.status)}</div>
+        showModal(`<div data-doc-title="أمر توريد" data-doc-no="${esc(o.no)}" data-doc-dept="المشتريات والمخازن" data-doc-status="${esc((ORD_STATUS[o.status] || [o.status])[0] || '')}" data-doc-signers="مسؤول المشتريات|المدير المالي|الآمر بالصرف|المورد (استلام الأمر)"></div><div class="spread"><h3>أمر توريد رقم ${esc(o.no)}</h3>${stBadge(ORD_STATUS, o.status)}</div>
           <p><b>المورد:</b> ${esc(o.supplierName)} · <b>تاريخ الإصدار:</b> ${fmt(o.createdAt)}</p>
           ${o.note ? `<p><b>شروط التوريد:</b> ${esc(o.note)}</p>` : ''}
           <table class="tbl"><thead><tr><th>الصنف</th><th>البيان</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead><tbody>

@@ -57,6 +57,38 @@
     ? `<svg class="fi" width="${s}" height="${s}" viewBox="0 0 24 24" aria-hidden="true">${FILL[n]}</svg>`
     : `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[n] || ''}</svg>`;
   const NAV_ICON = { desk: 'home', overview: 'home', enterprise: 'layers', home: 'home', guide: 'guide', grades: 'bars', fees: 'wallet', tx: 'file', affairs: 'users', student_life: 'housing', labtools: 'library', dashboard: 'bars', academics: 'book', comms: 'news', exchange: 'exchange', internal: 'file', corr: 'mail', hr: 'briefcase', payroll: 'briefcase', procurement: 'box', finance: 'wallet', settings: 'settings', units: 'layers', import: 'upload', export: 'download', attendance: 'hall', admin: 'settings', access: 'key', audit: 'audit', verify: 'check', lms: 'lms', research: 'research', alumni: 'graduation', qa: 'quality', expansions: 'clipboard', devops: 'settings', ai: 'spark', guidelines: 'compass' };
+  /* أيقونات التبويبات الفرعية في القائمة الجانبية: بمفتاح التبويب أولاً، ثم بكلمات عنوانه، وإلا أيقونة ملف.
+     تُزال الرموز التعبيرية من أول العنوان كي تتوحد التبويبات كلها على أيقونات الهوية. */
+  const SUB_ICON = {
+    unified: 'home', work: 'briefcase', myprofile: 'idcard',
+    requests: 'clipboard', list: 'users', new: 'cap', groups: 'layers', digital_card: 'idcard', advising: 'compass', lifecycle: 'exchange', scholarships: 'wallet', desk_queue: 'clock',
+    my_grades: 'chart', courses: 'book', grades: 'bars', gpa_sim: 'graduation', members: 'users',
+    scan: 'idcard', log: 'audit', smart_schedule: 'calendar',
+    payroll: 'wallet', att_leaves: 'clock', biometrics: 'key', appraisals: 'quality', enterprise_hr: 'briefcase',
+    in: 'download', out: 'upload', internal_requests: 'clipboard', internal_new: 'file', pending_all: 'check', new_corr: 'mail', tpl: 'layers', notifs: 'spark',
+    stats: 'chart', departments: 'hall', devops: 'settings', import: 'upload', export: 'download', news: 'news', complaints: 'mail',
+    general: 'settings', mysettings: 'idcard', rules: 'check', programs: 'graduation', units: 'grid', verify: 'shield', backup: 'box', identity: 'spark', services: 'briefcase', waf: 'shield',
+    users: 'users', roles: 'idcard', matrix: 'layers',
+    chain: 'audit', hc_perf: 'chart', archify: 'layers', logs: 'file', exec_offline: 'quality',
+    depts: 'hall', hierarchy: 'layers', corr_rules: 'mail', governance: 'shield',
+  };
+  const SUB_WORD = [
+    [/امتحان|اختبار|تظلم/, 'calendar'], [/ترقي/, 'research'], [/مبان|غرف|سكن/, 'housing'], [/احتياج|مستودع|مخز|أصناف|جرد/, 'box'],
+    [/محاضر|محتوى رقمي|تعلم/, 'lms'], [/بنك الأسئلة|أسئلة/, 'clipboard'], [/قبول|مفاضلة|معادلة/, 'graduation'], [/ساعات مكتبية|حجوز|موعد|دوام|حضور/, 'clock'],
+    [/مكتبة|إعارة/, 'library'], [/أندية|نشاط|أنشطة/, 'spark'], [/أبحاث|بحث|مشاريع/, 'research'], [/ماجستير|دكتوراه|رسائل/, 'book'],
+    [/خريج/, 'cap'], [/وظائف|تدريب|موردون|مورد/, 'briefcase'], [/مؤشر|KPI|إحصاء|المركز المالي/, 'chart'], [/تقييم|جودة/, 'quality'],
+    [/اعتماد|حماية|أمن|رقابة/, 'shield'], [/إنذار/, 'bars'], [/مرشد|إرشاد|خطة/, 'compass'], [/تصنيف|ذكي|ذكاء/, 'spark'],
+    [/لوحة|منظومة/, 'grid'], [/شراء|توريد|حركة|حركات/, 'exchange'], [/أصول|عهد|مفات/, 'key'], [/شجرة|هيكل|قوالب/, 'layers'],
+    [/قيود|يومية|دليل/, 'book'], [/تكامل|ربط/, 'exchange'], [/تقارير|قوائم|سجل/, 'file'], [/رسوم|أقساط/, 'cap'], [/خزينة|سندات|ذمم|رواتب|منح|مالي/, 'wallet'],
+    [/طلاب|طالب|موظف|أعضاء|حسابات|مستخدم/, 'users'], [/مراسل|بريد|كتاب|شكاو/, 'mail'], [/أخبار|تعميم/, 'news'], [/إعداد/, 'settings'],
+    [/جدول/, 'calendar'], [/قسم|أقسام|كلي|وحد/, 'hall'],
+  ];
+  const subLabel = (t) => String(t || '').replace(/^[\s‍️\p{Extended_Pictographic}]+/u, '').trim();
+  const subIcon = (key, label) => {
+    const l = subLabel(label);
+    const n = SUB_ICON[key] || (SUB_WORD.find(([re]) => re.test(l)) || [])[1] || 'file';
+    return ico(n, 16);
+  };
   const PARENT = { site: 'admin', services: 'admin' };
   /* مجموعات القائمة الجانبية وترتيبها */
   const NAV_GROUP = {
@@ -230,7 +262,7 @@
         ['affairs', 'scholarships', '3. المنح والإعفاءات المالية'],
         ['affairs', 'desk_queue', '4. مكتب خدمة الطالب والدور']
       );
-      return `<div class="sx-sub-list" role="group" aria-label="شؤون الطلاب">${it.filter((x) => okTab('sttab', x[1])).map((x) => `<button data-sx="sub" data-v="${x[0]}" data-t="${x[1]}"${S.view === x[0] && t === x[1] ? ' aria-current="true"' : ''}>${esc(x[2])}</button>`).join('')}</div>`;
+      return `<div class="sx-sub-list" role="group" aria-label="شؤون الطلاب">${it.filter((x) => okTab('sttab', x[1])).map((x) => `<button data-sx="sub" data-v="${x[0]}" data-t="${x[1]}"${S.view === x[0] && t === x[1] ? ' aria-current="true"' : ''}>${subIcon(x[1], x[2])}<span>${esc(x[2])}</span></button>`).join('')}</div>`;
     };
 
     // تبويبات الصفحة الداخلية تظهر في القائمة الجانبية تحت عنوان الصفحة لسهولة التنقل الفوري
@@ -253,7 +285,7 @@
             const bdgHtml = bdgVal && bdgVal !== '0'
               ? `<small style="margin-inline-start:auto;background:rgba(213,182,93,.22);color:#C9A24B;padding:1px 7px;border-radius:99px;font-size:11px;font-weight:700">${esc(bdgVal)}</small>`
               : '';
-            return `<button data-act="${x[1]}" data-t="${x[2]}" data-s="${x[2]}"${x[3] === 'true' ? ' aria-current="true"' : ''}><span>${esc(tr(cleanTxt))}</span>${bdgHtml}</button>`;
+            return `<button data-act="${x[1]}" data-t="${x[2]}" data-s="${x[2]}"${x[3] === 'true' ? ' aria-current="true"' : ''}>${subIcon(x[2], cleanTxt)}<span>${esc(subLabel(tr(cleanTxt)))}</span>${bdgHtml}</button>`;
           }).join('')}</div>`;
         }
       }
@@ -325,7 +357,7 @@
         <footer class="sx-foot"><span>© 2026 ${esc(tr(S.uni))}</span><span>${tr('جميع الحقوق محفوظة')}</span></footer>
       </div></div>`;
   };
-  UA.sx = { ico, initials, ago, dateLong, nf, statCard, navIcon: NAV_ICON, navGroup: NAV_GROUP };
+  UA.sx = { ico, subIcon, subLabel, initials, ago, dateLong, nf, statCard, navIcon: NAV_ICON, navGroup: NAV_GROUP };
 
   /* ---------- الأحداث ---------- */
   const pops = () => [document.getElementById('sx-notif'), document.getElementById('sx-menu')].filter(Boolean);

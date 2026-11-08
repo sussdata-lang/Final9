@@ -60,6 +60,26 @@
   };
   UA.printHtml = function (html, opts = {}) {
     if (opts.card) { printCards(Array.isArray(html) ? html : [html]); return; }
+    // المستندات (لا البطاقات): ورقة A4 بالترويسة الرسمية الموحّدة بدل ترويستها المختصرة (print_doc.js)
+    if (UA.printDoc && !opts.raw) {
+      const wrap = document.createElement('div');
+      wrap.innerHTML = Array.isArray(html) ? html.join('') : html;
+      let title = '', dept = '';
+      const hd = wrap.querySelector('.print-hd');
+      if (hd) { title = ((hd.querySelector('span') || hd).textContent || '').trim(); hd.remove(); }
+      const first = wrap.firstElementChild && wrap.firstElementChild.firstElementChild;
+      const head = wrap.querySelector('.doc-head') || (first && first.querySelector('h2') && /border-bottom/.test(first.getAttribute('style') || '') ? first : null);
+      if (head) {
+        const sub = head.querySelector('h4');
+        if (!title && sub) title = sub.textContent.trim();
+        if (!dept && head.querySelector('h2 + div')) dept = head.querySelector('h2 + div').textContent.trim();
+        head.remove();
+      }
+      if (!title) { const h = wrap.querySelector('h1, h2, h3'); if (h) { title = h.textContent.trim(); h.remove(); } }
+      const text = wrap.textContent || '';
+      UA.printDoc({ title, dept: dept || undefined, node: wrap, noSign: /توقيع[^\n]{0,50}:\s*[_.]{3,}|التوقيع والختم/.test(text) });
+      return;
+    }
     let root = document.getElementById('printroot');
     if (!root) { root = document.createElement('div'); root.id = 'printroot'; document.body.appendChild(root); }
     root.className = '';
@@ -275,7 +295,7 @@
       try { const dt = new DataTransfer(); dt.items.add(f); inp.files = dt.files; } catch { toast('تعذّر إرفاق الصورة؛ استخدم رفع ملف.'); return; }
       const m = document.getElementById('formcam-msg'); if (m) m.textContent = 'ستُرفَق الصورة الملتقَطة عند الحفظ.';
     }),
-    credprint: () => { if (!S.cred || !S.cred.student) return; UA.printHtml(card(S.cred.student, { cred: S.cred, files: S.cred.files, cert: S.cred.cert })); },
-    bcprint: () => { const st = S.stSel; if (st) UA.printHtml(card(st, { files: S.stFiles, cert: S.stCert })); },
+    credprint: () => { if (!S.cred || !S.cred.student) return; UA.printHtml(card(S.cred.student, { cred: S.cred, files: S.cred.files, cert: S.cred.cert }), { raw: true }); },
+    bcprint: () => { const st = S.stSel; if (st) UA.printHtml(card(st, { files: S.stFiles, cert: S.stCert }), { raw: true }); },
   });
 })();

@@ -160,6 +160,12 @@
     else if (a === 'del-hand') { if (window.confirm('حذف سجل المواد؟')) run(() => api('DELETE', `/api/housing/handouts/${id}`), 'حُذف'); }
     else if (a === 'receipt') {
       const h = d.handouts.find((v) => v.id === id);
+      if (UA.printDoc) {
+        UA.printDoc({ title: 'وصل استلام مواد السكن الجامعي', no: h.handout_no, dept: 'السكن الجامعي', date: h.handed_day,
+          html: `<table class="a4-kv a4-kv2"><tbody><tr><th>الطالب</th><td>${esc(h.student_name)}</td><th>الرقم الجامعي</th><td>${esc(h.student_no)}</td></tr><tr><th>الكلية</th><td>${esc(h.faculty_name)}</td><th>الغرفة</th><td>${esc(h.room_label || '—')}</td></tr></tbody></table><h3>المواد المستلمة</h3><table><thead><tr><th>المادة</th><th>الكمية</th><th>الرقم التسلسلي</th></tr></thead><tbody>${h.items.map((x) => `<tr><td>${esc(x.name)}</td><td>${x.qty}</td><td>${esc(x.serial || '')}</td></tr>`).join('')}</tbody></table>${h.note ? `<p><b>ملاحظات:</b> ${esc(h.note)}</p>` : ''}`,
+          signers: [['الطالب المستلم', h.student_name], ['المسلِّم', h.handed_by], ['مشرف السكن', '']] });
+        return;
+      }
       UA.printDocument(`<h2 style="text-align:center">وصل استلام مواد السكن الجامعي</h2><p>رقم الوصل: <b>${esc(h.handout_no)}</b> · التاريخ: ${esc(h.handed_day)}</p><p>الطالب: <b>${esc(h.student_name)}</b> (${esc(h.student_no)}) · ${esc(h.faculty_name)} · الغرفة: ${esc(h.room_label || '—')}</p><table><thead><tr><th>المادة</th><th>الكمية</th><th>الرقم التسلسلي</th></tr></thead><tbody>${h.items.map((x) => `<tr><td>${esc(x.name)}</td><td>${x.qty}</td><td>${esc(x.serial || '')}</td></tr>`).join('')}</tbody></table><p>${esc(h.note)}</p><div style="display:flex;justify-content:space-between;margin-top:40px"><span>توقيع الطالب: ................</span><span>المسلِّم: ${esc(h.handed_by)}</span></div>`,
         '@page{size:A4 portrait;margin:0}', 'body{font-family:Tahoma,Arial,sans-serif;padding:15mm;font-size:13px}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #8B9591;padding:6px;text-align:right}');
     }

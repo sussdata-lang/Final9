@@ -425,7 +425,7 @@
               <td>${{ financial: 'مالية', disciplinary: 'تأديبية', library: 'مكتبة' }[h.holdType] || esc(h.holdType)}</td>
               <td>${esc(h.note)}</td>
               <td>${h.active ? '<span class="bad-t">قائمة / محظور</span>' : '<span class="ok-t">مسددة / مرفوعة</span>'}</td>
-              <td style="white-space:nowrap">
+              <td style="white-space:nowrap">${UA.rowPrintBtn('قرار لجنة انضباطية', 'شؤون الطلاب', 'الطالب|رئيس اللجنة|مدير شؤون الطلاب')}
                 ${h.active ? `<button class="btn sm" data-act="clearhold" data-id="${h.id}">تسوية ورفع</button> ` : ''}
                 <button class="btn sm" data-act="edithold" data-id="${h.id}">تعديل</button>
                 <button class="btn sm bad" data-act="delhold" data-id="${h.id}">حذف</button>

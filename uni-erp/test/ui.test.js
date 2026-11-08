@@ -93,6 +93,8 @@ test('التسجيل بلا كاميرا: بطاقة موحّدة كاملة + �
 
 test('السجل 360: قسم المقررات حتى دون علامات، وزر الطباعة يملأ جذر الطباعة', async (t) => {
   if (!pw) return t.skip('Playwright غير متوفر');
+  // يعمل التنظيف حتى عند الفشل: نافذة #layer الباقية تحجب النقر في الاختبارات التالية فتفشل كلها
+  t.after(() => page.evaluate(() => { document.body.classList.remove('print-a4'); document.getElementById('a4root')?.replaceChildren(); document.getElementById('layer').innerHTML = ''; }));
   const id = (await api('GET', '/api/students?q=' + encodeURIComponent('ريم'))).j.students[0].id;
   await page.evaluate((id) => UA.actions.strecord(null, { id }), id); await page.waitForSelector('#layer .rec-h');
   const heads = (await page.locator('#layer .rec-h').allInnerTexts()).join('|');
@@ -100,8 +102,9 @@ test('السجل 360: قسم المقررات حتى دون علامات، وز�
   assert.ok((await page.locator('#layer table').first().innerText()).includes('أمن الشبكات'));
   await page.evaluate(() => { window.print = () => {}; });
   await page.locator('[data-act=r360print]').click();
-  assert.ok(await page.evaluate(() => document.querySelector('#printroot .rec-print')?.textContent.includes('المقررات')));
-  await page.evaluate(() => { document.body.classList.remove('print-root'); document.getElementById('printroot').innerHTML = ''; document.getElementById('layer').innerHTML = ''; });
+  // المستند يُبنى في طبقة A4 المستقلة بالترويسة الرسمية
+  await page.waitForFunction(() => document.querySelector('#a4root .rec-print')?.textContent.includes('المقررات'));
+  assert.ok(await page.evaluate(() => !!document.querySelector('#a4root .a4-head') && document.body.classList.contains('print-a4')));
 });
 
 test('الفلترة تشمل كل البيانات: تفعيل فلتر عمود يرفع الصفوف إلى 500', async (t) => {

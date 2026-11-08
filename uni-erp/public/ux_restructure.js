@@ -284,6 +284,7 @@
       <td><b>${a.overall_score}%</b></td>
       <td>${esc(a.recommendation)}</td>
       <td>${esc(a.evaluator_name)}</td>
+      <td>${UA.rowPrintBtn('تقييم أداء موظف', 'شؤون الموظفين', 'الموظف|المقيّم|مدير شؤون الموظفين')}</td>
     </tr>`).join('');
 
     return `<section class="card">
@@ -302,7 +303,7 @@
     </section>
     <section class="card" style="margin-top:16px">
       <h3>سجل التقييمات المعتمدة للموظفين (${U.appraisals.length})</h3>
-      <div class="tbl-wrap"><table><thead><tr><th>الموظف</th><th>القسم</th><th>الدورة</th><th>الالتزام</th><th>الجودة</th><th>التعاون</th><th>المعدل العام</th><th>التوصية</th><th>المقيّم</th></tr></thead><tbody>${rows || '<tr><td colspan="9" class="hint">لا توجد تقييمات مسجلة.</td></tr>'}</tbody></table></div>
+      <div class="tbl-wrap"><table><thead><tr><th>الموظف</th><th>القسم</th><th>الدورة</th><th>الالتزام</th><th>الجودة</th><th>التعاون</th><th>المعدل العام</th><th>التوصية</th><th>المقيّم</th><th>طباعة</th></tr></thead><tbody>${rows || '<tr><td colspan="9" class="hint">لا توجد تقييمات مسجلة.</td></tr>'}</tbody></table></div>
     </section>`;
   }
 

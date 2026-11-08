@@ -129,6 +129,13 @@
       ${q.instructions ? `<p>${esc(q.instructions)}</p>` : ''}
       ${qs.map((x, i) => `<div class="q"><b>${i + 1}. ${esc(x.q)} (${x.marks} علامة)</b>${x.type === 'essay' ? '<div class="l"></div><div class="l"></div><div class="l"></div>' : (x.options || []).map((o, k) => `<div class="o${withAnswers && (x.correct || []).includes(k) ? ' ok' : ''}">${x.type === 'multi' ? '☐' : '○'} ${esc(o)}</div>`).join('')}</div>`).join('')}
       <div class="s"><div>توقيع مدرس المادة: ........................</div><div>ختم الجامعة</div></div>`;
+    // الورقة الرسمية: الترويسة الموحّدة (print_doc.js) بدل الرأس المختصر، وأنماط الأسئلة محصورة في متن الورقة
+    if (UA.printDoc) {
+      const scoped = '.a4-body .m{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;margin:0 0 10px;padding:8px;border:1px solid #9DB5AD;border-radius:2mm}.a4-body .q{break-inside:avoid;margin:10px 0}.a4-body .q b{display:block;margin-bottom:5px}.a4-body .o{margin:3px 12px}.a4-body .l{border-bottom:1px dotted #566660;height:24px}.a4-body .s{display:flex;justify-content:space-between;margin-top:30px;break-inside:avoid}.a4-body .ok{font-weight:700;text-decoration:underline}';
+      const paper = body.replace(/^<div class="h">[\s\S]*?<\/div><\/div>\s*/, '');
+      UA.printDoc({ title: `${q.title}${withAnswers ? ' — نموذج الإجابة' : ''}`, dept: q.faculty_name || undefined, date: q.exam_day || undefined, html: `<style>${scoped}</style><p class="small">مدة الامتحان: <b>${esc(q.duration_min)} دقيقة</b></p>${paper}`, noSign: true });
+      return;
+    }
     UA.printDocument(body, '@page{size:A4 portrait;margin:0}', css);
   }
 

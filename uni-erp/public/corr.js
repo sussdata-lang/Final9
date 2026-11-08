@@ -172,7 +172,7 @@
     const actions = [];
     if (m.myTurn) {
       actions.push(`
-        <div style="background:#F6F8F5;border:1px solid #C9A24B;border-radius:10px;padding:12px;margin:12px 0">
+        <div data-print-skip style="background:#F6F8F5;border:1px solid #C9A24B;border-radius:10px;padding:12px;margin:12px 0">
           <strong style="color:#8A6A1B;display:block;margin-bottom:6px">⚡ هذا الكتاب بانتظار توقيعك واعتمادك الإداري</strong>
           <label>الشرح / الحاشية (إلزامية في حال الرفض)<textarea id="cr-note" rows="2" maxlength="500" placeholder="أوافق على مضمونه ويُحال للتنفيذ..."></textarea></label>
           <div class="actions" style="margin-top:8px">
@@ -223,7 +223,7 @@
       ${actions.join('')}
 
       ${d.status !== 'draft' ? `
-        <div style="margin-top:14px;border-top:1px solid var(--line,#DCE3DD);padding-top:12px">
+        <div data-print-skip style="margin-top:14px;border-top:1px solid var(--line,#DCE3DD);padding-top:12px">
           <label style="display:block">إضافة حاشية أو تعليق إداري على الكتاب<textarea id="cr-comment" rows="2" maxlength="1000" placeholder="اكتب ملاحظتك أو توجيهك الإداري..."></textarea></label>
           <div class="actions" style="margin-top:6px"><button class="btn sm" data-act="crcomment">💬 إدراج التعليق في السجل</button></div>
         </div>` : ''}

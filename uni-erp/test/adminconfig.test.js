@@ -58,3 +58,16 @@ test('هوية الموقع: اسم الجامعة يجب أن يحوي حروف
     phone: '0944123456', governorate: 'دمشق', city: 'المزة', address: 'شارع', hs_type: 'الثانوية العامة - الفرع العلمي', hs_year: 2024, hs_score: 2100, program_id: 2, admission_type: 'القبول العام (المفاضلة)', enroll_year: 2024, enroll_term: 'الفصل الأول', study_level: 1, guardian_name: 'أحمد', guardian_relation: 'الأب', guardian_phone: '0933111222' } });
   assert.equal(payloadFor(app.db, app.cfg, st.j.student.id).university, 'الجامعة السورية للعلوم الأمنية — دمشق');
 });
+
+test('ترويسة المطبوعات: تعديلها من هوية الموقع يظهر فوراً، والفارغ يخفي السطر، والرموز الممنوعة تُرفض', async () => {
+  const before = (await api('GET', '/api/me')).j.site;
+  assert.equal(before.countryEn, 'SYRIAN ARAB REPUBLIC');
+  assert.equal(before.ministry, 'وزارة الداخلية');
+  const ok = await api('PUT', '/api/admin/settings', { cookie: adm, body: { countryEn: 'TEST REPUBLIC', ministryEn: '' } });
+  assert.equal(ok.s, 200);
+  const after = (await api('GET', '/api/me')).j.site;
+  assert.equal(after.countryEn, 'TEST REPUBLIC');
+  assert.equal(after.ministryEn, '');
+  assert.equal((await api('PUT', '/api/admin/settings', { cookie: adm, body: { universityEn: '<b>x</b>' } })).s, 400);
+  await api('PUT', '/api/admin/settings', { cookie: adm, body: { countryEn: before.countryEn, ministryEn: before.ministryEn } });
+});

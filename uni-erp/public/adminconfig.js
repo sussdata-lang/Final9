@@ -21,6 +21,15 @@
         <label>اسم البوابة<input id="si-title" maxlength="60" value="${esc(s.title)}"></label>
         <label>اسم القسم<input id="si-dept" maxlength="80" value="${esc(s.department)}"></label>
         <button class="btn pri" data-act="savesite">حفظ</button></div>
+      <h3 style="margin-top:16px">ترويسة السندات والنماذج المطبوعة</h3>
+      <p class="hint">تظهر في أعلى كل مستند مطبوع، ويسري أي تعديل على الطباعة التالية مباشرة. اترك الحقل فارغاً لإخفاء سطره.</p>
+      <div class="inline-form">
+        <label>الدولة بالعربية<input id="si-country" maxlength="80" value="${esc(s.country)}"></label>
+        <label>الجهة الأعلى بالعربية<input id="si-ministry" maxlength="80" value="${esc(s.ministry)}"></label>
+        <label>الدولة بالإنكليزية<input id="si-country-en" dir="ltr" maxlength="80" value="${esc(s.countryEn)}"></label>
+        <label>الجهة الأعلى بالإنكليزية<input id="si-ministry-en" dir="ltr" maxlength="80" value="${esc(s.ministryEn)}"></label>
+        <label>الجامعة بالإنكليزية<input id="si-university-en" dir="ltr" maxlength="120" value="${esc(s.universityEn)}"></label>
+      </div>
       <p class="small">اسم التطبيق على شاشة الهاتف (بعد تثبيته) وشعاره وألوانه ثابتة حالياً.</p></section>`;
   }
 
@@ -178,8 +187,8 @@
   };
 
   A.savesite = async () => {
-    const r = await api('PUT', '/api/admin/settings', { university: val('si-uni'), title: val('si-title'), department: val('si-dept') });
-    B.site = r.site; UA.S.uni = /[\u0600-\u06FF]/.test(r.site.university) ? r.site.university : UA.S.uni; UA.render(); toast('حُفظت الإعدادات');
+    const r = await api('PUT', '/api/admin/settings', { university: val('si-uni'), title: val('si-title'), department: val('si-dept'), country: val('si-country'), ministry: val('si-ministry'), countryEn: val('si-country-en'), ministryEn: val('si-ministry-en'), universityEn: val('si-university-en') });
+    B.site = r.site; UA.S.site = r.site; UA.S.uni = /[\u0600-\u06FF]/.test(r.site.university) ? r.site.university : UA.S.uni; UA.render(); toast('حُفظت الإعدادات');
   };
   A.svnew = () => {
     B.sv = { mode: 'new', code: '', label: '', label0: '', description: '', slaHours: (UA.S.limits || {}).defaultSla || 48, requiresAttachment: false, issuesDocument: true, enabled: true, builtin: false, unit: '', audience: 'student', category: '', instructions: '', slotsText: '', maxAttachments: 1, fields: [] };

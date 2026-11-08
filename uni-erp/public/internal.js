@@ -173,7 +173,7 @@
         <td>${esc(r.unit ? r.unit.name : '—')}</td>
         <td><span class="pill p-${r.status}">${ST[r.status] || r.status}</span></td>
         <td>${fmt(r.createdAt)}</td>
-        <td><button class="btn sm" data-act="inopen" data-id="${r.id}">${B.open === r.id ? 'إخفاء المسار' : 'التفاصيل والمسار'}</button></td>
+        <td><button class="btn sm" data-act="inopen" data-id="${r.id}">${B.open === r.id ? 'إخفاء المسار' : 'التفاصيل والمسار'}</button> <button class="btn sm" data-act="reqprint" data-id="${r.id}">طباعة النموذج</button></td>
       </tr>
       ${B.open === r.id ? `<tr><td colspan="6" style="background:#F6F8F5;padding:12px">${detail(r)}</td></tr>` : ''}`).join('');
 

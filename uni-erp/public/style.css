@@ -2144,3 +2144,135 @@ tr.sx-row-click:hover>td{background:rgba(213,182,93,.08)}
 .hr-tile-t{display:grid;gap:3px;min-width:0}
 .hr-tile-t b{color:var(--accent);font-size:16px}
 .hr-tile-t small{color:var(--muted);font-size:12.5px}
+
+/* أيقونات التبويبات الفرعية في القائمة الجانبية: أصغر وأهدأ من أيقونات الأقسام */
+.sx-nav .sx-sub-list button{gap:9px}
+.sx-sub-list .fi{width:16px;height:16px;opacity:.85}
+.sx-nav .sx-sub-list button{--i1:#9CB8B0;--i3:#073A33}
+.sx-nav .sx-sub-list button:hover{--i1:#E2EEE9;--i3:#0D4038}
+.sx-nav .sx-sub-list button[aria-current="true"]{--i1:#FFFFFF;--i2:var(--sx-gold-2,#E6CB84);--i3:#0F4A40}
+.sx-nav .sx-sub-list button[aria-current="true"] .fi{opacity:1}
+.sx-sub-list button>span{min-width:0}
+
+/* ===== المستندات الرسمية المطبوعة: ورقة A4 بترويسة الجامعة (print_doc.js) ===== */
+#a4root{display:none}
+.a4-doc{font-family:var(--f-ui);color:#10211D;font-size:10.5pt;line-height:1.6;background:#fff}
+.a4-head{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:6mm;padding-bottom:3mm}
+.a4-ar{text-align:right;color:#054239;font-weight:800;line-height:1.45}
+.a4-ar .l0{font-size:14pt}.a4-ar .l1{font-size:13pt}.a4-ar .l2{font-size:12.5pt}
+.a4-en{text-align:left;color:#054239;font-weight:800;line-height:1.3;font-family:"Segoe UI",Arial,sans-serif}
+.a4-en .l0,.a4-en .l1{font-size:12pt;letter-spacing:.02em}.a4-en .l2{font-size:10.5pt;font-weight:700}
+.a4-crest img{display:block;width:26mm;height:auto}
+.a4-rule{height:0;border-top:1.6pt solid #054239;border-bottom:.8pt solid #C9A24B;padding-top:1.2pt;margin-bottom:5mm}
+.a4-title{text-align:center;font-size:15pt;font-weight:800;color:#054239;margin:0 0 4mm}
+.a4-meta{width:100%;border-collapse:collapse;margin-bottom:5mm;font-size:10pt}
+.a4-meta th,.a4-meta td{border:.6pt solid #9DB5AD;padding:1.6mm 2.4mm;text-align:start}
+.a4-meta th{background:#E2EEE9;color:#054239;font-weight:700;white-space:nowrap;width:1%}
+.a4-body{min-height:40mm}
+.a4-body .card,.a4-body .modal,.a4-body section{border:0!important;box-shadow:none!important;padding:0!important;margin:0 0 4mm!important;background:none!important;max-width:none!important;max-height:none!important;overflow:visible!important}
+.a4-body h2,.a4-body h3,.a4-body h4{color:#054239;font-size:12pt;margin:4mm 0 2mm}
+.a4-body p{margin:0 0 2mm}
+.a4-body .tbl-wrap{overflow:visible!important;max-height:none!important}
+.a4-body table{width:100%;border-collapse:collapse;font-size:9.5pt;margin:2mm 0 4mm;break-inside:auto}
+.a4-body th,.a4-body td{border:.6pt solid #9DB5AD;padding:1.4mm 2mm;text-align:start;vertical-align:top;background:none;color:#10211D}
+.a4-body thead th{background:#E2EEE9!important;color:#054239!important;font-weight:700}
+.a4-body tfoot th,.a4-body tfoot td{background:#F6F8F5!important;font-weight:800}
+.a4-body tr{break-inside:avoid}
+.a4-body thead{display:table-header-group}
+.a4-body code,.a4-body .mono{font-family:Consolas,monospace;font-size:9pt}
+.a4-body .pill,.a4-body .badge,.a4-body [class*="badge"]{border:.6pt solid #9DB5AD;background:none!important;color:#10211D!important;border-radius:3px;padding:0 1.5mm}
+.a4-body .a4-field{display:inline-block;min-width:30mm;border-bottom:.6pt dotted #566660;padding:0 1mm;font-weight:700}
+.a4-body label{display:block;margin-bottom:2mm;font-weight:600}
+.a4-body .inline-form,.a4-body .grid2,.a4-body .form{display:grid;grid-template-columns:1fr 1fr;gap:2mm 6mm}
+.a4-body svg{max-width:100%}
+.a4-sign{display:grid;gap:5mm;margin-top:8mm;break-inside:avoid}
+.a4-sig{border:.6pt solid #9DB5AD;border-radius:2mm;padding:2.5mm 3mm}
+.a4-sig-role{font-weight:800;color:#054239;text-align:center;border-bottom:.6pt solid #DCE3DD;padding-bottom:1.5mm;margin-bottom:2mm}
+.a4-sig-row{display:flex;gap:2mm;align-items:flex-end;margin-top:3mm;font-size:9.5pt}
+.a4-sig-row span{color:#566660;white-space:nowrap}
+.a4-sig-row b{flex:1;border-bottom:.6pt dotted #566660;min-height:5mm;font-weight:700}
+.a4-foot{display:flex;justify-content:space-between;gap:4mm;margin-top:6mm;padding-top:2mm;border-top:.6pt solid #C9A24B;font-size:8.5pt;color:#566660}
+@media print{
+  @page a4{size:A4 portrait;margin:12mm 12mm 12mm}
+  body.print-a4{background:#fff!important;padding:0!important;margin:0!important}
+  body.print-a4>*:not(#a4root){display:none!important}
+  body.print-a4 #a4root{display:block;page:a4}
+  body.print-a4 .a4-doc *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+/* لمسات الهوية على المستند المطبوع: إطار وزوايا ذهبية، علامة مائية، شريط عنوان، رؤوس خضراء */
+.a4-doc{position:relative;z-index:1;padding:3mm 4mm 0}
+.a4-frame{position:fixed;inset:0;border:.8pt solid #054239;outline:.5pt solid #C9A24B;outline-offset:-2.2mm;pointer-events:none;z-index:0}
+.a4-frame i{position:absolute;width:9mm;height:9mm;border-color:#C9A24B;border-style:solid;border-width:0}
+.a4-frame .c1{top:-.8pt;right:-.8pt;border-top-width:2.4pt;border-right-width:2.4pt}
+.a4-frame .c2{top:-.8pt;left:-.8pt;border-top-width:2.4pt;border-left-width:2.4pt}
+.a4-frame .c3{bottom:-.8pt;right:-.8pt;border-bottom-width:2.4pt;border-right-width:2.4pt}
+.a4-frame .c4{bottom:-.8pt;left:-.8pt;border-bottom-width:2.4pt;border-left-width:2.4pt}
+.a4-wm{position:fixed;top:50%;left:50%;width:110mm;height:auto;transform:translate(-50%,-42%);opacity:.045;z-index:0;pointer-events:none}
+.a4-title-wrap{display:flex;align-items:center;gap:4mm;margin:1mm 0 5mm}
+.a4-title-wrap::before,.a4-title-wrap::after{content:"";flex:1;height:0;border-top:.8pt solid #C9A24B}
+.a4-title{margin:0!important;background:#054239;color:#fff!important;font-size:14pt;padding:1.8mm 9mm;border-radius:5mm;box-shadow:inset 0 -1.4pt 0 #C9A24B;white-space:nowrap;max-width:75%;white-space:normal;text-align:center}
+.a4-meta th{background:#054239!important;color:#fff!important;border-color:#054239!important}
+.a4-meta td{background:#fff;font-weight:700}
+.a4-body thead th{background:#054239!important;color:#fff!important;border-color:#0A5A4D!important}
+.a4-body tbody tr:nth-child(even) td{background:#F2F7F4!important}
+.a4-body tfoot th,.a4-body tfoot td{background:#F7EFD9!important;color:#054239!important;border-top:1.2pt solid #C9A24B!important}
+.a4-body h2,.a4-body h3,.a4-body h4{border-inline-start:2.4pt solid #C9A24B;padding-inline-start:2mm}
+.a4-sig{border-color:#C9D9D2;border-top:2pt solid #C9A24B;background:#fff;padding:0 0 2.5mm;overflow:hidden}
+.a4-sig-role{background:#054239;color:#fff;border:0;padding:1.6mm 2mm;margin:0 0 1mm}
+.a4-sig-row{padding:0 3mm}
+.a4-foot{border-top:1.2pt solid #C9A24B;color:#054239;font-weight:600}
+.a4-foot span:first-child::before{content:"◆";color:#C9A24B;margin-inline-end:1.5mm}
+@media print{
+  @page a4l{size:A4 landscape;margin:10mm 12mm}
+  body.print-a4 #a4root.a4-land{page:a4l}
+}
+.a4-land .a4-body table{font-size:8.5pt}
+.a4-land .a4-body th,.a4-land .a4-body td{padding:1mm 1.4mm}
+/* الجداول العريضة تلتف داخل عرض الورقة بدل أن تُقص */
+.a4-body table{table-layout:auto;width:100%!important;min-width:0!important;max-width:100%!important}
+.a4-body th,.a4-body td{white-space:normal!important;min-width:0!important;width:auto!important;word-break:normal;overflow-wrap:break-word}
+.a4-body [style*="nowrap"]{white-space:normal!important}
+.a4-body [style*="min-width"]{min-width:0!important}
+.a4-land .a4-body table{font-size:7.6pt}
+.a4-land .a4-body th,.a4-land .a4-body td{padding:.8mm 1mm}
+.a4-body td.a4-num,.a4-body th.a4-num{white-space:nowrap!important;overflow-wrap:normal}
+.a4-body .mono,.a4-body code{font-family:var(--f-ui)!important}
+.a4-land .a4-body table{font-size:6.5pt}
+.a4-land .a4-body th,.a4-land .a4-body td{padding:.7mm .8mm!important}
+.a4-body .ux-tile-body{display:inline}
+/* جداول «الحقل: القيمة» في النماذج المطبوعة */
+.a4-body table.a4-kv{margin:1mm 0 3mm}
+.a4-body table.a4-kv th{width:32%;background:#E2EEE9!important;color:#054239!important;font-weight:700}
+.a4-body table.a4-kv td{font-weight:600}
+.a4-body table.a4-kv tbody tr:nth-child(even) td{background:#fff!important}
+/* الوثائق الرسمية (إفادات وشهادات): ورقة A4 بالطول وترويسة الجامعة الكاملة */
+@media print{
+  /* إخفاء كامل لا visibility فقط: وإلا أبقت صفحة التطبيق مساحتها فخرجت الورقة الأولى بيضاء والوثيقة بعدها */
+  body.print-doc>*:not(#layer){display:none!important}
+  body.print-doc .sheet:not(.sheet-tr){page:a4}
+  @page a4z{size:A4 portrait;margin:0}
+  body.print-doc .sheet-tr{page:a4z;margin:0;padding:0;width:auto;max-width:none}
+}
+.doc .a4-head{margin-bottom:2mm}
+.doc .a4-rule{margin-bottom:4mm}
+.doc .a4-ar .l0{font-size:clamp(13px,2.2vw,18px)}.doc .a4-ar .l1,.doc .a4-ar .l2{font-size:clamp(12px,2vw,16px)}
+.doc .a4-en .l0,.doc .a4-en .l1{font-size:clamp(10px,1.6vw,14px)}.doc .a4-en .l2{font-size:clamp(9px,1.4vw,12px)}
+.doc .a4-crest img{width:clamp(56px,9vw,96px)}
+.doc .a4-head,.doc .a4-ar,.doc .a4-en{font-family:var(--f-ui);line-height:1.4}
+.a4-body .doc,.a4-body .rec-print{border:0!important;padding:0!important;max-width:none!important;margin:0!important;box-shadow:none!important;font-size:inherit!important;line-height:1.6!important}
+.a4-body>div[style*="padding"]{padding:0!important}
+/* الوثائق الجاهزة في الطبقة المستقلة: A4 بالطول، وكشف العلامات بلا هوامش */
+@media print{
+  body.print-a4 #a4root.a4-zero{page:a4z}
+  body.print-a4 #a4root.a4-bare .doc{border:0;border-radius:0;box-shadow:none;padding:0}
+}
+/* نموذج الطلب: ورقة واحدة */
+.a4-body table.a4-kv2 th{width:16%}
+.a4-body table.a4-kv2 td{width:34%}
+.a4-compact h3{margin:2.6mm 0 1.2mm!important}
+.a4-compact table.a4-kv{margin:0 0 1.5mm!important}
+.a4-compact th,.a4-compact td{padding:1mm 1.8mm!important}
+.a4-doc:has(.a4-compact) .a4-sign{margin-top:4mm}
+.a4-doc:has(.a4-compact) .a4-foot{margin-top:3mm}
+.a4-doc:has(.a4-compact) .a4-sig-row{margin-top:2mm}
+.a4-doc:has(.a4-compact) .a4-body{min-height:0}

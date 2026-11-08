@@ -454,7 +454,7 @@
                     <td>${esc(w.action_plan)}</td>
                     <td class="mono small">${esc(w.session_date)}</td>
                     <td>${w.status === 'resolved' ? '<span class="pill p-approved">تمت المعالجة ✓</span>' : '<span class="pill p-rejected">إنذار نشط</span>'}</td>
-                    <td>${w.status !== 'resolved' ? `<button class="btn sm ok" data-act="sa-resolve-adv" data-id="${w.id}">إغلاق الإنذار</button>` : ''}</td>
+                    <td>${UA.rowPrintBtn('إنذار أكاديمي وخطة إرشاد', 'شؤون الطلاب', 'الطالب|المرشد الأكاديمي|مدير شؤون الطلاب')}${w.status !== 'resolved' ? `<button class="btn sm ok" data-act="sa-resolve-adv" data-id="${w.id}">إغلاق الإنذار</button>` : ''}</td>
                   </tr>
                 `
                   )
@@ -521,6 +521,7 @@
                   <th>الأثر الأكاديمي</th>
                   <th>الأثر المالي</th>
                   <th>رقم القرار</th>
+                  <th>طباعة</th>
                 </tr>
               </thead>
               <tbody>
@@ -535,6 +536,7 @@
                     <td class="small">${esc(m.academic_impact || '—')}</td>
                     <td class="small">${esc(m.financial_impact || '—')}</td>
                     <td class="small"><b>${esc(m.decision_no || '—')}</b><div class="small">${esc(m.reason || '')}</div></td>
+                    <td>${UA.rowPrintBtn('قرار حركة قيد', 'شؤون الطلاب', 'الطالب|عميد الكلية|مدير شؤون الطلاب')}</td>
                   </tr>
                 `
                   )
@@ -591,7 +593,7 @@
                     <td>${esc(h.note)}</td>
                     <td class="mono small">${esc(h.expiresAt || '—')}</td>
                     <td>${h.active ? '<span class="bad-t">قائمة (تحجب الوثائق)</span>' : '<span class="ok-t">مسوّاة / مرفوعة ✓</span>'}</td>
-                    <td>${h.active ? `<button class="btn sm ok" data-act="sa-clear-hold" data-id="${h.holdId}">تسوية ورفع الحجب</button>` : ''}</td>
+                    <td>${UA.rowPrintBtn('قرار لجنة انضباطية', 'شؤون الطلاب', 'الطالب|رئيس اللجنة|مدير شؤون الطلاب')}${h.active ? `<button class="btn sm ok" data-act="sa-clear-hold" data-id="${h.holdId}">تسوية ورفع الحجب</button>` : ''}</td>
                   </tr>
                 `
                   )
@@ -656,6 +658,7 @@
                   <th>قيمة الخصم المالي</th>
                   <th>الربط المحاسبي (المالية)</th>
                   <th>الجهة المعتمدة</th>
+                  <th>طباعة</th>
                 </tr>
               </thead>
               <tbody>
@@ -677,6 +680,7 @@
                       }
                     </td>
                     <td class="small">${esc(s.approved_by || 'لجنة المنح')}</td>
+                    <td>${UA.rowPrintBtn('قرار منحة أو إعفاء', 'شؤون الطلاب', 'الطالب|لجنة المنح|المدير المالي')}</td>
                   </tr>
                 `
                   )
@@ -764,7 +768,7 @@
                   <td>${esc(a.service_purpose)}</td>
                   <td class="small"><b>${esc(a.appointment_date)}</b> · ${esc(a.time_slot)}<div>${esc(a.counter_window)}</div></td>
                   <td>${qStatusBadge[a.queue_status] || esc(a.queue_status)}</td>
-                  <td style="white-space:nowrap">
+                  <td style="white-space:nowrap">${UA.rowPrintBtn('تذكرة مكتب خدمة الطالب', 'شؤون الطلاب', 'الطالب|موظف النافذة')}
                     ${
                       !['sa_scholarships:write', 'sa_scholarships:approve', 'request:decide', 'student:update'].some((p) => UA.can(p)) ? ''
                         : a.queue_status === 'waiting'
@@ -828,10 +832,10 @@
           </div>
           ${
             myAppts.length
-              ? `<div class="sx-tscroll"><table class="sx-table rsp"><thead><tr><th>رقم التذكرة</th><th>الغرض</th><th>الموعد والنافذة</th><th>الحالة</th></tr></thead><tbody>${myAppts
+              ? `<div class="sx-tscroll"><table class="sx-table rsp"><thead><tr><th>رقم التذكرة</th><th>الغرض</th><th>الموعد والنافذة</th><th>الحالة</th><th>طباعة</th></tr></thead><tbody>${myAppts
                   .map(
                     (a) =>
-                      `<tr><td><b class="mono">${esc(a.ticket_no)}</b></td><td>${esc(a.service_purpose)}</td><td>${esc(a.appointment_date)} (${esc(a.time_slot)}) · ${esc(a.counter_window)}</td><td><span class="pill ${a.queue_status === 'completed' ? 'p-approved' : 'p-review'}">${a.queue_status === 'completed' ? 'تم التسليم ✓' : a.queue_status === 'serving' ? '🔔 تفضل للنافذة الآن' : 'قيد الانتظار'}</span></td></tr>`
+                      `<tr><td><b class="mono">${esc(a.ticket_no)}</b></td><td>${esc(a.service_purpose)}</td><td>${esc(a.appointment_date)} (${esc(a.time_slot)}) · ${esc(a.counter_window)}</td><td><span class="pill ${a.queue_status === 'completed' ? 'p-approved' : 'p-review'}">${a.queue_status === 'completed' ? 'تم التسليم ✓' : a.queue_status === 'serving' ? '🔔 تفضل للنافذة الآن' : 'قيد الانتظار'}</span></td><td>${UA.rowPrintBtn('تذكرة مكتب خدمة الطالب', 'شؤون الطلاب', 'الطالب|موظف النافذة')}</td></tr>`
                   )
                   .join('')}</tbody></table></div>`
               : ''

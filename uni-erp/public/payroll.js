@@ -441,7 +441,7 @@
                   <td class="mono">${esc(l.startDate)}</td>
                   <td class="mono">${esc(l.endDate)}</td>
                   <td>${badge(LEAVE_STATUS[l.status] || l.status, l.status === 'approved' ? 'ok' : l.status === 'pending' ? 'warn' : 'info')}${l.status === 'rejected' && l.notes ? `<div class="small">${esc(l.notes)}</div>` : ''}</td>
-                  <td style="white-space:nowrap">${l.status === 'pending' && UA.can('hr:manage') ? `<button class="btn sm pri" data-act="hrleaveapprove" data-id="${l.id}">اعتماد</button>
+                  <td style="white-space:nowrap">${UA.rowPrintBtn('طلب إجازة', 'شؤون الموظفين', 'الموظف|رئيس القسم|مدير شؤون الموظفين')}${l.status === 'pending' && UA.can('hr:manage') ? `<button class="btn sm pri" data-act="hrleaveapprove" data-id="${l.id}">اعتماد</button>
                     <button class="btn sm" data-act="hrleavereject" data-id="${l.id}">رفض</button>
                     <button class="btn sm" data-act="hrleavecancel" data-id="${l.id}">إلغاء</button>` : ''}</td>
                 </tr>
@@ -480,7 +480,7 @@
             <h2 style="margin:0">مسير الرواتب والحسابات التفصيلي</h2>
             <p class="small" style="margin:2px 0 0">يجمع تلقائياً الاستحقاقات (الأساسي + السكن + الانتقال) ويطرح الخصومات (الغياب + إجازة بدون راتب + قسط السلفة + التأمينات + الضرائب)</p>
           </div>
-          <button class="btn no-print" data-act="print">🖨️ طباعة مسير الرواتب</button>
+          <button class="btn no-print" data-act="print">🖨️ طباعة مسير الرواتب</button><span hidden data-doc-orient="landscape" data-doc-dept="شؤون الموظفين" data-doc-signers="مُعِدّ المسير|مدير شؤون الموظفين|المدير المالي|الآمر بالصرف"></span>
         </div>
 
         <div class="tbl-wrap">
@@ -594,6 +594,7 @@
                     <td class="mono"><b>${nfMoney(ad.monthlyInstallment)}</b></td>
                     <td class="mono" style="color:${ad.remainingAmount > 0 ? '#B3261E' : '#0E4D2E'};font-weight:800">${nfMoney(ad.remainingAmount)}</td>
                     <td class="nowrap">
+                      ${UA.rowPrintBtn('سند سلفة موظف', 'شؤون الموظفين', 'الموظف|مدير شؤون الموظفين|المدير المالي')}
                       ${ad.status !== 'مدفوعة' && ad.remainingAmount > 0
                         ? `<button class="btn sm pri" data-act="hradvpay" data-id="${ad.id}">تسديد قسط</button>`
                         : '<span class="small">مكتملة ✓</span>'}
@@ -673,7 +674,7 @@
                     <td class="mono" style="direction:ltr;text-align:center;font-weight:800;color:${c.remainingDays < 0 ? '#B3261E' : c.remainingDays <= 60 ? '#8A6A1B' : '#0E4D2E'}">${c.remainingDays}</td>
                     <td>${badge(c.renewalAlert, alertTone)}</td>
                     <td>${badge(c.contractStatus, statusTone)}</td>
-                    <td><button class="btn sm pri" data-act="hrrenewopen" data-id="${c.id}">تجديد العقد</button></td>
+                    <td>${UA.rowPrintBtn('بيانات عقد عمل', 'شؤون الموظفين', 'الموظف|مدير شؤون الموظفين|الآمر بالتعيين')}<button class="btn sm pri" data-act="hrrenewopen" data-id="${c.id}">تجديد العقد</button></td>
                   </tr>
                 `;
               }).join('')}
@@ -1259,7 +1260,7 @@
           </div>
         </div>
         <div class="actions">
-          <button class="btn pri no-print" type="button" data-act="print">🖨️ طباعة القسيمة</button>
+          <button class="btn pri no-print" type="button" data-act="print">🖨️ طباعة القسيمة</button><span hidden data-doc-title="قسيمة راتب" data-doc-dept="شؤون الموظفين" data-doc-signers="المحاسب|مدير شؤون الموظفين|توقيع الموظف بالاستلام"></span>
           <button class="btn" type="button" data-act="hrmclose">إغلاق</button>
         </div>
       `;

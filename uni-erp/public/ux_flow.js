@@ -109,7 +109,7 @@
     list.setAttribute('role', 'group');
     list.setAttribute('aria-label', cur.textContent.trim());
     list.dataset.sig = sig;
-    list.innerHTML = tabs.map((b, i) => { if (!shown(b)) return ''; const badge = b.querySelector('.badge-n'); return `<button type="button" data-ux-sub="${i}"${b.matches(ACTIVE) ? ' aria-current="true"' : ''}><span>${esc(tabLabel(b))}</span>${badge ? `<small>${esc(badge.textContent)}</small>` : ''}</button>`; }).join('');
+    list.innerHTML = tabs.map((b, i) => { if (!shown(b)) return ''; const badge = b.querySelector('.badge-n'); const lbl = tabLabel(b), sx = UA.sx || {}; return `<button type="button" data-ux-sub="${i}"${b.matches(ACTIVE) ? ' aria-current="true"' : ''}>${sx.subIcon ? sx.subIcon(b.dataset.t || b.dataset.s || '', lbl) : ''}<span>${esc(sx.subLabel ? sx.subLabel(lbl) : lbl)}</span>${badge ? `<small>${esc(badge.textContent)}</small>` : ''}</button>`; }).join('');
     cur.after(list);
   }
   document.addEventListener('click', (e) => {

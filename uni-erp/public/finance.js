@@ -357,16 +357,16 @@
         <div class="tbl-wrap"><table class="tbl"><thead><tr><th>رقم القيد</th><th>التاريخ</th><th>المرجع</th><th>البيان والتفاصيل</th><th>إجمالي المدين</th><th>إجمالي الدائن</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody>
           ${F.entries.map((e) => `<tr>
             <td><code>${esc(e.no)}</code></td>
-            <td>${esc(e.entryDay)}</td>
+            <td>${esc(e.day || e.entryDay || "")}</td>
             <td><code>${esc(e.reference || '—')}</code></td>
             <td>
               <b>${esc(e.description)}</b>
               <div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px">
-                ${(e.lines || []).map((l) => `<span style="font-size:11px;background:#F6F8F5;padding:2px 6px;border-radius:4px"><code>${esc(l.accountCode)}</code> ${esc(l.accountName)}: ${l.debit > 0 ? `<b style="color:#0A5A4D">مدين ${money(l.debit)}</b>` : `<b style="color:#0d9488">دائن ${money(l.credit)}</b>`}</span>`).join('')}
+                ${(e.lines || []).map((l) => `<span style="font-size:11px;background:#F6F8F5;padding:2px 6px;border-radius:4px"><code>${esc(l.code || l.accountCode || "")}</code> ${esc(l.account || l.accountName || "")}: ${l.debit > 0 ? `<b style="color:#0A5A4D">مدين ${money(l.debit)}</b>` : `<b style="color:#0d9488">دائن ${money(l.credit)}</b>`}</span>`).join('')}
               </div>
             </td>
-            <td><b>${money(e.totalDebit)}</b></td>
-            <td><b>${money(e.totalCredit)}</b></td>
+            <td><b>${money(e.totalDebit ?? e.total)}</b></td>
+            <td><b>${money(e.totalCredit ?? e.total)}</b></td>
             <td>${badge(JE_ST, e.status)}</td>
             <td style="white-space:nowrap">
               <button class="btn sm" data-act="fin-view-je" data-id="${e.id}">عرض / طباعة</button>
@@ -405,7 +405,7 @@
       ${s === 'vouchers' ? `
         <div class="card">
           <h3 style="margin-top:0">🧾 سجل سندات القبض والصرف (الخزينة والمصرف)</h3>
-          <div class="tbl-wrap"><table class="tbl"><thead><tr><th>رقم السند</th><th>النوع</th><th>التاريخ</th><th>الطرف المالي</th><th>طريقة الدفع</th><th>المبلغ</th><th>البيان</th><th>القيد المحاسبي</th></tr></thead><tbody>
+          <div class="tbl-wrap"><table class="tbl"><thead><tr><th>رقم السند</th><th>النوع</th><th>التاريخ</th><th>الطرف المالي</th><th>طريقة الدفع</th><th>المبلغ</th><th>البيان</th><th>القيد المحاسبي</th><th>طباعة</th></tr></thead><tbody>
             ${F.vouchers.map((v) => `<tr>
               <td><code>${esc(v.no)}</code></td>
               <td><span class="badge ${v.kind === 'receipt' ? 'b-ok' : 'b-warn'}">${v.kind === 'receipt' ? 'سند قبض' : 'سند صرف'}</span></td>
@@ -415,7 +415,8 @@
               <td><b>${money(v.amount)}</b></td>
               <td>${esc(v.description)}</td>
               <td><code>JE#${v.journalId || '—'}</code></td>
-            </tr>`).join('') || '<tr><td colspan="8" class="empty">لا توجد سندات خزينة</td></tr>'}
+              <td>${UA.rowPrintBtn(v.kind === 'receipt' ? 'سند قبض' : 'سند صرف', 'المالية والمحاسبة', 'أمين الصندوق|المحاسب|المستلم / الدافع')}</td>
+            </tr>`).join('') || '<tr><td colspan="9" class="empty">لا توجد سندات خزينة</td></tr>'}
           </tbody></table></div>
         </div>
       ` : s === 'invoices' ? `
@@ -432,6 +433,7 @@
               <td style="color:${i.total - i.paidAmount > 0 ? '#B3261E' : '#1B7F4B'}"><b>${money(i.total - i.paidAmount)}</b></td>
               <td>${badge(INV_ST, i.status)}</td>
               <td>
+                ${UA.rowPrintBtn(i.kind === 'sale' ? 'فاتورة مبيعات' : 'فاتورة مشتريات', 'المالية والمحاسبة', 'المحاسب|المدير المالي|الطرف المستلم')}
                 ${i.status === 'draft' && can('finance:entry') ? `<button class="btn pri sm" data-act="fin-iss-inv" data-id="${i.id}">إصدار وترحيل</button>` : ''}
                 ${['issued', 'partial'].includes(i.status) && can('finance:entry') ? `<button class="btn pri sm" data-act="fin-pay-inv" data-id="${i.id}">تسجيل دفعة</button>` : ''}
                 ${['draft', 'issued'].includes(i.status) && i.paidAmount === 0 && can('finance:entry') ? `<button class="btn dan sm" data-act="fin-can-inv" data-id="${i.id}">إلغاء</button>` : ''}
@@ -481,7 +483,7 @@
           </div>
           <div style="display:flex;gap:6px">
             <a class="btn sm" href="/api/finance/reports/trial-balance.xlsx" target="_blank">📥 تصدير Excel</a>
-            <button class="btn sm no-print" data-act="print" data-print-next>🖨️ طباعة التقرير</button>
+            <button class="btn sm no-print" data-act="print" data-print-next>🖨️ طباعة التقرير</button><span hidden data-doc-dept="المالية والمحاسبة" data-doc-signers="المحاسب|المدقق المالي|المدير المالي"></span>
           </div>
         </div>
       </div>
@@ -499,9 +501,9 @@
               <td>${badge(TYPE_LBL, x.type)}</td>
               <td>${money(x.debit)}</td>
               <td>${money(x.credit)}</td>
-              <td><b>${money(x.balance)}</b></td>
+              <td><b>${money(x.balance ?? ((x.closeDebit || 0) - (x.closeCredit || 0)))}</b></td>
             </tr>`).join('')}
-          </tbody><tfoot><tr><th colspan="3">الإجمالي العام للميزان</th><th>${money(tb.totalDebit)}</th><th>${money(tb.totalCredit)}</th><th>${tb.balanced ? 'متوازن ✔' : 'غير متوازن'}</th></tr></tfoot></table></div>
+          </tbody><tfoot><tr><th colspan="3">الإجمالي العام للميزان</th><th>${money(tb.totalDebit ?? (tb.totals || {}).debit)}</th><th>${money(tb.totalCredit ?? (tb.totals || {}).credit)}</th><th>${tb.balanced ? 'متوازن ✔' : 'غير متوازن'}</th></tr></tfoot></table></div>
         </div>
       ` : r === 'is' ? `
         <div class="card">
@@ -926,12 +928,18 @@
       }
       else if (act === 'fin-view-je') {
         const { entry: j } = await api('GET', `/api/finance/journal/${b.dataset.id}`);
-        showModal(`<div class="spread"><h3>سند قيد يومية رقم ${esc(j.no)}</h3>${badge(JE_ST, j.status)}</div>
-          <p><b>التاريخ:</b> ${esc(j.entryDay)} · <b>المرجع:</b> ${esc(j.reference || '—')}</p>
+        // الخادم يرسل day وcode/account وnote وtotal؛ والأسماء القديمة تبقى احتياطاً
+        const jl = j.lines || [];
+        const sumD = jl.reduce((a, l) => a + Number(l.debit || 0), 0), sumC = jl.reduce((a, l) => a + Number(l.credit || 0), 0);
+        showModal(`<div data-doc-title="سند ${esc(j.typeLabel || 'قيد يومية')}" data-doc-no="${esc(j.no)}" data-doc-dept="المالية والمحاسبة" data-doc-status="${esc((JE_ST[j.status] || [j.status])[0] || j.status)}" data-doc-signers="المحاسب:${esc(j.createdBy || '')}|المدقق المالي|المدير المالي${j.postedBy ? ' (الترحيل):' + esc(j.postedBy) : ''}">
+          <div class="spread"><h3>سند قيد يومية رقم ${esc(j.no)}</h3>${badge(JE_ST, j.status)}</div>
+          <p><b>تاريخ القيد:</b> ${esc(j.day || j.entryDay || '')} · <b>المرجع:</b> ${esc(j.reference || '—')} · <b>السنة المالية:</b> ${esc(j.year || '')}</p>
           <p><b>البيان:</b> ${esc(j.description)}</p>
-          <table class="tbl"><thead><tr><th>رمز الحساب</th><th>اسم الحساب</th><th>مدين</th><th>دائن</th><th>البيان</th></tr></thead><tbody>
-            ${j.lines.map((l) => `<tr><td><code>${esc(l.accountCode)}</code></td><td>${esc(l.accountName)}</td><td>${money(l.debit)}</td><td>${money(l.credit)}</td><td>${esc(l.memo || '')}</td></tr>`).join('')}
-          </tbody><tfoot><tr><th colspan="2">الإجمالي المتوازن</th><th>${money(j.totalDebit)}</th><th>${money(j.totalCredit)}</th><th></th></tr></tfoot></table>
+          <table class="tbl"><thead><tr><th>رمز الحساب</th><th>اسم الحساب</th><th>مركز التكلفة</th><th>مدين</th><th>دائن</th><th>البيان</th></tr></thead><tbody>
+            ${jl.map((l) => `<tr><td><code>${esc(l.code || l.accountCode || '')}</code></td><td>${esc(l.account || l.accountName || '')}${l.party ? ` <small>(${esc(l.party)})</small>` : ''}</td><td>${esc(l.costCenter || '—')}</td><td>${money(l.debit)}</td><td>${money(l.credit)}</td><td>${esc((l.note || l.memo || '') === j.description ? '' : (l.note || l.memo || ''))}</td></tr>`).join('')}
+          </tbody><tfoot><tr><th colspan="3">الإجمالي المتوازن</th><th>${money(sumD)}</th><th>${money(sumC)}</th><th></th></tr></tfoot></table>
+          <p class="small">أنشأه: ${esc(j.createdBy || '—')}${j.postedBy ? ` · رحّله: ${esc(j.postedBy)}` : ''}</p>
+        </div>
           <div class="row-end" style="margin-top:12px"><button class="btn no-print" data-act="print">🖨️ طباعة سند القيد</button><button class="btn pri" data-act="fin-close-modal">إغلاق</button></div>`);
       }
       else if (act === 'fin-post-je') { await api('POST', `/api/finance/journal/${b.dataset.id}/post`, {}); toast('تم ترحيل القيد إلى الأستاذ العام'); await refresh(); }
@@ -1141,7 +1149,7 @@
             ${st.charges.filter((c) => c.status === 'open').map((c) => `<tr><td>${esc(c.dueDay)}</td><td>${esc(c.feeType)}${c.note ? ' · ' + esc(c.note) : ''}</td><td>${c.kind === 'fee' ? money(c.amount) : ''}</td><td>${c.kind === 'discount' ? money(c.amount) : ''}</td></tr>`).join('')}
             ${st.payments.filter((p) => p.status === 'ok').map((p) => `<tr><td>${esc(p.paidDay)}</td><td>دفعة ${esc(p.receiptNo)}</td><td></td><td>${money(p.amount)}</td></tr>`).join('')}
           </tbody></table></div>
-          <div class="row-end" style="margin-top:12px"><button class="btn pri" data-act="fin-close-modal">إغلاق</button></div>`);
+          <div class="row-end" style="margin-top:12px"><button class="btn no-print" data-act="print">طباعة</button><span hidden data-doc-dept="المالية والمحاسبة" data-doc-signers="الطالب:${esc(st.student.name)}|المحاسب|المدير المالي"></span><button class="btn pri" data-act="fin-close-modal">إغلاق</button></div>`);
       }
       else if (act === 'fin-void-charge' || act === 'fin-void-pay') {
         const isPay = act === 'fin-void-pay';
@@ -1195,7 +1203,7 @@
           <table class="tbl"><thead><tr><th>#</th><th>تاريخ الاستحقاق</th><th>المبلغ</th><th>المسدد</th><th>الحالة</th></tr></thead><tbody>
             ${inv.installments.map((x) => `<tr><td>${x.seq}</td><td>${esc(x.dueDay)}</td><td>${money(x.amount)}</td><td>${money(x.paidAmount)}</td><td>${esc(x.status)}</td></tr>`).join('')}
           </tbody></table>
-          <div class="row-end" style="margin-top:12px"><button class="btn pri" data-act="fin-close-modal">إغلاق</button></div>`);
+          <div class="row-end" style="margin-top:12px"><button class="btn no-print" data-act="print">طباعة</button><span hidden data-doc-dept="المالية والمحاسبة" data-doc-signers="الطالب|المحاسب|المدير المالي"></span><button class="btn pri" data-act="fin-close-modal">إغلاق</button></div>`);
       }
       else if (act === 'fin-pay-stu-inv') {
         const { invoice: inv } = await api('GET', `/api/finance/student-invoices/${b.dataset.id}`);
@@ -1222,7 +1230,7 @@
           <div class="tbl-wrap"><table class="tbl"><thead><tr><th>الرقم</th><th>الموظف</th><th>الراتب</th></tr></thead><tbody>
             ${p.rows.map((x) => `<tr><td><code>${esc(x.employeeNo)}</code></td><td>${esc(x.name)}</td><td>${money(x.amount)}</td></tr>`).join('') || '<tr><td colspan="3" class="empty">لا توجد رواتب مسجلة</td></tr>'}
           </tbody></table></div>
-          <div class="row-end" style="margin-top:12px"><button class="btn" data-act="fin-close-modal">إغلاق</button>${!p.entry && p.total > 0 && can('finance:post') ? `<button class="btn pri" data-act="fin-post-payroll" data-month="${esc(p.month)}">ترحيل القيد</button>` : ''}</div>`);
+          <div class="row-end" style="margin-top:12px"><button class="btn no-print" data-act="print">طباعة</button><span hidden data-doc-dept="المالية والمحاسبة" data-doc-signers="المحاسب|مدير شؤون الموظفين|المدير المالي"></span><button class="btn" data-act="fin-close-modal">إغلاق</button>${!p.entry && p.total > 0 && can('finance:post') ? `<button class="btn pri" data-act="fin-post-payroll" data-month="${esc(p.month)}">ترحيل القيد</button>` : ''}</div>`);
       }
       else if (act === 'fin-post-payroll') {
         const r = await api('POST', '/api/finance/payroll-entry', { month: b.dataset.month });

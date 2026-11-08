@@ -16,6 +16,9 @@ export const SCHEMA = [
     { key: 'institution.department', legacy: 'department_name', label: 'اسم القسم', type: 'text', default: 'قسم شؤون الطلاب', min: 2, max: 80 },
     { key: 'institution.ministry', label: 'الجهة الأعلى (ترويسة الوثائق)', type: 'text', default: 'وزارة الداخلية', min: 0, max: 80, hint: 'تظهر في ترويسة الوثائق والمراسلات المعتمدة؛ اتركها فارغة لإخفائها.' },
     { key: 'institution.country', label: 'اسم الدولة (ترويسة كشف العلامات)', type: 'text', default: 'الجمهورية العربية السورية', min: 0, max: 80 },
+    { key: 'institution.country_en', label: 'اسم الدولة بالإنكليزية (ترويسة المطبوعات)', type: 'text', default: 'SYRIAN ARAB REPUBLIC', min: 0, max: 80, hint: 'يظهر في الجهة اليسرى من ترويسة السندات والنماذج المطبوعة.' },
+    { key: 'institution.ministry_en', label: 'الجهة الأعلى بالإنكليزية', type: 'text', default: 'MINISTRY OF INTERIOR', min: 0, max: 80 },
+    { key: 'institution.university_en', label: 'اسم الجامعة بالإنكليزية', type: 'text', default: 'Syrian University for Security Sciences', min: 0, max: 120 },
   ] },
   { key: 'grades', label: 'العلامات والنجاح', desc: 'سلّم العلامات وحدود الإدخال وعتبة النجاح.', items: [
     { key: 'grades.total_max', label: 'العلامة الكلية القصوى للمقرر', type: 'int', default: 100, min: 10, max: 1000, unit: 'علامة' },

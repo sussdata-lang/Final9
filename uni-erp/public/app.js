@@ -289,7 +289,7 @@ Object.assign(window.UA, {
     S.drawerFor = sel ? sel.id : null;
     return `<div><section class="card"><h2>سجل الطلبات</h2><p class="hint" style="margin-top:0">اختر طلباً لعرض تفاصيله وإجراءاته في اللوحة الجانبية.</p><div class="chips">${fl.map((f) => `<button class="chip" data-act="flt" data-f="${f[0]}" aria-pressed="${S.filter === f[0]}">${f[1]}</button>`).join('')}</div>
       <div class="tbl-wrap"><table><thead><tr><th>الخدمة</th><th>الطالب</th><th>الحالة</th><th>التاريخ</th></tr></thead><tbody>${rows || '<tr><td colspan="4" class="empty">لا طلبات في هذا التصنيف.</td></tr>'}</tbody></table></div></section>
-      ${sel ? `<aside class="ux-drawer no-print" aria-label="تفاصيل الطلب"${fresh ? ' data-fresh="1"' : ''}><header><h2 tabindex="-1">تفاصيل الطلب</h2><button type="button" class="btn sm" data-act="reqclose" aria-label="إغلاق تفاصيل الطلب">إغلاق</button></header><div class="ux-drawer-body">${staffDetail(sel, canDecide)}</div></aside>` : ''}</div>`;
+      ${sel ? `<aside class="ux-drawer no-print" aria-label="تفاصيل الطلب"${fresh ? ' data-fresh="1"' : ''}><header><h2 tabindex="-1">تفاصيل الطلب</h2><span style="display:flex;gap:6px"><button type="button" class="btn sm" data-act="reqprint" data-id="${sel.id}">طباعة النموذج</button><button type="button" class="btn sm" data-act="reqclose" aria-label="إغلاق تفاصيل الطلب">إغلاق</button></span></header><div class="ux-drawer-body">${staffDetail(sel, canDecide)}</div></aside>` : ''}</div>`;
   }
   function staffDetail(r, canDecide) {
     const auto = r.rejectedBy === 'auto';
@@ -519,7 +519,7 @@ Object.assign(window.UA, {
     if (p.service.code === 'excellence_year') body = `<p>تشهد ${esc(p.university)} بأنه تقرر قبول تسجيل الطالب/ـة ${who}، المقيَّد/ـة في برنامج «${esc(st.program)}»، في سنة الامتياز للعام الدراسي ${esc(p.details.academic_year)}.</p>${p.details.notes ? `<p>ملاحظات: ${esc(p.details.notes)}</p>` : ''}`;
     if (p.service.code === 'excuse') body = `<p>بعد مراجعة المرفقات والتحقق من استيفائها للمدة النظامية، تقرر قبول العذر المقدَّم من الطالب/ـة ${who} عن امتحان مقرر «${esc(p.details.course)}» بتاريخ ${esc(p.details.exam_date)} (السبب: ${esc(p.details.reason)})، وتحديد موعد امتحان بديل.</p>`;
     if (!body) body = `<p>وثيقة صادرة عن قسم شؤون الطلاب للطالب/ـة ${who}، برنامج «${esc(st.program)}».</p>${(p.fields || []).filter((f) => p.details && p.details[f.name] !== undefined && p.details[f.name] !== '').map((f) => `<p><b>${esc(f.label)}:</b> ${esc(p.details[f.name])}</p>`).join('')}`;
-    return `<div class="doc"><div class="doc-head"><img class="crest" src="/brand/crest.svg" alt=""><h2>${esc(p.university)}</h2></div><div class="sub">قسم شؤون الطلاب · ${esc(p.service.label)}</div><hr>${body}
+    return `<div class="doc">${UA.letterheadSync ? UA.letterheadSync({ university: p.university }) : `<div class="doc-head"><img class="crest" src="/brand/crest.svg" alt=""><h2>${esc(p.university)}</h2></div>`}<div class="sub">قسم شؤون الطلاب · ${esc(p.service.label)}</div><hr>${body}
       <div class="doc-foot"><div><span class="stamp">موقّعة رقمياً</span><div style="margin-top:8px">رقم الطلب: <span class="mono">${esc(p.requestNo)}</span></div><div>تاريخ الإصدار: ${fmt(p.issuedAt)}</div><div>رمز التحقق: <span class="mono">${esc(d.code)}</span></div><div>البصمة: <span class="mono">${esc(d.hash.slice(0, 20))}…</span></div></div><div class="qr"><img alt="رمز QR للتحقق" src="/api/documents/${encodeURIComponent(d.code)}/qr.svg"></div></div></div>`;
   }
 
@@ -802,10 +802,18 @@ Object.assign(window.UA, {
         const al = document.createElement('a'); al.href = URL.createObjectURL(await res.blob()); al.download = `${d.c}.pdf`; al.click();
         setTimeout(() => URL.revokeObjectURL(al.href), 4000); toast('تم حفظ الوثيقة كملف PDF');
       }
+      else if (a === 'docprint' && UA.printSheet) { await UA.printSheet(el.closest('.sheet')); }
       else if (a === 'docprint') { document.body.classList.add('print-doc'); window.addEventListener('afterprint', () => document.body.classList.remove('print-doc'), { once: true }); window.print(); }
       else if (a === 'print') { // يطبع النافذة أو البطاقة التي فيها الزر وحدها، أو ما يلي شريط الأدوات إذا كان الزر فيه (data-print-next)
         const box = el.closest('.modal, .card');
         const target = box && 'printNext' in d ? box.nextElementSibling : box;
+        // المستند الرسمي: ورقة A4 بترويسة الجامعة والقسم والتاريخ وخانات التوقيع (print_doc.js)
+        if (target && UA.printElement) {
+          const titleFrom = 'printNext' in d ? box : null;
+          const t = titleFrom && titleFrom.querySelector('h1, h2, h3');
+          await UA.printElement(target, { ...(t ? { title: t.textContent.replace(/[\u{1F300}-\u{1FAFF}☀-➿️]/gu, '').replace(/\s+/g, ' ').trim() } : {}), metaFrom: titleFrom });
+          return;
+        }
         if (target) { target.classList.add('print-target'); document.body.classList.add('print-area'); window.addEventListener('afterprint', () => { target.classList.remove('print-target'); document.body.classList.remove('print-area'); }, { once: true }); }
         window.print();
       }
@@ -904,7 +912,7 @@ Object.assign(window.UA, {
   /* ---------- الإقلاع ---------- */
   UA.start = async function start() {
     const params = new URLSearchParams(location.search), code = params.get('verify');
-    try { const r = await api('GET', '/api/me'); S.uni = /[\u0600-\u06FF]/.test(r.university || '') ? r.university : 'الجامعة السورية للعلوم الأمنية'; S.trDefault = r.transcriptTemplate || 'classic'; S.limits = r.limits || {}; if (r.user) await afterLogin(r.user); } catch { S.me = null; }
+    try { const r = await api('GET', '/api/me'); S.uni = /[\u0600-\u06FF]/.test(r.university || '') ? r.university : 'الجامعة السورية للعلوم الأمنية'; S.site = r.site || {}; S.trDefault = r.transcriptTemplate || 'classic'; S.limits = r.limits || {}; if (r.user) await afterLogin(r.user); } catch { S.me = null; }
     if (code) { S.view = 'verify'; await doVerify(code); history.replaceState(null, '', location.pathname); }
     render();
   };
