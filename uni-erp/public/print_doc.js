@@ -101,6 +101,15 @@
       </div>`).join('')}</section>`;
   }
 
+  /* إطار الصفحة المعتمد بأبعاد الورقة؛ يُرسم بالاتجاهين لأن قلب الورقة يتقرر بعد قياس الجداول */
+  function frameSvg(W, H, cls) {
+    const c = 10, a = 8.2, b = 11.6, x = W - a, y = H - a, u = W - b, v = H - b, G = '#0A5A4D', L = '#BFD0C9', A = '#C9A24B';
+    const cn = (d) => `<path fill="${G}" d="${d}"/>`, ac = (d) => `<path fill="none" stroke="${A}" stroke-width=".45" d="${d}"/>`;
+    return `<svg class="a4-frame ${cls}" viewBox="0 0 ${W} ${H}" aria-hidden="true"><rect x="9" y="9" width="${W - 18}" height="${H - 18}" fill="none" stroke="${G}" stroke-width="1.5"/><rect x="${b}" y="${b}" width="${W - 2 * b}" height="${H - 2 * b}" fill="none" stroke="${L}" stroke-width=".3"/>`
+      + cn(`M${a} ${a}H${a + c}A${c} ${c} 0 0 1 ${a} ${a + c}Z`) + cn(`M${x} ${a}H${x - c}A${c} ${c} 0 0 0 ${x} ${a + c}Z`) + cn(`M${a} ${y}H${a + c}A${c} ${c} 0 0 0 ${a} ${y - c}Z`) + cn(`M${x} ${y}H${x - c}A${c} ${c} 0 0 1 ${x} ${y - c}Z`)
+      + ac(`M${b + c} ${b}A${c} ${c} 0 0 1 ${b} ${b + c}`) + ac(`M${u - c} ${b}A${c} ${c} 0 0 0 ${u} ${b + c}`) + ac(`M${b + c} ${v}A${c} ${c} 0 0 0 ${b} ${v - c}`) + ac(`M${u - c} ${v}A${c} ${c} 0 0 1 ${u} ${v - c}`) + '</svg>';
+  }
+
   const parseSigners = (s) => String(s || '').split('|').map((x) => x.trim()).filter(Boolean).map((x) => { const i = x.indexOf(':'); return i < 0 ? [x, ''] : [x.slice(0, i).trim(), x.slice(i + 1).trim()]; });
 
   /* الدالة العامة: تبني المستند وتطبعه */
@@ -114,8 +123,9 @@
     if (!root) { root = document.createElement('div'); root.id = 'a4root'; document.body.appendChild(root); }
     root.setAttribute('dir', 'rtl');
     root.className = o.landscape ? 'a4-land' : '';
-    // الإطار والزوايا والعلامة المائية ثابتة الموضع فتتكرر في كل صفحة مطبوعة
-    root.innerHTML = `<div class="a4-frame" aria-hidden="true"><i class="c1"></i><i class="c2"></i><i class="c3"></i><i class="c4"></i></div><img class="a4-wm" src="/brand/crest.svg" alt="" aria-hidden="true">
+    // الإطار والزخرفة والعلامة المائية ثابتة الموضع فتتكرر في كل صفحة مطبوعة
+    root.innerHTML = `${frameSvg(210, 297, 'p')}${frameSvg(297, 210, 'l')}<img class="a4-orn" src="/brand/form-ornament.svg" alt="" aria-hidden="true"><img class="a4-wm" src="/brand/crest.svg" alt="" aria-hidden="true">
+      <table class="a4-page" role="presentation"><thead><tr><td><div class="a4-sp-t"></div></td></tr></thead><tfoot><tr><td><div class="a4-sp-b"></div></td></tr></tfoot><tbody><tr><td>
       <article class="a4-doc">
         ${UA.letterheadHtml(s)}
         <div class="a4-title-wrap"><h1 class="a4-title">${esc(o.title || '')}</h1></div>
@@ -123,7 +133,7 @@
         <main class="a4-body"></main>
         ${o.noSign ? '' : signersHtml(signers)}
         <footer class="a4-foot"><span>${esc(s.university)}</span><span>طُبع بواسطة: ${esc(me.name || '—')} · ${esc(now())}</span></footer>
-      </article>`;
+      </article></td></tr></tbody></table>`;
     const main = root.querySelector('.a4-body');
     if (o.node) main.appendChild(o.node); else main.innerHTML = o.html || '';
     // الجدول العريض (9 أعمدة فأكثر) يُطبع على ورقة أفقية كي لا يخرج عن الهامش
@@ -137,14 +147,18 @@
     // قياس فعلي قبل الطباعة: جدول يتجاوز عرض الورقة يُصغَّر خطه، فإن لم يكفِ تُقلب الورقة بالعرض
     const portraitWide = () => { const w = main.getBoundingClientRect().width; return [...main.querySelectorAll('table')].some((t) => t.getBoundingClientRect().width > w + 1 || t.scrollWidth > w + 1); };
     if (!root.classList.contains('a4-land') && !o.landscape) {
-      root.style.cssText = 'display:block;position:absolute;visibility:hidden;left:-9999px;top:0;width:186mm';
+      root.style.cssText = 'display:block;position:absolute;visibility:hidden;left:-9999px;top:0;width:210mm';
       if (portraitWide()) { main.classList.add('a4-tight'); if (portraitWide()) { main.classList.remove('a4-tight'); root.classList.add('a4-land'); } }
       root.removeAttribute('style');
     }
-    // ننتظر الشعار والصور كي لا تخرج الورقة دونها
+    // ننتظر الشعار والزخرفة وخط الترويسة كي لا تخرج الورقة دونها
     await Promise.all([...root.querySelectorAll('img')].map((im) => (im.complete ? null : new Promise((r) => { im.onload = im.onerror = r; setTimeout(r, 2500); }))));
+    try { await Promise.race([document.fonts.load('16pt Mohanad', 'ج'), new Promise((r) => setTimeout(r, 2500))]); } catch { /* نطبع بالخط البديل */ }
+    // اتجاه الورقة: قاعدة عامة تُضاف عند الطباعة لأن المتصفح لا يطبق الصفحة المسماة على الورقة الأولى. الهامش صفر ليظهر الإطار كاملاً، والفراغ في كل صفحة من رأس .a4-page وذيله
+    const pg = document.getElementById('a4page') || document.head.appendChild(Object.assign(document.createElement('style'), { id: 'a4page' }));
+    pg.textContent = root.classList.contains('a4-land') ? '@page{size:A4 landscape;margin:0}' : '@page{size:A4 portrait;margin:0}';
     document.body.classList.add('print-a4');
-    const done = () => { document.body.classList.remove('print-a4'); root.innerHTML = ''; };
+    const done = () => { document.body.classList.remove('print-a4'); root.innerHTML = ''; pg.textContent = ''; };
     window.addEventListener('afterprint', done, { once: true });
     setTimeout(() => { try { window.print(); } catch { done(); } }, 60);
   };
@@ -242,7 +256,7 @@
     const d = btn.dataset;
     // رقم المستند من عمود «رقم/رمز» الخاص به، لا الرقم الجامعي أو الوظيفي
     const noRow = rows.find(([k, v]) => /رقم|رمز/.test(k) && !/جامعي|وظيف|الموظف|الطالب/.test(k) && v !== '—');
-    return UA.printDoc({ title: d.docTitle, no: noRow ? noRow[1].split(' ')[0] : '', dept: d.docDept, signers: parseSigners(d.docSigners), html: `<div class="a4-compact">${kv(rows)}</div>` });
+    return UA.printDoc({ title: d.docTitle, no: noRow ? noRow[1].split(' ')[0] : '', dept: d.docDept, signers: parseSigners(d.docSigners), html: `<div class="a4-compact${rows.length <= 12 ? ' a4-roomy' : ''}">${kv(rows)}</div>` });
   };
   document.addEventListener('click', (e) => {
     const b = e.target.closest && e.target.closest('[data-act="rowform"], [data-act="elprint"]');

@@ -2201,13 +2201,6 @@ tr.sx-row-click:hover>td{background:rgba(213,182,93,.08)}
 }
 /* لمسات الهوية على المستند المطبوع: إطار وزوايا ذهبية، علامة مائية، شريط عنوان، رؤوس خضراء */
 .a4-doc{position:relative;z-index:1;padding:3mm 4mm 0}
-.a4-frame{position:fixed;inset:0;border:.8pt solid #054239;outline:.5pt solid #C9A24B;outline-offset:-2.2mm;pointer-events:none;z-index:0}
-.a4-frame i{position:absolute;width:9mm;height:9mm;border-color:#C9A24B;border-style:solid;border-width:0}
-.a4-frame .c1{top:-.8pt;right:-.8pt;border-top-width:2.4pt;border-right-width:2.4pt}
-.a4-frame .c2{top:-.8pt;left:-.8pt;border-top-width:2.4pt;border-left-width:2.4pt}
-.a4-frame .c3{bottom:-.8pt;right:-.8pt;border-bottom-width:2.4pt;border-right-width:2.4pt}
-.a4-frame .c4{bottom:-.8pt;left:-.8pt;border-bottom-width:2.4pt;border-left-width:2.4pt}
-.a4-wm{position:fixed;top:50%;left:50%;width:110mm;height:auto;transform:translate(-50%,-42%);opacity:.045;z-index:0;pointer-events:none}
 .a4-title-wrap{display:flex;align-items:center;gap:4mm;margin:1mm 0 5mm}
 .a4-title-wrap::before,.a4-title-wrap::after{content:"";flex:1;height:0;border-top:.8pt solid #C9A24B}
 .a4-title{margin:0!important;background:#054239;color:#fff!important;font-size:14pt;padding:1.8mm 9mm;border-radius:5mm;box-shadow:inset 0 -1.4pt 0 #C9A24B;white-space:nowrap;max-width:75%;white-space:normal;text-align:center}
@@ -2283,3 +2276,57 @@ tr.sx-row-click:hover>td{background:rgba(213,182,93,.08)}
 .sx-nav .sx-sub-list .sx-sub-h{margin:8px 12px 2px 0;padding-inline-start:14px;color:#7FA79B;font-size:11px;font-weight:700;letter-spacing:.01em}
 .sx-nav .sx-sub-list .sx-sub-h:first-child{margin-top:2px}
 @media (max-width:820px){.aff-kpi{display:none}}
+/* قالب النماذج المعتمد: إطار وزخرفة شامية وعلامة مائية تتكرر في كل صفحة، وترويسة بخط المهند */
+@font-face{font-family:Mohanad;src:url(/fonts/AL-Mohanad-Bold-1.ttf);font-display:swap}
+@media print{
+  body.print-a4 #a4root:not(.a4-bare){page:auto}
+  body.print-a4 #a4root,body.print-a4 #a4root *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+#a4root .a4-frame,#a4root .a4-orn,#a4root .a4-wm{position:fixed;pointer-events:none;z-index:0}
+#a4root .a4-frame{display:block;top:0;left:0;width:210mm;height:297mm}
+#a4root .a4-frame.l{display:none;width:297mm;height:210mm}
+#a4root.a4-land .a4-frame.p{display:none}
+#a4root.a4-land .a4-frame.l{display:block}
+#a4root .a4-orn{left:11.8mm;bottom:11.8mm;width:100mm;height:76mm;opacity:.85}
+#a4root .a4-wm{top:50%;left:50%;width:128mm;height:auto;transform:translate(-50%,-46%);opacity:.07;filter:grayscale(1)}
+#a4root.a4-land .a4-wm{width:112mm}
+#a4root .a4-page{position:relative;z-index:1;width:100%;table-layout:fixed;border-collapse:collapse;background:none}
+#a4root .a4-page>*>tr>td{padding:0 18mm;border:0;background:none}
+#a4root.a4-land .a4-page>*>tr>td{padding:0 16mm}
+#a4root .a4-sp-t{height:16mm}
+#a4root .a4-sp-b{height:15mm}
+#a4root.a4-land .a4-sp-t{height:14mm}
+#a4root.a4-land .a4-sp-b{height:13mm}
+#a4root .a4-doc{position:relative;z-index:1;background:none;padding:0;display:flex;flex-direction:column;min-height:262mm}
+#a4root.a4-land .a4-doc{min-height:179mm}
+#a4root .a4-body{flex:1 0 auto}
+#a4root .a4-doc .a4-rule{display:none}
+#a4root .a4-doc .a4-head{grid-template-columns:1fr 29mm 1fr;gap:4mm;padding:0}
+#a4root .a4-doc .a4-crest img{width:27mm;margin:0 auto}
+#a4root .a4-doc .a4-ar{text-align:center;color:#10211D;font-family:Mohanad,var(--f-ui),serif;font-weight:400;line-height:1.45}
+#a4root .a4-doc .a4-ar .l0,#a4root .a4-doc .a4-ar .l1{font-size:16pt}
+#a4root .a4-doc .a4-ar .l2{font-size:14pt}
+#a4root .a4-doc .a4-en{text-align:center;color:#10211D;font-weight:400;line-height:1.45}
+#a4root .a4-doc .a4-en .l0{font-size:12.5pt}
+#a4root .a4-doc .a4-en .l1{font-size:11pt}
+#a4root .a4-doc .a4-en .l2{font-size:9.6pt;font-weight:600}
+#a4root .a4-title-wrap{margin:5mm 0 6mm}
+#a4root .a4-meta{margin-bottom:6mm}
+#a4root .a4-meta td{background:rgba(255,255,255,.75)}
+#a4root .a4-body tbody td{background:rgba(255,255,255,.72)}
+#a4root .a4-body tbody tr:nth-child(even) td{background:rgba(242,247,244,.72)!important}
+#a4root .a4-body table.a4-kv th{background:rgba(226,238,233,.85)!important}
+#a4root .a4-body table.a4-kv td,#a4root .a4-body table.a4-kv tbody tr:nth-child(even) td{background:rgba(255,255,255,.72)!important}
+#a4root .a4-roomy table.a4-kv{font-size:11pt}
+#a4root .a4-roomy table.a4-kv th,#a4root .a4-roomy table.a4-kv td{padding:2.3mm 3mm!important}
+#a4root .a4-roomy table.a4-kv th{width:36%!important}
+#a4root .a4-sign{gap:6mm;margin-top:6mm}
+#a4root .a4-sig{border-color:#C9D9D2;border-top-width:.7mm;border-radius:1.6mm}
+#a4root .a4-sig-role{font-size:10.5pt}
+#a4root .a4-foot{margin-top:4mm;background:none}
+#a4root .a4-foot span{background:rgba(255,255,255,.88);padding:0 1.5mm}
+#a4root.a4-land .a4-head .a4-crest img{width:21mm}
+#a4root.a4-land .a4-title-wrap{margin:2.5mm 0 3.5mm}
+#a4root.a4-land .a4-title{font-size:13pt;padding:1.3mm 9mm}
+#a4root.a4-land .a4-meta{margin-bottom:3mm}
+#a4root.a4-land .a4-sign{margin-top:4mm}
