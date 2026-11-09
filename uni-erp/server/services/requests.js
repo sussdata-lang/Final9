@@ -12,6 +12,7 @@ import { runRules } from './rules.js';
 import { issueDocument } from './documents.js';
 import { linkedTargets } from './access.js';
 import { recordLeaveOnApprove } from './staffatt.js';
+import { applyRequestMovement } from './student_affairs_suite.js';
 import { getCachedServiceByCode, getCachedUnitById, getCachedUnitByCode, getCachedStaffUsersMap } from '../cache.js';
 
 const ACADEMIC = new Set(['postponement', 'withdrawal', 'program_transfer', 'grade_appeal', 'violation_report']);
@@ -251,10 +252,12 @@ export function decide({ db, cfg }, user, id, action, reason, ip) {
         }
       }
       recordLeaveOnApprove(db, r, svc);
+      const movement = applyRequestMovement({ db }, user, r, ip);
       let code = null;
       if (svc.issues_document) code = issueDocument({ db, cfg }, r, user, now).code;
       db.prepare("UPDATE requests SET status = 'approved', decided_at = ?, decided_by = ? WHERE id = ?").run(now, user.id, r.id);
       addEvent(db, r.id, user.label, code ? `اعتماد الطلب وإصدار وثيقة موقعة برمز ${code}` : 'اعتماد الطلب');
+      if (movement) addEvent(db, r.id, 'النظام', `نُفذت حركة القيد ${movement.movementNo}: حالة الطالب الآن «${movement.newStatusLabel}»`);
       audit(db, user, 'اعتماد طلب', r.no, ip);
     } else {
       if (typeof reason !== 'string' || reason.trim().length < 3 || reason.length > 300) throw new HttpError(400, 'سبب الرفض مطلوب (3-300 حرفاً) ويظهر للطالب.', 'validation');

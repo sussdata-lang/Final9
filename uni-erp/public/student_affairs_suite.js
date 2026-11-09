@@ -159,6 +159,7 @@
       waitlisted: '<span class="pill p-review">قائمة احتياط</span>',
       rejected: '<span class="pill p-rejected">مرفوض (مجموع أدنى)</span>',
       enrolled: '<span class="pill p-approved" style="background:#054239;color:#fff">تم تثبيت القيد كطالب ★</span>',
+      enrolling: '<span class="pill p-review">جارٍ التثبيت</span>',
     };
 
     const progOptions = progs.map((p) => `<option value="${p.id}">${esc(p.faculty)} — ${esc(p.name)} (حد أدنى: ${p.minScore})</option>`).join('');
@@ -176,6 +177,15 @@
               <button class="btn pri" data-act="sa-run-sort" data-testid="sa-run-sort-btn">⚡ تشغيل محرك الفرز والمفاضلة الآلي</button>
             </div>
           </div>
+
+          <!-- خطة القبول: الحد الأدنى والمقاعد لكل برنامج -->
+          <details style="margin-bottom:14px;background:rgba(14,102,85,0.05);border:1px solid rgba(14,102,85,0.2);border-radius:10px;padding:10px 14px">
+            <summary style="cursor:pointer;font-weight:bold;color:#054239">خطة القبول لكل برنامج (الحد الأدنى والمقاعد)</summary>
+            <p class="hint">المقاعد المشغولة هي طلاب دفعة هذه السنة فقط. اترك الحقل فارغاً لاستخدام القيمة الافتراضية من الإعدادات العامة.</p>
+            <div class="tbl-wrap"><table><thead><tr><th>البرنامج</th><th>المشغول</th><th>الحد الأدنى</th><th>المقاعد</th><th></th></tr></thead><tbody>
+              ${progs.map((p) => `<tr><td>${esc(p.faculty)} — ${esc(p.name)}</td><td>${p.enrolledCount} / ${p.capacity}</td><td><input id="sa-plan-min-${p.id}" type="number" step="0.5" min="1" style="width:100px" value="${p.admission_min_score ?? ''}" placeholder="${p.minScore}"></td><td><input id="sa-plan-cap-${p.id}" type="number" min="0" style="width:100px" value="${p.admission_capacity ?? ''}" placeholder="${p.capacity}"></td><td><button class="btn sm" type="button" data-act="sa-save-plan" data-id="${p.id}">حفظ</button></td></tr>`).join('')}
+            </tbody></table></div>
+          </details>
 
           <!-- نموذج إضافة متقدم جديد للمفاضلة -->
           <details style="margin-bottom:14px;background:rgba(14,102,85,0.05);border:1px solid rgba(14,102,85,0.2);border-radius:10px;padding:10px 14px">
@@ -405,7 +415,7 @@
               ? `<div class="reason" style="margin-bottom:14px;background:rgba(217,119,6,0.1);border-color:#8A6A1B;color:inherit">
                   <b>⚠️ رصد آلي من سجل العلامات (${d.advising.atRiskTotal ?? atRisk.length} طالباً بحاجة لمتابعة إرشادية${(d.advising.atRiskTotal ?? 0) > atRisk.length ? `؛ يُعرض أضعف ${atRisk.length}` : ''}):</b>
                   <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">
-                    ${atRisk.map((r) => `<span class="pill p-review">${esc(r.name)} (${esc(r.studentNo)}) · المعدل: ${r.gpa ?? '—'}% · راسب: ${r.failedCount}</span>`).join('')}
+                    ${atRisk.map((r) => `<span class="pill p-review" style="white-space:normal;max-width:100%">${esc(r.name)} (${esc(r.studentNo)}) · المعدل: ${r.gpa ?? '—'}% · راسب: ${r.failedCount}</span>`).join('')}
                   </div>
                 </div>`
               : ''
@@ -505,6 +515,7 @@
               <option value="withdrawal">انسحاب نهائي وطي قيد</option>
             </select></label>
             <label>البرنامج الجديد (عند التحويل)<select id="sa-mov-prog">${progs.map((p) => `<option value="${p.id}">${esc(p.faculty)} — ${esc(p.name)}</option>`).join('')}</select></label>
+            <label>مدة التأجيل (الحد الأقصى ${d.lifecycle.maxPostponementYears ?? 6} سنوات)<select id="sa-mov-dur"><option value="1">فصل واحد</option><option value="2">فصلان / سنة دراسية</option></select></label>
             <label>رقم القرار الإداري<input id="sa-mov-dec" placeholder="قرار مجلس كلية #0E4D2E"></label>
             <label class="wide">السبب الموثق<input id="sa-mov-reason" placeholder="مثال: ظروف صحية موثقة / رغبة الطالب بالتحويل واستيفاء شرط المعدل"></label>
             <button class="btn pri" type="button" data-act="sa-exec-movement" data-testid="sa-exec-movement-btn">تنفيذ الحركة وتحديث قيد الطالب فوراً</button>
@@ -547,7 +558,7 @@
         </section>
 
         <!-- ب. سجل العقوبات والمخالفات المسلكية المدمج مع student_holds -->
-        <section class="card">
+        <section class="card"${d.access && !d.access.discipline ? ' hidden' : ''}>
           <h2>سجل اللجان الانضباطية والمخالفات المسلكية (مدمج مع نظام الحجب <span class="mono">student_holds</span>)</h2>
           <p class="hint" style="margin-top:0">أي عقوبة انضباطية نشطة تُدرج تلقائياً في جدول الموانع (<span class="mono">student_holds</span>) وتحجب إصدار الوثائق لحين تسويتها أو انتهاء مدتها.</p>
 
@@ -670,7 +681,7 @@
                     <td><b>${esc(s.studentName || '—')}</b><div class="small mono">${esc(s.studentNo || '')}</div></td>
                     <td><b>${esc(schTypeLabel[s.scholarship_type] || s.scholarship_type)}</b><div class="small">${esc(s.note || '')}</div></td>
                     <td>${s.gpa_at_grant ? `${s.gpa_at_grant}%` : '—'}</td>
-                    <td><span class="pill p-approved">${s.discount_percent}%</span></td>
+                    <td><span class="pill ${s.status === 'revoked' ? 'p-rejected' : 'p-approved'}">${s.discount_percent}%${s.status === 'revoked' ? ' — ملغاة' : ''}</span></td>
                     <td><b>${nf.format(s.amount)} ل.س</b></td>
                     <td>
                       ${
@@ -680,7 +691,7 @@
                       }
                     </td>
                     <td class="small">${esc(s.approved_by || 'لجنة المنح')}</td>
-                    <td>${UA.rowPrintBtn('قرار منحة أو إعفاء', 'شؤون الطلاب', 'الطالب|لجنة المنح|المدير المالي')}</td>
+                    <td>${UA.rowPrintBtn('قرار منحة أو إعفاء', 'شؤون الطلاب', 'الطالب|لجنة المنح|المدير المالي')}${s.status === 'active' ? ` <button class="btn sm bad" type="button" data-act="sa-revoke-sch" data-id="${s.id}">إلغاء</button>` : ''}</td>
                   </tr>
                 `
                   )
@@ -868,8 +879,43 @@
       UA.render();
       toast(`اكتمل الفرز الآلي للمفاضلة (${r.sortedCount} متقدماً)`);
     },
+    'sa-save-plan': async (el, d) => {
+      await api('PUT', `/api/student-affairs-suite/admissions/programs/${d.id}`, { minScore: val(`sa-plan-min-${d.id}`), capacity: val(`sa-plan-cap-${d.id}`) });
+      await loadSuiteData();
+      UA.render();
+      toast('حُفظت خطة قبول البرنامج');
+    },
+    'sa-revoke-sch': async (el, d) => {
+      const reason = await window.askText('إلغاء المنحة وعكس قيدها المالي', { label: 'سبب الإلغاء', submit: 'إلغاء المنحة', minLength: 3 });
+      if (!reason) return;
+      await api('POST', `/api/student-affairs-suite/scholarships/${d.id}/revoke`, { reason });
+      await loadSuiteData();
+      UA.render();
+      toast('أُلغيت المنحة وعُكس قيدها المالي');
+    },
     'sa-enroll-app': async (el, d) => {
-      const r = await api('POST', `/api/student-affairs-suite/admissions/enroll/${d.id}`, {});
+      const a = (SA.data.admissions.applicants || []).find((x) => String(x.id) === String(d.id)) || {};
+      const opt = SA.data.admissions.enrollOptions || { governorates: [], relations: [] };
+      const parts = String(a.full_name || '').trim().split(/\s+/);
+      const v = await window.askForm({ title: `تثبيت قيد المتقدم ${a.full_name || ''}`, submit: 'تثبيت القيد', fields: [
+        { name: 'first_name', label: 'الاسم الأول', value: parts[0] || '', required: true },
+        { name: 'father_name', label: 'اسم الأب', value: parts.length > 2 ? parts[1] : '', required: true },
+        { name: 'last_name', label: 'الكنية', value: parts.length > 1 ? parts[parts.length - 1] : '', required: true },
+        { name: 'mother_name', label: 'اسم الأم', required: true },
+        { name: 'gender', label: 'الجنس', type: 'select', options: ['ذكر', 'أنثى'], required: true },
+        { name: 'birth_date', label: 'تاريخ الميلاد', type: 'date', required: true },
+        { name: 'birth_place', label: 'مكان الولادة', required: true },
+        { name: 'nationality', label: 'الجنسية', value: 'سورية', required: true },
+        { name: 'phone', label: 'رقم الهاتف', type: 'tel', value: a.phone || '', required: true },
+        { name: 'governorate', label: 'محافظة السكن', type: 'select', options: opt.governorates, required: true },
+        { name: 'city', label: 'المدينة / المنطقة', required: true },
+        { name: 'address', label: 'العنوان التفصيلي', required: true },
+        { name: 'guardian_name', label: 'اسم ولي الأمر', required: true },
+        { name: 'guardian_relation', label: 'صلة القرابة', type: 'select', options: opt.relations, required: true },
+        { name: 'guardian_phone', label: 'هاتف ولي الأمر', type: 'tel', required: true },
+      ] });
+      if (!v) return;
+      const r = await api('POST', `/api/student-affairs-suite/admissions/enroll/${d.id}`, v);
       await loadSuiteData();
       UA.render();
       toast(`تم تثبيت القبول وتسجيل الطالب بالرقم الجامعي: ${r.student.studentNo}`);
@@ -918,6 +964,7 @@
       const r = await api('POST', '/api/student-affairs-suite/lifecycle', {
         studentId: await studentIdOf('sa-mov-student'),
         movementType: val('sa-mov-type'),
+        durationSemesters: Number(val('sa-mov-dur')),
         toProgramId: Number(val('sa-mov-prog')),
         decisionNo: val('sa-mov-dec'),
         reason: val('sa-mov-reason'),

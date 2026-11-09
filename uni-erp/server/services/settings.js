@@ -56,6 +56,9 @@ export const SCHEMA = [
     { key: 'students.admissions', label: 'أنواع القبول', type: 'list', default: ['القبول العام (المفاضلة)', 'التعليم الموازي', 'التعليم المفتوح / الافتراضي', 'أبناء أعضاء الهيئة التدريسية', 'الطلاب الوافدون', 'نقل من جامعة أخرى', 'أخرى'], max: 40, itemMax: 80 },
     { key: 'students.relations', label: 'صلات القرابة (ولي الأمر)', type: 'list', default: ['الأب', 'الأم', 'الأخ', 'الأخت', 'الزوج/الزوجة', 'قريب آخر', 'وصي'], max: 30, itemMax: 30 },
     { key: 'students.import_max_rows', label: 'أقصى عدد طلاب في ملف الاستيراد', type: 'int', default: 1500, min: 10, max: 20000, unit: 'طالب' },
+    { key: 'students.max_postponement_years', label: 'الحد الأقصى لمجموع تأجيلات الطالب', type: 'int', default: 6, min: 0, max: 12, unit: 'سنة', hint: 'مجموع مدد التأجيل وتجميد الدراسة خلال مدة الدراسة؛ كل سنة تعادل فصلين.' },
+    { key: 'students.admission_default_min_score', label: 'الحد الأدنى الافتراضي للقبول', type: 'int', default: 180, min: 1, max: 1000, unit: 'درجة', hint: 'للبرامج التي لم يُحدَّد لها حد في خطة القبول.' },
+    { key: 'students.admission_default_capacity', label: 'المقاعد الافتراضية لكل برنامج في السنة', type: 'int', default: 35, min: 0, max: 100000, unit: 'مقعد', hint: 'للبرامج التي لم يُحدَّد لها عدد في خطة القبول.' },
   ] },
   { key: 'import', label: 'الاستيراد', desc: 'مهلة التراجع عن دفعات الاستيراد.', items: [
     { key: 'import.undo_days', label: 'مهلة التراجع عن دفعة استيراد', type: 'int', default: 7, min: 1, max: 90, unit: 'يوم' },

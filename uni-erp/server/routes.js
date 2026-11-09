@@ -27,6 +27,7 @@ const ROUTE_LOCKS = {
   'POST /api/lms/loans': () => 'library', 'POST /api/lms/loans/:id/return': () => 'library',
   'POST /api/expansions/appeals/:id/decide': byId('appeal'),
   'POST /api/attendance/scan': (c) => `hall:${c.body?.code ?? c.body?.studentNo ?? ''}`,
+  'POST /api/student-affairs-suite/lifecycle': (c) => `lifecycle:${c.body?.studentId}`,
   'POST /api/procurement/receipts': () => 'stock', 'POST /api/procurement/issues': () => 'stock', 'POST /api/procurement/items/:id/adjust': () => 'stock',
 };
 // الرد يُرسل بعد إنهاء المعاملة، فلا يقرأ العميل بيانات لم تُحفظ بعد

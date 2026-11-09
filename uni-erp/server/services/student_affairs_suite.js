@@ -3,8 +3,8 @@ import { SOD_SENSITIVE_PERMISSIONS } from '../permissions.js';
 import { audit } from '../audit.js';
 import { HttpError } from '../http.js';
 import { registerStudent, STATUS_LABEL } from './students.js';
-import { createCharge } from './finance/fees.js';
-import { nextNumber } from './numbering.js';
+import { createCharge, voidCharge } from './finance/fees.js';
+import { nextNumber, withLock } from './numbering.js';
 import { ready as readyFinance } from './finance/core.js';
 import { getSetting } from './settings.js';
 
@@ -39,7 +39,7 @@ export function runAutomatedAdmissionsSort(applicants = [], programs = []) {
 
   const results = [];
   for (const app of sorted) {
-    if (app.sorting_status === 'enrolled') {
+    if (app.sorting_status === 'enrolled' || app.sorting_status === 'enrolling') {
       results.push({ id: app.id, status: 'enrolled', acceptedProgramId: app.accepted_program_id });
       continue;
     }
@@ -319,20 +319,24 @@ export function getStudentAffairsSuiteOverview(deps, query = {}) {
   const scoped = (column, sqlBody, tail) => (own ? db.prepare(`${sqlBody} WHERE ${column} = ? ${tail}`).all(own) : db.prepare(`${sqlBody} ${tail} LIMIT ${LIST_MAX}`).all());
   const count = (sql) => Number(db.prepare(sql).get().c);
 
+  // المقاعد المشغولة هي مقاعد دفعة هذه السنة فقط، لا طلاب كل السنوات
+  const admissionYear = new Date().getFullYear();
+  const defaultMinScore = Number(getSetting(db, 'students.admission_default_min_score')), defaultCapacity = Number(getSetting(db, 'students.admission_default_capacity'));
   const programs = db
     .prepare(`
-      SELECT p.id, p.name, p.faculty, p.degree, p.years,
+      SELECT p.id, p.name, p.faculty, p.degree, p.years, p.admission_min_score, p.admission_capacity,
+             (SELECT COUNT(*) FROM student_profiles sp WHERE sp.program_id = p.id AND sp.status = 'active' AND sp.enroll_year = ${admissionYear}) AS intakeStudents,
              (SELECT COUNT(*) FROM student_profiles sp WHERE sp.program_id = p.id AND sp.status = 'active') AS activeStudents
       FROM programs p
       WHERE p.active = 1
       ORDER BY p.id
     `)
     .all()
-    .map((p, idx) => ({
+    .map((p) => ({
       ...p,
-      minScore: idx === 0 ? 205 : idx === 1 ? 190 : 180,
-      capacity: 35,
-      enrolledCount: p.activeStudents,
+      minScore: p.admission_min_score ?? defaultMinScore,
+      capacity: p.admission_capacity ?? defaultCapacity,
+      enrolledCount: Number(p.intakeStudents),
     }));
 
   // الحقول المختلفة تبحث عن الطالب عند الكتابة، فلا تُرسل قائمة كل الطلاب مع كل فتح للقسم
@@ -576,6 +580,38 @@ function studentOverview(data, studentId) {
   };
 }
 
+// كل قسم من النظرة الشاملة لا يصل إلا لمن يملك صلاحية قراءته، بالقوائم نفسها التي تُظهر تبويبه
+const SECTION_READ = {
+  admissions: ['sa_admissions:view', 'sa_admissions:write', 'sa_admissions:approve', 'student:register'],
+  advising: ['sa_advising:view', 'sa_advising:edit', 'faculty:manage'],
+  lifecycle: ['sa_lifecycle:view', 'student:update'],
+  discipline: ['sa_discipline:view', 'holds:manage'],
+  scholarships: ['sa_scholarships:view', 'sa_scholarships:write', 'sa_scholarships:approve', 'finance:fees'],
+  desk: ['sa_desk:view', 'sa_scholarships:write', 'student:update', 'request:read_all', 'request:decide', 'sa_scholarships:approve'],
+};
+const canRead = (actor, perms) => !!actor && (adminBypass(actor, perms) || perms.some((p) => actor.can?.(p)));
+
+function staffOverview({ db }, data, actor) {
+  const see = Object.fromEntries(Object.entries(SECTION_READ).map(([k, perms]) => [k, canRead(actor, perms)]));
+  const studentData = Object.values(see).some(Boolean) || canRead(actor, ['student:read']);
+  const t = data.totals || {};
+  return {
+    ...data,
+    access: see,
+    kpis: { ...data.kpis, totalScholarshipAmount: see.scholarships ? data.kpis.totalScholarshipAmount : 0 },
+    totals: { ...t, applicants: see.admissions ? t.applicants : 0, equivalences: see.admissions ? t.equivalences : 0, warnings: see.advising ? t.warnings : 0, movements: see.lifecycle ? t.movements : 0, disciplinary: see.discipline ? t.disciplinary : 0, scholarships: see.scholarships ? t.scholarships : 0, appointments: see.desk ? t.appointments : 0 },
+    students: studentData ? data.students : [],
+    targetStudent: studentData ? data.targetStudent : null,
+    admissions: see.admissions
+      ? { ...data.admissions, enrollOptions: { governorates: getSetting(db, 'students.governorates'), relations: getSetting(db, 'students.relations') } }
+      : { ...data.admissions, applicants: [], equivalences: [] },
+    advising: see.advising ? data.advising : { ...data.advising, degreeTree: buildCoursePrerequisiteTree(), warnings: [], autoDetectedAtRisk: [], atRiskTotal: 0 },
+    lifecycle: { ...data.lifecycle, maxPostponementYears: Number(getSetting(db, 'students.max_postponement_years')), movements: see.lifecycle ? data.lifecycle.movements : [], disciplinaryRecords: see.discipline ? data.lifecycle.disciplinaryRecords : [] },
+    scholarships: see.scholarships ? data.scholarships : { ...data.scholarships, list: [] },
+    deskQueue: see.desk ? data.deskQueue : { ...data.deskQueue, appointments: [] },
+  };
+}
+
 /* ---------- 1. عمليات القبول والمفاضلة والمعادلة ---------- */
 
 function addAdmissionApplicant({ db }, actor, body, ip) {
@@ -591,7 +627,7 @@ function addAdmissionApplicant({ db }, actor, body, ip) {
   const appNo = `ADM-${new Date().getFullYear()}-${String(100 + nextId).padStart(4, '0')}`;
   const category = ['general', 'parallel', 'martyrs', 'transfer'].includes(body?.category) ? body.category : 'general';
   const hsType = String(body?.hsType || 'علمي').trim();
-  const phone = String(body?.phone || '0944000000').trim();
+  const phone = String(body?.phone || '').trim() || null;
   const pref2 = body?.pref2ProgramId ? Number(body.pref2ProgramId) : null;
   const pref3 = body?.pref3ProgramId ? Number(body.pref3ProgramId) : null;
 
@@ -606,6 +642,19 @@ function addAdmissionApplicant({ db }, actor, body, ip) {
   return { id: Number(info.lastInsertRowid), applicationNo: appNo };
 }
 
+// خطة القبول لكل برنامج: الفراغ يعيد البرنامج إلى القيم الافتراضية في الإعدادات
+export function saveProgramAdmissionPlan({ db }, actor, id, body, ip) {
+  requireSuitePerm(actor, 'sa_admissions:approve');
+  const num = (v) => (v === '' || v === null || v === undefined ? null : Number(v));
+  const minScore = num(body?.minScore), capacity = num(body?.capacity);
+  if (minScore !== null && !(minScore > 0 && minScore <= 1000)) throw new HttpError(400, 'الحد الأدنى غير صالح.', 'validation');
+  if (capacity !== null && !(Number.isInteger(capacity) && capacity >= 0 && capacity <= 100000)) throw new HttpError(400, 'عدد المقاعد غير صالح.', 'validation');
+  const res = db.prepare('UPDATE programs SET admission_min_score = ?, admission_capacity = ? WHERE id = ?').run(minScore, capacity, Number(id));
+  if (!res.changes) throw new HttpError(404, 'البرنامج غير موجود.', 'not_found');
+  audit(db, actor, 'تعديل خطة قبول برنامج', `#${id}: حد أدنى ${minScore ?? 'افتراضي'} / مقاعد ${capacity ?? 'افتراضي'}`, ip);
+  return { ok: true };
+}
+
 export function executeAdmissionsSorting(deps, actor, ip) {
   requireSuitePerm(actor, 'sa_admissions:approve');
   const { db } = deps;
@@ -613,7 +662,7 @@ export function executeAdmissionsSorting(deps, actor, ip) {
   const apps = db.prepare('SELECT * FROM sa_applicants').all();
   const sorted = runAutomatedAdmissionsSort(apps, overview.programs);
 
-  const upd = db.prepare('UPDATE sa_applicants SET sorting_status = ?, accepted_program_id = ? WHERE id = ? AND sorting_status != \'enrolled\'');
+  const upd = db.prepare('UPDATE sa_applicants SET sorting_status = ?, accepted_program_id = ? WHERE id = ? AND sorting_status NOT IN (\'enrolled\', \'enrolling\')');
   for (const res of sorted) {
     if (res.status !== 'enrolled') {
       upd.run(res.status, res.acceptedProgramId, res.id);
@@ -623,7 +672,8 @@ export function executeAdmissionsSorting(deps, actor, ip) {
   return { sortedCount: sorted.length, results: sorted };
 }
 
-export async function enrollAcceptedApplicant(deps, actor, applicantId, ip) {
+// البيانات الشخصية يدخلها الموظف من وثائق المتقدم؛ ما لا يصل منها يرفضه تحقق ملف الطالب بدل اختلاق قيمة
+export async function enrollAcceptedApplicant(deps, actor, applicantId, body, ip) {
   requireSuitePerm(actor, 'sa_admissions:approve');
   const { db } = deps;
   const app = db.prepare('SELECT * FROM sa_applicants WHERE id = ?').get(Number(applicantId));
@@ -631,11 +681,15 @@ export async function enrollAcceptedApplicant(deps, actor, applicantId, ip) {
   if (app.sorting_status === 'enrolled' && app.enrolled_student_id) {
     throw new HttpError(409, 'تم تثبيت تسجيل هذا المتقدم مسبقاً كطالب نظامي.', 'conflict');
   }
-  const programId = app.accepted_program_id || app.pref1_program_id;
+  if (app.sorting_status !== 'accepted' || !app.accepted_program_id) {
+    throw new HttpError(409, 'لا يُثبَّت إلا متقدم مقبول بنتيجة الفرز.', 'conflict');
+  }
+  const programId = app.accepted_program_id;
+  const input = (k) => String(body?.[k] ?? '').trim();
   const parts = String(app.full_name).trim().split(/\s+/);
-  const firstName = parts[0] || 'طالب';
-  const fatherName = parts.length > 2 ? parts[1] : 'محمد';
-  const lastName = parts.length > 1 ? parts[parts.length - 1] : 'المستجد';
+  const firstName = input('first_name') || parts[0] || '';
+  const fatherName = input('father_name') || (parts.length > 2 ? parts[1] : '');
+  const lastName = input('last_name') || (parts.length > 1 ? parts[parts.length - 1] : '');
 
   // القوائم المعتمدة في الإعدادات يمكن للمدير تعديلها؛ لذا نطابق قيمة المتقدم معها بدل تمرير نص ثابت يرفضه التحقق («قيمة غير صالحة»)
   const norm = (x) => String(x ?? '').replace(/[\u064B-\u0652\u0640]/g, '').replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/[()\-–—/،,]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -649,7 +703,7 @@ export async function enrollAcceptedApplicant(deps, actor, applicantId, ip) {
   const admissionHints = {
     general: ['القبول العام', 'مفاضلة'], parallel: ['موازي'], martyrs: ['القبول العام', 'مفاضلة'], transfer: ['نقل', 'انتقال'],
   };
-  const hsList = getSetting(db, 'students.hs_types'), admList = getSetting(db, 'students.admissions'), relList = getSetting(db, 'students.relations');
+  const hsList = getSetting(db, 'students.hs_types'), admList = getSetting(db, 'students.admissions');
   const hsRaw = String(app.hs_type || 'علمي');
   const hsHints = /ادب/.test(norm(hsRaw)) ? [hsRaw, 'الفرع الادبي'] : /(علم)/.test(norm(hsRaw)) ? [hsRaw, 'الفرع العلمي'] : [hsRaw];
 
@@ -657,17 +711,17 @@ export async function enrollAcceptedApplicant(deps, actor, applicantId, ip) {
     first_name: firstName,
     father_name: fatherName,
     last_name: lastName,
-    mother_name: 'فاطمة الأحمد',
+    mother_name: input('mother_name'),
     national_id: String(app.national_id),
-    gender: 'ذكر',
-    birth_date: '2006-05-15',
-    birth_place: 'دمشق',
-    nationality: 'سورية',
-    marital_status: 'عازب/عزباء',
-    phone: app.phone || '0944112233',
-    governorate: pick(getSetting(db, 'students.governorates'), ['دمشق'], 'دمشق'),
-    city: 'المزة',
-    address: 'دمشق — مساكن الجامعة',
+    gender: input('gender'),
+    birth_date: input('birth_date'),
+    birth_place: input('birth_place'),
+    nationality: input('nationality'),
+    marital_status: input('marital_status'),
+    phone: input('phone') || app.phone || '',
+    governorate: input('governorate'),
+    city: input('city'),
+    address: input('address'),
     hs_type: pick(hsList, hsHints, 'أخرى'),
     hs_year: Number(app.hs_year || 2025),
     hs_score: Number(app.hs_score || 200),
@@ -676,13 +730,22 @@ export async function enrollAcceptedApplicant(deps, actor, applicantId, ip) {
     enroll_year: new Date().getFullYear(),
     enroll_term: 'الفصل الأول',
     study_level: 1,
-    guardian_name: `${fatherName} ${lastName}`,
-    guardian_relation: pick(relList, ['الأب'], 'قريب آخر'),
-    guardian_phone: app.phone || '0944112233',
+    guardian_name: input('guardian_name'),
+    guardian_relation: input('guardian_relation'),
+    guardian_phone: input('guardian_phone'),
     notes: `ثُبِّت قبوله آلياً من بوابة المفاضلة رقم ${app.application_no}`,
   };
 
-  const created = await registerStudent(deps, actor, regInput, ip);
+  // حجز ذري: ضغطتان متزامنتان لا تنشئان طالبين، والفشل يعيد المتقدم إلى حالته
+  const claim = db.prepare("UPDATE sa_applicants SET sorting_status = 'enrolling' WHERE id = ? AND sorting_status = 'accepted'").run(app.id);
+  if (!claim.changes) throw new HttpError(409, 'يجري تثبيت هذا المتقدم أو ثُبّت مسبقاً.', 'conflict');
+  let created;
+  try {
+    created = await registerStudent(deps, actor, regInput, ip);
+  } catch (e) {
+    db.prepare("UPDATE sa_applicants SET sorting_status = 'accepted' WHERE id = ? AND sorting_status = 'enrolling'").run(app.id);
+    throw e;
+  }
   db.prepare("UPDATE sa_applicants SET sorting_status = 'enrolled', accepted_program_id = ?, enrolled_student_id = ? WHERE id = ?")
     .run(programId, created.student.id, app.id);
 
@@ -825,6 +888,57 @@ export const LIFECYCLE_IMPACT = {
   },
 };
 
+// الحالات التي تصح منها كل حركة: لا يُعاد قيد خريج ولا ينسحب منسحب مرة ثانية
+export const LIFECYCLE_FROM = {
+  postponement: ['active'],
+  suspension: ['active'],
+  withdrawal: ['active', 'suspended'],
+  reinstatement: ['suspended', 'withdrawn'],
+  program_transfer: ['active'],
+};
+const SEMESTERS_PER_YEAR = 2;
+const usedPostponementSemesters = (db, studentId) => Number(db.prepare("SELECT COALESCE(SUM(duration_semesters), 0) AS c FROM sa_lifecycle_movements WHERE student_id = ? AND movement_type = 'postponement' AND status = 'approved'").get(studentId).c);
+
+// لا تفتح معاملة: يستدعيها مسار الحركات داخل قفله، واعتماد الطلب داخل معاملته
+function applyMovement(db, actor, { studentId, movementType, reason, decisionNo, toProgramId, durationSemesters }, ip) {
+  if (!LIFECYCLE_STATUS[movementType]) throw new HttpError(400, 'نوع حركة القيد غير معروف.', 'validation');
+  const prof = db.prepare('SELECT * FROM student_profiles WHERE user_id = ?').get(studentId);
+  if (!prof) throw new HttpError(404, 'ملف الطالب غير موجود.', 'not_found');
+  if (!LIFECYCLE_FROM[movementType].includes(prof.status)) {
+    throw new HttpError(409, `لا تصح هذه الحركة لطالب حالة قيده «${STATUS_LABEL[prof.status] ?? prof.status}».`, 'conflict');
+  }
+
+  const duration = movementType === 'postponement' ? Number(durationSemesters ?? 1) : 1;
+  if (!Number.isInteger(duration) || duration < 1 || duration > 24) throw new HttpError(400, 'مدة التأجيل غير صالحة.', 'validation');
+  if (movementType === 'postponement') {
+    const years = Number(getSetting(db, 'students.max_postponement_years')), limit = years * SEMESTERS_PER_YEAR, used = usedPostponementSemesters(db, studentId);
+    if (used + duration > limit) {
+      throw new HttpError(409, `يتجاوز هذا التأجيل الحد الأقصى المسموح (${years} سنوات = ${limit} فصلاً). المستهلك ${used} فصلاً والمتبقي ${Math.max(0, limit - used)}.`, 'postponement_limit');
+    }
+  }
+
+  let targetProgram = prof.program_id;
+  if (movementType === 'program_transfer') {
+    targetProgram = Number(toProgramId);
+    if (!db.prepare('SELECT 1 AS x FROM programs WHERE id = ? AND active = 1').get(targetProgram)) throw new HttpError(400, 'البرنامج المطلوب غير موجود أو غير مفعّل.', 'validation');
+    if (targetProgram === Number(prof.program_id)) throw new HttpError(400, 'الطالب مسجَّل في هذا البرنامج أصلاً.', 'validation');
+  }
+
+  const toStatus = LIFECYCLE_STATUS[movementType];
+  const nextId = nextNumber(db, 'sa_lifecycle_movements', 'SELECT MAX(id) FROM sa_lifecycle_movements');
+  const movNo = `MOV-${new Date().getFullYear()}-${String(nextId).padStart(3, '0')}`;
+  const imp = LIFECYCLE_IMPACT[movementType];
+
+  db.prepare('UPDATE student_profiles SET status = ?, program_id = ?, updated_at = ? WHERE user_id = ?').run(toStatus, targetProgram, Date.now(), studentId);
+  const info = db.prepare(`
+      INSERT INTO sa_lifecycle_movements (movement_no, student_id, movement_type, academic_year, semester, from_status, to_status, from_program_id, to_program_id, financial_impact, academic_impact, decision_no, reason, status, created_by, created_at, duration_semesters)
+      VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, 'approved', ?, ?, ?)
+    `).run(movNo, studentId, movementType, academicYear(), prof.status, toStatus, prof.program_id, targetProgram, imp.fin, imp.acad, decisionNo || `قرار شؤون الطلاب #${100 + nextId}`, reason, actor.display_name || actor.name || actor.label || 'شؤون الطلاب', Date.now(), duration);
+
+  audit(db, actor, `تنفيذ حركة قيد طلابي (${movementType})`, `${movNo} — طالب #${studentId} (${prof.status} -> ${toStatus})`, ip);
+  return { id: Number(info.lastInsertRowid), movementNo: movNo, newStatus: toStatus, newStatusLabel: STATUS_LABEL[toStatus] };
+}
+
 export function executeLifecycleMovement({ db }, actor, body, ip) {
   if (!actor || (actor.role !== 'admin' && !actor.can?.('student:update'))) {
     throw new HttpError(403, 'لا تملك صلاحية تعديل حالة قيد الطالب (يتطلب صلاحية student:update).', 'forbidden');
@@ -835,45 +949,23 @@ export function executeLifecycleMovement({ db }, actor, body, ip) {
   if (!studentId || !reason) {
     throw new HttpError(400, 'يرجى اختيار الطالب وتحديد سبب حركة القيد.', 'validation');
   }
+  return applyMovement(db, actor, { studentId, movementType, reason, decisionNo: String(body?.decisionNo || '').trim(), toProgramId: body?.toProgramId, durationSemesters: body?.durationSemesters }, ip);
+}
 
-  const prof = db.prepare('SELECT * FROM student_profiles WHERE user_id = ?').get(studentId);
-  if (!prof) throw new HttpError(404, 'ملف الطالب غير موجود.', 'not_found');
+// الخدمات التي يغيّر اعتمادها حالة القيد
+const REQUEST_MOVEMENTS = { postponement: 'postponement', leave_study_freeze: 'postponement', withdrawal: 'withdrawal', adm_withdrawal_confirm: 'withdrawal', program_transfer: 'program_transfer' };
+const TERM_SEMESTERS = { 'فصل واحد': 1, 'فصلان': 2, 'سنة دراسية': 2 };
 
-  const toStatus = LIFECYCLE_STATUS[movementType] || prof.status;
-  const toProgramId = movementType === 'program_transfer' && body?.toProgramId ? Number(body.toProgramId) : prof.program_id;
-
-  const nextId = nextNumber(db, 'sa_lifecycle_movements', 'SELECT MAX(id) FROM sa_lifecycle_movements');
-  const movNo = `MOV-${new Date().getFullYear()}-${String(nextId).padStart(3, '0')}`;
-  const decisionNo = String(body?.decisionNo || `قرار شؤون الطلاب #${100 + nextId}`).trim();
-  const imp = LIFECYCLE_IMPACT[movementType] || LIFECYCLE_IMPACT.postponement;
-
-  // تحديث فعلي لحالة الطالب وبرنامجه في جدول student_profiles
-  db.prepare('UPDATE student_profiles SET status = ?, program_id = ?, updated_at = ? WHERE user_id = ?')
-    .run(toStatus, toProgramId, Date.now(), studentId);
-
-  const info = db
-    .prepare(`
-      INSERT INTO sa_lifecycle_movements (movement_no, student_id, movement_type, academic_year, semester, from_status, to_status, from_program_id, to_program_id, financial_impact, academic_impact, decision_no, reason, status, created_by, created_at)
-      VALUES (?, ?, ?, '2025-2026', 1, ?, ?, ?, ?, ?, ?, ?, ?, 'approved', ?, ?)
-    `)
-    .run(
-      movNo,
-      studentId,
-      movementType,
-      prof.status,
-      toStatus,
-      prof.program_id,
-      toProgramId,
-      imp.fin,
-      imp.acad,
-      decisionNo,
-      reason,
-      actor.display_name || actor.name || 'شؤون الطلاب',
-      Date.now()
-    );
-
-  audit(db, actor, `تنفيذ حركة قيد طلابي (${movementType})`, `${movNo} — طالب #${studentId} (${prof.status} -> ${toStatus})`, ip);
-  return { id: Number(info.lastInsertRowid), movementNo: movNo, newStatus: toStatus, newStatusLabel: STATUS_LABEL[toStatus] };
+// اعتماد الطلب ينفّذ حركة القيد المقابلة داخل معاملة الاعتماد نفسها؛ فإن لم تصح الحركة رُفض الاعتماد برسالة واضحة
+export function applyRequestMovement({ db }, actor, request, ip) {
+  const movementType = REQUEST_MOVEMENTS[request.service_code];
+  if (!movementType) return null;
+  db.prepare('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))').get(`lifecycle:${request.student_id}`);
+  if (!db.prepare('SELECT 1 AS x FROM student_profiles WHERE user_id = ?').get(request.student_id)) return null;
+  const details = JSON.parse(request.details_json || '{}');
+  const durationSemesters = Object.values(details).map((v) => TERM_SEMESTERS[v]).find(Boolean) ?? 1;
+  const text = [details.reason, details.justification].filter(Boolean).join(' — ') || 'بناءً على طلب معتمد';
+  return applyMovement(db, actor, { studentId: request.student_id, movementType, reason: String(text).slice(0, 300), decisionNo: request.no, toProgramId: details.target_program_id__id, durationSemesters }, ip);
 }
 
 export function createDisciplinaryRecord({ db }, actor, body, ip) {
@@ -908,6 +1000,9 @@ export function createDisciplinaryRecord({ db }, actor, body, ip) {
 
 /* ---------- 5. المنح والإعفاءات المدمجة مع المالية ---------- */
 
+const SCHOLARSHIP_TYPES = ['merit_top', 'martyrs_kin', 'sibling_discount', 'social_aid'];
+const canGrant = (actor) => !!actor && (adminBypass(actor, ['finance:fees', 'sa_scholarships:approve']) || actor.can?.('finance:fees') || actor.can?.('sa_scholarships:approve'));
+
 export function grantStudentScholarship(deps, actor, body, ip) {
   if (!actor || (!adminBypass(actor, ['finance:fees', 'sa_scholarships:approve']) && !actor.can?.('finance:fees') && !actor.can?.('sa_scholarships:approve'))) {
     throw new HttpError(403, 'لا تملك صلاحية منح الإعفاءات والحسومات المالية للطلاب.', 'forbidden');
@@ -936,27 +1031,26 @@ export function grantStudentScholarship(deps, actor, body, ip) {
   const discountFeeType = db.prepare("SELECT id FROM fin_fee_types WHERE kind = 'discount' AND active = 1 ORDER BY id LIMIT 1").get();
   if (!discountFeeType) throw new HttpError(409, 'لا يوجد نوع رسم خصم نشط في المالية؛ عرّفه أو فعّله أولاً ليُسجَّل قيد المنحة.', 'conflict');
 
-  const nextId = nextNumber(db, 'sa_scholarships', 'SELECT MAX(id) FROM sa_scholarships');
-  const grantNo = `SCH-${new Date().getFullYear()}-${String(nextId).padStart(3, '0')}`;
+  if (!SCHOLARSHIP_TYPES.includes(scholarshipType)) throw new HttpError(400, 'نوع المنحة غير معروف.', 'validation');
+  if (!(Number(body?.baseTuition) > 0)) throw new HttpError(400, 'أدخل القسط الأساسي الفعلي للطالب.', 'validation');
+  if (scholarshipType === 'merit_top' && !(gpa > 0 && gpa <= 100)) throw new HttpError(400, 'منحة التفوق تتطلب معدل الطالب الفعلي (من 1 إلى 100).', 'validation');
+  if (amount > baseTuition) throw new HttpError(400, 'مبلغ المنحة لا يجوز أن يتجاوز القسط الأساسي.', 'validation');
 
-  const info = db
-    .prepare(`
+  // الفحص والحجز تحت قفل الطالب، فلا تتجاوز طلبات متزامنة الحد
+  const { grantNo, scholarshipId } = withLock(db, `scholarship:${studentId}`, () => {
+    // منحة أُلغي قيد خصمها من المالية لا تُحتسب، وإلا تعذّر إصدار الحسم من جديد
+    const active = db.prepare("SELECT s.scholarship_type, s.discount_percent FROM sa_scholarships s LEFT JOIN fin_charges c ON c.id = s.fin_charge_id WHERE s.student_id = ? AND s.academic_year = ? AND s.status = 'active' AND (c.id IS NULL OR c.status = 'open')").all(studentId, grantYear);
+    if (active.some((x) => x.scholarship_type === scholarshipType)) throw new HttpError(409, 'لدى الطالب منحة فعالة من هذا النوع في السنة نفسها.', 'conflict');
+    const sum = active.reduce((n, x) => n + Number(x.discount_percent), 0);
+    if (sum + discountPercent > 100) throw new HttpError(409, `مجموع حسومات الطالب في هذه السنة سيتجاوز 100% (الحالي ${sum}%).`, 'conflict');
+    const nextId = nextNumber(db, 'sa_scholarships', 'SELECT MAX(id) FROM sa_scholarships');
+    const no = `SCH-${new Date().getFullYear()}-${String(nextId).padStart(3, '0')}`;
+    const info = db.prepare(`
       INSERT INTO sa_scholarships (grant_no, student_id, scholarship_type, discount_percent, amount, academic_year, gpa_at_grant, fin_charge_id, status, approved_by, note, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 'active', ?, ?, ?)
-    `)
-    .run(
-      grantNo,
-      studentId,
-      scholarshipType,
-      discountPercent,
-      amount,
-      grantYear,
-      gpa,
-      actor.display_name || actor.name || 'لجنة المنح والرعاية الطلابية',
-      String(body?.note || calc.label).slice(0, 200),
-      Date.now()
-    );
-  const scholarshipId = Number(info.lastInsertRowid);
+    `).run(no, studentId, scholarshipType, discountPercent, amount, grantYear, gpa, actor.display_name || actor.name || 'لجنة المنح والرعاية الطلابية', String(body?.note || calc.label).slice(0, 200), Date.now());
+    return { grantNo: no, scholarshipId: Number(info.lastInsertRowid) };
+  });
 
   // createCharge يفتح معاملته الخاصة، لذا تُحذف المنحة إن فشل قيدها فلا تبقى منحة بلا خصم
   let finChargeId;
@@ -982,6 +1076,27 @@ export function grantStudentScholarship(deps, actor, body, ip) {
 
   audit(db, actor, 'منح إعفاء/حسم طلابي وربطه بالمالية', `${grantNo} — ${amount} ل.س`, ip);
   return { id: scholarshipId, grantNo, amount, discountPercent, finChargeId };
+}
+
+// إلغاء منحة: يعكس قيد الخصم في المالية، ويبقى سجلها للرجوع إليه
+export function revokeScholarship(deps, actor, id, body, ip) {
+  if (!canGrant(actor)) throw new HttpError(403, 'لا تملك صلاحية إلغاء المنح.', 'forbidden');
+  const { db } = deps;
+  const reason = String(body?.reason ?? '').trim();
+  if (reason.length < 3 || reason.length > 200) throw new HttpError(400, 'اكتب سبب إلغاء المنحة (3-200 حرف).', 'validation');
+  const row = db.prepare('SELECT * FROM sa_scholarships WHERE id = ?').get(Number(id));
+  if (!row) throw new HttpError(404, 'المنحة غير موجودة.', 'not_found');
+  const claim = db.prepare("UPDATE sa_scholarships SET status = 'revoked' WHERE id = ? AND status = 'active'").run(row.id);
+  if (!claim.changes) throw new HttpError(409, 'المنحة ملغاة مسبقاً.', 'conflict');
+  try {
+    if (row.fin_charge_id) voidCharge(deps, actor, row.fin_charge_id, { reason: `إلغاء المنحة ${row.grant_no}: ${reason}` }, ip);
+  } catch (e) {
+    db.prepare("UPDATE sa_scholarships SET status = 'active' WHERE id = ?").run(row.id);
+    throw e;
+  }
+  db.prepare('UPDATE sa_scholarships SET note = ? WHERE id = ?').run(`${row.note || ''} | أُلغيت: ${reason}`.slice(0, 400), row.id);
+  audit(db, actor, 'إلغاء منحة طلابية', `${row.grant_no}: ${reason}`, ip);
+  return { ok: true, grantNo: row.grant_no };
 }
 
 /* ---------- 6. مكتب خدمة الطالب الموحد وحجز المواعيد والدور الذكي ---------- */
@@ -1055,7 +1170,7 @@ function updateDeskQueueStatus({ db }, actor, ticketId, status, ip) {
 
 export function suiteOverviewFor(deps, actor, query) {
   if (actor?.role === 'student') return studentOverview(getStudentAffairsSuiteOverview(deps, { ...query, studentId: actor.id, ownOnly: true }), actor.id);
-  return getStudentAffairsSuiteOverview(deps, query);
+  return staffOverview(deps, getStudentAffairsSuiteOverview(deps, query), actor);
 }
 
 export function registerStudentAffairsSuiteRoutes(r, deps) {
@@ -1074,8 +1189,10 @@ export function registerStudentAffairsSuiteRoutes(r, deps) {
   });
 
   r.add('POST', '/api/student-affairs-suite/admissions/enroll/:id', async (c) => {
-    c.json(201, await enrollAcceptedApplicant(deps, c.user, c.params.id, c.ip));
+    c.json(201, await enrollAcceptedApplicant(deps, c.user, c.params.id, c.body, c.ip));
   });
+
+  r.add('PUT', '/api/student-affairs-suite/admissions/programs/:id', (c) => { c.json(200, saveProgramAdmissionPlan(deps, c.user, c.params.id, c.body, c.ip)); });
 
   r.add('POST', '/api/student-affairs-suite/equivalence', (c) => {
     c.json(201, addTransferEquivalence(deps, c.user, c.body, c.ip));
@@ -1102,6 +1219,10 @@ export function registerStudentAffairsSuiteRoutes(r, deps) {
 
   r.add('POST', '/api/student-affairs-suite/scholarships', (c) => {
     c.json(201, grantStudentScholarship(deps, c.user, c.body, c.ip));
+  });
+
+  r.add('POST', '/api/student-affairs-suite/scholarships/:id/revoke', (c) => {
+    c.json(200, revokeScholarship(deps, c.user, c.params.id, c.body, c.ip));
   });
 
   r.add('POST', '/api/student-affairs-suite/queue/book', (c) => {

@@ -220,9 +220,9 @@ test('تثبيت القيد كطالب نظامي: كل فئات المتقدم�
   const apps = db.prepare("SELECT id, category, hs_type FROM sa_applicants WHERE sorting_status <> 'enrolled'").all();
   assert.ok(apps.length >= 1);
   const cats = new Set();
-  for (const a of apps) {
-    db.prepare('UPDATE sa_applicants SET accepted_program_id = 1 WHERE id = ?').run(a.id);
-    const r = await enrollAcceptedApplicant(deps, actor, a.id, '127.0.0.1');
+  for (const [i, a] of apps.entries()) {
+    db.prepare("UPDATE sa_applicants SET accepted_program_id = 1, sorting_status = 'accepted' WHERE id = ?").run(a.id);
+    const r = await enrollAcceptedApplicant(deps, actor, a.id, { first_name: 'سامي', father_name: 'خالد', last_name: 'النوري', mother_name: 'هدى', gender: 'ذكر', birth_date: new Date(Date.UTC(2006, 2, 1 + i)).toISOString().slice(0, 10), birth_place: 'حمص', nationality: 'سورية', phone: '0944000111', governorate: 'حمص', city: 'حمص', address: 'الحي الغربي', guardian_name: 'خالد النوري', guardian_relation: 'الأب', guardian_phone: '0944000222' }, '127.0.0.1');
     assert.ok(r.student.studentNo, `تعذّر تثبيت المتقدم ${a.id} (${a.category} / ${a.hs_type})`);
     cats.add(a.category);
   }

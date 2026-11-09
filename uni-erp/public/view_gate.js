@@ -130,7 +130,7 @@
     addhold: HOLDS, clearhold: HOLDS, edithold: HOLDS, delhold: HOLDS, 'sa-clear-hold': HOLDS,
     'sa-q-status': DESK, uxdesknext: DESK, xhrcsv: ['staffatt:manage'],
     newsedit: NEWS, newsdel: NEWS, nmdel: NEWS, nmlink: NEWS, nmup: NEWS,
-    'sa-run-sort': ADMIT, 'sa-enroll-app': ADMIT, 'sa-add-eq': ['course:manage', 'sa_admissions:approve'], 'sa-resolve-adv': ['sa_advising:edit'],
+    'sa-run-sort': ADMIT, 'sa-enroll-app': ADMIT, 'sa-save-plan': ADMIT, 'sa-revoke-sch': ['finance:fees', 'sa_scholarships:approve'], 'sa-add-eq': ['course:manage', 'sa_admissions:approve'], 'sa-resolve-adv': ['sa_advising:edit'],
   };
   function gateActions() {
     const can = window.UA.can;
