@@ -128,6 +128,19 @@
     if (o.node) main.appendChild(o.node); else main.innerHTML = o.html || '';
     // الجدول العريض (9 أعمدة فأكثر) يُطبع على ورقة أفقية كي لا يخرج عن الهامش
     if ([...main.querySelectorAll('table')].some((t) => t.rows[0] && [...t.rows[0].cells].reduce((n, c) => n + (c.colSpan || 1), 0) >= 9)) root.classList.add('a4-land');
+    // الجداول ذات 12 عموداً فأكثر: حذف الخانتين العشريتين الصفريتين فقط (بلا تغيير في القيمة) كي تتسع للورقة
+    main.querySelectorAll('table').forEach((t) => {
+      if (!t.rows[0] || t.rows[0].cells.length < 12) return;
+      t.classList.add('a4-dense');
+      t.querySelectorAll('td, th').forEach((c) => { if (c.children.length === 0 && /^[\d,]+\.00$/.test(c.textContent.trim())) c.textContent = c.textContent.trim().slice(0, -3); });
+    });
+    // قياس فعلي قبل الطباعة: جدول يتجاوز عرض الورقة يُصغَّر خطه، فإن لم يكفِ تُقلب الورقة بالعرض
+    const portraitWide = () => { const w = main.getBoundingClientRect().width; return [...main.querySelectorAll('table')].some((t) => t.getBoundingClientRect().width > w + 1 || t.scrollWidth > w + 1); };
+    if (!root.classList.contains('a4-land') && !o.landscape) {
+      root.style.cssText = 'display:block;position:absolute;visibility:hidden;left:-9999px;top:0;width:186mm';
+      if (portraitWide()) { main.classList.add('a4-tight'); if (portraitWide()) { main.classList.remove('a4-tight'); root.classList.add('a4-land'); } }
+      root.removeAttribute('style');
+    }
     // ننتظر الشعار والصور كي لا تخرج الورقة دونها
     await Promise.all([...root.querySelectorAll('img')].map((im) => (im.complete ? null : new Promise((r) => { im.onload = im.onerror = r; setTimeout(r, 2500); }))));
     document.body.classList.add('print-a4');

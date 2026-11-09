@@ -558,9 +558,9 @@
             <button class="btn pri sm" data-act="fin-load-gl">عرض حركة الأستاذ</button>
           </div>
           ${F.gl ? `
-            <p><b>الحساب:</b> <code>${esc(F.gl.account.code)}</code> ${esc(F.gl.account.name)} · <b>الرصيد الختامي:</b> ${money(F.gl.closingBalance)}</p>
+            <p><b>الحساب:</b> <code>${esc(F.gl.account.code)}</code> ${esc(F.gl.account.name)} · <b>الرصيد الختامي:</b> ${money(F.gl.closing ?? F.gl.closingBalance)}</p>
             <div class="tbl-wrap"><table class="tbl"><thead><tr><th>التاريخ</th><th>رقم القيد</th><th>البيان</th><th>مدين</th><th>دائن</th><th>الرصيد التراكمي</th></tr></thead><tbody>
-              ${F.gl.rows.map((x) => `<tr><td>${esc(x.entry_day)}</td><td><code>${esc(x.no)}</code></td><td>${esc(x.memo || x.description)}</td><td>${money(x.debit)}</td><td>${money(x.credit)}</td><td><b>${money(x.balance)}</b></td></tr>`).join('') || '<tr><td colspan="6" class="empty">لا توجد حركات</td></tr>'}
+              ${(F.gl.lines || F.gl.rows || []).map((x) => `<tr><td>${esc(x.day || x.entry_day || '')}</td><td><code>${esc(x.no)}</code></td><td>${esc(x.memo || x.description)}</td><td>${money(x.debit)}</td><td>${money(x.credit)}</td><td><b>${money(x.balance)}</b></td></tr>`).join('') || '<tr><td colspan="6" class="empty">لا توجد حركات</td></tr>'}
             </tbody></table></div>
           ` : '<div class="empty">اختر حساباً لعرض حركته التفصيلية</div>'}
         </div>

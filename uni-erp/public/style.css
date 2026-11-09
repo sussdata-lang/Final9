@@ -2276,3 +2276,7 @@ tr.sx-row-click:hover>td{background:rgba(213,182,93,.08)}
 .a4-doc:has(.a4-compact) .a4-foot{margin-top:3mm}
 .a4-doc:has(.a4-compact) .a4-sig-row{margin-top:2mm}
 .a4-doc:has(.a4-compact) .a4-body{min-height:0}
+.a4-land .a4-body table.a4-dense{font-size:6.2pt}
+.a4-land .a4-body table.a4-dense th,.a4-land .a4-body table.a4-dense td{padding:.6mm .6mm!important}
+.a4-body.a4-tight table{font-size:8pt}
+.a4-body.a4-tight th,.a4-body.a4-tight td{padding:1mm 1.1mm!important}
