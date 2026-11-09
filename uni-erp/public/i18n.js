@@ -254,6 +254,8 @@
     'سجل الطلاب (360°)': 'Students 360° Directory',
     'تسجيل طالب جديد': 'Register New Student',
     '1. القبول والمفاضلة والمعادلة': '1. Admissions, Ranking & Credit Transfer',
+    'القبول': 'Admissions', 'القبول والمفاضلة': 'Admissions & Ranking', 'السجل الطلابي': 'Student Records', 'الحركات والقرارات': 'Movements & Decisions', 'الإرشاد': 'Advising', 'الرعاية والمنح': 'Welfare & Scholarships', 'الخدمات والوثائق': 'Services & Documents',
+    'حركات القيد والانضباط': 'Enrollment Movements & Discipline', 'الخطة والإرشاد والإنذار': 'Plan, Advising & Warnings', 'المنح والإعفاءات': 'Scholarships & Exemptions', 'البطاقة الجامعية': 'University Card', 'مكتب خدمة الطالب والدور': 'Student Service Desk & Queue',
     '2. الخطة التفاعلية والإرشاد والإنذار': '2. Degree Audit, Advising & Early Warning',
     '2. الخطة والإرشاد والإنذار': '2. Degree Audit, Advising & Early Warning',
     '3. حركات القيد والانضباط المسلكي': '3. Enrollment Status & Student Conduct',

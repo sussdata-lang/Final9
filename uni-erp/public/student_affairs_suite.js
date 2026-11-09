@@ -170,7 +170,7 @@
         <section class="card">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px">
             <div>
-              <h2 style="margin:0">1. بوابة القبول والمفاضلة الإلكترونية الذكية (Smart Admissions & Auto-Sorting)</h2>
+              <h2 style="margin:0">بوابة القبول والمفاضلة الإلكترونية الذكية (Smart Admissions & Auto-Sorting)</h2>
               <p class="hint" style="margin:4px 0 0">فرز آلي للمتقدمين حسب المجموع الموزون، أولوية أبناء الشهداء، الرغبات الثلاث، والطاقة الاستيعابية لكل كلية مع تثبيت القيد الفوري.</p>
             </div>
             <div class="actions" style="margin:0">
@@ -349,7 +349,7 @@
         <section class="card">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px">
             <div>
-              <h2 style="margin:0">2. شجرة الخطة الدراسية التفاعلية والمتطلبات السابقة (Interactive Prerequisite Tree)</h2>
+              <h2 style="margin:0">شجرة الخطة الدراسية التفاعلية والمتطلبات السابقة (Interactive Prerequisite Tree)</h2>
               <p class="hint" style="margin:4px 0 0">خريطة مقررات الطالب: المنجز، والمسجل حالياً، والمتاح، والمحجوب بمتطلب سابق. اضغط مقرراً لتظليل ما يتطلبه وما يفتحه.</p>
             </div>
             <div style="display:flex;align-items:center;gap:8px">
@@ -521,7 +521,7 @@
       <div class="sa-suite-section" data-testid="sa-lifecycle-section" style="margin-top:16px;display:grid;gap:16px">
         <!-- أ. أتمتة حركات الوضع الطلابي -->
         <section class="card">
-          <h2>3. أتمتة حركات الوضع الطلابي (تأجيل، إيقاف قيد، انسحاب، إعادة قيد، تحويل تخصص)</h2>
+          <h2>أتمتة حركات الوضع الطلابي (تأجيل، إيقاف قيد، انسحاب، إعادة قيد، تحويل تخصص)</h2>
           <p class="hint" style="margin-top:0">كل حركة تمر بسلسلة اعتماد، ولا تتغير حالة الطالب إلا بعد القرار النهائي. ترقين القيد: براءات الذمة (المالية، المكتبة، المخابر) ثم موافقة العميد أو مجلس الكلية ثم قرار رئيس الجامعة أو نائبه. وبقية الحركات: العميد ثم القرار النهائي.</p>
 
           ${queueHtml}
@@ -579,8 +579,8 @@
 
         <!-- ب. سجل العقوبات والمخالفات المسلكية المدمج مع student_holds -->
         <section class="card"${d.access && !d.access.discipline ? ' hidden' : ''}>
-          <h2>سجل اللجان الانضباطية والمخالفات المسلكية (مدمج مع نظام الحجب <span class="mono">student_holds</span>)</h2>
-          <p class="hint" style="margin-top:0">أي عقوبة انضباطية نشطة تُدرج تلقائياً في جدول الموانع (<span class="mono">student_holds</span>) وتحجب إصدار الوثائق لحين تسويتها أو انتهاء مدتها.</p>
+          <h2>سجل اللجان الانضباطية والمخالفات المسلكية (مدمج مع حجب الوثائق)</h2>
+          <p class="hint" style="margin-top:0">أي عقوبة انضباطية نشطة تُدرج تلقائياً في الموانع وتحجب إصدار الوثائق لحين تسويتها أو انتهاء مدتها.</p>
 
           <div class="inline-form" style="margin-bottom:14px;background:rgba(179,38,30,0.06);padding:12px;border-radius:10px">
             ${studentField('sa-disc-student', 'الطالب')}
@@ -659,7 +659,7 @@
         <section class="card">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px">
             <div>
-              <h2 style="margin:0">5. محرك المنح والإعفاءات والرعاية الطلابية (مدمج مع المالية <span class="mono">fin_charges</span>)</h2>
+              <h2 style="margin:0">محرك المنح والإعفاءات والرعاية الطلابية (مدمج مع المالية)</h2>
               <p class="hint" style="margin:4px 0 0">عند اعتماد أي منحة أو إعفاء لطالب هنا، يُنشئ النظام تلقائياً قيد خصم مزدوج في حسابات الطلاب ودفتر الأستاذ في وحدة المالية والمحاسبة.</p>
             </div>
           </div>
@@ -746,7 +746,7 @@
       <section class="card" data-testid="sa-desk-queue-panel" style="margin-top:16px;border-top:3px solid #0E6655">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px">
           <div>
-            <h2 style="margin:0">6. مكتب خدمة الطالب الموحد ونظام الدور الذكي وحجز المواعيد (One-Stop Smart Queue)</h2>
+            <h2 style="margin:0">مكتب خدمة الطالب الموحد ونظام الدور الذكي وحجز المواعيد (One-Stop Smart Queue)</h2>
             <p class="hint" style="margin:4px 0 0">إدارة مواعيد مراجعة الطلاب لاستلام الوثائق المصدقة وتوزيعهم على نوافذ الخدمة مع ربط التذكرة بشريط تتبع المعاملة ذي الـ 5 مراحل.</p>
           </div>
         </div>

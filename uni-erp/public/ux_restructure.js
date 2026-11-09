@@ -759,7 +759,7 @@
       { cat: 'شؤون الطلاب', title: '🎓 شؤون الطلاب · سجل الطلاب والبحث', view: 'affairs', act: 'sttab', val: 'list' },
       { cat: 'شؤون الطلاب', title: '➕ شؤون الطلاب · تسجيل طالب جديد', view: 'affairs', act: 'sttab', val: 'new' },
       { cat: 'شؤون الطلاب', title: '🪪 شؤون الطلاب · البطاقة الجامعية الرقمية', view: 'affairs', act: 'sttab', val: 'digital_card' },
-      { cat: 'شؤون الطلاب', title: '🏫 شؤون الطلاب · القبول والمفاضلة والمعادلة', view: 'labtools', act: 'labtab', val: 'admissions' },
+      { cat: 'شؤون الطلاب', title: '🏫 شؤون الطلاب · القبول والمفاضلة والمعادلة', view: 'affairs', act: 'sttab', val: 'admissions' },
       { cat: 'شؤون الطلاب', title: '🧭 شؤون الطلاب · الخطة التفاعلية والإرشاد والإنذار', view: 'affairs', act: 'sttab', val: 'advising' },
       { cat: 'شؤون الطلاب', title: '🔁 شؤون الطلاب · حركات القيد والانضباط', view: 'affairs', act: 'sttab', val: 'lifecycle' },
       { cat: 'شؤون الطلاب', title: '⚖️ شؤون الطلاب · اللجنة التأديبية والمخالفات', view: 'affairs', act: 'sttab', val: 'lifecycle' },

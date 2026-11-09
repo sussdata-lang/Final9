@@ -173,7 +173,6 @@
 
   /* ---------- أدوات تجريبية ---------- */
   const LAB_TABS = [
-    ['admissions', 'القبول والمفاضلة والمعادلة', ['sa_admissions:view', 'sa_admissions:write', 'sa_admissions:approve', 'student:register']],
     ['office', 'حجوزات الساعات المكتبية والإرشاد', ['sa_housing:view', 'sa_housing:manage', 'faculty:manage']],
     ['library', 'المكتبة الرقمية والإعارة', ['lms_lib:view', 'lms_lib:write', 'lms_lib:edit', 'lms_lib:approve', 'course:manage', 'academic:read']],
     ['activities', 'الأندية والأنشطة الطلابية', ['sa_housing:view', 'sa_housing:manage']],
@@ -184,8 +183,7 @@
     el.innerHTML = `<section class="card"><h2 style="margin:0">أدوات تجريبية</h2><p class="hint" style="margin:4px 0 0">أدوات قيد التجربة، جُمعت هنا منفصلة عن الأعمال اليومية.</p></section>
       <div class="sub-tabs no-print" role="tablist">${tabs.map((t) => `<button class="chip" role="tab" data-act="labtab" data-t="${t[0]}" aria-pressed="${H.labTab === t[0]}">${t[1]}</button>`).join('')}</div><div id="lab-body"><div class="empty">جارٍ التحميل…</div></div>`;
     const box = el.querySelector('#lab-body');
-    if (H.labTab === 'admissions') { if (UA.loadStudentAffairsSuite) await UA.loadStudentAffairsSuite(); box.innerHTML = UA.studentAffairsSuite ? UA.studentAffairsSuite.renderTab('admissions') : ''; }
-    else if (H.labTab === 'library') await UA.views.lms(box, S.me, 'library');
+    if (H.labTab === 'library') await UA.views.lms(box, S.me, 'library');
     else if (H.labTab === 'office') await legacyLife(box, S.me, 'office');
     else if (H.labTab === 'activities') await legacyLife(box, S.me, 'dorms');
   };

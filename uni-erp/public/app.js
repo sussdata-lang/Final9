@@ -248,16 +248,19 @@ Object.assign(window.UA, {
       ${st.slaBreaches ? `<p class="reason" style="margin-top:12px">${st.slaBreaches} طلب تجاوز مدة الخدمة المعتمدة (SLA).</p>` : ''}` : '';
     const kpiExtra = UA.studentAffairsSuite ? UA.studentAffairsSuite.kpiStrip() : '';
 
-    const tabs = [['requests', can('request:decide') ? 'سجل الطلبات والتتبع الحي' : 'الطلبات']];
+    // التقسيم: القبول، السجل الطلابي، الحركات والقرارات، الإرشاد، الرعاية والمنح، الخدمات والوثائق
+    const tabs = [];
+    if (['sa_admissions:view', 'sa_admissions:write', 'sa_admissions:approve', 'student:register'].some(can)) tabs.push(['admissions', 'القبول والمفاضلة']);
     if (can('student:read')) tabs.push(['list', 'سجل الطلاب (360°)']);
     if (can('student:register')) tabs.push(['new', 'تسجيل طالب جديد']);
     tabs.push(
       ['groups', 'فئات الطلاب'],
-      ['digital_card', 'البطاقة الجامعية الرقمية والباركود الذكي (NFC / QR)'],
-      ['advising', '1. الخطة التفاعلية والإرشاد والإنذار'],
-      ['lifecycle', '2. حركات القيد والانضباط واللجان التأديبية'],
-      ['scholarships', '3. المنح والإعفاءات (مدمجة مالياً)'],
-      ['desk_queue', '4. مكتب خدمة الطالب والدور الذكي']
+      ['lifecycle', 'حركات القيد والانضباط'],
+      ['advising', 'الخطة والإرشاد والإنذار'],
+      ['scholarships', 'المنح والإعفاءات'],
+      ['requests', can('request:decide') ? 'سجل الطلبات والتتبع الحي' : 'الطلبات'],
+      ['digital_card', 'البطاقة الجامعية'],
+      ['desk_queue', 'مكتب خدمة الطالب والدور']
     );
     const cur = S.stTab === 'edit' ? 'list' : S.stTab;
     const bar = `<div class="sub-tabs no-print" role="tablist">${tabs.map((t) => `<button class="chip" role="tab" data-act="sttab" data-t="${t[0]}" aria-pressed="${cur === t[0]}">${t[1]}${t[0] === 'requests' && st && st.review ? ` <span class="badge-n">${st.review}</span>` : ''}</button>`).join('')}</div>`;
@@ -276,7 +279,9 @@ Object.assign(window.UA, {
     } else {
       bodyHtml = studentsView();
     }
-    return `${stats}${kpiExtra}<div style="margin-top:16px">${bar}</div>${bodyHtml}`;
+    // الأرقام تخص الطلبات: تظهر في تبويبها فقط، وصف المؤشرات يُخفى على الجوال كي يصل المحتوى مباشرة
+    const head = (S.stTab === 'requests' || !tabs.some((t) => t[0] === cur)) ? `${stats}<div class="aff-kpi">${kpiExtra}</div>` : '';
+    return `${head}<div style="margin-top:16px">${bar}</div>${bodyHtml}`;
   }
 
   function requestsBody() {

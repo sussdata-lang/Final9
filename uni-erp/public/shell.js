@@ -60,7 +60,7 @@
   /* أيقونات التبويبات الفرعية في القائمة الجانبية: بمفتاح التبويب أولاً، ثم بكلمات عنوانه، وإلا أيقونة ملف.
      تُزال الرموز التعبيرية من أول العنوان كي تتوحد التبويبات كلها على أيقونات الهوية. */
   const SUB_ICON = {
-    unified: 'home', work: 'briefcase', myprofile: 'idcard',
+    unified: 'home', work: 'briefcase', myprofile: 'idcard', admissions: 'graduation',
     requests: 'clipboard', list: 'users', new: 'cap', groups: 'layers', digital_card: 'idcard', advising: 'compass', lifecycle: 'exchange', scholarships: 'wallet', desk_queue: 'clock',
     my_grades: 'chart', courses: 'book', grades: 'bars', gpa_sim: 'graduation', members: 'users',
     scan: 'idcard', log: 'audit', smart_schedule: 'calendar',
@@ -251,18 +251,18 @@
     const okTab = (act, tab) => !UA.gate || UA.gate.allowed(act, tab, S.me);
     const subs = () => {
       const t = S.stTab === 'edit' ? 'list' : S.stTab;
-      const it = [['affairs', 'requests', can('request:decide') ? 'سجل الطلبات' : 'الطلبات']];
-      if (can('student:read')) it.push(['affairs', 'list', 'سجل الطلاب']);
-      if (can('student:register')) it.push(['affairs', 'new', 'تسجيل طالب جديد']);
-      it.push(
-        ['affairs', 'groups', 'فئات الطلاب'],
-        ['affairs', 'digital_card', 'البطاقة الرقمية والباركود الذكي'],
-        ['affairs', 'advising', '1. الخطة والإرشاد والإنذار'],
-        ['affairs', 'lifecycle', '2. حركات القيد والانضباط'],
-        ['affairs', 'scholarships', '3. المنح والإعفاءات المالية'],
-        ['affairs', 'desk_queue', '4. مكتب خدمة الطالب والدور']
-      );
-      return `<div class="sx-sub-list" role="group" aria-label="شؤون الطلاب">${it.filter((x) => okTab('sttab', x[1])).map((x) => `<button data-sx="sub" data-v="${x[0]}" data-t="${x[1]}"${S.view === x[0] && t === x[1] ? ' aria-current="true"' : ''}>${subIcon(x[1], x[2])}<span>${esc(x[2])}</span></button>`).join('')}</div>`;
+      const SECTIONS = [
+        ['القبول', [['admissions', 'القبول والمفاضلة']]],
+        ['السجل الطلابي', [can('student:read') && ['list', 'سجل الطلاب'], can('student:register') && ['new', 'تسجيل طالب جديد'], ['groups', 'فئات الطلاب']]],
+        ['الحركات والقرارات', [['lifecycle', 'حركات القيد والانضباط']]],
+        ['الإرشاد', [['advising', 'الخطة والإرشاد والإنذار']]],
+        ['الرعاية والمنح', [['scholarships', 'المنح والإعفاءات']]],
+        ['الخدمات والوثائق', [['requests', can('request:decide') ? 'سجل الطلبات' : 'الطلبات'], ['digital_card', 'البطاقة الجامعية'], ['desk_queue', 'مكتب خدمة الطالب والدور']]],
+      ];
+      const btn = (x) => `<button data-sx="sub" data-v="affairs" data-t="${x[0]}"${S.view === 'affairs' && t === x[0] ? ' aria-current="true"' : ''}>${subIcon(x[0], x[1])}<span>${esc(x[1])}</span></button>`;
+      // القسم بلا تبويب مسموح لا يظهر عنوانه
+      const html = SECTIONS.map(([title, items]) => { const ok = items.filter(Boolean).filter((x) => okTab('sttab', x[0])); return ok.length ? `<div class="sx-sub-h" role="presentation">${esc(tr(title))}</div>${ok.map(btn).join('')}` : ''; }).join('');
+      return `<div class="sx-sub-list" role="group" aria-label="شؤون الطلاب">${html}</div>`;
     };
 
     // تبويبات الصفحة الداخلية تظهر في القائمة الجانبية تحت عنوان الصفحة لسهولة التنقل الفوري

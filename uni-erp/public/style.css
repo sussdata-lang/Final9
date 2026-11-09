@@ -2280,3 +2280,6 @@ tr.sx-row-click:hover>td{background:rgba(213,182,93,.08)}
 .a4-land .a4-body table.a4-dense th,.a4-land .a4-body table.a4-dense td{padding:.6mm .6mm!important}
 .a4-body.a4-tight table{font-size:8pt}
 .a4-body.a4-tight th,.a4-body.a4-tight td{padding:1mm 1.1mm!important}
+.sx-nav .sx-sub-list .sx-sub-h{margin:8px 12px 2px 0;padding-inline-start:14px;color:#7FA79B;font-size:11px;font-weight:700;letter-spacing:.01em}
+.sx-nav .sx-sub-list .sx-sub-h:first-child{margin-top:2px}
+@media (max-width:820px){.aff-kpi{display:none}}
