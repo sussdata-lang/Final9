@@ -4,7 +4,7 @@ import { HttpError } from '../http.js';
 import { writeXlsx } from '../lib/xlsx.js';
 import { writeDocx } from '../lib/docx.js';
 import { writeZip } from '../lib/zip.js';
-import { passMark } from './academics.js';
+import { passMarkResolver } from './academics.js';
 import { logsForExport, KINDS as HALL_KINDS } from './attendance.js';
 import { sections, STATUS_LABEL, levelLabel, programLabel } from './students.js';
 
@@ -79,10 +79,11 @@ function gradesSet(db, f) {
   const rows = db.prepare(`SELECT gr.*, u.student_no, sp.first_name, sp.father_name, sp.last_name, g.faculty, g.name pname, c.code ccode
     FROM grades gr JOIN users u ON u.id = gr.student_id JOIN student_profiles sp ON sp.user_id = gr.student_id JOIN programs g ON g.id = sp.program_id LEFT JOIN faculties fa ON fa.id = g.faculty_id LEFT JOIN courses c ON c.id = gr.course_id
     ${where(w)} ORDER BY gr.academic_year, gr.level, gr.semester, u.student_no, gr.course`).all(...a);
+  const passOf = passMarkResolver(db);
   return { id: 'grades', title: 'العلامات', textCols: [0],
     headers: ['الرقم الجامعي', 'اسم الطالب', 'الكلية / المعهد', 'البرنامج', 'العام الدراسي', 'السنة الدراسية', 'الفصل', 'المقرر', 'رمز المقرر', 'الساعات', 'العلامة النظرية', 'العلامة العملية', 'المجموع', 'النتيجة'],
     meta: rows.map((r) => ({ level: r.level, semester: r.semester })),
-    rows: rows.map((r) => [r.student_no, fullName(r), r.faculty, r.pname, r.academic_year ?? '', r.level ? levelLabel(r.level, db) : '', semLabel(r.semester), r.course, r.ccode ?? '', r.hours, r.theory_mark ?? '', r.practical_mark ?? '', r.mark, r.mark >= passMark(db) ? 'ناجح' : 'راسب']) };
+    rows: rows.map((r) => [r.student_no, fullName(r), r.faculty, r.pname, r.academic_year ?? '', r.level ? levelLabel(r.level, db) : '', semLabel(r.semester), r.course, r.ccode ?? '', r.hours, r.theory_mark ?? '', r.practical_mark ?? '', r.mark, r.mark >= passOf(r.student_id) ? 'ناجح' : 'راسب']) };
 }
 
 function coursesSet(db, f) {

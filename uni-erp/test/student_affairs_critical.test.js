@@ -132,7 +132,7 @@ test('المنح: لا تكرار ولا تجاوز 100% ولا مبلغ أكب�
   } finally { t.done(); }
 });
 
-test('حركات القيد: قواعد الانتقال وحد التأجيل القابل للتعديل (6 سنوات افتراضياً)', async () => {
+test('حركات القيد: قواعد الانتقال وحد التأجيل القابل للتعديل (سنتان افتراضياً)', async () => {
   const t = await setup();
   try {
     t.addStudent(400, 'graduated'); t.addStudent(401, 'withdrawn'); t.addStudent(402); t.addStudent(403); t.addStudent(404);
@@ -143,9 +143,9 @@ test('حركات القيد: قواعد الانتقال وحد التأجيل �
     assert.throws(() => move(402, 'bogus'), (e) => e.status === 400);
     assert.throws(() => move(402, 'program_transfer', { toProgramId: 99999 }), (e) => e.status === 400);
 
-    // 6 سنوات = 12 فصلاً
-    for (let i = 0; i < 6; i++) { done(402, 'postponement', { durationSemesters: 2 }); done(402, 'reinstatement'); }
-    assert.throws(() => move(402, 'postponement'), (e) => e.status === 409 && /6 سنوات/.test(e.message), 'الفصل الثالث عشر يتجاوز الحد');
+    // سنتان = 4 فصول
+    for (let i = 0; i < 2; i++) { done(402, 'postponement', { durationSemesters: 2 }); done(402, 'reinstatement'); }
+    assert.throws(() => move(402, 'postponement'), (e) => e.status === 409 && /2 سنوات/.test(e.message), 'الفصل الخامس يتجاوز الحد');
     assert.notEqual(t.db.prepare('SELECT academic_year FROM sa_lifecycle_movements ORDER BY id DESC LIMIT 1').get().academic_year, '2025-2026', 'السنة ليست ثابتة');
 
     saveSettings(t.deps, admin, { values: { 'students.max_postponement_years': 1 } }, '::1');

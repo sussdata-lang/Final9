@@ -83,6 +83,8 @@ test('علامة العملي: الحد 30 افتراضياً وقابل للت�
   // علامة النجاح
   const g1 = (await api('GET', `/api/students/${stuId}/grades`, { cookie: staff })).json;
   assert.ok(g1);
+  // هذا الاختبار لعلامة الجهات التطبيقية
+  assert.equal((await put({ 'grades.non_applied_faculties': ['NONE'] }, adm)).status, 200);
   assert.equal((await put({ 'grades.pass_mark': 95 }, adm)).status, 200);
   const me = (await api('GET', '/api/me/grades', { cookie: stu })).json;
   assert.equal(me.passMark, 95); assert.ok(me.grades.every((g) => g.passed === (g.total >= 95)));

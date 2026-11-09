@@ -195,10 +195,10 @@ test('تغيير الحالة من ملف الطالب يدخل سجل حركا�
     t.addStudent(10);
     t.db.prepare("UPDATE student_profiles SET hs_type = 'الثانوية العامة - الفرع العلمي', admission_type = 'القبول العام (المفاضلة)', enroll_term = 'الفصل الأول' WHERE user_id = 10").run();
     const p = profileOf(t.db, 10);
-    updateStudent(t.deps, admin, 10, { ...p, status: 'graduated' }, '::1');
-    assert.equal(profileOf(t.db, 10).status, 'graduated');
+    updateStudent(t.deps, admin, 10, { ...p, status: 'transferred' }, '::1');
+    assert.equal(profileOf(t.db, 10).status, 'transferred');
     const m = t.db.prepare("SELECT * FROM sa_lifecycle_movements WHERE student_id = 10 AND movement_type = 'file_status_change'").get();
-    assert.equal(m.from_status, 'active'); assert.equal(m.to_status, 'graduated'); assert.equal(m.status, 'approved');
+    assert.equal(m.from_status, 'active'); assert.equal(m.to_status, 'transferred'); assert.equal(m.status, 'approved');
     updateStudent(t.deps, admin, 10, { ...profileOf(t.db, 10), phone: '0944000111' }, '::1');
     assert.equal(Number(t.db.prepare('SELECT COUNT(*) c FROM sa_lifecycle_movements WHERE student_id = 10').get().c), 1, 'تعديل غير الحالة لا ينشئ حركة');
   } finally { t.done(); }

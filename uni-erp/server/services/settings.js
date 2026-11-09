@@ -23,7 +23,9 @@ export const SCHEMA = [
   { key: 'grades', label: 'العلامات والنجاح', desc: 'سلّم العلامات وحدود الإدخال وعتبة النجاح.', items: [
     { key: 'grades.total_max', label: 'العلامة الكلية القصوى للمقرر', type: 'int', default: 100, min: 10, max: 1000, unit: 'علامة' },
     { key: 'grades.practical_max', label: 'الحد الأعلى للعلامة العملية', type: 'int', default: 30, min: 0, max: 1000, unit: 'علامة', hint: '0 = لا علامة عملية. تُرفض أي علامة عملية أعلى من هذا الحد.' },
-    { key: 'grades.pass_mark', label: 'علامة النجاح', type: 'int', default: 60, min: 1, max: 1000, unit: 'علامة', hint: 'تُعتمد في العلامات والكشوف والإحصاءات والإنذار الأكاديمي والوثائق.' },
+    { key: 'grades.pass_mark', label: 'علامة النجاح (الكليات التطبيقية)', type: 'int', default: 60, min: 1, max: 1000, unit: 'علامة', hint: 'تُعتمد في العلامات والكشوف والإحصاءات والإنذار الأكاديمي والوثائق.' },
+    { key: 'grades.pass_mark_other', label: 'علامة النجاح (الكليات غير التطبيقية)', type: 'int', default: 50, min: 1, max: 1000, unit: 'علامة', hint: 'تسري على الجهات المدرجة في القائمة التالية.' },
+    { key: 'grades.non_applied_faculties', label: 'رموز الجهات غير التطبيقية', type: 'list', default: ['CSS', 'HISS', 'TISS', 'CSSR'], max: 100, itemMax: 20, hint: 'رمز كل جهة في سطر. الجهة غير المدرجة هنا تُعامل كتطبيقية.' },
   ] },
   { key: 'academic', label: 'الأكاديمي', desc: 'حدود المقررات وتسميات السنوات الدراسية.', items: [
     { key: 'academic.max_course_hours', label: 'أقصى ساعات للمقرر الواحد', type: 'int', default: 12, min: 1, max: 40, unit: 'ساعة' },
@@ -50,13 +52,30 @@ export const SCHEMA = [
     { key: 'student_portal.perm_grade_read_own', label: 'صلاحية: عرض علاماته المعتمدة', type: 'bool', default: true },
     { key: 'student_portal.perm_complaint_create', label: 'صلاحية: إرسال الشكاوى', type: 'bool', default: true },
   ] },
+  { key: 'regulations', label: 'أنظمة الدراسة والتخرج', desc: 'القيم الافتراضية مأخوذة من المنشور عن لوائح الجامعات السورية؛ راجعها مع النص الرسمي واللائحة الداخلية لجامعتك.', items: [
+    { key: 'reg.promotion_max_carried', label: 'أقصى عدد مقررات محمولة للترفيع', type: 'int', default: 4, min: 0, max: 30, unit: 'مقرر', hint: 'يرفَّع الطالب إلى السنة التالية إذا لم تتجاوز مقرراته غير المنجزة هذا العدد. وعند صدور مرسوم ترفع إداري يُعدَّل هذا الحد لذلك العام.' },
+    { key: 'reg.max_stay_extra_percent', label: 'الزيادة المسموحة على مدة البرنامج', type: 'int', default: 50, min: 0, max: 300, unit: '%', hint: 'الحد الأقصى لسنوات الدراسة = مدة البرنامج + هذه النسبة. مثال: 4 سنوات + 50% = 6 سنوات.' },
+    { key: 'reg.count_postponement', label: 'احتساب سنوات التأجيل من مدة الدراسة', type: 'bool', default: false },
+    { key: 'reg.exhaustion_warn_years', label: 'تنبيه الطالب قبل الاستنفاد بـ', type: 'int', default: 1, min: 0, max: 10, unit: 'سنة' },
+    { key: 'reg.renewal_open', label: 'بداية تجديد القيد السنوي', type: 'text', default: '', min: 0, max: 10, hint: 'بصيغة 2026-09-01. فارغ يعني بلا قيد.' },
+    { key: 'reg.renewal_close', label: 'نهاية تجديد القيد السنوي', type: 'text', default: '', min: 0, max: 10, hint: 'بصيغة 2026-10-15. فارغ يعني بلا قيد.' },
+    { key: 'reg.renewal_late_days', label: 'أيام التجديد المتأخر بعد المهلة', type: 'int', default: 0, min: 0, max: 365, unit: 'يوم' },
+    { key: 'reg.renewal_block_dues', label: 'منع التجديد عند وجود مستحقات مالية', type: 'bool', default: true },
+    { key: 'reg.renewal_block_holds', label: 'منع التجديد عند وجود عقوبة أو ذمة قائمة', type: 'bool', default: true },
+    { key: 'reg.appeal_days', label: 'مهلة التظلم من القرار الانضباطي', type: 'int', default: 30, min: 1, max: 365, unit: 'يوم' },
+    { key: 'reg.appeal_warning', label: 'الإنذار يقبل التظلم', type: 'bool', default: false },
+    { key: 'reg.appeal_exam_zero', label: 'إلغاء علامة مقرر يقبل التظلم', type: 'bool', default: true },
+    { key: 'reg.appeal_term_suspension', label: 'حرمان الفصل يقبل التظلم', type: 'bool', default: true },
+    { key: 'reg.appeal_dismissal', label: 'الفصل النهائي يقبل التظلم', type: 'bool', default: true },
+    { key: 'reg.appeal_suspends', label: 'التظلم يوقف تنفيذ القرار حتى البت فيه', type: 'bool', default: false },
+  ] },
   { key: 'students', label: 'الطلاب والقبول', desc: 'قوائم الاختيار في نموذج تسجيل الطالب وحدود الاستيراد.', items: [
     { key: 'students.governorates', label: 'المحافظات', type: 'list', default: ['دمشق', 'ريف دمشق', 'حلب', 'حمص', 'حماة', 'اللاذقية', 'طرطوس', 'إدلب', 'درعا', 'السويداء', 'القنيطرة', 'دير الزور', 'الرقة', 'الحسكة', 'خارج سوريا'], max: 60, itemMax: 40 },
     { key: 'students.hs_types', label: 'أنواع الشهادة الثانوية', type: 'list', default: ['الثانوية العامة - الفرع العلمي', 'الثانوية العامة - الفرع الأدبي', 'الثانوية المهنية - صناعي', 'الثانوية المهنية - تجاري', 'الثانوية المهنية - نسوي', 'الثانوية المهنية - زراعي', 'معهد متوسط', 'شهادة ثانوية أجنبية / معادلة', 'أخرى'], max: 40, itemMax: 80 },
     { key: 'students.admissions', label: 'أنواع القبول', type: 'list', default: ['القبول العام (المفاضلة)', 'التعليم الموازي', 'التعليم المفتوح / الافتراضي', 'أبناء أعضاء الهيئة التدريسية', 'الطلاب الوافدون', 'نقل من جامعة أخرى', 'أخرى'], max: 40, itemMax: 80 },
     { key: 'students.relations', label: 'صلات القرابة (ولي الأمر)', type: 'list', default: ['الأب', 'الأم', 'الأخ', 'الأخت', 'الزوج/الزوجة', 'قريب آخر', 'وصي'], max: 30, itemMax: 30 },
     { key: 'students.import_max_rows', label: 'أقصى عدد طلاب في ملف الاستيراد', type: 'int', default: 1500, min: 10, max: 20000, unit: 'طالب' },
-    { key: 'students.max_postponement_years', label: 'الحد الأقصى لمجموع تأجيلات الطالب', type: 'int', default: 6, min: 0, max: 12, unit: 'سنة', hint: 'مجموع مدد التأجيل وتجميد الدراسة خلال مدة الدراسة؛ كل سنة تعادل فصلين.' },
+    { key: 'students.max_postponement_years', label: 'الحد الأقصى لمجموع تأجيلات الطالب', type: 'int', default: 2, min: 0, max: 12, unit: 'سنة', hint: 'مجموع مدد التأجيل وتجميد الدراسة خلال مدة الدراسة؛ كل سنة تعادل فصلين.' },
     { key: 'students.admission_default_min_score', label: 'الحد الأدنى للقبول', type: 'int', default: 0, min: 0, max: 1000, unit: 'درجة', hint: '0 يعني لا يوجد حد أدنى، وهو المعتمد في الجامعة.' },
     { key: 'students.admission_default_capacity', label: 'المقاعد الافتراضية لكل برنامج في السنة', type: 'int', default: 35, min: 0, max: 100000, unit: 'مقعد', hint: 'للبرامج التي لم يُحدَّد لها عدد في خطة القبول.' },
   ] },
@@ -215,7 +234,7 @@ export function saveSettings({ db }, actor, input, ip) {
   }
   // اتساق: النجاح والعملي ضمن العلامة القصوى
   const val = (k) => (k in next ? next[k] : getSetting(db, k));
-  if (val('grades.pass_mark') > val('grades.total_max')) throw bad('علامة النجاح لا تتجاوز العلامة الكلية القصوى.');
+  if (val('grades.pass_mark') > val('grades.total_max') || val('grades.pass_mark_other') > val('grades.total_max')) throw bad('علامة النجاح لا تتجاوز العلامة الكلية القصوى.');
   if (val('grades.practical_max') > val('grades.total_max')) throw bad('الحد الأعلى للعلامة العملية لا يتجاوز العلامة الكلية القصوى.');
   const changes = [];
   tx(db, () => {

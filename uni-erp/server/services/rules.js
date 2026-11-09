@@ -1,7 +1,8 @@
 // محرك القواعد: يقرأ القواعد من جدول rules (قابلة للتعديل دون برمجة) ويعيد أول مخالفة.
 // RULE_KINDS يصف كل نوع وحقوله؛ منه تُبنى شاشة الإدارة ويُتحقق من المعاملات.
 const DAY = 86400000;
-const passMarkOf = (db) => { try { return Number(db.prepare("SELECT value FROM site_settings WHERE key = 'grades.pass_mark'").get()?.value) || 60; } catch { return 60; } };
+
+import { passMarkFor } from './academics.js';
 
 export const RULE_KINDS = [
   { kind: 'no_active_hold', label: 'لا توجد ذمة فعّالة', desc: 'يُرفض الطلب إذا كان على الطالب ذمة فعّالة من النوع المحدد.', fields: [{ name: 'hold_type', label: 'نوع الذمة', type: 'select', options: { financial: 'مالية', disciplinary: 'انضباطية', library: 'مكتبة' } }] },
@@ -52,7 +53,7 @@ const CHECKS = {
     return charged - paid <= Math.round(Number(p.max_due ?? 0) * 100);
   },
   min_average: ({ db, studentId }, p) => { const r = db.prepare("SELECT SUM(mark * hours) AS pts, SUM(hours) AS hrs FROM grades WHERE student_id = ? AND workflow_status = 'approved'").get(studentId); return Number(r?.hrs) > 0 && Number(r.pts) / Number(r.hrs) >= p.min; },
-  min_passed_hours: ({ db, studentId }, p) => Number(db.prepare("SELECT COALESCE(SUM(hours), 0) AS v FROM grades WHERE student_id = ? AND workflow_status = 'approved' AND mark >= ?").get(studentId, passMarkOf(db)).v) >= p.min,
+  min_passed_hours: ({ db, studentId }, p) => Number(db.prepare("SELECT COALESCE(SUM(hours), 0) AS v FROM grades WHERE student_id = ? AND workflow_status = 'approved' AND mark >= ?").get(studentId, passMarkFor(db, studentId)).v) >= p.min,
   min_study_level: ({ db, studentId }, p) => { const pr = db.prepare('SELECT study_level FROM student_profiles WHERE user_id = ?').get(studentId); return !pr || Number(pr.study_level) >= p.min; },
 };
 

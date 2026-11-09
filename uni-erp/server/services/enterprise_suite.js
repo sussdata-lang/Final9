@@ -10,7 +10,7 @@ import { tx } from '../db.js';
 import crypto from 'node:crypto';
 import { HttpError } from '../http.js';
 import { audit } from '../audit.js';
-import { passMark } from './academics.js';
+import { passMarkFor, passSql } from './academics.js';
 
 /**
  * دوال منطقية نقية وقابلة للاختبار المباشر (Pure Functions for Unit Testing)
@@ -48,7 +48,7 @@ export function computeFacultyOverloadPay(quorumHours, actualTeachingHours, supe
 function advisingPlanFor(db, userId) {
   const profile = db.prepare('SELECT program_id FROM student_profiles WHERE user_id = ?').get(userId);
   if (!profile) return [];
-  const pm = passMark(db);
+  const pm = passMarkFor(db, userId);
   const marks = new Map(db.prepare("SELECT course_id, mark FROM grades WHERE student_id = ? AND workflow_status = 'approved' ORDER BY academic_year, id").all(userId).map((g) => [g.course_id, Number(g.mark)]));
   const enrolled = new Set(db.prepare('SELECT e.course_code FROM student_self_enrollments e JOIN users u ON u.student_no = e.student_no WHERE u.id = ?').all(userId).map((e) => e.course_code));
   const prereqs = new Map();
@@ -65,10 +65,10 @@ function executiveKpisFrom(db) {
   const pct = (part, whole) => (Number(whole) ? Math.round((Number(part) / Number(whole)) * 1000) / 10 : 0);
   const FACULTY = `FROM student_profiles sp JOIN programs p ON p.id = sp.program_id LEFT JOIN faculties fa ON fa.id = p.faculty_id`;
   const NAME = `COALESCE(fa.name, p.faculty, 'غير محدد')`;
-  const pm = passMark(db), byFaculty = new Map();
+  const passExpr = passSql(db, 'g.student_id'), byFaculty = new Map();
   const row = (faculty) => { if (!byFaculty.has(faculty)) byFaculty.set(faculty, { faculty, students: 0, graded: 0, passed: 0, charged: 0, paid: 0, researchPapers: 0 }); return byFaculty.get(faculty); };
   for (const r of db.prepare(`SELECT ${NAME} AS faculty, COUNT(*) AS n ${FACULTY} WHERE sp.status = 'active' GROUP BY ${NAME}`).all()) row(r.faculty).students = Number(r.n);
-  for (const r of db.prepare(`SELECT ${NAME} AS faculty, COUNT(*) AS n, SUM(CASE WHEN g.mark >= ? THEN 1 ELSE 0 END) AS passed FROM grades g JOIN student_profiles sp ON sp.user_id = g.student_id JOIN programs p ON p.id = sp.program_id LEFT JOIN faculties fa ON fa.id = p.faculty_id WHERE g.workflow_status = 'approved' GROUP BY ${NAME}`).all(pm)) Object.assign(row(r.faculty), { graded: Number(r.n), passed: Number(r.passed) });
+  for (const r of db.prepare(`SELECT ${NAME} AS faculty, COUNT(*) AS n, SUM(CASE WHEN g.mark >= ${passExpr} THEN 1 ELSE 0 END) AS passed FROM grades g JOIN student_profiles sp ON sp.user_id = g.student_id JOIN programs p ON p.id = sp.program_id LEFT JOIN faculties fa ON fa.id = p.faculty_id WHERE g.workflow_status = 'approved' GROUP BY ${NAME}`).all()) Object.assign(row(r.faculty), { graded: Number(r.n), passed: Number(r.passed) });
   for (const r of db.prepare(`SELECT ${NAME} AS faculty, SUM(c.amount) AS total FROM fin_charges c JOIN fin_fee_types ft ON ft.id = c.fee_type_id JOIN student_profiles sp ON sp.user_id = c.student_id JOIN programs p ON p.id = sp.program_id LEFT JOIN faculties fa ON fa.id = p.faculty_id WHERE c.status <> 'void' AND ft.kind = 'fee' GROUP BY ${NAME}`).all()) row(r.faculty).charged = Number(r.total);
   for (const r of db.prepare(`SELECT ${NAME} AS faculty, SUM(pay.amount) AS total FROM fin_payments pay JOIN student_profiles sp ON sp.user_id = pay.student_id JOIN programs p ON p.id = sp.program_id LEFT JOIN faculties fa ON fa.id = p.faculty_id WHERE pay.status <> 'void' GROUP BY ${NAME}`).all()) row(r.faculty).paid = Number(r.total);
   for (const r of db.prepare("SELECT faculty_name AS faculty, COUNT(*) AS n FROM research_projects WHERE status = 'published' GROUP BY faculty_name").all()) row(r.faculty).researchPapers = Number(r.n);
@@ -204,7 +204,7 @@ export function registerEnterpriseSuiteRoutes(r, deps) {
 
     // المتطلبات المربوطة في الخطة الدراسية تُفرض من السجل، لا مما يرسله المتصفح
     if (studentId) {
-      const pm = passMark(db);
+      const pm = passMarkFor(db, studentId);
       const required = db.prepare(`SELECT pc.id, pc.name, p.min_mark FROM courses c
         JOIN student_profiles sp ON sp.program_id = c.program_id AND sp.user_id = ?
         JOIN sa_course_prerequisites p ON p.course_id = c.id JOIN courses pc ON pc.id = p.prereq_course_id WHERE c.code = ?`).all(studentId, b.course_code);

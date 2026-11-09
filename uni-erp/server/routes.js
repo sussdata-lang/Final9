@@ -55,6 +55,7 @@ import { registerV12Modules } from './services/v12_modules.js';
 import { registerHrIntegratedRoutes } from './services/hr_integrated.js';
 import { registerEnterpriseSuiteRoutes } from './services/enterprise_suite.js';
 import { registerStudentAffairsSuiteRoutes } from './services/student_affairs_suite.js';
+import { registerStudentRegulationRoutes } from './services/student_regulations.js';
 import { login, logout, publicUser, changePassword, getSessionCacheStats, invalidateSessionCache } from './services/auth.js';
 import { listStaff, listStaffLight, staffDetail, createUser, updateUser, setUserActive, resetUserPassword, deleteUser } from './services/useradmin.js';
 import { getTranscriptTemplate, setTranscriptTemplate, getSite, saveSite, universityName } from './services/site.js';
@@ -596,6 +597,7 @@ export async function buildRouter(deps) {
   registerEnterpriseSuiteRoutes(r, deps);
   // منظومة شؤون الطلاب المتكاملة المطورة (Student Affairs Suite: 1, 2, 3, 5, 6)
   registerStudentAffairsSuiteRoutes(r, deps);
+  registerStudentRegulationRoutes(r, deps);
 
   // ---- محرك الأداء الفائق والضغط العالي (10,000+ مستخدم متزامن + 10+ مراسلات/إضافات مالية بالثانية) ----
   r.add('GET', '/api/v12/high-concurrency/telemetry', (c) => {

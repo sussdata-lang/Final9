@@ -255,8 +255,12 @@ Object.assign(window.UA, {
     if (can('student:register')) tabs.push(['new', 'تسجيل طالب جديد']);
     tabs.push(
       ['groups', 'فئات الطلاب'],
+      ['renewal', 'تجديد القيد السنوي'],
       ['lifecycle', 'حركات القيد والانضباط'],
+      ['promotion', 'الترفيع السنوي'],
+      ['appeals', 'التظلمات الانضباطية'],
       ['advising', 'الخطة والإرشاد والإنذار'],
+      ['exhaustion', 'استنفاد سنوات الدراسة'],
       ['scholarships', 'المنح والإعفاءات'],
       ['requests', can('request:decide') ? 'سجل الطلبات والتتبع الحي' : 'الطلبات'],
       ['digital_card', 'البطاقة الجامعية'],
@@ -266,7 +270,10 @@ Object.assign(window.UA, {
     const bar = `<div class="sub-tabs no-print" role="tablist">${tabs.map((t) => `<button class="chip" role="tab" data-act="sttab" data-t="${t[0]}" aria-pressed="${cur === t[0]}">${t[1]}${t[0] === 'requests' && st && st.review ? ` <span class="badge-n">${st.review}</span>` : ''}</button>`).join('')}</div>`;
     const suiteTabs = ['admissions', 'advising', 'lifecycle', 'scholarships', 'desk_queue', 'digital_card', 'disciplinary'];
     let bodyHtml = '';
-    if (cur === 'groups' && UA.renderStudentGroups) {
+    if (UA.studentRegs && UA.studentRegs.tabs.includes(cur)) {
+      bodyHtml = UA.studentRegs.placeholder();
+      setTimeout(() => UA.studentRegs.mount(cur), 0);
+    } else if (cur === 'groups' && UA.renderStudentGroups) {
       bodyHtml = UA.renderStudentGroups();
     } else if (cur === 'digital_card' && UA.renderDigitalCardSection) {
       bodyHtml = UA.renderDigitalCardSection();

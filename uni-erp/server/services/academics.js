@@ -7,6 +7,25 @@ import { nextNumber } from './numbering.js';
 import { getSetting } from './settings.js';
 
 export const passMark = (db) => getSetting(db, 'grades.pass_mark');
+// الجهات غير التطبيقية لها علامة نجاح مستقلة؛ وما لم يُدرج (أو طالب بلا جهة) يأخذ علامة التطبيقية الأعلى
+const otherCodes = (db) => getSetting(db, 'grades.non_applied_faculties').map((c) => String(c).trim().toUpperCase()).filter((c) => /^[A-Z0-9_-]+$/.test(c));
+export function passMarkFor(db, studentId) {
+  const code = db.prepare('SELECT f.code FROM student_profiles p JOIN programs g ON g.id = p.program_id JOIN faculties f ON f.id = g.faculty_id WHERE p.user_id = ?').get(Number(studentId))?.code;
+  return code && otherCodes(db).includes(String(code).toUpperCase()) ? getSetting(db, 'grades.pass_mark_other') : passMark(db);
+}
+// قيم عددية ورموز مُتحقق منها فقط، فيصح دمجها في الاستعلام
+export function passSql(db, studentCol) {
+  const codes = otherCodes(db), a = Number(passMark(db)), o = Number(getSetting(db, 'grades.pass_mark_other'));
+  if (!/^[a-z_][a-z0-9_.]*$/i.test(studentCol)) throw new Error('عمود غير صالح');
+  const cond = codes.length ? `UPPER(f_pm.code) IN (${codes.map((c) => `'${c}'`).join(',')})` : 'FALSE';
+  return `COALESCE((SELECT CASE WHEN ${cond} THEN ${o} ELSE ${a} END FROM student_profiles p_pm JOIN programs g_pm ON g_pm.id = p_pm.program_id JOIN faculties f_pm ON f_pm.id = g_pm.faculty_id WHERE p_pm.user_id = ${studentCol}), ${a})`;
+}
+// لقوائم فيها طلاب كثر: استعلام واحد بدل استعلام لكل صف
+export function passMarkResolver(db) {
+  const other = new Set(otherCodes(db)), a = passMark(db), o = getSetting(db, 'grades.pass_mark_other');
+  const m = new Map(db.prepare('SELECT p.user_id, f.code FROM student_profiles p JOIN programs g ON g.id = p.program_id JOIN faculties f ON f.id = g.faculty_id').all().map((r) => [Number(r.user_id), other.has(String(r.code).toUpperCase()) ? o : a]));
+  return (id) => m.get(Number(id)) ?? a;
+}
 const CTRL = /[\u0000-\u001f\u007f]/;
 const text = (v, min, max, label) => {
   const s = String(v ?? '').replace(/[ \t]+/g, ' ').trim();
@@ -61,7 +80,7 @@ const gview = (g, pm) => ({ id: g.id, course: g.course, courseId: g.course_id, l
 
 // العلامات مجمّعة بالمقرر: أحدث محاولة تظهر، وما قبلها «علامات سابقة»
 export function gradesFor(db, studentId, level, { onlyApproved = false } = {}) {
-  const pm = passMark(db);
+  const pm = passMarkFor(db, studentId);
   const rows = db.prepare(`SELECT g.*, c.instructor FROM grades g LEFT JOIN courses c ON c.id = g.course_id
     WHERE g.student_id = ? ${onlyApproved ? "AND g.workflow_status = 'approved'" : ''} ${level ? 'AND g.level = ?' : ''} ORDER BY g.semester, g.course, g.academic_year DESC`).all(...(level ? [studentId, Number(level)] : [studentId]));
   const byCourse = new Map();
@@ -74,7 +93,7 @@ export function gradesFor(db, studentId, level, { onlyApproved = false } = {}) {
 
 export function myGrades({ db }, user, q) {
   const p = db.prepare('SELECT study_level FROM student_profiles WHERE user_id = ?').get(user.id);
-  if (!p) return { grades: [], summary: { count: 0, passed: 0, failed: 0, average: null }, passMark: passMark(db), level: null };
+  if (!p) return { grades: [], summary: { count: 0, passed: 0, failed: 0, average: null }, passMark: passMarkFor(db, user.id), level: null };
   const level = Number(q.level) || p.study_level;
   return { ...gradesFor(db, user.id, level, { onlyApproved: true }), level };
 }
@@ -279,11 +298,11 @@ export function listGradesTable({ db }, q) {
   if (q.semester === '1' || q.semester === '2') { where.push('gr.semester = ?'); args.push(Number(q.semester)); }
   if (/^\d{4}\/\d{4}$/.test(String(q.year ?? ''))) { where.push('gr.academic_year = ?'); args.push(q.year); }
   if (['draft', 'reviewed', 'approved'].includes(q.workflow)) { where.push('gr.workflow_status = ?'); args.push(q.workflow); }
-  const PASS_MARK = passMark(db);
-  if (q.status === 'pass') { where.push('gr.mark >= ?'); args.push(PASS_MARK); } else if (q.status === 'fail') { where.push('gr.mark < ?'); args.push(PASS_MARK); }
+  const PASS_SQL = passSql(db, 'gr.student_id'), passOf = passMarkResolver(db);
+  if (q.status === 'pass') where.push(`gr.mark >= ${PASS_SQL}`); else if (q.status === 'fail') where.push(`gr.mark < ${PASS_SQL}`);
   const W = where.length ? 'WHERE ' + where.join(' AND ') : '';
   const FROM = `FROM grades gr JOIN users u ON u.id = gr.student_id LEFT JOIN student_profiles sp ON sp.user_id = u.id LEFT JOIN programs g ON g.id = sp.program_id LEFT JOIN courses c ON c.id = gr.course_id LEFT JOIN faculty_members fm ON fm.id = c.member_id`;
-  const sum = db.prepare(`SELECT COUNT(*) n, AVG(gr.mark) a, SUM(gr.mark >= ${PASS_MARK}) p, COUNT(DISTINCT gr.student_id) s ${FROM} ${W}`).get(...args);
+  const sum = db.prepare(`SELECT COUNT(*) n, AVG(gr.mark) a, SUM(CASE WHEN gr.mark >= ${PASS_SQL} THEN 1 ELSE 0 END) p, COUNT(DISTINCT gr.student_id) s ${FROM} ${W}`).get(...args);
   const size = Math.min(500, Math.max(5, Number(q.size) || 25)), pages = Math.max(1, Math.ceil(sum.n / size)), page = Math.min(pages, Math.max(1, Number(q.page) || 1));
   const col = GSORT[q.sort] ?? GSORT.enteredAt, dir = q.dir === 'asc' ? 'ASC' : 'DESC';
   const rows = db.prepare(`SELECT gr.id, gr.student_id, u.student_no, sp.first_name, sp.father_name, sp.last_name, g.id program_id, g.name pname, g.faculty fname, g.faculty_id fid, gr.course_id, gr.course, c.code, gr.level, gr.semester, gr.academic_year, gr.theory_mark, gr.practical_mark, gr.mark, gr.entered_at, gr.workflow_status, fm.user_id approver_id
@@ -293,5 +312,5 @@ export function listGradesTable({ db }, q) {
     workflow: { enabled: workflowOn(db), ...Object.fromEntries(db.prepare('SELECT workflow_status k, COUNT(*) n FROM grades GROUP BY workflow_status').all().map((r) => [r.k, r.n])) },
     summary: { count: sum.n, students: sum.s, average: sum.n ? Math.round(sum.a * 10) / 10 : null, passRate: sum.n ? Math.round((sum.p / sum.n) * 1000) / 10 : null },
     rows: rows.map((r) => ({ id: r.id, studentId: r.student_id, studentNo: r.student_no, studentName: [r.first_name, r.father_name, r.last_name].filter(Boolean).join(' ') || r.student_no, faculty: r.fname ?? '—', facultyId: r.fid ?? null, programId: r.program_id ?? null, program: r.pname ?? '—',
-      courseId: r.course_id, course: r.course, code: r.code ?? null, level: r.level, semester: r.semester, academicYear: r.academic_year, theory: r.theory_mark, practical: r.practical_mark, total: r.mark, passed: r.mark >= PASS_MARK, enteredAt: r.entered_at, workflowStatus: r.workflow_status, approverId: r.approver_id ?? null })) };
+      courseId: r.course_id, course: r.course, code: r.code ?? null, level: r.level, semester: r.semester, academicYear: r.academic_year, theory: r.theory_mark, practical: r.practical_mark, total: r.mark, passed: r.mark >= passOf(r.student_id), enteredAt: r.entered_at, workflowStatus: r.workflow_status, approverId: r.approver_id ?? null })) };
 }

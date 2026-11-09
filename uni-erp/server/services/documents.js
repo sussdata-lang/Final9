@@ -1,7 +1,7 @@
 import { sha256, hmac, safeEqual, newDocCode } from '../security.js';
 import { BUILTIN } from './catalog.js';
 import { universityName } from './site.js';
-import { passMark } from './academics.js';
+import { passMarkFor } from './academics.js';
 import { HttpError } from '../http.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -35,7 +35,7 @@ function transcriptData(db, studentId) {
     return { term: g.term, course: g.course, hours: g.hours, mark: g.mark, code: g.ccode ?? null, level: g.level ?? null, semester: g.semester ?? null,
       academicYear: g.academic_year ?? null, theory: g.theory_mark ?? null, practical: g.practical_mark ?? null, previous };
   }).sort((a, b) => (a.level ?? 99) - (b.level ?? 99) || (a.semester ?? 9) - (b.semester ?? 9) || a.course.localeCompare(b.course, 'ar') || Number(a.previous) - Number(b.previous));
-  const PASS = passMark(db), cur = grades.filter((g) => !g.previous), hrs = cur.reduce((s, g) => s + g.hours, 0);
+  const PASS = passMarkFor(db, studentId), cur = grades.filter((g) => !g.previous), hrs = cur.reduce((s, g) => s + g.hours, 0);
   const average = hrs ? r1(cur.reduce((s, g) => s + g.hours * g.mark, 0) / hrs) : null;
   const summary = { courses: cur.length, passed: cur.filter((g) => g.mark >= PASS).length, failed: cur.filter((g) => g.mark < PASS).length,
     hours: hrs, earnedHours: cur.filter((g) => g.mark >= PASS).reduce((s, g) => s + g.hours, 0) };

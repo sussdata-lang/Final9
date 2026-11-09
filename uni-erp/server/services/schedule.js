@@ -1,4 +1,5 @@
 // جدول محاضرات المقررات وكشف التعارض بين مقررات الطالب
+import { passMarkFor } from './academics.js';
 import { tx } from '../db.js';
 import { audit } from '../audit.js';
 import { HttpError } from '../http.js';
@@ -75,7 +76,7 @@ function currentCourses(db, studentId) {
   const p = db.prepare('SELECT program_id, study_level FROM student_profiles WHERE user_id = ?').get(Number(studentId));
   if (!p) throw new HttpError(404, 'الطالب غير موجود.', 'not_found');
   const courses = db.prepare(`SELECT c.id, c.name, c.semester FROM courses c WHERE c.program_id = ? AND c.level = ? AND c.active = 1
-    AND NOT EXISTS (SELECT 1 FROM grades g WHERE g.student_id = ? AND g.course_id = c.id AND g.workflow_status = 'approved' AND g.mark >= 60)`).all(p.program_id, p.study_level, Number(studentId));
+    AND NOT EXISTS (SELECT 1 FROM grades g WHERE g.student_id = ? AND g.course_id = c.id AND g.workflow_status = 'approved' AND g.mark >= ?)`).all(p.program_id, p.study_level, Number(studentId), passMarkFor(db, studentId));
   return { p, courses };
 }
 // مواعيد مقررات الطالب: موعد الفئة يخص أعضاءها، وما لا فئة له يخص الجميع

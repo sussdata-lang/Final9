@@ -114,6 +114,7 @@
     return sxHead('التعميمات والأخبار', 'آخر ما نشرته الجامعة.') + `<article class="sx-panel">${body}</article>`;
   }
   function txD() {
+    if (UA.studentRegs) setTimeout(() => UA.studentRegs.mountStudent(), 0);
     let body;
     if (!T.reqs) body = sxWait();
     else if (!T.reqs.length) body = sxEmpty('لا يوجد معاملات سابقة لك', 'ابدأ بإنشاء معاملة جديدة الآن بسهولة.');
@@ -123,7 +124,7 @@
       return `<tr><td><strong>${esc(r.service.label)}</strong><div class="sx-sub">${esc(r.no)}</div></td><td class="sx-muted" data-l="تاريخ التقديم">${esc(fmt(r.createdAt))}</td><td data-l="الحالة">${UA.pill(r)}</td><td class="sx-acts"><button class="sx-link" data-act="reqtoggle" data-id="${r.id}" aria-expanded="${!!open}">${open ? 'إخفاء' : 'التفاصيل'}</button><button class="sx-link" data-act="reqprint" data-id="${r.id}">${sx().ico('file', 15)} طباعة النموذج</button>${r.document ? `<button class="sx-link" data-act="docpdf" data-c="${esc(r.document.code)}">${sx().ico('download', 15)} حفظ PDF</button>` : ''}</td></tr>${det}`;
     }).join('')}</tbody></table>`;
     const queueBox = UA.studentAffairsSuite ? UA.studentAffairsSuite.renderStudentPortalBooking(T.reqs) : '';
-    return sxHead('المعاملات ومكتب خدمة الطالب الموحد', 'تابع مراحل معاملتك عبر شريط التتبع الخماسي أو احجز تذكرة دور ذكية لاستلام الوثائق.', newTxBtn()) + `<article class="sx-panel"><div class="sx-tscroll" style="margin-top:-20px">${body}</div></article>${queueBox}`;
+    return sxHead('المعاملات ومكتب خدمة الطالب الموحد', 'تابع مراحل معاملتك عبر شريط التتبع الخماسي أو احجز تذكرة دور ذكية لاستلام الوثائق.', newTxBtn()) + `<article class="sx-panel"><div class="sx-tscroll" style="margin-top:-20px">${body}</div></article>${queueBox}` + (UA.studentRegs ? UA.studentRegs.studentPlaceholder() : '');
   }
   // دليل الطالب: كيف يقوم بما يحتاجه من بوابته
   function guidelinesD() {

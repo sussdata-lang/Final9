@@ -4,6 +4,8 @@ import { audit } from '../audit.js';
 import { HttpError } from '../http.js';
 import { registerStudent, STATUS_LABEL } from './students.js';
 import { createCharge, voidCharge } from './finance/fees.js';
+import { graduationBlockers, appealBlocksMovement } from './student_regulations.js';
+import { passMarkFor, passSql } from './academics.js';
 import { nextNumber, withLock } from './numbering.js';
 import { tx } from '../db.js';
 import { ready as readyFinance } from './finance/core.js';
@@ -393,7 +395,7 @@ export function getStudentAffairsSuiteOverview(deps, query = {}) {
     : courses;
   const targetGrades = targetStudent
     ? db
-        .prepare("SELECT course_id AS courseId, course, mark AS total, CASE WHEN mark >= 60 THEN 1 ELSE 0 END AS passed FROM grades WHERE student_id = ? AND workflow_status = 'approved'")
+        .prepare(`SELECT course_id AS courseId, course, mark AS total, CASE WHEN mark >= ${passSql(db, 'grades.student_id')} THEN 1 ELSE 0 END AS passed FROM grades WHERE student_id = ? AND workflow_status = 'approved'`)
         .all(targetStudent.id)
     : [];
   const prereqs = db.prepare('SELECT * FROM sa_course_prerequisites').all();
@@ -417,7 +419,7 @@ export function getStudentAffairsSuiteOverview(deps, query = {}) {
   const atRiskAll = own ? [] : db
     .prepare(`
       SELECT u.id, u.display_name AS name, u.student_no AS studentNo, g.hrs, g.weighted, g.failed
-      FROM (SELECT student_id, SUM(COALESCE(hours, 3)) AS hrs, SUM(COALESCE(hours, 3) * mark) AS weighted, SUM(CASE WHEN mark < 60 THEN 1 ELSE 0 END) AS failed
+      FROM (SELECT student_id, SUM(COALESCE(hours, 3)) AS hrs, SUM(COALESCE(hours, 3) * mark) AS weighted, SUM(CASE WHEN mark < ${passSql(db, 'grades.student_id')} THEN 1 ELSE 0 END) AS failed
             FROM grades WHERE workflow_status = 'approved' GROUP BY student_id) g
       JOIN users u ON u.id = g.student_id
       JOIN student_profiles sp ON sp.user_id = u.id
@@ -854,7 +856,7 @@ export function createAdvisingSession({ db }, actor, body, ip) {
   }
   if (!db.prepare('SELECT 1 AS x FROM student_profiles WHERE user_id = ?').get(studentId)) throw new HttpError(404, 'ملف الطالب غير موجود.', 'not_found');
   // ما لم يُدخله المرشد يُحسب من علامات الطالب المعتمدة؛ وما لا مصدر له (الغياب) يبقى فارغاً
-  const passMark = Number(getSetting(db, 'grades.pass_mark'));
+  const passMark = Number(passMarkFor(db, studentId));
   const real = db.prepare("SELECT SUM(mark * hours) AS w, SUM(hours) AS h, SUM(CASE WHEN mark < ? THEN 1 ELSE 0 END) AS failed FROM grades WHERE student_id = ? AND workflow_status = 'approved' AND mark IS NOT NULL").get(passMark, studentId);
   const gpaSnapshot = optionalPercent(body?.gpaSnapshot, 'المعدل') ?? (Number(real.h) > 0 ? Math.round((Number(real.w) / Number(real.h)) * 100) / 100 : null);
   const absenceRate = optionalPercent(body?.absenceRate, 'نسبة الغياب') ?? null;
@@ -895,6 +897,7 @@ export const LIFECYCLE_STATUS = {
   program_transfer: 'active',
   disciplinary_suspension: 'suspended',
   dismissal: 'withdrawn',
+  graduation: 'graduated',
 };
 export const LIFECYCLE_IMPACT = {
   postponement: {
@@ -921,6 +924,10 @@ export const LIFECYCLE_IMPACT = {
     fin: 'مراجعة رسوم فصل الحرمان بقرار لجنة الانضباط',
     acad: 'حرمان الطالب من الفصل وتعليق قيده بقرار لجنة الانضباط',
   },
+  graduation: {
+    fin: 'تسوية الذمة المالية قبل منح وثيقة التخرج',
+    acad: 'إنهاء متطلبات الخطة ومنح وثيقة التخرج',
+  },
   dismissal: {
     fin: 'تسوية الذمة المالية المترتبة على الفصل النهائي',
     acad: 'طي قيد الطالب بقرار الفصل النهائي من لجنة الانضباط',
@@ -936,6 +943,7 @@ export const LIFECYCLE_FROM = {
   program_transfer: ['active'],
   disciplinary_suspension: ['active'],
   dismissal: ['active', 'suspended'],
+  graduation: ['active'],
 };
 // هاتان الحركتان تنشآن من قرار لجنة الانضباط فقط، لا من نموذج حركات القيد
 const PENALTY_MOVEMENT = { term_suspension: 'disciplinary_suspension', dismissal: 'dismissal' };
@@ -954,7 +962,7 @@ const STEPS = {
   president: { label: 'القرار النهائي: رئيس الجامعة أو نائبه لشؤون الطلاب', perms: ['sa_lifecycle:final'], sod: true },
 };
 const CLEARANCES = ['clearance_finance', 'clearance_library', 'clearance_labs'];
-const chainFor = (movementType) => (movementType === 'withdrawal' ? [...CLEARANCES, 'dean', 'president'] : ['dean', 'president']);
+const chainFor = (movementType) => (['withdrawal', 'graduation'].includes(movementType) ? [...CLEARANCES, 'dean', 'president'] : ['dean', 'president']);
 const actorName = (actor, fallback) => actor.display_name || actor.name || actor.label || fallback;
 const lockStudent = (db, studentId) => db.prepare('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))').get(`lifecycle:${studentId}`);
 
@@ -965,6 +973,11 @@ function movementPlan(db, { studentId, movementType, toProgramId, durationSemest
   if (!prof) throw new HttpError(404, 'ملف الطالب غير موجود.', 'not_found');
   if (!LIFECYCLE_FROM[movementType].includes(prof.status)) {
     throw new HttpError(409, `لا تصح هذه الحركة لطالب حالة قيده «${STATUS_LABEL[prof.status] ?? prof.status}».`, 'conflict');
+  }
+  // شروط التخرج تُفحص عند التقديم وعند القرار النهائي
+  if (movementType === 'graduation') {
+    const blockers = graduationBlockers(db, studentId);
+    if (blockers.length) throw new HttpError(409, `لا تتحقق شروط التخرج: ${blockers.join(' ')}`, 'graduation_blocked');
   }
   const duration = movementType === 'postponement' ? Number(durationSemesters ?? 1) : 1;
   if (!Number.isInteger(duration) || duration < 1 || duration > 24) throw new HttpError(400, 'مدة التأجيل غير صالحة.', 'validation');
@@ -1035,7 +1048,7 @@ export function submitRequestMovement({ db }, actor, request, ip) {
   return submitMovement(db, actor, { studentId: request.student_id, movementType, reason: String(text).slice(0, 300), decisionNo: request.no, toProgramId: details.target_program_id__id, durationSemesters, requestId: request.id }, ip);
 }
 
-const financialDue = (db, studentId) => {
+export const financialDue = (db, studentId) => {
   const charged = Number(db.prepare("SELECT COALESCE(SUM(CASE WHEN ft.kind = 'discount' THEN -c.amount ELSE c.amount END), 0) AS v FROM fin_charges c JOIN fin_fee_types ft ON ft.id = c.fee_type_id WHERE c.student_id = ? AND c.status = 'open'").get(studentId).v);
   const paid = Number(db.prepare("SELECT COALESCE(SUM(amount), 0) AS v FROM fin_payments WHERE student_id = ? AND status <> 'void'").get(studentId).v);
   return Math.max(0, charged - paid) / 100;
@@ -1056,6 +1069,7 @@ const concernedStaff = (db) => db.prepare("SELECT u.id FROM users u JOIN org_uni
 function finalizeMovement(deps, actor, movement, ip) {
   const { db, cfg } = deps, now = Date.now();
   lockStudent(db, movement.student_id);
+  if (appealBlocksMovement(db, movement)) throw new HttpError(409, 'يوجد تظلم قائم على هذا القرار، ويوقف تنفيذه حتى البت فيه.', 'appeal_pending');
   const { toStatus, targetProgram, prof } = movementPlan(db, { studentId: movement.student_id, movementType: movement.movement_type, toProgramId: movement.to_program_id, durationSemesters: movement.duration_semesters }, movement.id);
   db.prepare('UPDATE student_profiles SET status = ?, program_id = ?, updated_at = ? WHERE user_id = ?').run(toStatus, targetProgram, now, movement.student_id);
   // المنسحب أو المفصول لا يدخل البوابة، ويعود حسابه بإعادة القيد

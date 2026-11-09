@@ -1,6 +1,6 @@
 // لوحة الإحصاءات: مؤشرات ومجموعات بيانات للمخططات (تُرسم في المتصفح) وللتصدير (Excel / Word / PDF).
 // مصدر واحد للأرقام: الواجهة والتصدير يستهلكان نفس الجداول، فلا تختلف الأرقام بين الشاشة والملف.
-import { passMark } from './academics.js';
+import { passSql } from './academics.js';
 import { STATUS_LABEL, levelLabel } from './students.js';
 import { cacheGetOrSet } from '../cache.js';
 
@@ -59,7 +59,7 @@ export function analytics(db, { faculty, year } = {}, now = new Date()) {
     const G = `FROM grades gr JOIN student_profiles sp ON sp.user_id = gr.student_id JOIN programs g ON g.id = sp.program_id LEFT JOIN faculties fa ON fa.id = g.faculty_id
                WHERE gr.workflow_status = 'approved' AND (? IS NULL OR fa.id = ?) AND (? IS NULL OR sp.enroll_year = ?)`;
     const gs = one(
-      `SELECT COUNT(*) c, AVG(gr.mark) a, SUM(gr.mark >= ${passMark(db)}) p,
+      `SELECT COUNT(*) c, AVG(gr.mark) a, SUM(CASE WHEN gr.mark >= ${passSql(db, 'gr.student_id')} THEN 1 ELSE 0 END) p,
               SUM(CASE WHEN gr.mark BETWEEN 0 AND 49 THEN 1 ELSE 0 END) b0,
               SUM(CASE WHEN gr.mark BETWEEN 50 AND 59 THEN 1 ELSE 0 END) b1,
               SUM(CASE WHEN gr.mark BETWEEN 60 AND 69 THEN 1 ELSE 0 END) b2,
@@ -77,7 +77,7 @@ export function analytics(db, { faculty, year } = {}, now = new Date()) {
       ['80 – 89', gs.b4 ?? 0],
       ['90 – 100', gs.b5 ?? 0],
     ];
-    const gradeByFaculty = all(`SELECT COALESCE(fa.name, 'غير محدد') k, COUNT(*) c, AVG(gr.mark) a, SUM(gr.mark >= ${passMark(db)}) p ${G} GROUP BY fa.id ORDER BY a DESC`, ...SP).map((r) => [r.k, round1(r.a), pct(r.p, r.c)]);
+    const gradeByFaculty = all(`SELECT COALESCE(fa.name, 'غير محدد') k, COUNT(*) c, AVG(gr.mark) a, SUM(CASE WHEN gr.mark >= ${passSql(db, 'gr.student_id')} THEN 1 ELSE 0 END) p ${G} GROUP BY fa.id ORDER BY a DESC`, ...SP).map((r) => [r.k, round1(r.a), pct(r.p, r.c)]);
     const courses = all(`SELECT COALESCE(fa.name, 'غير محدد') k, COUNT(*) c FROM courses c JOIN programs g ON g.id = c.program_id LEFT JOIN faculties fa ON fa.id = g.faculty_id WHERE c.active = 1 AND (? IS NULL OR fa.id = ?) GROUP BY fa.id ORDER BY c DESC`, f, f).map((r) => [r.k, r.c]);
 
     /* --- الشكاوى والأخبار --- */

@@ -60,7 +60,7 @@
   /* أيقونات التبويبات الفرعية في القائمة الجانبية: بمفتاح التبويب أولاً، ثم بكلمات عنوانه، وإلا أيقونة ملف.
      تُزال الرموز التعبيرية من أول العنوان كي تتوحد التبويبات كلها على أيقونات الهوية. */
   const SUB_ICON = {
-    unified: 'home', work: 'briefcase', myprofile: 'idcard', admissions: 'graduation',
+    unified: 'home', work: 'briefcase', myprofile: 'idcard', admissions: 'graduation', renewal: 'calendar', promotion: 'chart', appeals: 'shield', exhaustion: 'clock',
     requests: 'clipboard', list: 'users', new: 'cap', groups: 'layers', digital_card: 'idcard', advising: 'compass', lifecycle: 'exchange', scholarships: 'wallet', desk_queue: 'clock',
     my_grades: 'chart', courses: 'book', grades: 'bars', gpa_sim: 'graduation', members: 'users',
     scan: 'idcard', log: 'audit', smart_schedule: 'calendar',
@@ -253,9 +253,9 @@
       const t = S.stTab === 'edit' ? 'list' : S.stTab;
       const SECTIONS = [
         ['القبول', [['admissions', 'القبول والمفاضلة']]],
-        ['السجل الطلابي', [can('student:read') && ['list', 'سجل الطلاب'], can('student:register') && ['new', 'تسجيل طالب جديد'], ['groups', 'فئات الطلاب']]],
-        ['الحركات والقرارات', [['lifecycle', 'حركات القيد والانضباط']]],
-        ['الإرشاد', [['advising', 'الخطة والإرشاد والإنذار']]],
+        ['السجل الطلابي', [can('student:read') && ['list', 'سجل الطلاب'], can('student:register') && ['new', 'تسجيل طالب جديد'], ['groups', 'فئات الطلاب'], ['renewal', 'تجديد القيد السنوي']]],
+        ['الحركات والقرارات', [['lifecycle', 'حركات القيد والانضباط'], ['promotion', 'الترفيع السنوي'], ['appeals', 'التظلمات الانضباطية']]],
+        ['الإرشاد', [['advising', 'الخطة والإرشاد والإنذار'], ['exhaustion', 'استنفاد سنوات الدراسة']]],
         ['الرعاية والمنح', [['scholarships', 'المنح والإعفاءات']]],
         ['الخدمات والوثائق', [['requests', can('request:decide') ? 'سجل الطلبات' : 'الطلبات'], ['digital_card', 'البطاقة الجامعية'], ['desk_queue', 'مكتب خدمة الطالب والدور']]],
       ];

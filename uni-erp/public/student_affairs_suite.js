@@ -499,6 +499,7 @@
       disciplinary_suspension: 'حرمان فصل بقرار انضباطي',
       dismissal: 'فصل نهائي بقرار انضباطي',
       file_status_change: 'تعديل حالة من ملف الطالب',
+      graduation: 'تخرج',
     };
 
     const ST_DONE = { approved: 'تمت', not_applicable: 'لا ينطبق', rejected: 'مرفوضة', pending: 'بانتظار' };
@@ -533,9 +534,10 @@
               <option value="reinstatement">إعادة قيد وتفعيل (يحوّل القيد إلى مقيَّد فعّال)</option>
               <option value="program_transfer">تحويل تخصص داخلي إلى برنامج آخر</option>
               <option value="withdrawal">انسحاب نهائي وطي قيد</option>
+              <option value="graduation">تخرج (يتحقق النظام من الشروط ثم براءات الذمة والاعتماد)</option>
             </select></label>
             <label>البرنامج الجديد (عند التحويل)<select id="sa-mov-prog">${progs.map((p) => `<option value="${p.id}">${esc(p.faculty)} — ${esc(p.name)}</option>`).join('')}</select></label>
-            <label>مدة التأجيل (الحد الأقصى ${d.lifecycle.maxPostponementYears ?? 6} سنوات)<select id="sa-mov-dur"><option value="1">فصل واحد</option><option value="2">فصلان / سنة دراسية</option></select></label>
+            <label>مدة التأجيل (الحد الأقصى ${d.lifecycle.maxPostponementYears ?? 2} سنوات)<select id="sa-mov-dur"><option value="1">فصل واحد</option><option value="2">فصلان / سنة دراسية</option></select></label>
             <label>رقم القرار الإداري<input id="sa-mov-dec" placeholder="قرار مجلس كلية #0E4D2E"></label>
             <label class="wide">السبب الموثق<input id="sa-mov-reason" placeholder="مثال: ظروف صحية موثقة / رغبة الطالب بالتحويل واستيفاء شرط المعدل"></label>
             <button class="btn pri" type="button" data-act="sa-exec-movement" data-testid="sa-exec-movement-btn">تقديم الحركة إلى سلسلة الاعتماد</button>

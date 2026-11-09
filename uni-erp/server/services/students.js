@@ -326,6 +326,8 @@ export function updateStudent({ db }, actor, id, input, ip) {
   if (p.status !== cur.status && (CHAIN_STATUS.includes(p.status) || CHAIN_STATUS.includes(cur.status))) {
     throw new HttpError(409, 'تغيير هذه الحالة يتم عبر «حركات القيد» وسلسلة اعتمادها.', 'in_approval_chain');
   }
+  // التخرج حصراً عبر حركة التخرج التي تتحقق من إنهاء جميع المقررات
+  if (p.status === 'graduated' && cur.status !== 'graduated') throw new HttpError(409, 'التخرج يتم عبر «حركات القيد» بعد إنهاء جميع المقررات.', 'in_approval_chain');
   const changed = COLUMNS.filter((c) => (cur[c] ?? null) !== (p[c] ?? null));
   tx(db, () => {
     if (extra !== undefined && JSON.stringify(extra) !== JSON.stringify(extraOf(cur))) {

@@ -7,6 +7,7 @@ import { createApp } from '../server/app.js';
 import { hashPassword } from '../server/security.js';
 import { drainCertificates } from '../server/services/enrollcert.js';
 import { resetWaf } from '../server/waf.js';
+import { saveSettings } from '../server/services/settings.js';
 
 const PW = 'Test#Pass12345', fx = (n) => fs.readFileSync(new URL(`./fixtures/${n}`, import.meta.url));
 let app, base, staff, auditor, stu, ccs, css, cCss1, cCss2;
@@ -55,6 +56,8 @@ test('دليل المواد: الموظف يرى كل المقررات من كل
 });
 
 test('جدول العلامات: الصلاحيات والبنية والملخص', async () => {
+  // بيانات هذا الملف مبنية على علامة نجاح واحدة (الجهات التطبيقية)
+  saveSettings({ db: app.db }, { id: 1, role: 'admin' }, { values: { 'grades.non_applied_faculties': ['NONE'] } }, '::1');
   assert.equal((await G('', auditor)).status, 200); assert.equal((await G('', stu)).status, 403);   // المدقق: اطّلاع فقط (academic:read) assert.equal((await api('GET', '/api/grades')).status, 401);
   const r = (await G('')).json;
   assert.equal(r.total, 7); assert.equal(r.rows.length, 7); assert.equal(r.page, 1); assert.equal(r.pages, 1);
