@@ -168,7 +168,7 @@ test('علامة النجاح: 60 للتطبيقية و50 لغيرها، وال�
   const t = await setup();
   try {
     const code = t.db.prepare('SELECT code FROM faculties WHERE id = 1').get().code;
-    set(t, { 'grades.non_applied_faculties': [code] });
+    set(t, { 'grades.non_applied_faculties': [code], 'grades.pass_mark_other': 50 });
     t.addStudent(10); t.addStudent(11);
     const ids = addCourses(t.db, 1, 2);
     pass(t.db, 10, ids, 55);

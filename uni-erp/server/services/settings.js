@@ -24,7 +24,7 @@ export const SCHEMA = [
     { key: 'grades.total_max', label: 'العلامة الكلية القصوى للمقرر', type: 'int', default: 100, min: 10, max: 1000, unit: 'علامة' },
     { key: 'grades.practical_max', label: 'الحد الأعلى للعلامة العملية', type: 'int', default: 30, min: 0, max: 1000, unit: 'علامة', hint: '0 = لا علامة عملية. تُرفض أي علامة عملية أعلى من هذا الحد.' },
     { key: 'grades.pass_mark', label: 'علامة النجاح (الكليات التطبيقية)', type: 'int', default: 60, min: 1, max: 1000, unit: 'علامة', hint: 'تُعتمد في العلامات والكشوف والإحصاءات والإنذار الأكاديمي والوثائق.' },
-    { key: 'grades.pass_mark_other', label: 'علامة النجاح (الكليات غير التطبيقية)', type: 'int', default: 50, min: 1, max: 1000, unit: 'علامة', hint: 'تسري على الجهات المدرجة في القائمة التالية.' },
+    { key: 'grades.pass_mark_other', label: 'علامة النجاح (الكليات غير التطبيقية)', type: 'int', default: 60, min: 1, max: 1000, unit: 'علامة', hint: 'تسري على الجهات المدرجة في القائمة التالية.' },
     { key: 'grades.non_applied_faculties', label: 'رموز الجهات غير التطبيقية', type: 'list', default: ['CSS', 'HISS', 'TISS', 'CSSR'], max: 100, itemMax: 20, hint: 'رمز كل جهة في سطر. الجهة غير المدرجة هنا تُعامل كتطبيقية.' },
   ] },
   { key: 'academic', label: 'الأكاديمي', desc: 'حدود المقررات وتسميات السنوات الدراسية.', items: [
