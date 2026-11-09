@@ -25,6 +25,8 @@ export const PERMISSION_CATALOG = [
       { key: 'student:update', label: 'تعديل ملفات الطلاب وحركات القيد النظامية', op: 'edit', module: 'student_affairs' },
       { key: 'student:reset_password', label: 'إعادة تعيين كلمات مرور الطلاب واعتماد حساباتهم', op: 'approve', module: 'student_affairs' },
       { key: 'student:delete', label: 'حذف ملف طالب نهائياً', op: 'delete', module: 'student_affairs' },
+      { key: 'sa_lifecycle:dean', label: 'موافقة العميد أو مجلس الكلية على حركات القيد', op: 'approve', module: 'student_affairs' },
+      { key: 'sa_lifecycle:final', label: 'القرار النهائي لحركات القيد (رئيس الجامعة أو نائبه)', op: 'approve', module: 'student_affairs' },
     ],
   },
   {
@@ -181,7 +183,7 @@ export const PLATFORM_MODULES_MATRIX = [
       view: { label: 'عرض الملفات والسجل', perms: ['student:read', 'student:lookup'] },
       write: { label: 'تسجيل طلاب جدد', perms: ['student:register'] },
       edit: { label: 'تعديل البيانات وحركات القيد', perms: ['student:update'] },
-      approve: { label: 'إدارة الذمم وكلمات المرور', perms: ['student:reset_password', 'holds:manage'] },
+      approve: { label: 'إدارة الذمم وكلمات المرور واعتماد حركات القيد', perms: ['student:reset_password', 'holds:manage', 'sa_lifecycle:dean', 'sa_lifecycle:final'] },
       delete: { label: 'حذف ملفات وتصدير البيانات', perms: ['student:delete', 'data:export'] },
     },
   },

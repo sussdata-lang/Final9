@@ -12,7 +12,7 @@ import { runRules } from './rules.js';
 import { issueDocument } from './documents.js';
 import { linkedTargets } from './access.js';
 import { recordLeaveOnApprove } from './staffatt.js';
-import { applyRequestMovement } from './student_affairs_suite.js';
+import { submitRequestMovement, requestInChain } from './student_affairs_suite.js';
 import { getCachedServiceByCode, getCachedUnitById, getCachedUnitByCode, getCachedStaffUsersMap } from '../cache.js';
 
 const ACADEMIC = new Set(['postponement', 'withdrawal', 'program_transfer', 'grade_appeal', 'violation_report']);
@@ -235,6 +235,7 @@ export function decide({ db, cfg }, user, id, action, reason, ip) {
     if (!r) throw new HttpError(404, 'الطلب غير موجود.', 'not_found');
     if (!visibleTo(user, r)) throw new HttpError(404, 'الطلب غير موجود.', 'not_found');
     if (r.status !== 'review') throw new HttpError(409, 'تم البت في هذا الطلب مسبقاً.', 'conflict');
+    if (requestInChain(db, r.id)) throw new HttpError(409, 'الطلب في سلسلة اعتماد حركة القيد؛ يُبت فيه من مراحلها.', 'in_approval_chain');
     if (r.student_id === user.id) throw new HttpError(403, 'لا يجوز البت في طلبك الخاص (فصل المهام).', 'forbidden');
     const now = Date.now();
     if (action === 'approve') {
@@ -251,13 +252,18 @@ export function decide({ db, cfg }, user, id, action, reason, ip) {
           throw new HttpError(409, `لا يمكن اعتماد الطلب وإصدار الوثيقة لوجود ذمة أو إيقاف فعال على الطالب (${activeHold.note || activeHold.hold_type || 'مانع فعال'}).`, 'active_hold');
         }
       }
+      // طلبات حركات القيد لا تُعتمد هنا: تدخل سلسلة الاعتماد ويبقى الطلب قيد المراجعة حتى القرار النهائي
+      const movement = submitRequestMovement({ db }, user, r, ip);
+      if (movement) {
+        addEvent(db, r.id, user.label, `موافقة شعبة شؤون الطلاب وإحالة الطلب إلى سلسلة الاعتماد (${movement.movementNo}). المرحلة التالية: ${movement.nextStep}`);
+        audit(db, user, 'إحالة طلب إلى سلسلة اعتماد حركة قيد', `${r.no} ← ${movement.movementNo}`, ip);
+        return requestView(db, db.prepare('SELECT * FROM requests WHERE id = ?').get(r.id), { withStudent: true });
+      }
       recordLeaveOnApprove(db, r, svc);
-      const movement = applyRequestMovement({ db }, user, r, ip);
       let code = null;
       if (svc.issues_document) code = issueDocument({ db, cfg }, r, user, now).code;
       db.prepare("UPDATE requests SET status = 'approved', decided_at = ?, decided_by = ? WHERE id = ?").run(now, user.id, r.id);
       addEvent(db, r.id, user.label, code ? `اعتماد الطلب وإصدار وثيقة موقعة برمز ${code}` : 'اعتماد الطلب');
-      if (movement) addEvent(db, r.id, 'النظام', `نُفذت حركة القيد ${movement.movementNo}: حالة الطالب الآن «${movement.newStatusLabel}»`);
       audit(db, user, 'اعتماد طلب', r.no, ip);
     } else {
       if (typeof reason !== 'string' || reason.trim().length < 3 || reason.length > 300) throw new HttpError(400, 'سبب الرفض مطلوب (3-300 حرفاً) ويظهر للطالب.', 'validation');

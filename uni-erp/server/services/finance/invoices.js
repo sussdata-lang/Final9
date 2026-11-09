@@ -3,11 +3,50 @@
 import { audit } from '../../audit.js';
 import { docNo } from '../../lib/doc_no.js';
 import { bad, ready, sysAccount, createEntry, reverseEntry, fromMinor, toMinor, isDay, today } from './core.js';
+import { getSetting, saveSettings } from '../settings.js';
 
 const KINDS = {
-  sale: { settle: 'debtors', counter: 'rev_services', counterTypes: ['revenue'], payType: 'RV', label: 'مبيعات' },
-  purchase: { settle: 'suppliers', counter: 'general_exp', counterTypes: ['expense', 'asset'], payType: 'PV', label: 'مشتريات' },
+  sale: { settle: 'debtors', counter: 'rev_services', settleTypes: ['asset'], counterTypes: ['revenue'], settleCode: '1203', counterCode: '4203', payType: 'RV', label: 'مبيعات' },
+  purchase: { settle: 'suppliers', counter: 'general_exp', settleTypes: ['liability'], counterTypes: ['expense', 'asset'], settleCode: '2101', counterCode: '5401', payType: 'PV', label: 'مشتريات' },
 };
+const settingKey = (kind, role) => `finance.invoice_${kind}_${role}`;
+const ROLE_NAME = { settle: 'الذمة', counter: 'الإيراد أو المصروف' };
+const usable = (acc, types) => !!acc && !!acc.active && !!acc.postable && types.includes(acc.type);
+
+// الحساب الافتراضي للفاتورة من الإعدادات. الرمز الافتراضي غير الموجود (دليل حسابات مخصص) يعود إلى الحساب الوظيفي
+function defaultAccount(db, kind, role) {
+  const def = KINDS[kind], code = String(getSetting(db, settingKey(kind, role))), types = def[`${role}Types`];
+  const acc = db.prepare('SELECT * FROM fin_accounts WHERE code = ?').get(code);
+  if (!acc && code === def[`${role}Code`]) return sysAccount(db, def[role]);
+  if (!usable(acc, types)) throw bad(`حساب ${ROLE_NAME[role]} الافتراضي لفواتير ${def.label} (${code}) غير صالح؛ عدّله من إعدادات الفواتير.`, 409, 'conflict');
+  return acc;
+}
+
+export function invoiceDefaults({ db }) {
+  ready(db);
+  const one = (kind, role) => {
+    const code = String(getSetting(db, settingKey(kind, role)));
+    const acc = db.prepare('SELECT code, name, active, postable, type FROM fin_accounts WHERE code = ?').get(code);
+    return { code, name: acc?.name ?? null, valid: usable(acc, KINDS[kind][`${role}Types`]), types: KINDS[kind][`${role}Types`] };
+  };
+  return { sale: { settle: one('sale', 'settle'), counter: one('sale', 'counter') }, purchase: { settle: one('purchase', 'settle'), counter: one('purchase', 'counter') } };
+}
+
+export function saveInvoiceDefaults(deps, actor, b, ip) {
+  const { db } = deps; ready(db);
+  const values = {};
+  for (const kind of Object.keys(KINDS)) {
+    for (const role of ['settle', 'counter']) {
+      const v = b?.[kind]?.[role];
+      if (v === undefined) continue;
+      const code = String(v).trim(), acc = db.prepare('SELECT * FROM fin_accounts WHERE code = ?').get(code);
+      if (!usable(acc, KINDS[kind][`${role}Types`])) throw bad(`الحساب ${code || '(فارغ)'} لا يصلح حساب ${ROLE_NAME[role]} لفواتير ${KINDS[kind].label}.`);
+      values[settingKey(kind, role)] = code;
+    }
+  }
+  if (Object.keys(values).length) saveSettings(deps, actor, { values }, ip);
+  return invoiceDefaults(deps);
+}
 
 const SELECT = `SELECT i.*, p.name AS party_name, e.reversed_by AS entry_reversed_by,
     (SELECT COALESCE(SUM(l.debit), 0) FROM fin_lines l JOIN fin_entries pe ON pe.id = l.entry_id
@@ -66,7 +105,7 @@ export function createInvoice(deps, actor, b, ip) {
   const total = toMinor(items.reduce((s, l) => s + Number(l.qty) * Number(l.unitPrice), 0));
   if (!Number.isSafeInteger(total) || total <= 0) throw bad('مجموع الفاتورة غير صالح.');
 
-  let counterId = sysAccount(db, def.counter).id;
+  let counterId = b?.counterAccountId ? null : defaultAccount(db, kind, 'counter').id;
   if (b?.counterAccountId) {
     const acc = db.prepare('SELECT id, type FROM fin_accounts WHERE id = ? AND active = 1 AND postable = 1').get(Number(b.counterAccountId));
     if (!acc) throw bad('حساب الفاتورة غير صالح أو غير نهائي.');
@@ -76,7 +115,7 @@ export function createInvoice(deps, actor, b, ip) {
   const description = `فاتورة ${def.label}: ${party.name} — ${String(items[0].description || 'خدمات').trim()}`.slice(0, 300);
   const id = Number(db.prepare(`INSERT INTO fin_invoices (no, kind, party_id, issue_day, description, total, status, settle_account_id, counter_account_id, created_by, created_at)
     VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?)`)
-    .run(docNo('INV'), kind, party.id, day, description, total, sysAccount(db, def.settle).id, counterId, actor?.id ?? null, Date.now()).lastInsertRowid);
+    .run(docNo('INV'), kind, party.id, day, description, total, defaultAccount(db, kind, 'settle').id, counterId, actor?.id ?? null, Date.now()).lastInsertRowid);
   audit(db, actor, 'إنشاء فاتورة', `${kind} #${id} ${fromMinor(total)}`, ip);
   if (b?.issue === false) return view(load(db, id));
   // createEntry يفتح معاملته الخاصة، لذا تُحذف الفاتورة إن فشل ترحيلها

@@ -15,6 +15,7 @@ import { sessionUserAsync } from './services/auth.js';
 import { ensureCoreAccounts, seedPassword, hasConfiguredSeedPassword } from './services/bootstrap.js';
 import { ensureStructure, STRUCTURE, FACULTY_ROLE } from './services/structure.js';
 import { startAssignmentScheduler } from './services/lms_assignment_notify.js';
+import { expireDisciplinaryHolds } from './services/student_affairs_suite.js';
 import { ensureForms } from './services/forms/index.js';
 import { ready as financeReady } from './services/finance/core.js';
 import { hashPassword } from './security.js';
@@ -115,6 +116,10 @@ export async function createApp(overrides = {}) {
   // تنظيف الجلسات المنتهية كل ساعة
   const timer = setInterval(() => db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now()), 3600_000);
   timer.unref();
+  // رفع حجب العقوبات التي بلغت تاريخ انتهائها: عند الإقلاع ثم كل ساعة
+  const expireHolds = () => { try { expireDisciplinaryHolds(db); } catch (e) { console.warn('disciplinary expiry:', e.message); } };
+  const holdsFirst = scheduler ? setTimeout(expireHolds, 5_000) : null, holdsTimer = scheduler ? setInterval(expireHolds, 3600_000) : null;
+  holdsFirst?.unref(); holdsTimer?.unref();
   const stopBackups = scheduler ? startBackupScheduler({ db, cfg }) : () => {};
   const stopAssignmentTick = scheduler ? startAssignmentScheduler({ db, cfg }) : () => {};
   // ما يتغير في عملية يُبطَل من ذاكرة بقية العمليات
@@ -149,5 +154,5 @@ export async function createApp(overrides = {}) {
   const auditPurge = () => { try { purgeIdempotencyKeys(db); } catch (e) { console.warn('idempotency purge:', e.message); } try { const r = purgeAuditLog(db, getSetting(db, 'audit.retention_years')); if (r.removed) console.log(`سجل التدقيق: حُذف ${r.removed} صفاً تجاوز مدة الاحتفاظ.`); } catch (e) { console.error('audit purge:', e.message); } };
   const purgeFirst = scheduler ? setTimeout(auditPurge, 120_000) : null, purgeTimer = scheduler ? setInterval(auditPurge, 24 * 3600_000) : null;
   purgeFirst?.unref(); purgeTimer?.unref();
-  return { server, db, cfg, limiter, router, close: async () => { stopBus(); clearInterval(touchTimer); try { flushSessionTouches(db); } catch {} clearInterval(timer); clearTimeout(purgeFirst); clearInterval(purgeTimer); stopBackups(); stopAssignmentTick(); stopLoopWatch(); await drainCertificates(db); await drainPush(); await heavy.close(); await new Promise((res) => server.close(() => { db.close(); res(); })); await closeLogger(); } };
+  return { server, db, cfg, limiter, router, close: async () => { stopBus(); clearInterval(touchTimer); try { flushSessionTouches(db); } catch {} clearInterval(timer); clearTimeout(holdsFirst); clearInterval(holdsTimer); clearTimeout(purgeFirst); clearInterval(purgeTimer); stopBackups(); stopAssignmentTick(); stopLoopWatch(); await drainCertificates(db); await drainPush(); await heavy.close(); await new Promise((res) => server.close(() => { db.close(); res(); })); await closeLogger(); } };
 }

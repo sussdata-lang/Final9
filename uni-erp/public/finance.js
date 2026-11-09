@@ -102,7 +102,7 @@
         api('GET', '/api/finance/parties'),
         api('GET', '/api/finance/accounts')
       ]);
-      F.vouchers = v.vouchers; F.invoices = inv.invoices; F.parties = p.parties; F.accounts = a.accounts;
+      F.vouchers = v.vouchers; F.invoices = inv.invoices; F.invoiceDefaults = inv.defaults; F.parties = p.parties; F.accounts = a.accounts;
     } else if (t === 'reports') {
       const [tb, is, bs, cb, cc, a, p] = await Promise.all([
         api('GET', '/api/finance/reports/trial-balance'),
@@ -440,6 +440,7 @@
               </td>
             </tr>`).join('') || '<tr><td colspan="9" class="empty">لا توجد فواتير</td></tr>'}
           </tbody></table></div>
+          ${invDefaultsPanel()}
         </div>
       ` : `
         <div class="card">
@@ -713,6 +714,23 @@
       </tr>`).join('')}
     </tbody></table></div>`;
   }
+
+  // قائمة حسابات نهائية من الأنواع المسموحة للدور، والمختار الحساب الافتراضي الحالي
+  const invDefSelect = (id, label, cur) => `<label>${label}<select id="${id}">${(F.accounts || []).filter((a) => a.postable && a.active && cur.types.includes(a.type)).map((a) => `<option value="${esc(a.code)}"${a.code === cur.code ? ' selected' : ''}>${esc(a.code)} · ${esc(a.name)}</option>`).join('')}</select></label>`;
+  const invDefaultsPanel = () => {
+    const d = F.invoiceDefaults;
+    if (!d || !can('finance:setup')) return '';
+    return `<details class="no-print" style="margin-top:12px"><summary style="cursor:pointer;font-weight:700">الحسابات الافتراضية للفواتير</summary>
+      <p class="hint">تسري على الفواتير الجديدة فقط، ولا تغيّر الفواتير السابقة. ويمكن اختيار حساب إيراد أو مصروف آخر عند إنشاء كل فاتورة.</p>
+      <div class="form-grid">
+        ${invDefSelect('fid-sale-settle', 'المبيعات: حساب الذمة (مدين)', d.sale.settle)}
+        ${invDefSelect('fid-sale-counter', 'المبيعات: حساب الإيراد (دائن)', d.sale.counter)}
+        ${invDefSelect('fid-purchase-counter', 'المشتريات: حساب المصروف (مدين)', d.purchase.counter)}
+        ${invDefSelect('fid-purchase-settle', 'المشتريات: حساب المورد (دائن)', d.purchase.settle)}
+      </div>
+      <div class="row-end"><button class="btn pri sm" data-act="fin-save-inv-def">حفظ الحسابات الافتراضية</button></div>
+    </details>`;
+  };
 
   function viewPayrollFin() {
     return `
@@ -1009,6 +1027,11 @@
           lines: [{ description: document.getElementById('fi-desc').value, qty: Number(document.getElementById('fi-qty').value), unitPrice: Number(document.getElementById('fi-price').value) }]
         });
         toast(draft ? 'حُفظت الفاتورة كمسودة' : 'أُصدرت الفاتورة ورُحّل قيدها'); closeModal(); await refresh();
+      }
+      else if (act === 'fin-save-inv-def') {
+        const v = (id) => document.getElementById(id).value;
+        await api('PUT', '/api/finance/invoice-defaults', { sale: { settle: v('fid-sale-settle'), counter: v('fid-sale-counter') }, purchase: { settle: v('fid-purchase-settle'), counter: v('fid-purchase-counter') } });
+        toast('حُفظت الحسابات الافتراضية للفواتير'); await refresh();
       }
       else if (act === 'fin-pay-inv') {
         const inv = F.invoices.find((x) => String(x.id) === b.dataset.id);

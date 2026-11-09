@@ -1,5 +1,6 @@
 import { tx } from '../db.js';
 import { nextNumber } from './numbering.js';
+import { academicYear } from '../lib/doc_no.js';
 import { enqueueCertificate } from './enrollcert.js';
 import { audit } from '../audit.js';
 import { hashPassword, tempPassword } from '../security.js';
@@ -320,6 +321,11 @@ export function updateStudent({ db }, actor, id, input, ip) {
   if (!cur) throw new HttpError(404, 'الطالب غير موجود.', 'not_found');
   const p = validateProfile(db, input, { current: cur }), extra = cleanExtra(input?.extra);
   duplicateCheck(db, p, cur.user_id);
+  // حالات القيد التي تخضع لسلسلة الاعتماد لا تتغير من ملف الطالب مباشرة
+  const CHAIN_STATUS = ['suspended', 'withdrawn'];
+  if (p.status !== cur.status && (CHAIN_STATUS.includes(p.status) || CHAIN_STATUS.includes(cur.status))) {
+    throw new HttpError(409, 'تغيير هذه الحالة يتم عبر «حركات القيد» وسلسلة اعتمادها.', 'in_approval_chain');
+  }
   const changed = COLUMNS.filter((c) => (cur[c] ?? null) !== (p[c] ?? null));
   tx(db, () => {
     if (extra !== undefined && JSON.stringify(extra) !== JSON.stringify(extraOf(cur))) {
@@ -333,7 +339,14 @@ export function updateStudent({ db }, actor, id, input, ip) {
     }
     const no = db.prepare('SELECT student_no FROM users WHERE id = ?').get(cur.user_id).student_no;
     const labels = { ...Object.fromEntries(allFields(sections(db)).map((f) => [f.name, f.label])), extra: 'بيانات إضافية' };
-    if (changed.includes('status')) audit(db, actor, `تغيير حالة القيد: ${STATUS_LABEL[cur.status]} ← ${STATUS_LABEL[p.status]}`, no, ip);
+    if (changed.includes('status')) {
+      audit(db, actor, `تغيير حالة القيد: ${STATUS_LABEL[cur.status]} ← ${STATUS_LABEL[p.status]}`, no, ip);
+      // تغيير الحالة من الملف يدخل سجل حركات القيد أيضاً، كي يكون سجل القيد كاملاً
+      const n = nextNumber(db, 'sa_lifecycle_movements', 'SELECT MAX(id) FROM sa_lifecycle_movements'), now = Date.now();
+      db.prepare(`INSERT INTO sa_lifecycle_movements (movement_no, student_id, movement_type, academic_year, semester, from_status, to_status, from_program_id, to_program_id, academic_impact, reason, status, created_by, created_by_id, created_at, decided_at)
+        VALUES (?, ?, 'file_status_change', ?, 1, ?, ?, ?, ?, ?, ?, 'approved', ?, ?, ?, ?)`)
+        .run(`MOV-${new Date().getFullYear()}-${String(n).padStart(3, '0')}`, cur.user_id, academicYear(), cur.status, p.status, cur.program_id, p.program_id ?? cur.program_id, `تعديل حالة القيد من ${STATUS_LABEL[cur.status]} إلى ${STATUS_LABEL[p.status]}`, 'تعديل مباشر من ملف الطالب', actor.display_name || actor.name || actor.label || 'شؤون الطلاب', actor.id ?? null, now, now);
+    }
     const rest = changed.filter((c) => c !== 'status');
     if (rest.length) audit(db, actor, `تعديل ملف طالب (${rest.map((c) => labels[c]).join('، ')})`.slice(0, 300), no, ip);   // أسماء الحقول فقط، لا القيم
   });
@@ -524,6 +537,9 @@ export function deleteStudent({ db, cfg }, actor, id, ip) {
   if (!u) throw new HttpError(404, 'الطالب غير موجود.', 'not_found');
   const reqs = db.prepare('SELECT COUNT(*) c FROM requests WHERE student_id = ?').get(u.id).c;
   if (reqs) throw new HttpError(409, `لا يمكن حذف طالب لديه ${reqs} طلباً؛ الطلبات والوثائق الموقَّعة سجلات دائمة. غيّر حالة قيده إلى «منسحب» أو «موقوف».`, 'conflict');
+  // العلامات سجل أكاديمي دائم، فلا تُمحى بحذف الطالب
+  const marks = Number(db.prepare('SELECT COUNT(*) c FROM grades WHERE student_id = ?').get(u.id).c);
+  if (marks) throw new HttpError(409, `لا يمكن حذف طالب لديه ${marks} علامة مسجلة؛ العلامات سجل أكاديمي دائم. غيّر حالة قيده عبر «حركات القيد».`, 'conflict');
   const cert = db.prepare('SELECT file FROM student_certs WHERE student_id = ?').get(u.id);
   tx(db, () => {
     for (const t of ['grades', 'student_holds', 'complaints', 'sessions', 'student_certs', 'hall_logs', 'push_subscriptions']) db.prepare(`DELETE FROM ${t} WHERE ${t === 'sessions' || t === 'push_subscriptions' ? 'user_id' : 'student_id'} = ?`).run(u.id);

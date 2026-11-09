@@ -109,7 +109,7 @@ test('invoices post by kind, track payments from the ledger, and cancel by rever
   assert.equal(code(buy.entryId, 'credit'), 'suppliers');
   const sell = (await make({ kind: 'sale' })).body.invoice;
   assert.equal(code(sell.entryId, 'debit'), 'debtors');
-  assert.equal(code(sell.entryId, 'credit'), 'rev_services');
+  assert.equal(db.prepare('SELECT a.code FROM fin_lines l JOIN fin_accounts a ON a.id = l.account_id WHERE l.entry_id = ? AND l.credit > 0').get(sell.entryId).code, '4203', 'مبيعات الخارج إيرادات متنوعة، لا رسوم طلاب');
 
   // الحساب يجب أن يوافق النوع
   const rev = db.prepare("SELECT id FROM fin_accounts WHERE system_key = 'rev_services'").get().id;

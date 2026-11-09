@@ -145,14 +145,16 @@ test('التعديل: يحدّث الاسم والبرنامج، وحالة غي
   // تعديل رقم وطني إلى رقم طالب آخر مرفوض
   assert.equal((await api('PUT', `/api/students/${id}`, { cookie: staff, body: form({ national_id: '01234567891' }) })).status, 409);
 
+  // حالة القيد الخاضعة للاعتماد لا تتغير من ملف الطالب؛ وهنا تُضبط مباشرة لاختبار أثرها على الطلبات
   const w = await api('PUT', `/api/students/${id}`, { cookie: staff, body: form({ study_level: 2, program_id: 1, status: 'withdrawn' }) });
-  assert.equal(w.json.student.status, 'withdrawn');
+  assert.equal(w.status, 409);
+  app.db.prepare("UPDATE student_profiles SET status = 'withdrawn' WHERE user_id = ?").run(id);
   const s = await loginAs('CSS-2024-0001', 'NewPass#2026ok');
   const att = await api('POST', '/api/requests', { cookie: s.cookie, body: { service: 'attendance', details: { purpose: 'سفارة', copies: 1 } } });
   assert.equal(att.json.request.status, 'rejected'); assert.equal(att.json.request.rejectedBy, 'auto');
   const tr = await api('POST', '/api/requests', { cookie: s.cookie, body: { service: 'transcript', details: { lang: 'العربية', copies: 1 } } });
   assert.equal(tr.json.request.status, 'review');
-  await api('PUT', `/api/students/${id}`, { cookie: staff, body: form({ study_level: 2, program_id: 1, status: 'active' }) });
+  app.db.prepare("UPDATE student_profiles SET status = 'active' WHERE user_id = ?").run(id);
   assert.equal((await api('POST', '/api/requests', { cookie: s.cookie, body: { service: 'attendance', details: { purpose: 'سفارة', copies: 1 } } })).json.request.status, 'review');
 });
 

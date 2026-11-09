@@ -89,7 +89,8 @@ export async function registerFinance(r, deps, { writeXlsx }) {
     return { voucher: { id: entry.id, no: entry.no, amount: amt, kind: b?.kind } };
   }));
 
-  r.add('GET', '/api/finance/invoices', fin('finance:read', () => ({ invoices: I.listInvoices(deps) })));
+  r.add('GET', '/api/finance/invoices', fin('finance:read', () => ({ invoices: I.listInvoices(deps), defaults: I.invoiceDefaults(deps) })));
+  r.add('PUT', '/api/finance/invoice-defaults', fin('finance:setup', (c, b) => ({ defaults: I.saveInvoiceDefaults(deps, c.user, b, c.ip) })));
   r.add('POST', '/api/finance/invoices', finC('finance:entry', (c, b) => ({ invoice: I.createInvoice(deps, c.user, b, c.ip) })));
   r.add('POST', '/api/finance/invoices/:id/issue', fin('finance:entry', (c) => ({ invoice: I.issueInvoice(deps, c.user, c.params.id, c.ip) })));
   r.add('POST', '/api/finance/invoices/:id/cancel', fin('finance:entry', (c) => ({ invoice: I.cancelInvoice(deps, c.user, c.params.id, c.ip) })));

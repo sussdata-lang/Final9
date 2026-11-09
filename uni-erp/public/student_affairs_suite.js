@@ -162,7 +162,7 @@
       enrolling: '<span class="pill p-review">جارٍ التثبيت</span>',
     };
 
-    const progOptions = progs.map((p) => `<option value="${p.id}">${esc(p.faculty)} — ${esc(p.name)} (حد أدنى: ${p.minScore})</option>`).join('');
+    const progOptions = progs.map((p) => `<option value="${p.id}">${esc(p.faculty)} — ${esc(p.name)} ${p.minScore > 0 ? ` (حد أدنى: ${p.minScore})` : ''}</option>`).join('');
 
     return `
       <div class="sa-suite-section" data-testid="sa-admissions-section" style="margin-top:16px;display:grid;gap:16px">
@@ -178,12 +178,12 @@
             </div>
           </div>
 
-          <!-- خطة القبول: الحد الأدنى والمقاعد لكل برنامج -->
+          <!-- خطة القبول: المقاعد لكل برنامج، ولا يوجد حد أدنى للقبول -->
           <details style="margin-bottom:14px;background:rgba(14,102,85,0.05);border:1px solid rgba(14,102,85,0.2);border-radius:10px;padding:10px 14px">
-            <summary style="cursor:pointer;font-weight:bold;color:#054239">خطة القبول لكل برنامج (الحد الأدنى والمقاعد)</summary>
-            <p class="hint">المقاعد المشغولة هي طلاب دفعة هذه السنة فقط. اترك الحقل فارغاً لاستخدام القيمة الافتراضية من الإعدادات العامة.</p>
-            <div class="tbl-wrap"><table><thead><tr><th>البرنامج</th><th>المشغول</th><th>الحد الأدنى</th><th>المقاعد</th><th></th></tr></thead><tbody>
-              ${progs.map((p) => `<tr><td>${esc(p.faculty)} — ${esc(p.name)}</td><td>${p.enrolledCount} / ${p.capacity}</td><td><input id="sa-plan-min-${p.id}" type="number" step="0.5" min="1" style="width:100px" value="${p.admission_min_score ?? ''}" placeholder="${p.minScore}"></td><td><input id="sa-plan-cap-${p.id}" type="number" min="0" style="width:100px" value="${p.admission_capacity ?? ''}" placeholder="${p.capacity}"></td><td><button class="btn sm" type="button" data-act="sa-save-plan" data-id="${p.id}">حفظ</button></td></tr>`).join('')}
+            <summary style="cursor:pointer;font-weight:bold;color:#054239">خطة القبول لكل برنامج (المقاعد)</summary>
+            <p class="hint">المقاعد المشغولة هي طلاب دفعة هذه السنة فقط. اترك الحقل فارغاً لاستخدام العدد الافتراضي من الإعدادات العامة. لا يوجد حد أدنى للقبول، فالترتيب بالمجموع وحسب المقاعد.</p>
+            <div class="tbl-wrap"><table><thead><tr><th>البرنامج</th><th>المشغول</th><th>المقاعد</th><th></th></tr></thead><tbody>
+              ${progs.map((p) => `<tr><td>${esc(p.faculty)} — ${esc(p.name)}</td><td>${p.enrolledCount} / ${p.capacity}</td><td><input id="sa-plan-cap-${p.id}" type="number" min="0" style="width:100px" value="${p.admission_capacity ?? ''}" placeholder="${p.capacity}"></td><td><button class="btn sm" type="button" data-act="sa-save-plan" data-id="${p.id}">حفظ</button></td></tr>`).join('')}
             </tbody></table></div>
           </details>
 
@@ -272,9 +272,9 @@
             <label>رمز المقرر الخارجي<input id="sa-eq-code" dir="ltr" placeholder="LAW204"></label>
             <label>اسم المقرر الخارجي<input id="sa-eq-name" placeholder="مثال: أمن نظم التشغيل"></label>
             <label>الساعات<input id="sa-eq-hrs" type="number" min="1" max="6"></label>
-            <label>العلامة (من 100)<input id="sa-eq-mark" type="number" min="60" max="100"></label>
+            <label>العلامة (من 100)<input id="sa-eq-mark" type="number" min="0" max="100" required></label>
             <label>المقرر المقابل في جامعتنا<select id="sa-eq-course">${courses.map((c) => `<option value="${c.id}">${esc(c.name)} (سنة ${c.level} · ${c.hours} س)</option>`).join('')}</select></label>
-            <button class="btn pri" type="button" data-act="sa-add-eq" data-testid="sa-add-eq-btn">اعتماد المعادلة وإدراج العلامة</button>
+            <button class="btn pri" type="button" data-act="sa-add-eq" data-testid="sa-add-eq-btn">حفظ المعادلة بانتظار الاعتماد</button>
           </div>
 
           <div class="tbl-wrap">
@@ -289,6 +289,7 @@
                   <th>المقرر المعادل في الخطة</th>
                   <th>جهة القرار</th>
                   <th>الحالة</th>
+                  <th>إجراء</th>
                 </tr>
               </thead>
               <tbody>
@@ -302,8 +303,9 @@
                     <td>${e.external_hours}</td>
                     <td><b>${e.external_mark}%</b></td>
                     <td><b>${esc(e.internalCourseName || '—')}</b></td>
-                    <td class="small">${esc(e.decided_by || 'اللجنة العلمية')}</td>
-                    <td><span class="pill p-approved">معادل ومعتمد ✓</span></td>
+                    <td class="small">${esc(e.decided_by || '—')}</td>
+                    <td>${e.equivalence_status === 'approved' ? '<span class="pill p-approved">معادل ومعتمد ✓</span>' : e.equivalence_status === 'rejected' ? `<span class="pill p-rejected" title="${esc(e.note || '')}">مرفوضة</span>` : '<span class="pill p-review">قيد الاعتماد</span>'}</td>
+                    <td style="white-space:nowrap">${e.equivalence_status === 'pending' ? `<button class="btn sm ok" type="button" data-act="sa-eq-decide" data-id="${e.id}" data-d="approve">اعتماد</button> <button class="btn sm bad" type="button" data-act="sa-eq-decide" data-id="${e.id}" data-d="reject">رفض</button>` : ''}</td>
                   </tr>
                 `
                   )
@@ -459,7 +461,7 @@
                   <tr>
                     <td><b>${esc(w.studentName || '—')}</b><div class="small mono">${esc(w.studentNo || '')}</div></td>
                     <td><b>${esc(warnTypeLabel[w.warning_type] || w.warning_type)}</b></td>
-                    <td class="small">معدل: <b>${w.gpa_snapshot ?? '—'}%</b> · غياب: <b>${w.absence_rate ?? 0}%</b></td>
+                    <td class="small">معدل: <b>${w.gpa_snapshot === null || w.gpa_snapshot === undefined ? '—' : `${w.gpa_snapshot}%`}</b> · غياب: <b>${w.absence_rate === null || w.absence_rate === undefined ? '—' : `${w.absence_rate}%`}</b></td>
                     <td>${esc(w.advisor_name)}</td>
                     <td>${esc(w.action_plan)}</td>
                     <td class="mono small">${esc(w.session_date)}</td>
@@ -494,7 +496,24 @@
       withdrawal: 'انسحاب وطي قيد',
       reinstatement: 'إعادة قيد ومباشرة',
       program_transfer: 'تحويل تخصص داخلي',
+      disciplinary_suspension: 'حرمان فصل بقرار انضباطي',
+      dismissal: 'فصل نهائي بقرار انضباطي',
+      file_status_change: 'تعديل حالة من ملف الطالب',
     };
+
+    const ST_DONE = { approved: 'تمت', not_applicable: 'لا ينطبق', rejected: 'مرفوضة', pending: 'بانتظار' };
+    const stepsLine = (m) => {
+      if (m.status === 'approved' && !(m.steps || []).length) return '';
+      const head = m.status === 'pending' ? '<span class="pill p-review">قيد الاعتماد</span>' : m.status === 'rejected' ? '<span class="pill p-rejected">مرفوضة</span>' : '<span class="pill p-approved">معتمدة نهائياً</span>';
+      const list = (m.steps || []).map((s) => `<li>${esc(s.label)}: <b>${ST_DONE[s.status] || s.status}</b>${s.decided_by_name ? ` (${esc(s.decided_by_name)})` : ''}${s.note ? ` — ${esc(s.note)}` : ''}</li>`).join('');
+      return `<div style="margin-top:6px">${head}</div>${list ? `<ol class="small" style="margin:4px 0 0;padding-inline-start:18px">${list}</ol>` : ''}${m.reject_reason ? `<div class="small">السبب: ${esc(m.reject_reason)}</div>` : ''}`;
+    };
+    const queue = d.lifecycle.myQueue || [];
+    const queueHtml = queue.length ? `<div style="border:1px solid #C9A24B;border-radius:10px;padding:12px;margin-bottom:14px">
+      <h3 style="margin:0 0 8px">بانتظار اعتمادك (${queue.length})</h3>
+      <div class="tbl-wrap"><table><thead><tr><th>الحركة</th><th>الطالب</th><th>النوع</th><th>المرحلة</th><th>السبب</th><th>القرار</th></tr></thead><tbody>
+      ${queue.map((q) => `<tr><td class="mono">${esc(q.movement_no)}</td><td><b>${esc(q.studentName || '—')}</b><div class="small mono">${esc(q.studentNo || '')}</div><div class="small">${esc(q.faculty || '')}</div></td><td>${esc(movTypeLabel[q.movement_type] || q.movement_type)}</td><td><b>${esc(q.label)}</b><div class="small">المرحلة ${q.current_step} من ${q.total}</div>${q.due !== undefined ? `<div class="small">المستحقات: ${nf.format(q.due)} ل.س</div>` : ''}${q.openLoans !== undefined ? `<div class="small">إعارات غير مُعادة: ${q.openLoans}</div>` : ''}</td><td class="small">${esc(q.reason || '')}</td><td style="white-space:nowrap">${q.blockedSelf ? '<span class="small">قدّمتَها أنت، فيعتمدها غيرك</span>' : `<button class="btn ok sm" type="button" data-act="sa-mov-step" data-step="${q.current_step}" data-id="${q.id}" data-d="approve">موافقة</button>${q.allowNa ? ` <button class="btn sm" type="button" data-act="sa-mov-step" data-step="${q.current_step}" data-id="${q.id}" data-d="not_applicable">لا ينطبق</button>` : ''} <button class="btn bad sm" type="button" data-act="sa-mov-step" data-step="${q.current_step}" data-id="${q.id}" data-d="reject">رفض</button>`}</td></tr>`).join('')}
+      </tbody></table></div></div>` : '';
 
     const statusAr = d.lifecycle.statuses || { active: 'مقيَّد', suspended: 'موقوف القيد', withdrawn: 'منسحب', transferred: 'محوَّل', graduated: 'متخرج' };
 
@@ -503,9 +522,10 @@
         <!-- أ. أتمتة حركات الوضع الطلابي -->
         <section class="card">
           <h2>3. أتمتة حركات الوضع الطلابي (تأجيل، إيقاف قيد، انسحاب، إعادة قيد، تحويل تخصص)</h2>
-          <p class="hint" style="margin-top:0">يُحدِّث هذا المحرك حالة الطالب وبرنامجه في جدول <span class="mono">student_profiles</span> تلقائياً ويحتسب الأثر الأكاديمي والمالي للقرار.</p>
+          <p class="hint" style="margin-top:0">كل حركة تمر بسلسلة اعتماد، ولا تتغير حالة الطالب إلا بعد القرار النهائي. ترقين القيد: براءات الذمة (المالية، المكتبة، المخابر) ثم موافقة العميد أو مجلس الكلية ثم قرار رئيس الجامعة أو نائبه. وبقية الحركات: العميد ثم القرار النهائي.</p>
 
-          <div class="inline-form" style="margin-bottom:14px;background:rgba(124,58,237,0.06);padding:12px;border-radius:10px">
+          ${queueHtml}
+          <div class="inline-form"${UA.can('student:update') ? '' : ' hidden'} style="margin-bottom:14px;background:rgba(124,58,237,0.06);padding:12px;border-radius:10px">
             ${studentField('sa-mov-student', 'الطالب')}
             <label>نوع حركة القيد<select id="sa-mov-type">
               <option value="postponement">تأجيل فصل دراسي (يحوّل القيد إلى موقوف مؤقتاً)</option>
@@ -518,7 +538,7 @@
             <label>مدة التأجيل (الحد الأقصى ${d.lifecycle.maxPostponementYears ?? 6} سنوات)<select id="sa-mov-dur"><option value="1">فصل واحد</option><option value="2">فصلان / سنة دراسية</option></select></label>
             <label>رقم القرار الإداري<input id="sa-mov-dec" placeholder="قرار مجلس كلية #0E4D2E"></label>
             <label class="wide">السبب الموثق<input id="sa-mov-reason" placeholder="مثال: ظروف صحية موثقة / رغبة الطالب بالتحويل واستيفاء شرط المعدل"></label>
-            <button class="btn pri" type="button" data-act="sa-exec-movement" data-testid="sa-exec-movement-btn">تنفيذ الحركة وتحديث قيد الطالب فوراً</button>
+            <button class="btn pri" type="button" data-act="sa-exec-movement" data-testid="sa-exec-movement-btn">تقديم الحركة إلى سلسلة الاعتماد</button>
           </div>
 
           <div class="tbl-wrap">
@@ -543,7 +563,7 @@
                     <td class="mono">${esc(m.movement_no)}</td>
                     <td><b>${esc(m.studentName || '—')}</b><div class="small mono">${esc(m.studentNo || '')}</div></td>
                     <td><b>${esc(movTypeLabel[m.movement_type] || m.movement_type)}</b></td>
-                    <td><span class="pill p-review">${esc(statusAr[m.from_status] || m.from_status)}</span> ← <span class="pill p-approved">${esc(statusAr[m.to_status] || m.to_status)}</span></td>
+                    <td><span class="pill p-review">${esc(statusAr[m.from_status] || m.from_status)}</span> ← <span class="pill p-approved">${esc(statusAr[m.to_status] || m.to_status)}</span>${stepsLine(m)}</td>
                     <td class="small">${esc(m.academic_impact || '—')}</td>
                     <td class="small">${esc(m.financial_impact || '—')}</td>
                     <td class="small"><b>${esc(m.decision_no || '—')}</b><div class="small">${esc(m.reason || '')}</div></td>
@@ -573,9 +593,10 @@
             <label>العقوبة المقررة<select id="sa-disc-pen">
               <option value="warning">إنذار مسلكي مسجل</option>
               <option value="exam_zero">إلغاء علامة مقرر امتحاني</option>
-              <option value="term_suspension">حرمان فصل دراسي</option>
+              <option value="term_suspension">حرمان فصل دراسي (عبر سلسلة الاعتماد)</option>
+              <option value="dismissal">فصل نهائي (عبر سلسلة الاعتماد)</option>
             </select></label>
-            <label>تاريخ انتهاء الحجب<input id="sa-disc-exp" type="date"></label>
+            <label>تاريخ انتهاء الحجب (فارغ: حتى الرفع اليدوي)<input id="sa-disc-exp" type="date"></label>
             <label class="wide">تفاصيل القرار والمخالفة<input id="sa-disc-note" placeholder="مثال: قرار لجنة الانضباط بحجب الوثائق غير العاجلة لنهاية الفصل"></label>
             <button class="btn bad" type="button" data-act="sa-add-disc" data-testid="sa-add-disc-btn">تسجيل العقوبة وتفعيل حجب الوثائق</button>
           </div>
@@ -880,7 +901,7 @@
       toast(`اكتمل الفرز الآلي للمفاضلة (${r.sortedCount} متقدماً)`);
     },
     'sa-save-plan': async (el, d) => {
-      await api('PUT', `/api/student-affairs-suite/admissions/programs/${d.id}`, { minScore: val(`sa-plan-min-${d.id}`), capacity: val(`sa-plan-cap-${d.id}`) });
+      await api('PUT', `/api/student-affairs-suite/admissions/programs/${d.id}`, { capacity: val(`sa-plan-cap-${d.id}`) });
       await loadSuiteData();
       UA.render();
       toast('حُفظت خطة قبول البرنامج');
@@ -934,7 +955,15 @@
       });
       await loadSuiteData(sid);
       UA.render();
-      toast('تم اعتماد معادلة المقرر وإدراجه في السجل الأكاديمي للطالب');
+      toast('حُفظت المعادلة بانتظار اعتمادها من شخص آخر');
+    },
+    'sa-eq-decide': async (el, d) => {
+      let note = '';
+      if (d.d === 'reject') { note = await window.askText('رفض المعادلة', { label: 'سبب الرفض', submit: 'رفض المعادلة' }); if (!note) return; }
+      await api('POST', `/api/student-affairs-suite/equivalence/${d.id}/decide`, { decision: d.d, note });
+      await loadSuiteData(SA.selectedStudentId);
+      UA.render();
+      toast(d.d === 'approve' ? 'اعتُمدت المعادلة ورُصدت العلامة في سجل الطالب' : 'رُفضت المعادلة');
     },
     'sa-unlink': async (el, d) => {
       await api('DELETE', `/api/student-affairs-suite/prerequisites/${d.id}`);
@@ -971,7 +1000,18 @@
       });
       await loadSuiteData();
       UA.render();
-      toast(`تم تنفيذ حركة القيد (${r.movementNo}) وتحديث حالة الطالب إلى: ${r.newStatusLabel}`);
+      toast(`قُدّمت الحركة (${r.movementNo}) إلى سلسلة الاعتماد. المرحلة الأولى: ${r.nextStep}`);
+    },
+    'sa-mov-step': async (el, d) => {
+      let note = '';
+      if (d.d === 'reject') { note = await window.askText('رفض حركة القيد', { label: 'سبب الرفض', submit: 'رفض الحركة', minLength: 3 }); if (!note) return; }
+      let r;
+      // رفض لتغيّر المرحلة يعني أن القائمة قديمة: تُحدَّث ويرى الموظف الوضع الفعلي
+      try { r = await api('POST', `/api/student-affairs-suite/lifecycle/${d.id}/decide`, { decision: d.d, note, stepNo: Number(d.step) }); }
+      catch (e) { if (e.status === 409) { await loadSuiteData(); UA.render(); } throw e; }
+      await loadSuiteData();
+      UA.render();
+      toast(r.status === 'approved' ? `صدر القرار النهائي: ${r.newStatusLabel}` : r.status === 'rejected' ? 'رُفضت الحركة' : `المرحلة التالية: ${r.nextStep}`);
     },
     'sa-add-disc': async () => {
       const r = await api('POST', '/api/student-affairs-suite/disciplinary', {

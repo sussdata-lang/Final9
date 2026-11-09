@@ -20,7 +20,7 @@
   const TABS = {
     overview: [['maindashtab', 'unified', 'اللوحة الرئيسية'], ['maindashtab', 'work', 'أعمالي'], ['maindashtab', 'myprofile', 'ملفي']],
     affairs: [['sttab', 'requests', 'الطلبات', ['request:read_all', 'request:read_unit']], ['sttab', 'list', 'سجل الطلاب', ['student:read']], ['sttab', 'new', 'تسجيل طالب جديد', ['student:register']], ['sttab', 'groups', 'فئات الطلاب', ['student:update', 'course:manage', 'attendance:manage', 'grade:manage', 'grade:approve', 'exams_housing:view', 'exams_housing:write', 'exams_housing:edit', 'exams_housing:approve', 'audit:read']], ['sttab', 'digital_card', 'البطاقة الجامعية', ['student:register', 'student:update']],
-      ['sttab', 'advising', 'الخطة والإرشاد', ['sa_advising:view', 'sa_advising:edit', 'faculty:manage']], ['sttab', 'lifecycle', 'حركات القيد والانضباط', ['sa_lifecycle:view', 'student:update']],
+      ['sttab', 'advising', 'الخطة والإرشاد', ['sa_advising:view', 'sa_advising:edit', 'faculty:manage']], ['sttab', 'lifecycle', 'حركات القيد والانضباط', ['sa_lifecycle:view', 'sa_lifecycle:dean', 'sa_lifecycle:final', 'student:update', 'finance:fees', 'lms_lib:approve']],
       ['sttab', 'scholarships', 'المنح والإعفاءات', ['sa_scholarships:view', 'sa_scholarships:write', 'sa_scholarships:approve', 'finance:fees']], ['sttab', 'desk_queue', 'مكتب خدمة الطالب', ['sa_desk:view', 'sa_scholarships:write', 'student:update', 'request:read_all']]],
     corr: [['corrunified', 'in', 'الوارد'], ['corrunified', 'out', 'الصادر'], ['corrunified', 'pending_all', 'بانتظار توقيعي'], ['corrunified', 'internal_requests', 'الطلبات الداخلية'], ['corrunified', 'internal_new', 'طلب داخلي جديد', ['request:create_internal']], ['corrunified', 'new_corr', 'كتاب رسمي جديد', ['corr:use']], ['corrunified', 'tpl', 'قوالب المراسلات', ['corr:templates']], ['corrunified', 'notifs', 'تنبيهات الاعتماد']],
     academics: [['acadtab', 'my_grades', 'علامات موادي', ['grade:approve_own']], ['acadtab', 'courses', 'دليل المواد'], ['acadtab', 'grades', 'جدول العلامات', ['grade:manage', 'grade:approve', 'academic:read']], ['acadtab', 'gpa_sim', 'محاكي المعدل'], ['acadtab', 'members', 'أعضاء هيئة التدريس', ['faculty:manage']]],
@@ -130,7 +130,7 @@
     addhold: HOLDS, clearhold: HOLDS, edithold: HOLDS, delhold: HOLDS, 'sa-clear-hold': HOLDS,
     'sa-q-status': DESK, uxdesknext: DESK, xhrcsv: ['staffatt:manage'],
     newsedit: NEWS, newsdel: NEWS, nmdel: NEWS, nmlink: NEWS, nmup: NEWS,
-    'sa-run-sort': ADMIT, 'sa-enroll-app': ADMIT, 'sa-save-plan': ADMIT, 'sa-revoke-sch': ['finance:fees', 'sa_scholarships:approve'], 'sa-add-eq': ['course:manage', 'sa_admissions:approve'], 'sa-resolve-adv': ['sa_advising:edit'],
+    'sa-run-sort': ADMIT, 'sa-enroll-app': ADMIT, 'sa-save-plan': ADMIT, 'sa-revoke-sch': ['finance:fees', 'sa_scholarships:approve'], 'sa-add-eq': ['course:manage', 'sa_admissions:approve'], 'sa-resolve-adv': ['sa_advising:edit'], 'sa-eq-decide': ['course:manage', 'sa_admissions:approve'],
   };
   function gateActions() {
     const can = window.UA.can;

@@ -13,6 +13,7 @@ import {
   getStudentAffairsSuiteOverview,
   executeAdmissionsSorting,
   executeLifecycleMovement,
+  decideMovementStep,
   grantStudentScholarship,
   bookDeskAppointment,
 } from '../server/services/student_affairs_suite.js';
@@ -152,7 +153,11 @@ test('Database Integration: Student Affairs Suite (1, 2, 3, 5, 6) seeds and exec
     { studentId: 3, movementType: 'postponement', reason: 'ظروف صحية موثقة' },
     '127.0.0.1'
   );
-  assert.equal(movRes.newStatus, 'suspended');
+  assert.equal(movRes.status, 'pending');
+  assert.equal(db.prepare('SELECT status FROM student_profiles WHERE user_id = 3').get().status, 'active', 'لا يتغير القيد قبل القرار النهائي');
+  const approver = { ...actor, id: 99 };
+  decideMovementStep(deps, approver, movRes.id, { decision: 'approve' }, '127.0.0.1');
+  assert.equal(decideMovementStep(deps, approver, movRes.id, { decision: 'approve' }, '127.0.0.1').newStatus, 'suspended');
   const updatedStatus = db.prepare('SELECT status FROM student_profiles WHERE user_id = 3').get().status;
   assert.equal(updatedStatus, 'suspended');
 
