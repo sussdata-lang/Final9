@@ -480,13 +480,16 @@ test('POST /api/finance/discounts posts a real discount and lowers the balance',
   assert.equal(inv[0].netAmount, 750);
 
   assert.equal((await post({ percent: 80 })).status, 409, 'لا يتجاوز مجموع الحسومات الرسوم');
-  assert.equal((await post({ percent: 75 })).status, 201);
+  assert.equal((await post({ percent: 75 })).status, 409, 'لا منحتان فعالتان من النوع نفسه في السنة');
+  assert.equal((await post({ percent: 75, kind: 'social' })).status, 201);
   assert.equal((await statement()).balance, 0);
 
   // إلغاء قيد الخصم يخرجه من السجل ويعيد الرصيد
   assert.equal((await req('POST', `/api/finance/charges/${ok.body.finChargeId}/void`, { reason: 'خطأ' }, adminCookie)).status, 200);
   assert.equal((await statement()).balance, 250);
   assert.equal((await req('GET', '/api/finance/discounts', null, adminCookie)).body.discounts.length, 1);
+  assert.equal((await post({})).status, 201, 'الحسم الملغى لا يمنع إصدار النوع نفسه من جديد');
+  assert.equal((await statement()).balance, 0);
 });
 
 // ── فواتير الطلاب: الأقساط والمسدد الفعلي والمتأخرات ─────────────────────────
