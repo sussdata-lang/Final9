@@ -67,7 +67,7 @@ test('الملف: PDF/A-2b بتوقيع CMS صالح، بصمة SHA-256، وQR/�
   if (hasOpenssl) {            // مرجع مستقل: OpenSSL يتحقق من CMS على نفس المقاطع
     const m = /\/ByteRange\s*\[\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*\]/.exec(txt).slice(1).map(Number), hex = /\/Contents\s*<([0-9A-F]+)>/.exec(txt)[1].replace(/(00)+$/, '');
     fs.writeFileSync(path.join(dir, 'c.bin'), Buffer.concat([pdf.subarray(m[0], m[0] + m[1]), pdf.subarray(m[2], m[2] + m[3])])); fs.writeFileSync(path.join(dir, 'c.p7s'), Buffer.from(hex, 'hex'));
-    execFileSync('openssl', ['cms', '-verify', '-inform', 'DER', '-in', path.join(dir, 'c.p7s'), '-content', path.join(dir, 'c.bin'), '-binary', '-noverify', '-out', '/dev/null'], { stdio: 'pipe' });
+    execFileSync('openssl', ['cms', '-verify', '-inform', 'DER', '-in', path.join(dir, 'c.p7s'), '-content', path.join(dir, 'c.bin'), '-binary', '-noverify', '-out', path.join(dir, 'c.out')], { stdio: 'pipe' });   // ملف عادي لا /dev/null: نسخة Windows الأصلية من openssl لا تعرفه
   }
   if (hasQpdf) assert.equal(spawnSync('qpdf', ['--check', path.join(dir, 'up', 'certs', certFor(app.db, sid(stuNo)).file)]).status, 0);
 });
@@ -115,7 +115,8 @@ test('الإصدار عند الطلب: طالب قديم بلا شهادة تُ
 test('الختم الزمني RFC 3161: يُدمج في التوقيع ويُتحقق منه، وتعثّره لا يُبطل الشهادة', { skip: !hasOpenssl && 'يتطلب openssl' }, async () => {
   const t = path.join(dir, 'tsa'); fs.mkdirSync(t);
   const sh = (...a) => execFileSync('openssl', a, { cwd: t, stdio: 'pipe' });
-  fs.writeFileSync(path.join(t, 'tsa.cnf'), `[tsa]\ndefault_tsa=tsa_def\n[tsa_def]\nserial=${t}/serial\nsigner_cert=${t}/tsa.crt\nsigner_key=${t}/tsa.key\ndefault_policy=1.2.3.4.1\ndigests=sha256\nsigner_digest=sha256\naccuracy=secs:1\nordering=no\ntsa_name=no\ness_cert_id_chain=no\ness_cert_id_alg=sha256\n`);
+  // مسارات نسبية إلى cwd: openssl يعامل «\» في ملف الإعداد كمحرف هروب فتفسد مسارات Windows المطلقة
+  fs.writeFileSync(path.join(t, 'tsa.cnf'), `[tsa]\ndefault_tsa=tsa_def\n[tsa_def]\nserial=serial\nsigner_cert=tsa.crt\nsigner_key=tsa.key\ndefault_policy=1.2.3.4.1\ndigests=sha256\nsigner_digest=sha256\naccuracy=secs:1\nordering=no\ntsa_name=no\ness_cert_id_chain=no\ness_cert_id_alg=sha256\n`);
   fs.writeFileSync(path.join(t, 'serial'), '01\n');
   sh('req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', 'tsa.key', '-out', 'tsa.crt', '-subj', '/CN=Test TSA', '-days', '2', '-addext', 'extendedKeyUsage=critical,timeStamping', '-addext', 'keyUsage=critical,digitalSignature');
   let hits = 0;
