@@ -165,6 +165,7 @@ Object.assign(window.UA, {
     if (can('corr:use') || can('corr:read_all') || can('corr:templates') || can('request:create_internal')) {
       v.push(['corr', tr('الديوان والمراسلات والطلبات الداخلية')]);
     }
+    v.push(['councils', tr('المجالس واللجان')]);
     // 5) التقارير والبيانات والذكاء الاصطناعي
     if (['stats:read', 'hr_emp:view', 'hr_emp:write', 'hr_emp:edit', 'hr_emp:delete', 'hr:manage', 'hr_payroll:approve', 'staffatt:manage', 'audit:read', 'devops:manage', 'settings:manage', 'backup:manage'].some(can)) v.push(['dashboard', tr('الإحصاءات والتقارير')]);
     if (can('student:register') || can('course:manage') || can('grade:manage') || can('data:export') || can('request:import') || ['import:academic', 'import:procurement', 'import:finance', 'import:hr', 'import:student_fin', 'import:misc'].some(can)) v.push(['exchange', tr('الاستيراد والتصدير')]);

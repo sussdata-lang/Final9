@@ -26,6 +26,8 @@ const ROUTE_LOCKS = {
   'POST /api/finance/student-invoices/:id/pay': () => 'billing', 'POST /api/finance/payments': () => 'billing', 'POST /api/finance/charges/:id/void': () => 'billing', 'POST /api/finance/payments/:id/void': () => 'billing', 'POST /api/finance/discounts': () => 'billing',
   'POST /api/finance/journal/:id/post': byId('entry'), 'POST /api/finance/journal/:id/reverse': byId('entry'), 'POST /api/finance/payroll-entry': () => 'payroll',
   'POST /api/enterprise/installments/:id/pay': byId('installment'),
+  'POST /api/council-items/:id/decide': byId('council_item'), 'POST /api/council-items/:id/recuse': byId('council_item'), 'POST /api/council-meetings/:id/attendance': byId('council_meeting'),
+  'POST /api/council-meetings/:id/close': byId('council_meeting'), 'POST /api/council-meetings/:id/schedule': byId('council_meeting'), 'POST /api/council-tasks/:id/done': byId('council_task'),
   'POST /api/finance/budgets/transfer': () => 'budget', 'POST /api/procurement/orders/:id/order': () => 'budget',
   'POST /api/finance/invoices/:id/match': () => 'billing', 'POST /api/finance/invoices/:id/override': () => 'billing',
   'POST /api/lms/loans': () => 'library', 'POST /api/lms/loans/:id/return': () => 'library',
@@ -60,6 +62,7 @@ import { registerHrIntegratedRoutes } from './services/hr_integrated.js';
 import { registerEnterpriseSuiteRoutes } from './services/enterprise_suite.js';
 import { registerStudentAffairsSuiteRoutes } from './services/student_affairs_suite.js';
 import { registerStudentRegulationRoutes } from './services/student_regulations.js';
+import { registerCouncilRoutes } from './services/councils.js';
 import { login, logout, publicUser, changePassword, getSessionCacheStats, invalidateSessionCache } from './services/auth.js';
 import { listStaff, listStaffLight, staffDetail, createUser, updateUser, setUserActive, resetUserPassword, deleteUser } from './services/useradmin.js';
 import { getTranscriptTemplate, setTranscriptTemplate, getSite, saveSite, universityName } from './services/site.js';
@@ -606,6 +609,7 @@ export async function buildRouter(deps) {
   // منظومة شؤون الطلاب المتكاملة المطورة (Student Affairs Suite: 1, 2, 3, 5, 6)
   registerStudentAffairsSuiteRoutes(r, deps);
   registerStudentRegulationRoutes(r, deps);
+  registerCouncilRoutes(r, deps);
 
   // ---- محرك الأداء الفائق والضغط العالي (10,000+ مستخدم متزامن + 10+ مراسلات/إضافات مالية بالثانية) ----
   r.add('GET', '/api/v12/high-concurrency/telemetry', (c) => {
