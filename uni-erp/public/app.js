@@ -296,7 +296,7 @@ Object.assign(window.UA, {
     const fl = [['all', 'الكل'], ['review', 'قيد المراجعة'], ['approved', 'معتمدة'], ['rejected', 'مرفوضة']];
     const list = S.requests.filter((r) => S.filter === 'all' || r.status === S.filter);
     const sel = S.requests.find((r) => r.id === S.sel);
-    const rows = list.map((r) => `<tr class="row" tabindex="0" data-act="sel" data-id="${r.id}" aria-selected="${S.sel === r.id}"><td>${esc(r.service.label)}${r.unit ? `<div class="small">عند: ${esc(r.unit.name)}</div>` : ''}</td><td>${esc(r.student.name)}</td><td>${pill(r)}${UA.flow && UA.flow.isPending(r.id) ? ' <span class="small ux-pending-tag">بانتظار مهلة التراجع</span>' : ''}</td><td class="hint" style="white-space:nowrap">${fmt(r.createdAt)}</td></tr>`).join('');
+    const rows = list.map((r) => `<tr class="row" tabindex="0" data-act="sel" data-id="${r.id}" aria-selected="${S.sel === r.id}"><td>${esc(r.service.label)}${r.escalationLevel ? ` <span class="pill p-rejected">مصعّد ${r.escalationLevel}</span>` : ''}${r.unit ? `<div class="small">عند: ${esc(r.unit.name)}</div>` : ''}</td><td>${esc(r.student.name)}</td><td>${pill(r)}${UA.flow && UA.flow.isPending(r.id) ? ' <span class="small ux-pending-tag">بانتظار مهلة التراجع</span>' : ''}</td><td class="hint" style="white-space:nowrap">${fmt(r.createdAt)}</td></tr>`).join('');
     const fresh = sel && S.drawerFor !== sel.id;
     S.drawerFor = sel ? sel.id : null;
     return `<div><section class="card"><h2>سجل الطلبات</h2><p class="hint" style="margin-top:0">اختر طلباً لعرض تفاصيله وإجراءاته في اللوحة الجانبية.</p><div class="chips">${fl.map((f) => `<button class="chip" data-act="flt" data-f="${f[0]}" aria-pressed="${S.filter === f[0]}">${f[1]}</button>`).join('')}</div>

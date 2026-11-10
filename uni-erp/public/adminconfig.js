@@ -83,7 +83,7 @@
         <label>الجمهور<select id="sv-aud">${AUD.map(([k, v]) => `<option value="${k}"${d.audience === k ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
         <label>الفئة (للتجميع في القوائم)<input id="sv-cat" maxlength="60" value="${esc(d.category)}"></label></div>
       <label style="display:block;margin-top:10px">وصف يظهر للطالب<textarea id="sv-desc" maxlength="300" rows="2">${esc(d.description)}</textarea></label>
-      <label style="display:block;margin-top:10px">تعليمات تُعرض قبل التقديم<textarea id="sv-ins" maxlength="1000" rows="3">${esc(d.instructions)}</textarea></label>
+      <label style="display:block;margin-top:10px">تعليمات تُعرض قبل التقديم<textarea id="sv-ins" maxlength="6000" rows="3">${esc(d.instructions)}</textarea></label>
       <label style="display:block;margin-top:10px">المرفقات المطلوبة (سطر لكل مرفق، ضع * في نهاية السطر إن كان إلزامياً — حتى 8)<textarea id="sv-slots" rows="3" ${ro ? 'disabled' : ''}>${esc(d.slotsText)}</textarea></label>
       <div style="display:flex;gap:18px;flex-wrap:wrap;margin:10px 0">
         <label class="chk"><input type="checkbox" id="sv-att"${d.requiresAttachment ? ' checked' : ''}> يتطلب مرفقاً</label>

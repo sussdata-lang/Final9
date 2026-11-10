@@ -834,6 +834,7 @@
           const [s, it, rq] = await Promise.all([api('GET', '/api/procurement/suppliers'), api('GET', '/api/procurement/items'), api('GET', '/api/procurement/requests')]);
           P.suppliers = s.suppliers; P.items = it.items; P.requests = rq.requests;
         }
+        P.budgets = can('procurement:manage') ? (await api('GET', '/api/procurement/budgets').catch(() => ({ budgets: [] }))).budgets : [];
         const preReqId = act === 'proc-req-to-po' ? Number(b.dataset.id) : null;
         const preReq = preReqId ? P.requests.find((r) => r.id === preReqId) : null;
         const appReqs = P.requests.filter((r) => r.status === 'approved');
@@ -842,6 +843,7 @@
           <div class="form-grid">
             <label>المورد المعتمد<select id="po-sup">${P.suppliers.filter((s) => s.active).map((s) => `<option value="${s.id}">${esc(s.name)} (${esc(s.code)})</option>`).join('')}</select></label>
             <label>ربط بطلب شراء معتمد<select id="po-req"><option value="">— أمر توريد مباشر —</option>${appReqs.map((r) => `<option value="${r.id}" ${preReqId === r.id ? 'selected' : ''}>${esc(r.no)} · ${esc(r.title)}</option>`).join('')}</select></label>
+            <label>بند الموازنة<select id="po-budget" data-no-other="1"><option value="">— دون ربط بالموازنة —</option>${(P.budgets || []).map((x) => `<option value="${x.id}">${esc(x.label)} — المتاح ${Number(x.available).toLocaleString('en-US')}</option>`).join('')}</select></label>
             <label style="grid-column:1/-1">شروط التوريد والتسليم<input id="po-note" value="${preReq ? `توريد بنود الطلب ${preReq.no}` : 'تسليم أرض المستودع المركزي خلال 7 أيام'}"></label>
           </div>
           <h4>بنود أمر التوريد</h4>
@@ -867,6 +869,7 @@
         await api('POST', '/api/procurement/orders', {
           supplierId: Number(document.getElementById('po-sup').value),
           requestId: document.getElementById('po-req').value || null,
+          budgetId: Number(document.getElementById('po-budget')?.value) || null,
           note: document.getElementById('po-note').value,
           lines
         });

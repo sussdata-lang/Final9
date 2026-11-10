@@ -12,13 +12,14 @@
   /* ---------- تخزين واسترجاع سجل نشاط البطاقة الرقمية (Check-in / Check-out Logs) ---------- */
   // السجل على الخادم وحده؛ ويُزال ما تركته النسخ السابقة في المتصفح
   for (const k of ['suss_digital_card_activity_logs_v2', 'suss_digital_card_activity_logs_v3']) { try { localStorage.removeItem(k); } catch {} }
-  const cardLogState = { studentId: null, logs: [] };
+  const cardLogState = { studentId: null, logs: [], block: null };
   const fromServer = (r) => ({ id: r.id, studentId: r.student_id, studentNo: r.student_no, studentName: r.student_name, eventType: r.event_type, locationName: r.location_name, locationCode: r.location_code, method: r.method, terminalId: r.terminal_id, status: r.status, reason: r.reason, pkiHash: r.pki_hash, timestamp: Number(r.created_at) });
   async function loadCardLogs(studentId) {
     cardLogState.studentId = studentId;
     const d = await UA.api('GET', `/api/students/${studentId}/card-activity`);
     if (cardLogState.studentId !== studentId) return;
     cardLogState.logs = (d.logs || []).map(fromServer);
+    cardLogState.block = d.block || null;
     UA.render();
   }
   const getCardLogs = () => cardLogState.logs;
@@ -48,6 +49,29 @@
   /* ==========================================================================
      6. شؤون الطلاب: البطاقة الجامعية الذكية والباركود المشفر + سجل نشاط التحقق اللحظي
      ========================================================================== */
+  function cardBlockHtml(st) {
+    const b = cardLogState.block, manage = UA.can('student:update');
+    if (b) return `<div class="hint" role="status" style="background:#FBEDED;border:1px solid #E5B9B9;padding:10px 12px;border-radius:8px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <span><b style="color:#9B2C2C">البطاقة موقوفة</b> بسبب ${esc(b.reasonLabel)}${b.note ? ` · ${esc(b.note)}` : ''}. تُرفض عند البوابات والقاعات.</span>
+      ${manage ? `<button class="btn sm" type="button" data-act="cardunblock" data-id="${st.id}">رفع الإيقاف</button>` : ''}</div>`;
+    if (!manage) return '';
+    return `<div class="inline-form" style="gap:8px;margin-bottom:12px;align-items:flex-end;flex-wrap:wrap">
+      <label>سبب إيقاف البطاقة<select id="card-block-reason" data-no-other="1"><option value="lost">فقدان</option><option value="stolen">سرقة</option><option value="damaged">تلف</option><option value="admin">قرار إداري</option></select></label>
+      <button class="btn dan" type="button" data-act="cardblock" data-id="${st.id}" style="height:38px">إيقاف البطاقة فوراً</button></div>`;
+  }
+  Object.assign(UA.actions, {
+    cardblock: async (_el, d) => {
+      if (!confirm('إيقاف هذه البطاقة فوراً؟')) return;
+      await UA.api('POST', `/api/students/${d.id}/card/block`, { reason: document.getElementById('card-block-reason').value });
+      await loadCardLogs(Number(d.id));
+    },
+    cardunblock: async (_el, d) => {
+      if (!confirm('رفع إيقاف هذه البطاقة؟')) return;
+      await UA.api('POST', `/api/students/${d.id}/card/unblock`, {});
+      await loadCardLogs(Number(d.id));
+    },
+  });
+
   UA.renderDigitalCardSection = () => {
     const stList = (S.stList && S.stList.students) || [];
     // قائمة الطلاب لا تكون محمّلة إن فُتح هذا التبويب قبل «سجل الطلاب»
@@ -59,7 +83,7 @@
     if (!st) return '<section class="card" style="margin-top:0"><h2 style="margin-top:0">🪪 البطاقة الجامعية الرقمية</h2><p class="hint">لا يوجد طلاب لعرض بطاقاتهم. سجّل طالباً أولاً من «تسجيل طالب جديد».</p></section>';
     const secureBarcode = UA.generateStudentSecureBarcode ? UA.generateStudentSecureBarcode(st.studentNo, st.nationalId || '2026') : `SUSS-${st.studentNo}-SEC94`;
 
-    if (cardLogState.studentId !== st.id) { cardLogState.logs = []; loadCardLogs(st.id).catch(() => {}); }
+    if (cardLogState.studentId !== st.id) { cardLogState.logs = []; cardLogState.block = null; loadCardLogs(st.id).catch(() => {}); }
     const allLogs = getCardLogs();
     // تصفية سجلات الطالب المحدد
     const stLogs = allLogs.filter((l) => Number(l.studentId) === Number(st.id) || String(l.studentNo) === String(st.studentNo));
@@ -120,6 +144,7 @@
       </div>
 
       <p class="small" style="margin:0 0 10px">رمز البطاقة الثابت: <b class="mono" dir="ltr">${esc(UA.generateStudentSecureBarcode(st.studentNo))}</b> · رمز NFC الثابت: <b class="mono" dir="ltr">${esc(UA.studentNfcCode(st.studentNo))}</b></p>
+      ${cardBlockHtml(st)}
       ${UA.digitalCardHtml(st, { screen: true })}
 
       <!-- ==========================================================================

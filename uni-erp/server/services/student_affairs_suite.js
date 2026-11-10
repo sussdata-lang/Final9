@@ -4,6 +4,8 @@ import { audit } from '../audit.js';
 import { HttpError } from '../http.js';
 import { registerStudent, STATUS_LABEL } from './students.js';
 import { createCharge, voidCharge } from './finance/fees.js';
+import { createStudentInvoice } from './finance/student_billing.js';
+import { currentTerm } from './sections.js';
 import { graduationBlockers, appealBlocksMovement } from './student_regulations.js';
 import { passMarkFor, passSql } from './academics.js';
 import { nextNumber, withLock } from './numbering.js';
@@ -761,7 +763,29 @@ export async function enrollAcceptedApplicant(deps, actor, applicantId, body, ip
     .run(programId, created.student.id, app.id);
 
   audit(db, actor, 'تثبيت قبول متقدم وتسجيله كطالب نظامي', `${app.application_no} -> ${created.student.studentNo}`, ip);
-  return { applicantId: app.id, student: created.student, credentials: created.credentials };
+  return { applicantId: app.id, student: created.student, credentials: created.credentials, followUp: admissionFollowUp(deps, actor, created.student, programId, ip) };
+}
+
+const unitStaff = (db, codes) => db.prepare(`SELECT u.id FROM users u JOIN org_units o ON o.id = u.unit_id WHERE u.active = 1 AND o.code IN (${codes.map(() => '?').join(',')})`).all(...codes).map((u) => u.id);
+const notifyStaff = (db, ids, kind, ref, text) => { const ins = db.prepare("INSERT INTO user_notifications (user_id, kind, ref_id, text, url, at) VALUES (?, ?, ?, ?, '', ?) ON CONFLICT DO NOTHING"), now = Date.now(); for (const id of new Set(ids)) ins.run(id, kind, ref, text, now); };
+
+// بعد تثبيت القبول: فاتورة من هيكل رسوم البرنامج، وتنبيه مكتب الوثائق لإصدار البطاقة المطبوعة (الرقمية متاحة فوراً).
+// تعذّر الفاتورة لا يلغي القبول؛ تُبلَّغ المالية لتصدرها يدوياً
+function admissionFollowUp(deps, actor, student, programId, ip) {
+  const { db } = deps, out = { invoiceCount: 0, invoiceNote: '' }, who = `${student.name ?? ''} (${student.studentNo})`;
+  notifyStaff(db, unitStaff(db, ['of_docs']), 'card_needed', Number(student.id), `طالب جديد بحاجة إلى إصدار بطاقة جامعية: ${who}.`);
+  if (!getSetting(db, 'academic.auto_invoice_on_admission')) return out;
+  const year = academicYear();
+  const fee = db.prepare("SELECT total_fee FROM fin_fee_structures WHERE program_id = ? AND REPLACE(academic_year, '-', '/') = ? ORDER BY semester, id LIMIT 1").get(programId, year);
+  if (!(Number(fee?.total_fee) > 0)) { out.invoiceNote = 'لا يوجد هيكل رسوم لهذا البرنامج في العام الحالي.'; }
+  else {
+    try {
+      const due = new Date(Date.now() + Number(getSetting(db, 'academic.admission_invoice_days')) * 86400000).toISOString().slice(0, 10);
+      out.invoiceCount = createStudentInvoice(deps, actor, { studentId: student.id, academicYear: year, totalAmount: Number(fee.total_fee), installmentsCount: 1, firstDueDay: due }, ip).count;
+    } catch (e) { out.invoiceNote = e.message; }
+  }
+  if (out.invoiceNote) notifyStaff(db, unitStaff(db, ['finance']), 'invoice_needed', Number(student.id), `تعذّر إصدار فاتورة الطالب الجديد ${who}: ${out.invoiceNote}`);
+  return out;
 }
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
@@ -1064,7 +1088,7 @@ const notifyUsers = (db, ids, movement, text) => {
   for (const id of new Set(ids)) ins.run(id, movement.id, text, now);
 };
 // الجهات المعنية بالقرار: وحدات المالية والمكتبة والقبول وشؤون الطلاب
-const concernedStaff = (db) => db.prepare("SELECT u.id FROM users u JOIN org_units o ON o.id = u.unit_id WHERE u.active = 1 AND o.code IN ('finance', 'library', 'admission', 'affairs', 'exams')").all().map((u) => u.id);
+const concernedStaff = (db) => db.prepare("SELECT u.id FROM users u JOIN org_units o ON o.id = u.unit_id WHERE u.active = 1 AND o.code IN ('finance', 'library', 'admission', 'affairs', 'exams', 'of_housing')").all().map((u) => u.id);
 
 function finalizeMovement(deps, actor, movement, ip) {
   const { db, cfg } = deps, now = Date.now();
@@ -1091,6 +1115,8 @@ function finalizeMovement(deps, actor, movement, ip) {
     }
   }
   const student = db.prepare('SELECT display_name, student_no FROM users WHERE id = ?').get(movement.student_id);
+  // من أُجِّل قيده أو انسحب لا يبقى مسجلاً في مقررات الفصل الجاري
+  if (['suspended', 'withdrawn', 'transferred'].includes(toStatus) && student?.student_no) db.prepare("UPDATE student_self_enrollments SET dropped_at = ?, status = 'محذوف بحركة قيد' WHERE student_no = ? AND semester = ? AND dropped_at IS NULL").run(now, student.student_no, currentTerm(db));
   notifyUsers(db, [movement.student_id], movement, `صدر القرار النهائي بشأن حركة القيد ${movement.movement_no}: حالتك الآن «${label}».`);
   // الأثر المالي مهمة على المالية: لا يتغير أي مبلغ تلقائياً. الإشعار الأول للمستخدم هو المحفوظ، فتصل المالية مهمتها قبل الإشعار العام
   if (movement.financial_impact) {

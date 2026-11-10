@@ -1,4 +1,5 @@
 // /api/finance/* — يُسجَّل من routes.js عبر registerFinance(r, deps, helpers)
+import * as BG from './budgets.js';
 import { HttpError } from '../../http.js';
 const need = (ctx, perm) => { if (!ctx.user.can(perm)) throw new HttpError(403, 'لا تملك صلاحية هذا الإجراء.', 'forbidden'); };
 import * as C from './core.js';
@@ -94,6 +95,13 @@ export async function registerFinance(r, deps, { writeXlsx }) {
   r.add('POST', '/api/finance/invoices', finC('finance:entry', (c, b) => ({ invoice: I.createInvoice(deps, c.user, b, c.ip) })));
   r.add('POST', '/api/finance/invoices/:id/issue', fin('finance:entry', (c) => ({ invoice: I.issueInvoice(deps, c.user, c.params.id, c.ip) })));
   r.add('POST', '/api/finance/invoices/:id/cancel', fin('finance:entry', (c) => ({ invoice: I.cancelInvoice(deps, c.user, c.params.id, c.ip) })));
+  r.add('POST', '/api/finance/invoices/:id/match', fin('finance:entry', (c) => ({ invoice: I.recheckInvoice(deps, c.user, c.params.id, c.ip) })));
+  r.add('POST', '/api/finance/invoices/:id/override', fin('finance:post', (c, b) => ({ invoice: I.overrideMatch(deps, c.user, c.params.id, b, c.ip) })));
+  r.add('GET', '/api/finance/purchase-orders', fin('finance:read', () => ({ orders: I.matchableOrders(deps) })));
+  r.add('GET', '/api/finance/budgets', fin('finance:read', (_c, _b, q) => BG.listBudgets(deps, q)));
+  r.add('POST', '/api/finance/budgets', finC('finance:setup', (c, b) => ({ budget: BG.saveBudget(deps, c.user, b, c.ip) })));
+  r.add('POST', '/api/finance/budgets/transfer', finC('finance:setup', (c, b) => BG.transferBudget(deps, c.user, b, c.ip)));
+  r.add('POST', '/api/finance/budgets/:id/approve', fin('finance:post', (c) => ({ budget: BG.approveBudget(deps, c.user, c.params.id, c.ip) })));
   r.add('POST', '/api/finance/invoices/:id/pay', fin('finance:entry', (c, b) => ({ invoice: I.payInvoice(deps, c.user, c.params.id, b, c.ip) })));
 
   /* ---- الأطراف ---- */

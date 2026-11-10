@@ -171,7 +171,7 @@
         <td class="mono"><b>${esc(r.no)}</b></td>
         <td><b>${esc(r.service.label)}</b></td>
         <td>${esc(r.unit ? r.unit.name : '—')}</td>
-        <td><span class="pill p-${r.status}">${ST[r.status] || r.status}</span></td>
+        <td><span class="pill p-${r.status}">${ST[r.status] || r.status}</span>${r.escalationLevel ? ` <span class="pill p-rejected">مصعّد ${r.escalationLevel}</span>` : ''}</td>
         <td>${fmt(r.createdAt)}</td>
         <td><button class="btn sm" data-act="inopen" data-id="${r.id}">${B.open === r.id ? 'إخفاء المسار' : 'التفاصيل والمسار'}</button> <button class="btn sm" data-act="reqprint" data-id="${r.id}">طباعة النموذج</button></td>
       </tr>

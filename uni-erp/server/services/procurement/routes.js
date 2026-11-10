@@ -1,3 +1,5 @@
+import { recheckOrderInvoices } from '../finance/invoices.js';
+import { approvedBudgets } from '../finance/budgets.js';
 import { HttpError } from '../../http.js';
 import * as P from './core.js';
 const need = (ctx, perm) => { if (!ctx.user.can(perm)) throw new HttpError(403, 'لا تملك صلاحية هذا الإجراء.', 'forbidden'); };
@@ -40,7 +42,9 @@ export async function registerProcurement(r, deps){
   r.add('POST','/api/procurement/orders/:id/order', g('procurement:manage', (c)=>P.orderAction(deps,c.user,c.params.id,'order',c.ip)));
   r.add('POST','/api/procurement/orders/:id/cancel', g('procurement:manage', (c)=>P.orderAction(deps,c.user,c.params.id,'cancel',c.ip)));
   r.add('GET','/api/procurement/receipts', g('procurement:read', (_c,_b,q)=>({receipts:P.listReceipts(db,q)})));
-  r.add('POST','/api/procurement/receipts', gc('procurement:stock', (c,b)=>P.createReceipt(deps,c.user,b,c.ip)));
+  // الاستلام اللاحق يعيد مطابقة فواتير الأمر الموقوفة، فتُصدر المطابِقة منها
+  r.add('POST','/api/procurement/receipts', gc('procurement:stock', (c,b)=>{ const out=P.createReceipt(deps,c.user,b,c.ip); recheckOrderInvoices(deps,c.user,b?.orderId,c.ip); return out; }));
+  r.add('GET','/api/procurement/budgets', g('procurement:manage', ()=>({budgets:approvedBudgets(deps)})));
   r.add('GET','/api/procurement/issues', g('procurement:read', (_c,_b,q)=>({issues:P.listIssues(db,q)})));
   r.add('POST','/api/procurement/issues', gc('procurement:stock', (c,b)=>P.createIssue(deps,c.user,b,c.ip)));
   r.add('GET','/api/procurement/assets', g('procurement:read', (_c,_b,q)=>({assets:P.listAssets(db,q)})));

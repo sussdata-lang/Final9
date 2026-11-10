@@ -7,9 +7,10 @@ import { STUDENT_AFFAIRS } from './studentAffairs.js';
 import { ACADEMIC_CORE } from './academicCore.js';
 import { HR_FORMS, FINANCE_FORMS, PROCURE_FORMS, ADMIN_FORMS } from './support.js';
 import { IT_FORMS, LIBRARY_FORMS, QUALITY_FORMS, RESEARCH_FORMS, LEGAL_FORMS, MEDIA_FORMS, SAFETY_FORMS } from './services.js';
+import { CONDUCT_FORMS, APPENDIX_FORMS } from './conduct.js';
 
 export const FORMS = [...STUDENT_AFFAIRS, ...ACADEMIC_CORE, ...HR_FORMS, ...FINANCE_FORMS, ...PROCURE_FORMS, ...ADMIN_FORMS,
-  ...IT_FORMS, ...LIBRARY_FORMS, ...QUALITY_FORMS, ...RESEARCH_FORMS, ...LEGAL_FORMS, ...MEDIA_FORMS, ...SAFETY_FORMS];
+  ...IT_FORMS, ...LIBRARY_FORMS, ...QUALITY_FORMS, ...RESEARCH_FORMS, ...LEGAL_FORMS, ...MEDIA_FORMS, ...SAFETY_FORMS, ...CONDUCT_FORMS, ...APPENDIX_FORMS];
 
 // الخدمات الأساسية الموجودة مسبقاً: تُنسب إلى وحدتها وفئتها دون المساس بحقولها
 const ADOPT = {

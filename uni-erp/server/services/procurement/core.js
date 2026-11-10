@@ -1,4 +1,5 @@
 // المشتريات والمخازن والأصول — النواة
+import { checkOrderBudget, validBudgetForOrder } from '../finance/budgets.js';
 import { tx } from '../../db.js';
 import { nextNumber } from '../numbering.js';
 import { audit } from '../../audit.js';
@@ -202,13 +203,14 @@ export function getOrder(db,id){
 export function createOrder({db},actor,b,ip){
   const supId=Number(b?.supplierId); if(!supId || !db.prepare('SELECT 1 FROM proc_suppliers WHERE id=? AND active=1').get(supId)) throw bad('المورد غير موجود أو معطّل.');
   const reqId=b?.requestId?Number(b.requestId):null;
+  const budgetId=validBudgetForOrder(db, b?.budgetId?Number(b.budgetId):null);
   if(reqId){ const rq=db.prepare('SELECT * FROM proc_requests WHERE id=?').get(reqId); if(!rq) throw bad('طلب الشراء غير موجود.',404,'not_found'); if(rq.status!=='approved') throw bad('طلب الشراء ليس معتمداً.',409,'conflict'); if(db.prepare("SELECT 1 FROM proc_orders WHERE request_id=? AND status!='cancelled' LIMIT 1").get(reqId)) throw bad('يوجد أمر توريد مرتبط بهذا الطلب.',409,'conflict'); }
   const lines=b?.lines; if(!Array.isArray(lines)||!lines.length) throw bad('أضف بنداً واحداً على الأقل.');
   for(let i=0;i<lines.length;i++){ const l=lines[i]; clean(l?.description,100,`وصف البند ${i+1}`,2); if(Number(l?.qty)<=0) throw bad(`البند ${i+1}: الكمية غير صالحة.`); if(Number(l?.unitCost)<0) throw bad(`البند ${i+1}: سعر الوحدة غير صالح.`); }
   return tx(db,()=>{
     const no=nextNo(db,'PO','proc_orders');
     const total=lines.reduce((s,l)=>s+Number(l.qty)*Number(l.unitCost||0),0);
-    const id=Number(db.prepare('INSERT INTO proc_orders (no,request_id,supplier_id,status,total_amount,note,created_by,created_at) VALUES (?,?,?,?,?,?,?,?)').run(no,reqId,supId,'draft',total,String(b?.note??'').slice(0,300),actor.id,Date.now()).lastInsertRowid);
+    const id=Number(db.prepare('INSERT INTO proc_orders (no,request_id,supplier_id,status,total_amount,note,created_by,created_at,budget_id) VALUES (?,?,?,?,?,?,?,?,?)').run(no,reqId,supId,'draft',total,String(b?.note??'').slice(0,300),actor.id,Date.now(),budgetId).lastInsertRowid);
     for(const l of lines) db.prepare('INSERT INTO proc_order_lines (order_id,item_id,description,qty,unit_cost,line_total) VALUES (?,?,?,?,?,?)').run(id,l.itemId?Number(l.itemId):null,clean(l.description,100,'وصف البند',1),Number(l.qty),Number(l.unitCost||0),Number(l.qty)*Number(l.unitCost||0));
     if(reqId) db.prepare("UPDATE proc_requests SET status='ordered' WHERE id=?").run(reqId);
     audit(db,actor,'إنشاء أمر توريد',no,ip); return getOrder(db,id);
@@ -216,7 +218,7 @@ export function createOrder({db},actor,b,ip){
 }
 export function orderAction({db},actor,id,action,ip){
   const o=db.prepare('SELECT * FROM proc_orders WHERE id=?').get(Number(id)); if(!o) throw bad('أمر التوريد غير موجود.',404,'not_found');
-  if(action==='order'){ if(o.status!=='draft') throw bad('الأمر ليس مسودة.',409,'conflict'); db.prepare("UPDATE proc_orders SET status='ordered', ordered_at=? WHERE id=?").run(Date.now(),o.id); audit(db,actor,'إرسال أمر توريد',o.no,ip); }
+  if(action==='order'){ if(o.status!=='draft') throw bad('الأمر ليس مسودة.',409,'conflict'); const warn=checkOrderBudget(db,o); if(warn) audit(db,actor,'تجاوز موازنة بأمر توريد (تحذير)',`${o.no}: ${warn}`,ip); db.prepare("UPDATE proc_orders SET status='ordered', ordered_at=? WHERE id=?").run(Date.now(),o.id); audit(db,actor,'إرسال أمر توريد',o.no,ip); }
   else if(action==='cancel'){ if(!['draft','ordered'].includes(o.status)) throw bad('لا يمكن الإلغاء.',409,'conflict'); db.prepare("UPDATE proc_orders SET status='cancelled' WHERE id=?").run(o.id); audit(db,actor,'إلغاء أمر توريد',o.no,ip); }
   else throw bad('إجراء غير صالح.');
   return getOrder(db,o.id);

@@ -199,6 +199,93 @@
     `;
   }
 
+  /* ---------- التسجيل بالشعب وفترة الحذف والإضافة ---------- */
+  const sectionNameOf = (D, id) => (D.courseSections || []).find((s) => Number(s.id) === Number(id))?.name || '—';
+  const isCurrent = (D, e) => !e.dropped_at && D.registration && e.semester === D.registration.term;
+  const canDrop = (D, e) => isCurrent(D, e) && (S.me?.role === 'student' ? D.registration.isOpen : UA.can('course:manage') || UA.can('student:register'));
+  function enrollOptions(D) {
+    const sections = D.courseSections || [];
+    return (D.enrollableCourses || []).flatMap((c) => {
+      const own = sections.filter((s) => s.courseCode === c.code);
+      if (!own.length) return [`<option value="${esc(c.code)}|">${esc(c.name)} (${esc(c.code)}) · ${c.hours} ساعة</option>`];
+      return own.map((s) => `<option value="${esc(c.code)}|${s.id}"${s.seatsLeft ? '' : ' disabled'}>${esc(c.name)} · شعبة ${esc(s.name)}${s.instructor ? ` · ${esc(s.instructor)}` : ''} · ${s.seatsLeft ? `متبقي ${s.seatsLeft}` : 'مكتملة'}</option>`);
+    }).join('');
+  }
+  function enrollFormHtml(D) {
+    const r = D.registration || {};
+    const period = r.open || r.close ? ` · فترة التسجيل والحذف والإضافة: ${esc(r.open || 'مفتوحة')} إلى ${esc(r.close || 'مفتوحة')}` : '';
+    const head = `<p class="small" style="margin:0 0 10px">الفصل الحالي: <b>${esc(r.term || '—')}</b>${period}${r.isOpen === false ? ' · <b style="color:#9B2C2C">الفترة مغلقة</b>' : ''}</p>`;
+    if (UA.S.me.role !== 'student') return `${head}<p class="small">يسجّل الطالب مقرراته من حسابه.</p>`;
+    return `${head}<form id="es-enroll-form" class="inline-form" style="margin-bottom:14px">
+      <label style="flex:1">المقرر والشعبة<select id="es-enr-course" data-no-other="1" required>${enrollOptions(D) || '<option value="">لا توجد مقررات متاحة</option>'}</select></label>
+      <button class="btn pri" type="submit"${r.isOpen === false ? ' disabled' : ''}>تسجيل المقرر في الفصل الحالي</button>
+    </form>`;
+  }
+  function sectionsAdminHtml(D) {
+    if (!UA.can('course:manage')) return '';
+    const sections = D.courseSections || [];
+    return `<section class="es-card">
+      <h2><span>شعب مقررات الفصل الحالي</span></h2>
+      <p class="sub">إذا فُتحت شعب لمقرر، يختار الطالب إحداها عند التسجيل ضمن سعتها.</p>
+      <form id="es-section-form" class="inline-form" style="margin-bottom:14px">
+        <label style="flex:2">المقرر<select id="es-sec-course" data-no-other="1" required>${(D.enrollableCourses || []).map((c) => `<option value="${esc(c.code)}">${esc(c.name)} (${esc(c.code)})</option>`).join('')}</select></label>
+        <label>الشعبة<input id="es-sec-name" maxlength="20" required placeholder="أ"></label>
+        <label>السعة<input id="es-sec-cap" type="number" min="1" max="2000" value="40" required></label>
+        <label>المدرّس<input id="es-sec-ins" maxlength="120"></label>
+        <label>القاعة<input id="es-sec-hall" maxlength="60"></label>
+        <button class="btn pri" type="submit">إضافة شعبة</button>
+      </form>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>المقرر</th><th>الشعبة</th><th>المسجلون</th><th>السعة</th><th>المدرّس</th><th>القاعة</th><th>الحالة</th><th>إجراء</th></tr></thead>
+        <tbody>${sections.map((s) => `<tr>
+          <td>${esc(s.courseName)} <span class="mono small">${esc(s.courseCode)}</span></td>
+          <td>${esc(s.name)}</td><td>${s.enrolled}</td>
+          <td><input id="es-cap-${s.id}" type="number" min="1" max="2000" value="${s.capacity}" style="width:80px" aria-label="سعة الشعبة"></td>
+          <td>${esc(s.instructor || '—')}</td><td>${esc(s.hall || '—')}</td>
+          <td><span class="pill ${s.active ? 'p-approved' : 'p-rejected'}">${s.active ? 'مفعلة' : 'معطلة'}</span></td>
+          <td><button class="btn sm" type="button" data-act="essecsave" data-id="${s.id}">حفظ السعة</button> <button class="btn sm" type="button" data-act="essectoggle" data-id="${s.id}" data-on="${s.active ? 0 : 1}">${s.active ? 'تعطيل' : 'تفعيل'}</button></td>
+        </tr>`).join('') || '<tr><td colspan="8" class="small">لا توجد شعب لهذا الفصل بعد.</td></tr>'}</tbody>
+      </table></div>
+    </section>`;
+  }
+
+  // تبويب «الشعب والتسجيل» في الشؤون الأكاديمية: إدارة الشعب وتسجيلات الفصل الحالي
+  UA.renderSectionsAdmin = () => {
+    injectStyles();
+    ensureEnterpriseDataLoaded();
+    const D = E.data;
+    if (!D) return '<section class="card"><p class="hint">جارٍ التحميل…</p></section>';
+    const rows = (D.selfEnrollments || []).filter((e) => D.registration && e.semester === D.registration.term);
+    return `<div class="es-wrap">${sectionsAdminHtml(D)}
+      <section class="es-card"><h2><span>تسجيلات الفصل الحالي</span></h2>${enrollFormHtml(D)}
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>الطالب</th><th>المقرر</th><th>الشعبة</th><th>الحالة</th><th>إجراء</th></tr></thead>
+        <tbody>${rows.map((e) => `<tr><td>${esc(e.student_name)} <span class="mono small">${esc(e.student_no)}</span></td><td>${esc(e.course_name)} <span class="mono small">${esc(e.course_code)}</span></td>
+          <td>${esc(sectionNameOf(D, e.section_id))}</td><td><span class="pill ${e.dropped_at ? 'p-rejected' : 'p-approved'}">${esc(e.status)}</span></td>
+          <td>${canDrop(D, e) ? `<button class="btn sm" type="button" data-act="esdrop" data-id="${e.id}">حذف</button>` : '—'}</td></tr>`).join('') || '<tr><td colspan="5" class="small">لا توجد تسجيلات في هذا الفصل.</td></tr>'}</tbody>
+      </table></div></section></div>`;
+  };
+
+  // قسم التسجيل في بوابة الطالب (صفحة دليل المواد): النموذج نفسه وجدول تسجيل الفصل الحالي
+  UA.renderStudentRegistration = () => {
+    injectStyles();
+    ensureEnterpriseDataLoaded();
+    const D = E.data;
+    if (!D) return '<article class="sx-panel" style="margin-top:16px"><p class="hint">جارٍ تحميل التسجيل…</p></article>';
+    const rows = (D.selfEnrollments || []).filter((e) => D.registration && e.semester === D.registration.term);
+    return `<article class="sx-panel" style="margin-top:16px"><div class="sx-ph"><div><h2>التسجيل في المقررات</h2><p>سجّل مقررات الفصل الحالي واختر شعبتها، واحذف ما تريد ضمن فترة الحذف والإضافة.</p></div></div>
+      ${enrollFormHtml(D)}
+      <div class="tbl-wrap"><table class="sx-table rsp">
+        <thead><tr><th>المقرر</th><th>الساعات</th><th>الشعبة</th><th>الحالة</th><th>إجراء</th></tr></thead>
+        <tbody>${rows.map((e) => `<tr>
+          <td><strong>${esc(e.course_name)}</strong> <span class="mono small">${esc(e.course_code)}</span></td>
+          <td>${e.credits}</td><td>${esc(sectionNameOf(D, e.section_id))}</td>
+          <td><span class="pill ${e.dropped_at ? 'p-rejected' : 'p-approved'}">${esc(e.status)}</span></td>
+          <td>${canDrop(D, e) ? `<button class="btn sm" type="button" data-act="esdrop" data-id="${e.id}">حذف المقرر</button>` : '—'}</td>
+        </tr>`).join('') || '<tr><td colspan="5" class="small">لم تسجّل أي مقرر في هذا الفصل بعد.</td></tr>'}</tbody>
+      </table></div></article>`;
+  };
+
   /* ---------- التبويب 2: شؤون الطلاب والوثائق والبطاقة الذكية (4-6) ---------- */
   function viewStudentPki(D) {
     const enrolls = D.selfEnrollments || [];
@@ -249,7 +336,7 @@
                 <div style="font-size:13px;color:#A8D8BE">الرقم الجامعي: <b class="mono">${esc(stNo)}</b></div>
                 <div style="font-size:12.5px;color:#A8D8BE;margin-top:2px">الكلية: هندسة الأمن السيبراني · المستوى الثاني</div>
                 <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-                  <span style="background:rgba(255,255,255,.15);padding:3px 8px;border-radius:6px;font-size:11px">NFC Чип: نشط</span>
+                  <span style="background:rgba(255,255,255,.15);padding:3px 8px;border-radius:6px;font-size:11px">${D.cardBlock ? `البطاقة موقوفة: ${esc(D.cardBlock.reasonLabel)}` : 'البطاقة: فعّالة'}</span>
                   <span style="background:rgba(213,182,93,.25);color:#E6CB84;padding:3px 8px;border-radius:6px;font-size:11px">براءة ذمة: مكتملة</span>
                 </div>
               </div>
@@ -267,6 +354,9 @@
               </div>
             </div>
           </div>
+          ${S.me?.role === 'student' ? (D.cardBlock
+            ? `<p class="small" style="margin:10px 0 0;color:#9B2C2C"><b>البطاقة موقوفة.</b> راجع مكتب الوثائق لإصدار بديل أو رفع الإيقاف.</p>`
+            : `<div class="row-end" style="margin-top:10px;gap:8px"><button class="btn dan sm" type="button" data-act="escardlost" data-r="lost">الإبلاغ عن فقدان البطاقة</button><button class="btn sm" type="button" data-act="escardlost" data-r="stolen">الإبلاغ عن سرقتها</button></div>`) : ''}
         </section>
       </div>
 
@@ -274,26 +364,25 @@
       <section class="es-card">
         <h2><span>📚 بوابة التسجيل الذاتي للمقررات الدراسية (Self-Enrollment)</span><span class="es-num">ميزة #5</span></h2>
         <p class="sub">تسجيل مباشر للمقررات مع التحقق الآلي من الساعات المعتمدة والمتطلبات السابقة وبراءة الذمة المالية.</p>
-        ${UA.S.me.role === 'student' ? `<form id="es-enroll-form" class="inline-form" style="margin-bottom:14px">
-          <label>المقرر المتاح للتسجيل<select id="es-enr-course" required>${(D.enrollableCourses || []).length ? (D.enrollableCourses || []).map((c) => `<option value="${esc(c.code)}">${esc(c.code)} — ${esc(c.name)} (${c.hours} س)</option>`).join('') : '<option value="">لا توجد مقررات متاحة</option>'}</select></label>
-          <button class="btn pri" type="submit">تسجيل المقرر في الفصل الحالي</button>
-        </form>` : '<p class="small">يسجّل الطالب مقرراته من حسابه.</p>'}
+        ${enrollFormHtml(D)}
         <div class="tbl-wrap">
           <table>
-            <thead><tr><th>رمز المقرر</th><th>اسم المقرر</th><th>الساعات</th><th>المتطلب السابق</th><th>الفصل الدراسي</th><th>الحالة</th></tr></thead>
+            <thead><tr><th>رمز المقرر</th><th>اسم المقرر</th><th>الساعات</th><th>الشعبة</th><th>الفصل الدراسي</th><th>الحالة</th><th>إجراء</th></tr></thead>
             <tbody>
               ${enrolls.map((e) => `<tr>
                 <td class="mono"><b>${esc(e.course_code)}</b></td>
                 <td>${esc(e.course_name)}</td>
                 <td>${e.credits}</td>
-                <td class="mono">${esc(e.prerequisite_code || '—')}</td>
+                <td>${esc(sectionNameOf(D, e.section_id))}</td>
                 <td>${esc(e.semester)}</td>
-                <td><span class="pill p-approved">${esc(e.status)}</span></td>
+                <td><span class="pill ${e.dropped_at ? 'p-rejected' : 'p-approved'}">${esc(e.status)}</span></td>
+                <td>${canDrop(D, e) ? `<button class="btn sm" type="button" data-act="esdrop" data-id="${e.id}">حذف المقرر</button>` : '—'}</td>
               </tr>`).join('')}
             </tbody>
           </table>
         </div>
       </section>
+      ${sectionsAdminHtml(D)}
     `;
   }
 
@@ -634,6 +723,31 @@
 
   /* ---------- ربط الأحداث والنماذج ---------- */
   Object.assign(UA.actions, {
+    esdrop: async (_el, d) => {
+      if (!confirm('حذف هذا المقرر من تسجيل الفصل الحالي؟')) return;
+      await api('POST', `/api/enterprise/self-enroll/${d.id}/drop`, {});
+      await UA.loaders.enterprise();
+      render();
+      toast('✓ حُذف المقرر');
+    },
+    essecsave: async (_el, d) => {
+      await api('PUT', `/api/enterprise/sections/${d.id}`, { capacity: Number(document.getElementById(`es-cap-${d.id}`).value) });
+      await UA.loaders.enterprise();
+      render();
+      toast('✓ حُفظت السعة');
+    },
+    essectoggle: async (_el, d) => {
+      await api('PUT', `/api/enterprise/sections/${d.id}`, { active: d.on === '1' });
+      await UA.loaders.enterprise();
+      render();
+    },
+    escardlost: async (_el, d) => {
+      if (!confirm('ستتوقف البطاقة فوراً عند البوابات والقاعات، ولا يرفع الإيقاف إلا مكتب الوثائق. متابعة؟')) return;
+      await api('POST', `/api/students/${S.me.id}/card/block`, { reason: d.r });
+      await UA.loaders.enterprise();
+      render();
+      toast('✓ أُوقفت البطاقة');
+    },
     estab: async (_el, d) => {
       E.tab = d.t;
       render();
@@ -709,10 +823,18 @@
       render();
     },
     'es-enroll-form': async () => {
-      await api('POST', '/api/enterprise/self-enroll', { course_code: document.getElementById('es-enr-course').value });
+      const [course_code, section_id] = document.getElementById('es-enr-course').value.split('|');
+      await api('POST', '/api/enterprise/self-enroll', { course_code, ...(section_id ? { section_id: Number(section_id) } : {}) });
       await UA.loaders.enterprise();
       render();
-      toast(`✓ تم تسجيل مقرر ${course_name} (${course_code}) بنجاح`);
+      toast(`✓ تم تسجيل المقرر ${course_code}`);
+    },
+    'es-section-form': async () => {
+      const v = (id) => document.getElementById(id).value;
+      await api('POST', '/api/enterprise/sections', { courseCode: v('es-sec-course'), name: v('es-sec-name'), capacity: Number(v('es-sec-cap')), instructor: v('es-sec-ins'), hall: v('es-sec-hall') });
+      await UA.loaders.enterprise();
+      render();
+      toast('✓ أُضيفت الشعبة');
     },
     'es-payslip-form': async () => {
       const r = await api('POST', '/api/enterprise/payslips/issue', {

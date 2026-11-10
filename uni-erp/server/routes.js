@@ -1,6 +1,7 @@
 import { registerHousingRoutes } from './services/housing.js';
 import { IDEMPOTENT_ROUTES, withIdempotency } from './services/idempotency.js';
 import { withLock } from './services/numbering.js';
+import { activeCardBlock, blockCard, unblockCard } from './services/card_blocks.js';
 import { startSetup, confirmSetup, disableMfa, resetUserMfa } from './services/mfa.js';
 import { stageFiles, removeStaged } from './services/staging.js';
 
@@ -15,7 +16,8 @@ function readPgStatements(db) {
 // عمليات «افحص ثم اكتب» على السجل نفسه: تُسلسل عبر كل عمليات الخادم
 const byId = (name) => (c) => `${name}:${c.params.id}`;
 const ROUTE_LOCKS = {
-  'POST /api/enterprise/self-enroll': (c) => `enroll:${c.user?.id}`,
+  'POST /api/enterprise/self-enroll': (c) => (c.body?.section_id ? `section:${Number(c.body.section_id)}` : `enroll:${c.user?.id}`),
+  'POST /api/enterprise/self-enroll/:id/drop': byId('enrollment'),
   'POST /api/requests/:id/approve': byId('request'), 'POST /api/requests/:id/reject': byId('request'), 'POST /api/requests/:id/forward': byId('request'),
   'POST /api/lms/quizzes/:id/start': (c) => `quiz:${c.params.id}:${c.user?.id}`, 'POST /api/lms/quizzes/:id/submit': (c) => `quiz:${c.params.id}:${c.user?.id}`,
   'POST /api/housing/allocations': () => 'housing', 'POST /api/housing/handouts': () => 'housing',
@@ -24,6 +26,8 @@ const ROUTE_LOCKS = {
   'POST /api/finance/student-invoices/:id/pay': () => 'billing', 'POST /api/finance/payments': () => 'billing', 'POST /api/finance/charges/:id/void': () => 'billing', 'POST /api/finance/payments/:id/void': () => 'billing', 'POST /api/finance/discounts': () => 'billing',
   'POST /api/finance/journal/:id/post': byId('entry'), 'POST /api/finance/journal/:id/reverse': byId('entry'), 'POST /api/finance/payroll-entry': () => 'payroll',
   'POST /api/enterprise/installments/:id/pay': byId('installment'),
+  'POST /api/finance/budgets/transfer': () => 'budget', 'POST /api/procurement/orders/:id/order': () => 'budget',
+  'POST /api/finance/invoices/:id/match': () => 'billing', 'POST /api/finance/invoices/:id/override': () => 'billing',
   'POST /api/lms/loans': () => 'library', 'POST /api/lms/loans/:id/return': () => 'library',
   'POST /api/expansions/appeals/:id/decide': byId('appeal'),
   'POST /api/attendance/scan': (c) => `hall:${c.body?.code ?? c.body?.studentNo ?? ''}`,
@@ -271,11 +275,13 @@ export async function buildRouter(deps) {
     const limit = Number(c.query.limit) || 100;
     try {
       const rows = db.prepare('SELECT * FROM sa_card_activity_logs WHERE student_id = ? ORDER BY created_at DESC LIMIT ?').all(sid, limit);
-      c.json(200, { logs: rows, count: rows.length });
+      c.json(200, { logs: rows, count: rows.length, block: activeCardBlock(db, sid) });
     } catch {
-      c.json(200, { logs: [], count: 0 });
+      c.json(200, { logs: [], count: 0, block: null });
     }
   });
+  r.add('POST', '/api/students/:id/card/block', (c) => { if (!c.user) throw new HttpError(401, 'سجّل الدخول أولاً.', 'unauthorized'); c.json(200, blockCard(deps, c.user, c.params.id, c.body, c.ip)); });
+  r.add('POST', '/api/students/:id/card/unblock', (c) => { need(c, 'student:update'); c.json(200, unblockCard(deps, c.user, c.params.id, c.body, c.ip)); });
   r.add('POST', '/api/students/:id/card-activity', (c) => {
     if (!c.user.can('attendance:manage') && !c.user.can('student:update')) throw new HttpError(403, 'لا تملك صلاحية هذا الإجراء.', 'forbidden');
     const sid = Number(c.params.id);
@@ -287,8 +293,10 @@ export async function buildRouter(deps) {
     const locCode = String(b.locationCode ?? '').trim().slice(0, 40);
     if (!eventType || !locName || !locCode) throw new HttpError(400, 'نوع الحركة والموقع مطلوبان.', 'validation');
     const terminalId = String(b.terminalId ?? '').trim().slice(0, 40) || 'MANUAL';
-    const status = b.status === 'denied' ? 'denied' : 'granted';
-    const reason = b.reason || (status === 'granted' ? 'تصريح دخول نظامي ساري المفعول' : 'محاولة دخول غير مصرحة');
+    // البطاقة الموقوفة تُرفض مهما أرسل الجهاز، ويبقى أثر المحاولة في السجل
+    const blocked = activeCardBlock(db, sid);
+    const status = blocked || b.status === 'denied' ? 'denied' : 'granted';
+    const reason = blocked ? `بطاقة موقوفة: ${blocked.reasonLabel}` : (b.reason || (status === 'granted' ? 'تصريح دخول نظامي ساري المفعول' : 'محاولة دخول غير مصرحة'));
     const now = Date.now();
     // بصمة للسجل نفسه، وليست توقيعاً من البطاقة ولا قيمة يرسلها العميل
     const pkiHash = 'sha256:' + crypto.createHash('sha256').update(`${sid}|${eventType}|${locCode}|${method}|${terminalId}|${status}|${now}`).digest('hex').slice(0, 32);

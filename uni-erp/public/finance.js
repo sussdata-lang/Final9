@@ -70,6 +70,7 @@
     ['coa', '🌳 شجرة الحسابات ومراكز التكلفة'],
     ['journal', '⚖️ قيود اليومية المزدوجة'],
     ['treasury', '🏦 الخزينة والسندات والذمم'],
+    ['budget', '🎯 الموازنة والرقابة على الصرف'],
     ['reports', '📈 القوائم والتقارير المالية الختامية'],
     ['student_fees', '🎓 محاسبة الرسوم والأقساط الطلابية'],
     ['payroll_fin', '💼 التكامل المالي للرواتب']
@@ -103,6 +104,9 @@
         api('GET', '/api/finance/accounts')
       ]);
       F.vouchers = v.vouchers; F.invoices = inv.invoices; F.invoiceDefaults = inv.defaults; F.parties = p.parties; F.accounts = a.accounts;
+    } else if (t === 'budget') {
+      const [bg, a, c] = await Promise.all([api('GET', '/api/finance/budgets' + (F.budgetYear ? `?yearId=${F.budgetYear}` : '')), api('GET', '/api/finance/accounts'), api('GET', '/api/finance/cost-centers')]);
+      F.budget = bg; F.accounts = a.accounts; F.centers = c.costCenters;
     } else if (t === 'reports') {
       const [tb, is, bs, cb, cc, a, p] = await Promise.all([
         api('GET', '/api/finance/reports/trial-balance'),
@@ -381,6 +385,59 @@
       </div>`;
   }
 
+  /* الموازنة: المخصص والمحجوز بأوامر التوريد والمصروف والمتاح لكل مركز كلفة وحساب */
+  function viewBudget() {
+    const d = F.budget || { budgets: [], years: [], totals: {}, transfers: [] }, t = d.totals || {};
+    const label = (id) => { const x = d.budgets.find((b) => b.id === id); return x ? `${x.costCenter} / ${x.account}` : `#${id}`; };
+    const bar = (p) => `<div style="height:6px;background:#E6ECE8;border-radius:4px;min-width:80px"><div style="height:6px;border-radius:4px;width:${Math.min(100, Math.max(0, p))}%;background:${p > 100 ? '#B3261E' : p > 85 ? '#C9A24B' : '#0A5A4D'}"></div></div><small>${p}%</small>`;
+    return `
+      <div class="card" style="margin-bottom:14px;padding:12px 16px">
+        <div class="spread" style="flex-wrap:wrap;gap:10px">
+          <label style="display:flex;gap:8px;align-items:center">السنة المالية<select id="fbg-year" data-no-other="1">${d.years.map((y) => `<option value="${y.id}"${Number(y.id) === Number(d.yearId) ? ' selected' : ''}>${esc(y.name)}${y.status === 'open' ? '' : ' (مغلقة)'}</option>`).join('')}</select>
+            <button class="btn sm" data-act="fin-bg-year">عرض</button></label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            ${can('finance:setup') ? `<button class="btn pri sm" data-act="fin-new-bg">+ بند موازنة</button><button class="btn sm" data-act="fin-bg-transfer">مناقلة بين البنود</button>` : ''}
+          </div>
+        </div>
+      </div>
+      <div class="kpi-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px">
+        ${[['المخصص المعتمد', t.allotted], ['المحجوز بأوامر التوريد', t.reserved], ['المصروف', t.spent], ['المتاح', t.available]].map(([l, v]) => `<div class="card" style="margin:0;padding:12px"><small>${l}</small><div style="font-size:20px;font-weight:800;color:${l === 'المتاح' && v < 0 ? '#B3261E' : '#054239'}">${money(v)}</div></div>`).join('')}
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">بنود الموازنة</h3>
+        <p class="hint">المحجوز: أوامر توريد مرسلة لم تُفوتر بعد. المصروف: فواتير أوامر التوريد والقيود المرحّلة مباشرة على الحساب ومركز الكلفة. تُعدَّل البنود المعتمدة بالمناقلة فقط.</p>
+        <div class="tbl-wrap"><table class="tbl"><thead><tr><th>مركز الكلفة</th><th>الحساب</th><th>المخصص</th><th>المحجوز</th><th>المصروف</th><th>المتاح</th><th>الاستهلاك</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody>
+          ${d.budgets.map((b) => `<tr>
+            <td><b>${esc(b.costCenter)}</b></td><td>${esc(b.account)}</td>
+            <td>${money(b.allotted)}${b.transfersIn || b.transfersOut ? `<div class="small">أصلي ${money(b.amount)}</div>` : ''}</td>
+            <td>${money(b.reserved)}</td><td>${money(b.spent)}</td>
+            <td style="color:${b.available < 0 ? '#B3261E' : '#1B7F4B'}"><b>${money(b.available)}</b></td>
+            <td>${bar(b.usedPercent)}</td>
+            <td><span class="badge ${b.status === 'approved' ? 'b-ok' : 'b-mut'}">${b.status === 'approved' ? 'معتمد' : 'مسودة'}</span></td>
+            <td>${b.status === 'draft' && can('finance:post') ? `<button class="btn pri sm" data-act="fin-bg-approve" data-id="${b.id}">اعتماد</button>` : '—'}</td>
+          </tr>`).join('') || '<tr><td colspan="9" class="empty">لا توجد بنود موازنة لهذه السنة</td></tr>'}
+        </tbody></table></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">سجل المناقلات</h3>
+        <div class="tbl-wrap"><table class="tbl"><thead><tr><th>التاريخ</th><th>من بند</th><th>إلى بند</th><th>المبلغ</th><th>السبب</th><th>بواسطة</th></tr></thead><tbody>
+          ${d.transfers.map((x) => `<tr><td>${new Date(x.at).toISOString().slice(0, 10)}</td><td>${esc(label(x.fromId))}</td><td>${esc(label(x.toId))}</td><td><b>${money(x.amount)}</b></td><td>${esc(x.reason)}</td><td>${esc(x.by || '—')}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">لا توجد مناقلات</td></tr>'}
+        </tbody></table></div>
+      </div>`;
+  }
+  const MATCH_ST = { matched: ['مطابقة', 'b-ok'], held: ['موقوفة للمطابقة', 'b-err'], override: ['معتمدة رغم الفرق', 'b-warn'] };
+  function poInvoiceLines() {
+    const o = (F.poOrders || []).find((x) => String(x.id) === String(document.getElementById('fpo-order')?.value));
+    if (!o) return '<p class="hint">لا توجد أوامر توريد مرسلة.</p>';
+    return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>البند</th><th>المطلوب</th><th>المستلم</th><th>المفوتر سابقاً</th><th>كمية الفاتورة</th><th>سعر الوحدة</th></tr></thead><tbody>
+      ${o.lines.map((l) => { const left = Math.max(0, (l.received === null ? l.qty : l.received) - l.invoiced); return `<tr class="fpo-line" data-id="${l.id}">
+        <td>${esc(l.description)}${l.received === null ? '<div class="small">خدمة دون استلام مخزني</div>' : ''}</td><td>${l.qty}</td><td>${l.received === null ? '—' : l.received}</td><td>${l.invoiced}</td>
+        <td><input class="fpo-qty" type="number" min="0" value="${left}" style="width:90px" aria-label="كمية الفاتورة"></td>
+        <td><input class="fpo-price" type="number" min="0" step="0.01" value="${l.unitCost}" style="width:120px" aria-label="سعر الوحدة"></td></tr>`; }).join('')}
+    </tbody></table></div>`;
+  }
+  document.addEventListener('change', (e) => { if (e.target.id === 'fpo-order') { const box = document.getElementById('fpo-lines'); if (box) box.innerHTML = poInvoiceLines(); } });
+
   function viewTreasury() {
     const s = F.treasurySub || 'vouchers';
     return `
@@ -396,6 +453,7 @@
               <button class="btn pri sm" data-act="fin-new-vch" data-kind="receipt">+ سند قبض</button>
               <button class="btn sm" data-act="fin-new-vch" data-kind="payment">+ سند صرف</button>
               <button class="btn sm" data-act="fin-new-inv">+ فاتورة ذمم</button>
+              <button class="btn sm" data-act="fin-new-poinv">+ فاتورة مورّد على أمر توريد</button>
             ` : ''}
             ${can('finance:setup') ? `<button class="btn sm" data-act="fin-new-party">+ تعريف طرف مالي</button>` : ''}
           </div>
@@ -431,10 +489,12 @@
               <td><b>${money(i.total)}</b></td>
               <td>${money(i.paidAmount)}</td>
               <td style="color:${i.total - i.paidAmount > 0 ? '#B3261E' : '#1B7F4B'}"><b>${money(i.total - i.paidAmount)}</b></td>
-              <td>${badge(INV_ST, i.status)}</td>
+              <td>${badge(INV_ST, i.status)}${i.matchStatus ? ` ${badge(MATCH_ST, i.matchStatus)}` : ''}${i.orderNo ? `<div class="small">أمر التوريد ${esc(i.orderNo)}</div>` : ''}${i.matchStatus === 'held' ? `<div class="small" style="color:#B3261E">${esc(i.matchNote)}</div>` : ''}</td>
               <td>
                 ${UA.rowPrintBtn(i.kind === 'sale' ? 'فاتورة مبيعات' : 'فاتورة مشتريات', 'المالية والمحاسبة', 'المحاسب|المدير المالي|الطرف المستلم')}
-                ${i.status === 'draft' && can('finance:entry') ? `<button class="btn pri sm" data-act="fin-iss-inv" data-id="${i.id}">إصدار وترحيل</button>` : ''}
+                ${i.status === 'draft' && i.matchStatus !== 'held' && can('finance:entry') ? `<button class="btn pri sm" data-act="fin-iss-inv" data-id="${i.id}">إصدار وترحيل</button>` : ''}
+                ${i.status === 'draft' && i.matchStatus === 'held' && can('finance:entry') ? `<button class="btn sm" data-act="fin-inv-match" data-id="${i.id}">إعادة المطابقة</button>` : ''}
+                ${i.status === 'draft' && i.matchStatus === 'held' && can('finance:post') ? `<button class="btn sm" data-act="fin-inv-ovr" data-id="${i.id}">اعتماد رغم الفرق</button>` : ''}
                 ${['issued', 'partial'].includes(i.status) && can('finance:entry') ? `<button class="btn pri sm" data-act="fin-pay-inv" data-id="${i.id}">تسجيل دفعة</button>` : ''}
                 ${['draft', 'issued'].includes(i.status) && i.paidAmount === 0 && can('finance:entry') ? `<button class="btn dan sm" data-act="fin-can-inv" data-id="${i.id}">إلغاء</button>` : ''}
               </td>
@@ -751,6 +811,7 @@
     if (F.tab === 'coa') return viewCoa() + currenciesCard();
     if (F.tab === 'journal') return viewJournal();
     if (F.tab === 'treasury') return viewTreasury();
+    if (F.tab === 'budget') return viewBudget();
     if (F.tab === 'reports') return viewReports();
     if (F.tab === 'student_fees') return viewStudentFees();
     if (F.tab === 'payroll_fin') return viewPayrollFin();
@@ -1054,6 +1115,72 @@
           cashAccountId: Number(document.getElementById('fp-cash').value) || null
         });
         toast('سُجلت الدفعة ورُحّل قيدها'); closeModal(); await refresh();
+      }
+      else if (act === 'fin-bg-year') { F.budgetYear = Number(document.getElementById('fbg-year').value) || null; await refresh(); }
+      else if (act === 'fin-new-bg') {
+        const years = (F.budget?.years || []).filter((y) => y.status === 'open');
+        showModal(`<h3>🎯 بند موازنة جديد</h3>
+          <div class="form-grid">
+            <label>السنة المالية<select id="fbg-y" data-no-other="1">${years.map((y) => `<option value="${y.id}"${Number(y.id) === Number(F.budget.yearId) ? ' selected' : ''}>${esc(y.name)}</option>`).join('')}</select></label>
+            <label>مركز الكلفة<select id="fbg-cc" data-no-other="1">${(F.centers || []).filter((c) => c.active).map((c) => `<option value="${c.id}">${esc(c.code)} · ${esc(c.name)}</option>`).join('')}</select></label>
+            <label>الحساب<select id="fbg-acc" data-no-other="1">${F.accounts.filter((a) => a.active && a.postable && a.type === 'expense').map((a) => `<option value="${a.id}">${esc(a.code)} · ${esc(a.name)}</option>`).join('')}</select></label>
+            <label>المبلغ المخصص (ل.س)<input id="fbg-amt" type="number" min="0" step="0.01"></label>
+            <label style="grid-column:1/-1">ملاحظة<input id="fbg-note" maxlength="300"></label>
+          </div>
+          ${(F.centers || []).length ? '' : '<p class="hint">عرّف مراكز الكلفة أولاً من تبويب شجرة الحسابات.</p>'}
+          <p class="hint">يحفظ البند مسودة، ويعتمده مستخدم آخر يملك صلاحية الترحيل.</p>
+          <div class="row-end"><button class="btn" data-act="fin-close-modal">إلغاء</button><button class="btn pri" data-act="fin-save-bg">حفظ البند</button></div>`);
+      }
+      else if (act === 'fin-save-bg') {
+        const v = (id) => document.getElementById(id).value;
+        await api('POST', '/api/finance/budgets', { yearId: Number(v('fbg-y')), costCenterId: Number(v('fbg-cc')), accountId: Number(v('fbg-acc')), amount: Number(v('fbg-amt')), note: v('fbg-note') });
+        toast('حُفظ بند الموازنة'); closeModal(); await refresh();
+      }
+      else if (act === 'fin-bg-approve') { await api('POST', `/api/finance/budgets/${b.dataset.id}/approve`, {}); toast('اعتُمد بند الموازنة'); await refresh(); }
+      else if (act === 'fin-bg-transfer') {
+        const ok = (F.budget?.budgets || []).filter((x) => x.status === 'approved');
+        const opts = ok.map((x) => `<option value="${x.id}">${esc(x.costCenter)} / ${esc(x.account)} — المتاح ${money(x.available)}</option>`).join('');
+        showModal(`<h3>مناقلة بين بنود الموازنة</h3>
+          <div class="form-grid">
+            <label>من بند<select id="fbt-from" data-no-other="1">${opts}</select></label>
+            <label>إلى بند<select id="fbt-to" data-no-other="1">${opts}</select></label>
+            <label>المبلغ (ل.س)<input id="fbt-amt" type="number" min="0" step="0.01"></label>
+            <label style="grid-column:1/-1">سبب المناقلة<input id="fbt-reason" maxlength="300"></label>
+          </div>
+          <div class="row-end"><button class="btn" data-act="fin-close-modal">إلغاء</button><button class="btn pri" data-act="fin-save-bt">تنفيذ المناقلة</button></div>`);
+      }
+      else if (act === 'fin-save-bt') {
+        const v = (id) => document.getElementById(id).value;
+        await api('POST', '/api/finance/budgets/transfer', { fromId: Number(v('fbt-from')), toId: Number(v('fbt-to')), amount: Number(v('fbt-amt')), reason: v('fbt-reason') });
+        toast('نُفذت المناقلة'); closeModal(); await refresh();
+      }
+      else if (act === 'fin-new-poinv') {
+        F.poOrders = (await api('GET', '/api/finance/purchase-orders')).orders;
+        showModal(`<h3>فاتورة مورّد على أمر توريد</h3>
+          <p class="hint">تُقارن كل كمية بما استُلم فعلاً، وكل سعر بسعر أمر التوريد. الفاتورة المطابقة تصدر مباشرة، وغير المطابقة تبقى موقوفة حتى يكتمل الاستلام أو يعتمدها مختص.</p>
+          <div class="form-grid">
+            <label>أمر التوريد<select id="fpo-order" data-no-other="1">${F.poOrders.map((o) => `<option value="${o.id}">${esc(o.no)} · ${esc(o.supplier)}</option>`).join('')}</select></label>
+            <label>رقم فاتورة المورّد<input id="fpo-ref" maxlength="60"></label>
+            <label>تاريخ الفاتورة<input id="fpo-day" type="date" value="${new Date().toISOString().slice(0, 10)}"></label>
+          </div>
+          <div id="fpo-lines"></div>
+          <div class="row-end" style="margin-top:12px"><button class="btn" data-act="fin-close-modal">إلغاء</button><button class="btn pri" data-act="fin-save-poinv">تسجيل الفاتورة ومطابقتها</button></div>`);
+        document.getElementById('fpo-lines').innerHTML = poInvoiceLines();
+      }
+      else if (act === 'fin-save-poinv') {
+        const lines = [...document.querySelectorAll('#fpo-lines .fpo-line')].map((r) => ({ orderLineId: Number(r.dataset.id), qty: Number(r.querySelector('.fpo-qty').value), unitPrice: Number(r.querySelector('.fpo-price').value) })).filter((l) => l.qty > 0);
+        const r = await api('POST', '/api/finance/invoices', { kind: 'purchase', orderId: Number(document.getElementById('fpo-order').value), supplierRef: document.getElementById('fpo-ref').value, issueDay: document.getElementById('fpo-day').value, lines });
+        toast(r.invoice.matchStatus === 'held' ? `سُجلت الفاتورة موقوفة: ${r.invoice.matchNote}` : 'سُجلت الفاتورة مطابقة وصدرت'); closeModal(); F.treasurySub = 'invoices'; await refresh();
+      }
+      else if (act === 'fin-inv-match') {
+        const r = await api('POST', `/api/finance/invoices/${b.dataset.id}/match`, {});
+        toast(r.invoice.matchStatus === 'held' ? 'ما زالت الفاتورة غير مطابقة' : 'طابقت الفاتورة وصدرت'); await refresh();
+      }
+      else if (act === 'fin-inv-ovr') {
+        const reason = prompt('سبب اعتماد الفاتورة رغم عدم المطابقة:');
+        if (!reason) return;
+        await api('POST', `/api/finance/invoices/${b.dataset.id}/override`, { reason });
+        toast('اعتُمدت الفاتورة وصدرت'); await refresh();
       }
       else if (act === 'fin-iss-inv') { await api('POST', `/api/finance/invoices/${b.dataset.id}/issue`, {}); toast('أُصدرت الفاتورة'); await refresh(); }
       else if (act === 'fin-can-inv') { await api('POST', `/api/finance/invoices/${b.dataset.id}/cancel`, {}); toast('أُلغيت الفاتورة'); await refresh(); }

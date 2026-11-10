@@ -1,5 +1,6 @@
 // سجل دخول وخروج الطلاب من القاعات (حضور مادة أو فحص): يُسجَّل بمسح باركود الرقم الجامعي (Code 128).
 // المسح الأول يسجّل الدخول، والمسح التالي لنفس المادة والقاعة يسجّل الخروج. الطالب لا يكون داخل قاعتين في آن واحد.
+import { assertCardUsable } from './card_blocks.js';
 import { isGroupMember } from './student_groups.js';
 import { tx } from '../db.js';
 import { audit } from '../audit.js';
@@ -73,7 +74,9 @@ function verifyStudentCourseEnrollment(db, st, courseId, subjectText) {
 
 // مسح باركود: يسجّل دخولاً أو خروجاً تلقائياً (action: auto | in | out)
 export function scan({ db }, actor, b, ip) {
-  const st = findStudent(db, b.code), s = subjectOf(db, b), hall = text(b.hall, 'القاعة', { max: 60 }), act = ['auto', 'in', 'out'].includes(b.action) ? b.action : 'auto', now = Date.now();
+  const st = findStudent(db, b.code);
+  assertCardUsable(db, st.id);
+  const s = subjectOf(db, b), hall = text(b.hall, 'القاعة', { max: 60 }), act = ['auto', 'in', 'out'].includes(b.action) ? b.action : 'auto', now = Date.now();
   verifyStudentCourseEnrollment(db, st, s.course_id, s.subject);
   const warnings = [];
   if (st.status && st.status !== 'active') warnings.push(`حالة القيد: ${STATUS_LABEL[st.status] ?? st.status}`);

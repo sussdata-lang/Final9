@@ -16,6 +16,7 @@ import { ensureCoreAccounts, seedPassword, hasConfiguredSeedPassword } from './s
 import { ensureStructure, STRUCTURE, FACULTY_ROLE } from './services/structure.js';
 import { startAssignmentScheduler } from './services/lms_assignment_notify.js';
 import { expireDisciplinaryHolds } from './services/student_affairs_suite.js';
+import { escalateOverdueRequests } from './services/escalation.js';
 import { ensureForms } from './services/forms/index.js';
 import { ready as financeReady } from './services/finance/core.js';
 import { hashPassword } from './security.js';
@@ -117,7 +118,10 @@ export async function createApp(overrides = {}) {
   const timer = setInterval(() => db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now()), 3600_000);
   timer.unref();
   // رفع حجب العقوبات التي بلغت تاريخ انتهائها: عند الإقلاع ثم كل ساعة
-  const expireHolds = () => { try { expireDisciplinaryHolds(db); } catch (e) { console.warn('disciplinary expiry:', e.message); } };
+  const expireHolds = () => {
+    try { expireDisciplinaryHolds(db); } catch (e) { console.warn('disciplinary expiry:', e.message); }
+    try { escalateOverdueRequests(db); } catch (e) { console.warn('request escalation:', e.message); }
+  };
   const holdsFirst = scheduler ? setTimeout(expireHolds, 5_000) : null, holdsTimer = scheduler ? setInterval(expireHolds, 3600_000) : null;
   holdsFirst?.unref(); holdsTimer?.unref();
   const stopBackups = scheduler ? startBackupScheduler({ db, cfg }) : () => {};

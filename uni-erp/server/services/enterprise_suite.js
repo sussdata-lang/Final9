@@ -11,6 +11,11 @@ import crypto from 'node:crypto';
 import { HttpError } from '../http.js';
 import { audit } from '../audit.js';
 import { passMarkFor, passSql } from './academics.js';
+import { getSetting } from './settings.js';
+import { STATUS_LABEL } from './students.js';
+import { overdueDues } from './finance/fees.js';
+import { currentTerm, registrationWindow, assertRegistrationOpen, listSections, activeSectionsOf, createSection, updateSection, dropEnrollment } from './sections.js';
+import { activeCardBlock } from './card_blocks.js';
 
 /**
  * دوال منطقية نقية وقابلة للاختبار المباشر (Pure Functions for Unit Testing)
@@ -50,7 +55,7 @@ function advisingPlanFor(db, userId) {
   if (!profile) return [];
   const pm = passMarkFor(db, userId);
   const marks = new Map(db.prepare("SELECT course_id, mark FROM grades WHERE student_id = ? AND workflow_status = 'approved' ORDER BY academic_year, id").all(userId).map((g) => [g.course_id, Number(g.mark)]));
-  const enrolled = new Set(db.prepare('SELECT e.course_code FROM student_self_enrollments e JOIN users u ON u.student_no = e.student_no WHERE u.id = ?').all(userId).map((e) => e.course_code));
+  const enrolled = new Set(db.prepare('SELECT e.course_code FROM student_self_enrollments e JOIN users u ON u.student_no = e.student_no WHERE u.id = ? AND e.semester = ? AND e.dropped_at IS NULL').all(userId, currentTerm(db)).map((e) => e.course_code));
   const prereqs = new Map();
   for (const p of db.prepare('SELECT p.course_id, c.code FROM sa_course_prerequisites p JOIN courses c ON c.id = p.prereq_course_id').all()) prereqs.set(p.course_id, [...(prereqs.get(p.course_id) ?? []), p.code]);
   return db.prepare('SELECT id, code, name, hours, level FROM courses WHERE program_id = ? AND active = 1 ORDER BY level, semester, id').all(profile.program_id).map((c) => {
@@ -128,6 +133,9 @@ export function enterpriseOverviewFor(db, user) {
   return {
     ...ov,
     advisingPlan: user.role === 'student' ? advisingPlanFor(db, user.id) : [],
+    registration: registrationWindow(db),
+    courseSections: listSections(db, { activeOnly: user.role === 'student' }),
+    cardBlock: user.role === 'student' ? activeCardBlock(db, user.id) : null,
     enrollableCourses: user.role === 'student'
       ? db.prepare('SELECT c.code, c.name, c.hours FROM courses c JOIN student_profiles sp ON sp.program_id = c.program_id WHERE sp.user_id = ? AND c.active = 1 AND c.code IS NOT NULL ORDER BY c.level, c.semester, c.name').all(user.id)
       : db.prepare('SELECT code, name, hours FROM courses WHERE active = 1 AND code IS NOT NULL ORDER BY name LIMIT 500').all(),
@@ -178,8 +186,14 @@ export function registerEnterpriseSuiteRoutes(r, deps) {
       LIMIT 1
     `).get(studentNo, studentNo);
     const studentId = stuUser?.id || (c.user?.role === 'student' ? c.user.id : null);
-    if (stuUser?.status && ['withdrawn', 'suspended', 'dismissed'].includes(stuUser.status)) {
-      throw new HttpError(403, `لا يمكن تسجيل المقررات لأن حالة قيد الطالب الحالية (${stuUser.status}).`, 'student_inactive');
+    if (stuUser?.status && stuUser.status !== 'active') {
+      throw new HttpError(403, `لا يمكن تسجيل المقررات لأن حالة قيد الطالب الحالية: ${STATUS_LABEL[stuUser.status] ?? stuUser.status}.`, 'student_inactive');
+    }
+    if (self) assertRegistrationOpen(db);
+    if (stuUser?.id) db.prepare('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))').get(`enroll:${stuUser.id}`);
+    if (studentId && getSetting(db, 'academic.registration_requires_clearance')) {
+      const due = overdueDues(db, { id: studentId, student_no: studentNo }) / 100;
+      if (due > Number(getSetting(db, 'academic.registration_max_due'))) throw new HttpError(409, `يُفتح التسجيل بعد سداد المستحقات التي حان موعدها: ${due.toLocaleString('en-US')} ل.س.`, 'financial_dues');
     }
     if (studentId) {
       const activeHold = db.prepare('SELECT hold_type, note FROM student_holds WHERE student_id = ? AND cleared_at IS NULL AND (active IS NULL OR active = 1) LIMIT 1').get(studentId);
@@ -192,11 +206,27 @@ export function registerEnterpriseSuiteRoutes(r, deps) {
     const course = db.prepare('SELECT code, name, hours FROM courses WHERE code = ? AND active = 1 ORDER BY id LIMIT 1').get(String(b.course_code));
     if (!course) throw new HttpError(404, 'المقرر غير موجود أو غير مفعل.', 'not_found');
 
-    const dup = db.prepare('SELECT id FROM student_self_enrollments WHERE student_no = ? AND course_code = ?').get(studentNo, course.code);
+    // منع التكرار وحد الساعات يخصان الفصل الحالي؛ الفصول السابقة سجل تاريخي
+    const term = currentTerm(db);
+    const dup = db.prepare('SELECT id FROM student_self_enrollments WHERE student_no = ? AND course_code = ? AND semester = ? AND dropped_at IS NULL').get(studentNo, course.code, term);
     if (dup) throw new HttpError(409, 'أنت مسجل مسبقاً في هذا المقرر لهذا الفصل.');
+    if (studentId) {
+      const best = db.prepare("SELECT MAX(g.mark) AS m FROM grades g JOIN courses c ON c.id = g.course_id WHERE g.student_id = ? AND c.code = ? AND g.workflow_status = 'approved'").get(studentId, course.code)?.m;
+      if (best !== null && best !== undefined && Number(best) >= passMarkFor(db, studentId)) throw new HttpError(409, 'نجحت في هذا المقرر سابقاً، فلا يُعاد تسجيله.', 'already_passed');
+    }
+
+    // إذا فُتحت شعب للمقرر فالاختيار منها إلزامي ضمن السعة
+    const sections = activeSectionsOf(db, course.code);
+    let sectionId = null;
+    if (sections.length) {
+      const sec = sections.find((s) => s.id === Number(b.section_id));
+      if (!sec) throw new HttpError(400, 'اختر شعبة من شعب هذا المقرر.', 'section_required');
+      if (sec.seatsLeft <= 0) throw new HttpError(409, `الشعبة «${sec.name}» مكتملة.`, 'section_full');
+      sectionId = sec.id;
+    }
 
     const newCredits = Number(course.hours);
-    const currentCreditsRow = db.prepare('SELECT COALESCE(SUM(credits), 0) AS total FROM student_self_enrollments WHERE student_no = ?').get(studentNo);
+    const currentCreditsRow = db.prepare('SELECT COALESCE(SUM(credits), 0) AS total FROM student_self_enrollments WHERE student_no = ? AND semester = ? AND dropped_at IS NULL').get(studentNo, term);
     const currentCredits = Number(currentCreditsRow?.total || 0);
     if (currentCredits + newCredits > 18) {
       throw new HttpError(400, `لا يمكن تجاوز الحد الأقصى للعبء الفصلي المسموح (18 ساعة معتمدة). الساعات المسجلة حالياً: ${currentCredits}.`, 'credit_limit_exceeded');
@@ -215,11 +245,15 @@ export function registerEnterpriseSuiteRoutes(r, deps) {
     }
 
     db.prepare(`
-      INSERT INTO student_self_enrollments (student_no, student_name, course_code, course_name, credits, semester, prerequisite_code, status, registered_at)
-      VALUES (?, ?, ?, ?, ?, 'الفصل الأول ${academicYear()}', ?, 'مسجل ومعتمد آلياً', ?)
-    `).run(studentNo, studentName, course.code, course.name, newCredits, '', Date.now());
+      INSERT INTO student_self_enrollments (student_no, student_name, course_code, course_name, credits, semester, prerequisite_code, status, registered_at, section_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'مسجل ومعتمد آلياً', ?, ?)
+    `).run(studentNo, studentName, course.code, course.name, newCredits, term, '', Date.now(), sectionId);
     c.json(201, { ok: true });
   });
+
+  r.add('POST', '/api/enterprise/self-enroll/:id/drop', (c) => { if (!c.user) throw new HttpError(401, 'سجّل الدخول أولاً.', 'unauthorized'); c.json(200, dropEnrollment(deps, c.user, c.params.id, c.ip)); });
+  r.add('POST', '/api/enterprise/sections', (c) => { needAny(c, 'course:manage'); c.json(201, createSection(deps, c.user, c.body, c.ip)); });
+  r.add('PUT', '/api/enterprise/sections/:id', (c) => { needAny(c, 'course:manage'); c.json(200, updateSection(deps, c.user, c.params.id, c.body, c.ip)); });
 
   // 5. احتساب العبء التدريسي الإضافي وإصدار قسيمة راتب موقعة رقمياً (Faculty Overload & Signed Payslip)
   r.add('POST', '/api/enterprise/faculty-overload', (c) => {

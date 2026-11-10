@@ -108,6 +108,7 @@ function requestView(db, r, { withStudent = false, ctx = null } = {}) {
     attachment: att ? { id: att.id, name: att.name, size: att.size } : null, attachments: atts,
     document: doc ? { code: doc.code, issuedAt: doc.issued_at } : null,
     unit: cachedUnit ? { id: cachedUnit.id, name: cachedUnit.name } : null,
+    escalationLevel: Number(r.escalation_level ?? 0),
     events: ctx ? (ctx.events.get(Number(r.id)) ?? []).map((e) => ({ at: e.at, actor: e.actor, text: e.text })) : db.prepare('SELECT at, actor_label AS actor, text FROM request_events WHERE request_id = ? ORDER BY id').all(r.id),
   };
   if (withStudent) {

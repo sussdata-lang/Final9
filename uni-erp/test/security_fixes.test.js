@@ -152,6 +152,8 @@ test('مسارات الوحدات الموسعة وشؤون الطلاب وال�
     'PUT /api/lms/assignments/1/submission', 'POST /api/lms/assignments/1/submission/submit', 'POST /api/lms/assignments/1/submission/files', 'DELETE /api/lms/assignments/1/submission/files/1', 'POST /api/notifications/read',
     // التصحيح محميّ بملكية التكليف (404 لغير المالك)؛ يُختبر على حل حقيقي في lms_assignments_flow.test.js
     'POST /api/lms/assignments/submissions/1/grade', 'POST /api/lms/assignments/submissions/1/feedback-file',
+    // الطالب يحذف تسجيله هو ضمن فترة الحذف والإضافة، وتسجيل غيره 404؛ يُختبر في registration_links.test.js
+    'POST /api/enterprise/self-enroll/1/drop',
   ]);
   const open = [];
   for (const r of app.router.routes) {

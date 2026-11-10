@@ -24,7 +24,7 @@ function parseCommon(db, input) {
   const category = input?.category ? String(input.category).replace(/\s+/g, ' ').trim() : null;
   if (category && category.length > 60) throw bad('اسم الفئة حتى 60 حرفاً.');
   const instructions = String(input?.instructions ?? '').trim();
-  if (instructions.length > 1000) throw bad('التعليمات حتى 1000 حرف.');
+  if (instructions.length > 6000) throw bad('التعليمات حتى 6000 حرف.');
   const slots = input?.attachments ?? [];
   if (!Array.isArray(slots) || slots.length > 8) throw bad('المرفقات المطلوبة: حتى 8.');
   const attachments = slots.map((s) => {

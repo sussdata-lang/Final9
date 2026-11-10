@@ -46,10 +46,20 @@ export function listCharges({ db }, q = {}) {
   const where = w.length ? 'WHERE ' + w.join(' AND ') : '';
   return db.prepare(`SELECT c.*, ft.name ft_name, ft.kind ft_kind FROM fin_charges c JOIN fin_fee_types ft ON ft.id = c.fee_type_id ${where} ORDER BY c.due_day DESC, c.id DESC${limitSql(q)}`).all(...a).map(chView);
 }
+// ما حان موعد سداده ولم يُدفع (بالوحدة الصغرى)، ومنه الأقساط القديمة غير المرحَّلة إلى المالية
+export function overdueDues(db, student, day = today()) {
+  const charged = Number(db.prepare("SELECT COALESCE(SUM(CASE WHEN ft.kind = 'discount' THEN -c.amount ELSE c.amount END), 0) AS v FROM fin_charges c JOIN fin_fee_types ft ON ft.id = c.fee_type_id WHERE c.student_id = ? AND c.status = 'open' AND c.due_day <= ?").get(student.id, day).v);
+  const paid = Number(db.prepare("SELECT COALESCE(SUM(amount), 0) AS v FROM fin_payments WHERE student_id = ? AND status <> 'void'").get(student.id).v);
+  const legacy = student.student_no ? Number(db.prepare('SELECT COALESCE(SUM(amount - COALESCE(paid_amount, 0)), 0) AS v FROM student_fee_installments WHERE student_no = ? AND paid_at IS NULL AND fin_charge_id IS NULL AND SUBSTR(due_date, 1, 10) <= ?').get(student.student_no, day).v) : 0;
+  return Math.max(0, charged - paid) + Math.round(legacy * 100);
+}
+
 export function createCharge(deps, actor, input, ip) {
   const { db } = deps; ready(db);
   const stu = db.prepare("SELECT * FROM users WHERE id=? AND role='student'").get(Number(input?.studentId)); if (!stu) throw bad('الطالب غير موجود.', 404, 'not_found');
   const ft = db.prepare('SELECT * FROM fin_fee_types WHERE id=? AND active=1').get(Number(input?.feeTypeId)); if (!ft) throw bad('نوع الرسم غير موجود أو معطّل.', 404, 'not_found');
+  // المؤجل والموقوف قيده لا تصدر عليه رسوم جديدة حتى إعادة القيد؛ الخصومات والمنح تبقى ممكنة
+  if (ft.kind === 'fee' && db.prepare('SELECT status FROM student_profiles WHERE user_id = ?').get(stu.id)?.status === 'suspended') throw bad('قيد الطالب مؤجل أو موقوف، فلا تصدر عليه رسوم جديدة.', 409, 'student_suspended');
   const amt = toMinor(input?.amount ?? ft.default_amount);
   if (!Number.isFinite(amt) || amt <= 0) throw bad('مبلغ الاستحقاق غير صالح.');
   const due = String(input?.dueDay ?? today()); if (!isDay(due)) throw bad('تاريخ الاستحقاق غير صالح.');
@@ -108,6 +118,7 @@ export function createPayment(deps, actor, input, ip) {
   const day = String(input?.paidDay ?? today()); if (!isDay(day)) throw bad('تاريخ الدفع غير صالح.');
   const studAcc = sysAccount(db, 'students');
   const note = clean(input?.note ?? '', 200, 'ملاحظة', 0);
+  const overdueBefore = overdueDues(db, stu);
   return tx(db, () => {
     const rno = input?.receiptNo ? String(input.receiptNo) : nextReceiptNo(db);
     const pid = Number(db.prepare('INSERT INTO fin_payments (receipt_no,student_id,amount,method,account_id,paid_day,note,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?)').run(rno, stu.id, amt, method, cashAcc.id, day, note, actor.id, Date.now()).lastInsertRowid);
@@ -115,6 +126,8 @@ export function createPayment(deps, actor, input, ip) {
     const entry = createEntry(deps, actor, { day, description: desc, lines: [{ accountId: cashAcc.id, debit: fromMinor(amt) }, { accountId: studAcc.id, credit: fromMinor(amt), studentId: stu.id }], post: true }, ip, { type: 'RV', source: `payment:${pid}`, post: true, system: true });
     db.prepare("UPDATE fin_payments SET entry_id=?, status='ok' WHERE id=?").run(entry.id, pid);
     audit(db, actor, 'استلام دفعة', `${rno} ${stu.display_name}`, ip);
+    // سداد آخر ما حان موعده يفتح التسجيل، فيُبلَّغ الطالب بذلك
+    if (overdueBefore > 0 && overdueDues(db, stu) === 0) db.prepare("INSERT INTO user_notifications (user_id, kind, ref_id, text, url, at) VALUES (?, 'registration_open', ?, 'سُددت مستحقاتك، ويمكنك التسجيل في المقررات.', '', ?) ON CONFLICT DO NOTHING").run(stu.id, pid, Date.now());
     return { payment: pyView(db.prepare(`SELECT p.*, u.display_name student_name FROM fin_payments p JOIN users u ON u.id=p.student_id WHERE p.id=?`).get(pid)), receiptNo: rno };
   });
 }
