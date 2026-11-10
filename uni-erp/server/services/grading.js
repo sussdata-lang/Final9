@@ -6,6 +6,8 @@ import { tx } from '../db.js';
 import { getSetting } from './settings.js';
 import { needJustification } from './workflow.js';
 import { academicYear } from '../lib/doc_no.js';
+import { writeXlsx } from '../lib/xlsx.js';
+import { sendRaw } from '../http.js';
 
 export const COMPONENT_KINDS = { theory: 'نظري', practical: 'عملي' };
 const bad = (msg, status = 400, code = 'validation') => new HttpError(status, msg, code);
@@ -48,6 +50,7 @@ export function saveComponents({ db }, actor, courseId, b, ip) {
 export function componentMarks(db, courseId, input) {
   const comps = courseComponents(db, courseId);
   if (!comps.length) return null;
+  if (input === undefined || input === null || typeof input !== 'object') throw bad(`علامة هذا المقرر من مكوناته، فأدخل علامة كل مكوّن: ${comps.map((c) => `${c.name} (من ${c.max})`).join('، ')}.`, 400, 'components_required');
   const marks = comps.map((c) => {
     const raw = input?.[c.id] ?? input?.[String(c.id)];
     const v = Number(raw);
@@ -98,6 +101,16 @@ export function lockResults({ db }, actor, b, ip) {
   return { locked: Number(s.total) };
 }
 
+// قالب Excel لمقرر: عمود لكل مكوّن باسمه، ليُملأ ويُستورد دون ضبط يدوي للأعمدة
+export function gradesTemplate({ db }, courseId) {
+  const c = db.prepare('SELECT * FROM courses WHERE id = ?').get(Number(courseId));
+  if (!c) throw bad('المقرر غير موجود.', 404, 'not_found');
+  const comps = courseComponents(db, c.id);
+  const head = ['الرقم الجامعي', 'رمز المقرر', 'العام الدراسي', ...(comps.length ? comps.map((x) => x.name) : ['العلامة النظرية', 'العلامة العملية'])];
+  const info = [['تعليمات'], [`مقرر: ${c.name}${c.code ? ` (${c.code})` : ''}`], [comps.length ? `العلامة من المكونات: ${comps.map((x) => `${x.name} من ${x.max}`).join('، ')}. اترك صف العناوين كما هو.` : 'لا مكونات محددة لهذا المقرر: تُرصد العلامة النظرية والعملية.'], ['العام الدراسي بصيغة 2026/2027.']];
+  return writeXlsx([{ name: 'تعليمات', rows: info, widths: [70], rtl: true }, { name: 'العلامات', rows: [head, ['', c.code ?? '', academicYear(), ...head.slice(3).map(() => '')]], widths: head.map((_, i) => (i < 3 ? 18 : 22)), rtl: true, freeze: true }], { title: 'علامات' });
+}
+
 export function registerGradingRoutes(r, deps) {
   const any = (c, ...perms) => { if (!c.user || !perms.some((p) => c.user.can(p))) throw bad('لا تملك صلاحية هذا الإجراء.', 403, 'forbidden'); return c.user; };
   r.add('GET', '/api/courses/:id/components', (c) => {
@@ -105,6 +118,7 @@ export function registerGradingRoutes(r, deps) {
     const q = c.query ?? {}, marks = q.studentId && q.year ? Object.fromEntries(deps.db.prepare('SELECT m.component_id, m.mark FROM grade_component_marks m JOIN grades g ON g.id = m.grade_id WHERE g.course_id = ? AND g.student_id = ? AND g.academic_year = ?').all(Number(c.params.id), Number(q.studentId), String(q.year)).map((x) => [Number(x.component_id), Number(x.mark)])) : null;
     c.json(200, { components: courseComponents(deps.db, c.params.id), kinds: COMPONENT_KINDS, totalMax: Number(getSetting(deps.db, 'grades.total_max')), marks });
   });
+  r.add('GET', '/api/courses/:id/grades-template.xlsx', (c) => { any(c, 'grade:manage', 'course:manage'); sendRaw(c.res, 200, { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': `attachment; filename="grades-course-${Number(c.params.id)}.xlsx"` }, gradesTemplate(deps, c.params.id)); });
   r.add('PUT', '/api/courses/:id/components', (c) => c.json(200, saveComponents(deps, any(c, 'course:manage'), c.params.id, c.body, c.ip)));
   r.add('GET', '/api/grades/results', (c) => { any(c, 'grade:approve', 'grade:manage'); c.json(200, resultsSummary(deps, c.query ?? {})); });
   r.add('POST', '/api/grades/results/lock', (c) => c.json(200, lockResults(deps, any(c, 'grade:approve'), c.body, c.ip)));

@@ -9,6 +9,7 @@ import { getSetting } from './settings.js';
 import { HttpError } from '../http.js';
 import { sections, validateProfile, duplicateCheck, registerStudent } from './students.js';
 import { enterGrade } from './academics.js';
+import { courseComponents } from './grading.js';
 import { importLogRow } from './attendance.js';
 import { notify } from './push.js';
 
@@ -43,7 +44,10 @@ function columnMap(db, kind) {
     kind: A('النوع', 'نوع التسجيل', 'kind', 'type'), subject: A('المادة', 'المادة / الفحص', 'المادة أو الفحص', 'الفحص', 'subject', 'course', 'exam'),
     hall: A('القاعة', 'hall', 'room'), entered_at: A('وقت الدخول', 'الدخول', 'entered_at', 'enteredat', 'in', 'timein', 'تاريخ ووقت الدخول'), exited_at: A('وقت الخروج', 'الخروج', 'exited_at', 'exitedat', 'out', 'timeout', 'تاريخ ووقت الخروج'),
   };
+  const comp = {};
+  for (const n of new Set(db.prepare('SELECT DISTINCT name FROM course_grade_components').all().map((x) => norm(x.name)))) comp[`comp:${n}`] = [n];
   return {
+    ...comp,
     student_no: A('الرقم الجامعي', 'رقم الطالب', 'اسم المستخدم', 'student_no', 'studentno', 'username', 'studentid'),
     course: A('اسم المقرر', 'المقرر', 'course', 'coursename'), course_code: A('رمز المقرر', 'course_code', 'coursecode', 'code'),
     academic_year: A('العام الدراسي', 'العام', 'academic_year', 'academicyear', 'year'), semester: A('الفصل', 'semester'),
@@ -67,7 +71,9 @@ function toObjects(db, kind, grid) {            // grid: string[][]
   for (let i = 0; i < Math.min(grid.length, 20); i++) if (grid[i].filter((c) => rev.has(norm(c))).length >= 2) { h = i; break; }
   if (h < 0) throw bad('لم أجد صف العناوين: استخدم قالب الاستيراد وأبقِ صف العناوين كما هو.');
   const cols = grid[h].map((c) => rev.get(norm(c)) ?? null), seen = new Set(), unused = grid[h].filter((c, i) => !cols[i] && String(c).trim());
-  const miss = NEED[kind].filter(([k]) => !cols.includes(k)).map(([, l]) => l);
+  // العلامة النظرية مطلوبة ما لم يحوِ الملف أعمدة مكونات (لمقررات محددة المكونات)
+  const hasComp = kind === 'grades' && cols.some((c) => c && c.startsWith('comp:'));
+  const miss = NEED[kind].filter(([k]) => !cols.includes(k) && !(k === 'theory' && hasComp)).map(([, l]) => l);
   if (kind === 'students' && !cols.includes('faculty') && !cols.includes('program') && !cols.includes('program_id')) miss.push('الكلية / المعهد');
   if (kind === 'courses' && !cols.includes('faculty') && !cols.includes('program')) miss.push('الكلية / المعهد');
   if (kind === 'grades' && !cols.includes('course') && !cols.includes('course_code')) miss.push('اسم المقرر أو رمزه');
@@ -222,7 +228,23 @@ function importGrades(deps, actor, rows, commit, ip) {
     const ay = latinDigits(r.academic_year).replace(/[-–]/g, '/').replace(/\s/g, '');
     const select = db.prepare('SELECT * FROM grades WHERE student_id = ? AND course_id = ? AND academic_year = ?');
     const ex = select.get(st.id, cs[0].id, ay);
-    enterGrade({ db }, actor, st.id, { courseId: cs[0].id, academicYear: ay, theory: latinDigits(r.theory).replace(/\.0+$/, ''), practical: latinDigits(r.practical ?? '').replace(/\.0+$/, '') }, ip);
+    const num = (v) => latinDigits(v ?? '').replace(/\.0+$/, '');
+    const comps = courseComponents(db, cs[0].id);
+    let input;
+    if (comps.length) {
+      // مقرر محدد المكونات: علامة كل مكوّن من عمود باسمه (والنظري/العملي يغطيان مكوناً بهذا الاسم)
+      const cmap = columnMap(db, 'grades'), components = {}, missing = [];
+      for (const c of comps) {
+        const n = norm(c.name);
+        let v = r[`comp:${n}`];
+        if ((v === undefined || v === '') && cmap.theory.includes(n)) v = r.theory;
+        if ((v === undefined || v === '') && cmap.practical.includes(n)) v = r.practical;
+        if (v === undefined || v === '') missing.push(c.name); else components[c.id] = num(v);
+      }
+      if (missing.length) throw bad(`المقرر «${cs[0].name}» علامته من مكونات، ولم أجد في هذا الصف علامة: ${missing.join('، ')}. أضف عموداً باسم كل مكوّن.`);
+      input = { courseId: cs[0].id, academicYear: ay, components };
+    } else input = { courseId: cs[0].id, academicYear: ay, theory: num(r.theory), practical: num(r.practical) };
+    enterGrade({ db }, actor, st.id, input, ip);
     const after = select.get(st.id, cs[0].id, ay);
     changes.push({ table: 'grades', pk: [after.id], op: ex ? 'update' : 'insert', before: ex ?? null, after });
     touched.add(st.id);

@@ -42,6 +42,7 @@
           <label>الوزن<input data-gc="max" data-i="${i}" type="number" min="1" max="${e.totalMax}" value="${esc(r.max)}" style="width:90px"></label>
           <button class="btn sm" type="button" data-act="gcdel" data-i="${i}">حذف</button></div>`).join('')}
         <p class="small">المجموع الحالي: <b style="color:${sum === e.totalMax || !e.rows.length ? '#1B7F4B' : '#B3261E'}">${sum}</b> من ${e.totalMax}</p>
+        <p class="small"><a href="/api/courses/${e.courseId}/grades-template.xlsx" download>تنزيل قالب Excel لاستيراد علامات هذا المقرر</a> (عمود لكل مكوّن باسمه)</p>
         <div class="actions"><button class="btn" type="button" data-act="gcadd">إضافة مكوّن</button><button class="btn pri" type="button" data-act="gcsave">حفظ</button><button class="btn" type="button" data-act="gcclose">إغلاق</button></div>
       </div></div>`;
   }
