@@ -48,7 +48,7 @@
   }
   function courseRows(v) {
     return v.shown.map((c) => `<tr${c.active ? '' : ' class="off"'}><td class="nm">${esc(c.faculty || '—')}</td><td>${esc(c.program === c.faculty ? '—' : c.program || '—')}</td><td class="nowrap">${lvl(c.level)}</td><td class="nowrap">${c.semester === 1 ? 'الأول' : 'الثاني'}</td><td class="nm"><b>${esc(c.name)}</b></td><td class="mono">${esc(c.code || '—')}</td><td>${c.hours}</td><td>${esc(c.instructor || '—')}</td><td>${c.grades}</td>
-      <td>${pill(c.active, 'فعّال', 'معطَّل')}</td><td class="nowrap"><button class="btn sm" data-act="acedit" data-id="${c.id}">تعديل</button> <button class="btn sm" data-act="actoggle" data-id="${c.id}" data-on="${c.active ? 0 : 1}">${c.active ? 'تعطيل' : 'تفعيل'}</button> <button class="btn sm bad" data-act="acdel" data-id="${c.id}">حذف</button></td></tr>`).join('')
+      <td>${pill(c.active, 'فعّال', 'معطَّل')}</td><td class="nowrap"><button class="btn sm" data-act="acedit" data-id="${c.id}">تعديل</button> <button class="btn sm" data-act="gcomp" data-id="${c.id}" data-name="${esc(c.name)}">مكونات العلامة</button> <button class="btn sm" data-act="actoggle" data-id="${c.id}" data-on="${c.active ? 0 : 1}">${c.active ? 'تعطيل' : 'تفعيل'}</button> <button class="btn sm bad" data-act="acdel" data-id="${c.id}">حذف</button></td></tr>`).join('')
       || '<tr><td colspan="12" class="empty">لا مقررات مطابقة. غيّر الفلاتر أو أضف مقرراً.</td></tr>';
   }
   function courseTable() {
@@ -147,6 +147,7 @@
         ${m.msg ? `<div class="okbox" role="status">${esc(m.msg)}</div>` : ''}${m.err ? `<div class="err" role="alert" style="margin-top:12px">${esc(m.err)}</div>` : ''}
         <form class="form" id="acgrade" style="border:0;padding:0;margin-top:10px"><label>المقرر<select id="gr-course" required${edit ? ' disabled' : ''}><option value="">— اختر —</option>${m.courses.map((c) => `<option value="${c.id}"${String(c.id) === String(m.courseId || '') ? ' selected' : ''}>${lvl(c.level)} · ${sem(c.semester)} — ${esc(c.name)}</option>`).join('')}</select></label>
           <div class="two"><label>العام الدراسي<input id="gr-year" value="${esc(m.year || defYear())}" dir="ltr" pattern="\\d{4}/\\d{4}" required${edit ? ' readonly' : ''}></label><span></span></div>
+          <div id="gr-comp" data-student="${st.id}"></div>
           <div class="two"><label>العلامة النظرية<input id="gr-th" type="number" min="0" max="${(UA.S.limits || {}).totalMax || 100}" required value="${m.th ?? ''}"></label><label>العلامة العملية<input id="gr-pr" type="number" min="0" max="${(UA.S.limits || {}).practicalMax ?? 100}" value="${m.pr ?? ''}"></label></div>
           ${m.locked ? '<label>تبرير تعديل علامة معتمدة (يُسجَّل في سجل التغييرات)<textarea id="gr-just" rows="2" required minlength="5" maxlength="300"></textarea></label>' : ''}
           <div class="small">مجموع العلامتين لا يتجاوز ${(UA.S.limits || {}).totalMax || 100} (العملي حتى ${(UA.S.limits || {}).practicalMax ?? 100})، والنجاح من ${(UA.S.limits || {}).passMark || 60}. إعادة إدخال علامة لنفس المقرر والعام تعدّلها${m.locked ? '، وهذه العلامة معتمدة ومقفلة' : '، وتعديل علامة غير معتمدة يعيدها إلى «مدخلة»'}.</div>
@@ -249,7 +250,7 @@
     acgrade: async () => {
       const m = A.modal, courseId = m.edit ? m.courseId : Number(val('gr-course'));
       try {
-        await api('POST', `/api/students/${m.student.id}/grades`, { courseId, academicYear: val('gr-year'), theory: val('gr-th'), practical: val('gr-pr'), ...(m.locked ? { justification: val('gr-just') } : {}) });
+        await api('POST', `/api/students/${m.student.id}/grades`, { courseId, academicYear: val('gr-year'), theory: val('gr-th'), practical: val('gr-pr'), ...(UA.grading ? UA.grading.collect() : {}), ...(m.locked ? { justification: val('gr-just') } : {}) });
         await loadGrades();
         if (m.edit) { A.modal = null; toast('حُفظ تعديل العلامة'); } else { const cname = (m.courses.find((c) => c.id === courseId) || {}).name || ''; Object.assign(m, { msg: `حُفظت علامة «${cname}» للطالب ${m.student.name}. يمكنك إدخال مقرر آخر.`, err: '', courseId: '', th: '', pr: '', year: val('gr-year') }); }
         UA.render();

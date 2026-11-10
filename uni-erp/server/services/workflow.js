@@ -88,6 +88,7 @@ export function transitionGrades({ db }, actor, b, ip) {
         }
       } else if (from === 'approved') {                    // إعادة فتح علامة معتمدة
         if (!canApprove(actor)) throw new HttpError(403, 'إعادة فتح علامة معتمدة تتطلب صلاحية الاعتماد.', 'forbidden');
+        if (db.prepare('SELECT 1 FROM grade_locks WHERE course_id = ? AND academic_year = ?').get(g.course_id, g.academic_year) && !actor?.can?.('grade:unlock')) throw new HttpError(409, 'أُعلنت نتائج هذا المقرر وقُفلت؛ لا تُعاد علاماته للتدقيق إلا بالمسار الاستثنائي.', 'grades_locked');
         if (stage !== 'reviewed' && stage !== 'draft') { skipped.push({ id, reason: 'تُعاد المعتمدة إلى «مراجَعة» أو «مدخلة» فقط' }); continue; }
         needJustification(just, b?.decisionNo);
       } else if (!forward && !(from === 'reviewed' && stage === 'draft')) { skipped.push({ id, reason: 'انتقال غير مسموح' }); continue; }

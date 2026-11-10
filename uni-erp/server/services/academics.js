@@ -6,6 +6,7 @@ import { tx } from '../db.js';
 import { nextNumber } from './numbering.js';
 import { getSetting } from './settings.js';
 import { assertNotDeprived } from './teaching.js';
+import { componentMarks, saveComponentMarks, assertEditable } from './grading.js';
 
 export const passMark = (db) => getSetting(db, 'grades.pass_mark');
 // الجهات غير التطبيقية لها علامة نجاح مستقلة؛ وما لم يُدرج (أو طالب بلا جهة) يأخذ علامة التطبيقية الأعلى
@@ -108,10 +109,14 @@ export function enterGrade({ db }, actor, studentId, b, ip) {
   const m = /^(\d{4})\/(\d{4})$/.exec(ay);
   if (!m || Number(m[2]) !== Number(m[1]) + 1) throw new HttpError(400, 'العام الدراسي بصيغة 2025/2026.', 'validation');
   assertNotDeprived(db, studentId, c.id, ay);
+  // بعد إعلان النتائج: مسار استثنائي بصلاحيته وتبرير، وتبقى العلامة معتمدة
+  const lockJust = assertEditable(db, actor, c.id, ay, b?.justification, b?.decisionNo);
   const totalMax = getSetting(db, 'grades.total_max'), practicalMax = getSetting(db, 'grades.practical_max');
-  const theory = intIn(b.theory, 0, totalMax, 'العلامة النظرية');
-  const practical = b.practical === '' || b.practical === null || b.practical === undefined ? null : intIn(b.practical, 0, practicalMax, 'العلامة العملية');
-  const total = theory + (practical ?? 0);
+  // المقرر ذو المكونات تُرصد علامته مكوناً مكوناً، ويُحسب النظري والعملي منها
+  const comp = componentMarks(db, c.id, b?.components);
+  const theory = comp ? comp.theory : intIn(b.theory, 0, totalMax, 'العلامة النظرية');
+  const practical = comp ? comp.practical : (b.practical === '' || b.practical === null || b.practical === undefined ? null : intIn(b.practical, 0, practicalMax, 'العلامة العملية'));
+  const total = comp ? comp.total : theory + (practical ?? 0);
   if (total > totalMax) throw new HttpError(400, `مجموع العلامتين لا يتجاوز ${totalMax}.`, 'validation');
   const term = `${ay}-${c.semester === 1 ? 'الفصل الأول' : 'الفصل الثاني'}`, now = Date.now();
   return tx(db, () => {
@@ -121,10 +126,11 @@ export function enterGrade({ db }, actor, studentId, b, ip) {
       if (locked && !canApprove(actor) && !b?.justification) {
         throw new HttpError(403, 'العلامة معتمدة ومقفلة؛ تعديلها يتطلب صلاحية اعتماد العلامات أو تبريراً رسمياً لإعادة فتحها للتدقيق.', 'forbidden');
       }
-      const just = locked ? needJustification(b.justification, b.decisionNo) : null;
-      const resetWf = locked && (!canApprove(actor) || b?.resetWorkflow === true);
+      const just = lockJust ?? (locked ? needJustification(b.justification, b.decisionNo) : null);
+      const resetWf = !lockJust && locked && (!canApprove(actor) || b?.resetWorkflow === true);
       const status = locked ? (resetWf ? 'draft' : 'approved') : initialStatus(db);
-      logChange(db, actor, ex, locked ? (resetWf ? 'تعديل علامة معتمدة وإعادة للمسودة' : 'تعديل علامة معتمدة') : 'تعديل علامة', { mark: total, theory, practical, status }, just);
+      if (comp) saveComponentMarks(db, ex.id, comp.marks);
+      logChange(db, actor, ex, lockJust ? 'تعديل علامة بعد إعلان النتائج' : locked ? (resetWf ? 'تعديل علامة معتمدة وإعادة للمسودة' : 'تعديل علامة معتمدة') : 'تعديل علامة', { mark: total, theory, practical, status }, just);
       db.prepare(`UPDATE grades SET theory_mark = ?, practical_mark = ?, mark = ?, entered_by = ?, entered_at = ?, workflow_status = ?,
         reviewed_by = CASE WHEN ? = 'approved' THEN reviewed_by ELSE NULL END, reviewed_at = CASE WHEN ? = 'approved' THEN reviewed_at ELSE NULL END,
         approved_by = CASE WHEN ? = 'approved' THEN approved_by ELSE NULL END, approved_at = CASE WHEN ? = 'approved' THEN approved_at ELSE NULL END WHERE id = ?`)
@@ -134,7 +140,8 @@ export function enterGrade({ db }, actor, studentId, b, ip) {
       const status = initialStatus(db);
       const gid = Number(db.prepare(`INSERT INTO grades (student_id, term, course, hours, mark, course_id, level, semester, academic_year, theory_mark, practical_mark, entered_by, entered_at, workflow_status)
                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(Number(studentId), term, c.name, c.hours, total, c.id, c.level, c.semester, ay, theory, practical, actor.id, now, status).lastInsertRowid);
-      logChange(db, actor, { id: gid, student_id: Number(studentId), course: c.name }, 'إدخال علامة', { mark: total, theory, practical, status }, null);
+      if (comp) saveComponentMarks(db, gid, comp.marks);
+      logChange(db, actor, { id: gid, student_id: Number(studentId), course: c.name }, lockJust ? 'إدخال علامة بعد إعلان النتائج' : 'إدخال علامة', { mark: total, theory, practical, status }, lockJust);
       audit(db, actor, 'إدخال علامة', `${st.student_no} / ${c.name}`.slice(0, 100), ip);
     }
     return gradesFor(db, Number(studentId), null);
@@ -257,6 +264,7 @@ export function deleteCourse({ db }, actor, id, ip) {
 export function deleteGrade({ db }, actor, studentId, gradeId, ip, justification) {
   const g = db.prepare('SELECT g.*, u.student_no FROM grades g JOIN users u ON u.id = g.student_id WHERE g.id = ? AND g.student_id = ?').get(Number(gradeId), Number(studentId));
   if (!g) throw new HttpError(404, 'العلامة غير موجودة.', 'not_found');
+  assertEditable(db, actor, g.course_id, g.academic_year, justification);
   let just = null;
   if (g.workflow_status === 'approved' && workflowOn(db)) { if (!canApprove(actor)) throw new HttpError(403, 'العلامة معتمدة؛ حذفها يتطلب صلاحية اعتماد العلامات.', 'forbidden'); just = needJustification(justification); }
   tx(db, () => { logChange(db, actor, g, 'حذف علامة', { status: 'deleted' }, just); db.prepare('DELETE FROM grades WHERE id = ?').run(g.id); audit(db, actor, 'حذف علامة', `${g.student_no} / ${g.course}`.slice(0, 100), ip); });

@@ -10,6 +10,15 @@ const today = () => new Date().toISOString().slice(0, 10);
 const bad = (msg, status = 400, code = 'validation') => new HttpError(status, msg, code);
 const clean = (v, max) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 
+// الحد الفصلي للساعات حسب المعدل الموزون للعلامات المعتمدة؛ الطالب بلا علامات يأخذ الحد المتوسط
+export function creditCap(db, studentId) {
+  const r = studentId ? db.prepare("SELECT SUM(mark * hours) AS pts, SUM(hours) AS hrs FROM grades WHERE student_id = ? AND workflow_status = 'approved'").get(Number(studentId)) : null;
+  const gpa = r && Number(r.hrs) > 0 ? Math.round((Number(r.pts) / Number(r.hrs)) * 10) / 10 : null;
+  const n = (k) => Number(getSetting(db, k));
+  const cap = gpa === null ? n('academic.cap_hours_default') : gpa < n('academic.cap_gpa_low') ? n('academic.cap_hours_low') : gpa >= n('academic.cap_gpa_high') ? n('academic.cap_hours_high') : n('academic.cap_hours_default');
+  return { cap, gpa };
+}
+
 // اسم الفصل الجاري كما يُحفظ مع التسجيل: من الإعدادات والعام الدراسي
 export const currentTerm = (db) => `${getSetting(db, 'academic.current_semester')} ${academicYear()}`;
 

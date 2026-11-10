@@ -28,6 +28,11 @@ export const SCHEMA = [
     { key: 'grades.non_applied_faculties', label: 'رموز الجهات غير التطبيقية', type: 'list', default: ['CSS', 'HISS', 'TISS', 'CSSR'], max: 100, itemMax: 20, hint: 'رمز كل جهة في سطر. الجهة غير المدرجة هنا تُعامل كتطبيقية.' },
   ] },
   { key: 'academic', label: 'الأكاديمي', desc: 'حدود المقررات وتسميات السنوات الدراسية.', items: [
+    { key: 'academic.cap_hours_default', label: 'الحد الفصلي للساعات (المعدل المتوسط أو الطالب الجديد)', type: 'int', default: 18, min: 1, max: 40, unit: 'ساعة' },
+    { key: 'academic.cap_gpa_low', label: 'المعدل الذي يُخفَّض دونه الحد الفصلي', type: 'int', default: 60, min: 0, max: 100, unit: '%' },
+    { key: 'academic.cap_hours_low', label: 'الحد الفصلي لمن معدله دون ذلك', type: 'int', default: 12, min: 1, max: 40, unit: 'ساعة' },
+    { key: 'academic.cap_gpa_high', label: 'المعدل الذي يُرفع عنده الحد الفصلي', type: 'int', default: 75, min: 0, max: 100, unit: '%' },
+    { key: 'academic.cap_hours_high', label: 'الحد الفصلي لمن بلغ ذلك المعدل', type: 'int', default: 21, min: 1, max: 40, unit: 'ساعة' },
     { key: 'academic.max_absence_percent', label: 'الحد الأقصى للغياب قبل الحرمان من المقرر', type: 'int', default: 15, min: 1, max: 100, unit: '%' },
     { key: 'academic.min_sessions_for_absence', label: 'أقل عدد محاضرات منعقدة قبل احتساب الغياب', type: 'int', default: 3, min: 1, max: 60, unit: 'محاضرة' },
     { key: 'academic.registration_open', label: 'بداية التسجيل في المقررات', type: 'text', default: '', min: 0, max: 10, hint: 'بصيغة 2026-09-01. فارغ يعني بلا قيد.' },

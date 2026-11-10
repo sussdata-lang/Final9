@@ -52,6 +52,7 @@ export const PERMISSION_CATALOG = [
       { key: 'course:manage', label: 'كتابة وتعديل دليل المواد والمتطلبات السابقة والجداول', op: 'edit', module: 'academics' },
       { key: 'grade:manage', label: 'إدخال العلامات وتعديلها قبل الاعتماد', op: 'write', module: 'academics' },
       { key: 'grade:approve', label: 'اعتماد علامات المقررات غير المسندة لعضو هيئة، وتعديل المعتمد بتبرير', op: 'approve', module: 'academics' },
+      { key: 'grade:unlock', label: 'تعديل علامات مقرر بعد إعلان نتائجه وقفلها (مسار استثنائي بتبرير)', op: 'approve', module: 'academics' },
       { key: 'grade:approve_own', label: 'اعتماد علامات المقررات المسندة إليه فقط، بعد إرسالها من قسم الامتحانات', op: 'approve', module: 'academics' },
       { key: 'attendance:manage', label: 'تسجيل وإدارة سجل دخول وخروج القاعات (مسح الباركود)', op: 'write', module: 'academics' },
       { key: 'faculty:manage', label: 'إدارة ملفات أعضاء هيئة التدريس والعبء التدريسي', op: 'edit', module: 'academics' },

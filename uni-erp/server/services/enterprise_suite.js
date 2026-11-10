@@ -14,7 +14,7 @@ import { passMarkFor, passSql } from './academics.js';
 import { getSetting } from './settings.js';
 import { STATUS_LABEL } from './students.js';
 import { overdueDues } from './finance/fees.js';
-import { currentTerm, registrationWindow, assertRegistrationOpen, listSections, activeSectionsOf, createSection, updateSection, dropEnrollment } from './sections.js';
+import { creditCap, currentTerm, registrationWindow, assertRegistrationOpen, listSections, activeSectionsOf, createSection, updateSection, dropEnrollment } from './sections.js';
 import { activeCardBlock } from './card_blocks.js';
 
 /**
@@ -228,8 +228,9 @@ export function registerEnterpriseSuiteRoutes(r, deps) {
     const newCredits = Number(course.hours);
     const currentCreditsRow = db.prepare('SELECT COALESCE(SUM(credits), 0) AS total FROM student_self_enrollments WHERE student_no = ? AND semester = ? AND dropped_at IS NULL').get(studentNo, term);
     const currentCredits = Number(currentCreditsRow?.total || 0);
-    if (currentCredits + newCredits > 18) {
-      throw new HttpError(400, `لا يمكن تجاوز الحد الأقصى للعبء الفصلي المسموح (18 ساعة معتمدة). الساعات المسجلة حالياً: ${currentCredits}.`, 'credit_limit_exceeded');
+    const { cap, gpa } = creditCap(db, studentId);
+    if (currentCredits + newCredits > cap) {
+      throw new HttpError(400, `لا يمكن تجاوز الحد الأقصى للعبء الفصلي المسموح (${cap} ساعة${gpa === null ? '' : ` لمعدل ${gpa}%`}). الساعات المسجلة حالياً: ${currentCredits}.`, 'credit_limit_exceeded');
     }
 
     // المتطلبات المربوطة في الخطة الدراسية تُفرض من السجل، لا مما يرسله المتصفح
