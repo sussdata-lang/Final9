@@ -104,7 +104,6 @@
     ['student_pki', '2. التسجيل الذاتي والبطاقة والتحقق (4–6)'],
     ['hr_finance', '3. قسائم الرواتب والعبء والأقساط (7–9)'],
     ['ux_offline', '4. الإشعارات وحضور اللجان (10–12)'],
-    ['exec_devops', '5. مؤشرات الرئاسة (14)'],
   ];
 
   function injectStyles() {
@@ -638,6 +637,11 @@
   UA.views.enterprise = enterpriseView;
   UA.renderEnterpriseSection = function (defaultTab) {
     return enterpriseView(null, null, defaultTab);
+  };
+  // لوحة مؤشرات الرئاسة تُعرض في «الامتحانات والتقييم»؛ البيانات من /api/enterprise/overview (صلاحية stats:read)
+  UA.renderExecKpis = function () {
+    injectStyles();
+    return `<div class="es-wrap">${viewExecDevops(E.data || UA.enterpriseData || {})}</div>`;
   };
   UA.setEnterpriseTab = function (tab) {
     if (tab) {

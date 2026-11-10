@@ -164,7 +164,7 @@
       return bar + `<div id="audit-devops-mount"></div>`;
     }
     if (tab === 'exec_offline') {
-      const esHtml = UA.renderEnterpriseSection ? UA.renderEnterpriseSection('exec_devops') : '';
+      const esHtml = UA.renderEnterpriseSection ? UA.renderEnterpriseSection('ux_offline') : '';
       return bar + `<div id="audit-enterprise-mount" data-mounted="${esHtml ? '1' : ''}">${esHtml}</div>`;
     }
     const c = S.chain;

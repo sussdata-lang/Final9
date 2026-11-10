@@ -828,12 +828,13 @@
             <div>
               <span class="v12-badge-gold">الوحدتان 5.5 · 5.6</span>
               <h1>الامتحانات والتظلمات</h1>
-              <p>جداول الامتحانات والقاعات والتظلمات، والترقيات العلمية.</p>
+              <p>جداول الامتحانات والقاعات والتظلمات، والترقيات العلمية، ومؤشرات الأداء الاستراتيجية لرئاسة الجامعة.</p>
             </div>
           </div>
           <div class="v12-tabs">
             <button class="v12-tab ${activeTab === 'exams' ? 'active' : ''}" data-t="exams">📅 5.5 جداول الامتحانات والتظلمات</button>
             <button class="v12-tab ${activeTab === 'faculty' ? 'active' : ''}" data-t="faculty">👨‍🏫 5.6 الترقيات العلمية</button>
+            <button class="v12-tab ${activeTab === 'kpis' ? 'active' : ''}" data-t="kpis">🏛️ مؤشرات الأداء الاستراتيجية</button>
           </div>
           <div id="v12-exp-body"></div>
         </div>
@@ -846,6 +847,11 @@
 
     function renderBody(d) {
       const box = el.querySelector('#v12-exp-body');
+      if (activeTab === 'kpis') {
+        box.innerHTML = UA.enterpriseData ? UA.renderExecKpis() : '<p class="hint">جارٍ تحميل المؤشرات…</p>';
+        if (!UA.enterpriseData && UA.loaders.enterprise) UA.loaders.enterprise().then(() => { if (activeTab === 'kpis') box.innerHTML = UA.renderExecKpis(); }).catch(() => { box.innerHTML = '<p class="hint">تعذّر تحميل المؤشرات.</p>'; });
+        return;
+      }
       if (activeTab === 'exams') {
         box.innerHTML = `
           <div id="exp-master-exam-banner"></div>

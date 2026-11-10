@@ -466,7 +466,7 @@
     const audEnt = document.getElementById('audit-enterprise-mount');
     if (audEnt && !audEnt.dataset.mounted && UA.renderEnterpriseSection) {
       audEnt.dataset.mounted = '1';
-      audEnt.innerHTML = UA.renderEnterpriseSection('exec_devops');
+      audEnt.innerHTML = UA.renderEnterpriseSection('ux_offline');
     }
     const acadEnt = document.getElementById('acad-enterprise-mount');
     if (acadEnt && !acadEnt.dataset.mounted && UA.renderEnterpriseSection) {
@@ -1265,7 +1265,7 @@
         try { U.hcTelemetry = await api('GET', '/api/v12/high-concurrency/telemetry'); } catch {}
       }
       if (t === 'exec_offline') {
-        if (UA.setEnterpriseTab) UA.setEnterpriseTab('exec_devops');
+        if (UA.setEnterpriseTab) UA.setEnterpriseTab('ux_offline');
         if (UA.loaders.enterprise) await UA.loaders.enterprise().catch(() => {});
       }
       UA.render();
