@@ -28,6 +28,8 @@ export const SCHEMA = [
     { key: 'grades.non_applied_faculties', label: 'رموز الجهات غير التطبيقية', type: 'list', default: ['CSS', 'HISS', 'TISS', 'CSSR'], max: 100, itemMax: 20, hint: 'رمز كل جهة في سطر. الجهة غير المدرجة هنا تُعامل كتطبيقية.' },
   ] },
   { key: 'academic', label: 'الأكاديمي', desc: 'حدود المقررات وتسميات السنوات الدراسية.', items: [
+    { key: 'academic.max_absence_percent', label: 'الحد الأقصى للغياب قبل الحرمان من المقرر', type: 'int', default: 15, min: 1, max: 100, unit: '%' },
+    { key: 'academic.min_sessions_for_absence', label: 'أقل عدد محاضرات منعقدة قبل احتساب الغياب', type: 'int', default: 3, min: 1, max: 60, unit: 'محاضرة' },
     { key: 'academic.registration_open', label: 'بداية التسجيل في المقررات', type: 'text', default: '', min: 0, max: 10, hint: 'بصيغة 2026-09-01. فارغ يعني بلا قيد.' },
     { key: 'academic.add_drop_close', label: 'نهاية فترة الحذف والإضافة', type: 'text', default: '', min: 0, max: 10, hint: 'بصيغة 2026-09-20. فارغ يعني بلا قيد.' },
     { key: 'academic.registration_requires_clearance', label: 'منع التسجيل عند وجود مستحقات حان موعدها', type: 'bool', default: true },
@@ -115,6 +117,7 @@ export const SCHEMA = [
   { key: 'hr', label: 'الحضور والإجازات', desc: 'استحقاق الإجازة والعطلة الأسبوعية.', items: [
     { key: 'hr.leave_default_days', legacy: 'leave_default_days', label: 'الاستحقاق السنوي الافتراضي للإجازة الاعتيادية', type: 'int', default: 30, min: 0, max: 366, unit: 'يوماً', hint: 'يمكن تخصيص رصيد لموظف بعينه من «الحضور والإجازات ← أرصدة الإجازات».' },
     { key: 'hr.weekend', legacy: 'weekend_days', label: 'العطلة الأسبوعية', type: 'select', default: 'fri,sat', options: opt(['fri,sat', 'الجمعة والسبت'], ['fri', 'الجمعة فقط'], ['sat,sun', 'السبت والأحد']), hint: 'تؤثر في حساب أيام الإجازات المعتمدة بعد الحفظ.' },
+    { key: 'hr.auto_account', label: 'إنشاء حساب في المنظومة لكل موظف جديد', type: 'bool', default: true, hint: 'يُنشأ بصلاحيات دنيا: الحضور الشخصي والطلبات الداخلية والمراسلات، ثم يُمنح دوره من الحسابات والصلاحيات.' },
     { key: 'hr.currency', label: 'رمز العملة المعروض مع الرواتب', type: 'text', default: 'ل.س', min: 1, max: 10 },
     { key: 'hr.annual_leave_type', label: 'اسم نوع الإجازة المخصوم من الرصيد', type: 'text', default: 'اعتيادية', min: 2, max: 30, hint: 'يجب أن يطابق الخيار في نموذج «طلب إجازة».' },
   ] },
@@ -134,6 +137,8 @@ export const SCHEMA = [
     { key: 'finance.receipt_title', label: 'عنوان الإيصال (رأس PDF)', type: 'text', default: 'إيصال استلام رسوم', min: 5, max: 80 },
     { key: 'finance.receipt_footer', label: 'تذييل الإيصال', type: 'text', default: 'شكراً لسدادكم في الوقت المحدد', min: 0, max: 120 },
     { key: 'finance.separate_poster', label: 'فصل المهام: لا يرحّل القيد من أنشأه', type: 'bool', default: false, hint: 'عند تفعيله يُلزم بأن يرحّل شخص مختلف عن منشئ القيد.' },
+    { key: 'procurement.approval_finance_above', label: 'طلب الشراء فوق هذا المبلغ يحتاج اعتماداً مالياً', type: 'int', default: 1000000, min: 0, max: 100000000000, unit: 'ل.س', hint: 'صفر يلغي هذه المرحلة.' },
+    { key: 'procurement.approval_top_above', label: 'طلب الشراء فوق هذا المبلغ يحتاج اعتماد رئاسة الجامعة', type: 'int', default: 10000000, min: 0, max: 100000000000, unit: 'ل.س', hint: 'صفر يلغي هذه المرحلة.' },
     { key: 'finance.budget_control', label: 'الرقابة على الموازنة عند إرسال أمر التوريد', type: 'select', default: 'block', options: opt(['block', 'منع التجاوز'], ['warn', 'تحذير وتسجيل فقط'], ['off', 'بلا رقابة']) },
     { key: 'finance.po_requires_budget', label: 'إلزام كل أمر توريد ببند موازنة', type: 'bool', default: false },
     { key: 'finance.purchase_requires_po', label: 'لا تُسجَّل فاتورة مشتريات إلا على أمر توريد', type: 'bool', default: false },

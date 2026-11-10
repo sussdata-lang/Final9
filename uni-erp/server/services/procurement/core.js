@@ -1,4 +1,6 @@
 // المشتريات والمخازن والأصول — النواة
+import { getSetting } from '../settings.js';
+import { effective } from '../../permissions.js';
 import { checkOrderBudget, validBudgetForOrder } from '../finance/budgets.js';
 import { tx } from '../../db.js';
 import { nextNumber } from '../numbering.js';
@@ -127,12 +129,12 @@ export function listRequests(db,q={}){
   const w=[],a=[]; if(q.status) { w.push('r.status=?'); a.push(q.status); } if(q.q){ const l='%'+String(q.q).replace(/[\\%_]/g,'\\$&')+'%'; w.push('(r.no LIKE ? ESCAPE "\\" OR r.title LIKE ? ESCAPE "\\")'); a.push(l,l); }
   if(q.mine) { w.push('r.requester_id=?'); a.push(Number(q.mine)); }
   const where=w.length?'WHERE '+w.join(' AND '):'';
-  return db.prepare(`SELECT r.*, u.display_name requester_name FROM proc_requests r LEFT JOIN users u ON u.id=r.requester_id ${where} ORDER BY r.id DESC LIMIT 300`).all(...a).map(r=>({id:r.id,no:r.no,title:r.title,description:r.description,requesterId:r.requester_id,requesterName:r.requester_name,warehouseId:r.warehouse_id,status:r.status,requestedAt:r.requested_at,decidedBy:r.decided_by,decidedAt:r.decided_at,decisionNote:r.decision_note,createdAt:r.created_at,lines: db.prepare('SELECT l.*, i.name itemName, i.code itemCode FROM proc_request_lines l LEFT JOIN proc_items i ON i.id=l.item_id WHERE l.request_id=? ORDER BY l.id').all(r.id).map(x=>({id:x.id,itemId:x.item_id,itemCode:x.itemCode,itemName:x.itemName,description:x.description,qty:x.qty,estCost:x.est_cost,note:x.note}))}));
+  return db.prepare(`SELECT r.*, u.display_name requester_name FROM proc_requests r LEFT JOIN users u ON u.id=r.requester_id ${where} ORDER BY r.id DESC LIMIT 300`).all(...a).map(r=>({stage: r.status==='pending' ? (approvalStage(db,r).next?.label ?? null) : null, id:r.id,no:r.no,title:r.title,description:r.description,requesterId:r.requester_id,requesterName:r.requester_name,warehouseId:r.warehouse_id,status:r.status,requestedAt:r.requested_at,decidedBy:r.decided_by,decidedAt:r.decided_at,decisionNote:r.decision_note,createdAt:r.created_at,lines: db.prepare('SELECT l.*, i.name itemName, i.code itemCode FROM proc_request_lines l LEFT JOIN proc_items i ON i.id=l.item_id WHERE l.request_id=? ORDER BY l.id').all(r.id).map(x=>({id:x.id,itemId:x.item_id,itemCode:x.itemCode,itemName:x.itemName,description:x.description,qty:x.qty,estCost:x.est_cost,note:x.note}))}));
 }
 export function getRequest(db,id){
   const r=db.prepare('SELECT r.*, u.display_name requester_name FROM proc_requests r LEFT JOIN users u ON u.id=r.requester_id WHERE r.id=?').get(Number(id)); if(!r) throw bad('طلب الشراء غير موجود.',404,'not_found');
   const lines=db.prepare('SELECT l.*, i.name itemName, i.code itemCode FROM proc_request_lines l LEFT JOIN proc_items i ON i.id=l.item_id WHERE l.request_id=? ORDER BY l.id').all(r.id);
-  return {request:{id:r.id,no:r.no,title:r.title,description:r.description,requesterId:r.requester_id,requesterName:r.requester_name,warehouseId:r.warehouse_id,status:r.status,requestedAt:r.requested_at,decidedBy:r.decided_by,decidedAt:r.decided_at,decisionNote:r.decision_note,createdAt:r.created_at,lines:lines.map(x=>({id:x.id,itemId:x.item_id,itemCode:x.itemCode,itemName:x.itemName,description:x.description,qty:x.qty,estCost:x.est_cost,note:x.note}))}};
+  return {request:{approval:approvalStage(db,r),id:r.id,no:r.no,title:r.title,description:r.description,requesterId:r.requester_id,requesterName:r.requester_name,warehouseId:r.warehouse_id,status:r.status,requestedAt:r.requested_at,decidedBy:r.decided_by,decidedAt:r.decided_at,decisionNote:r.decision_note,createdAt:r.created_at,lines:lines.map(x=>({id:x.id,itemId:x.item_id,itemCode:x.itemCode,itemName:x.itemName,description:x.description,qty:x.qty,estCost:x.est_cost,note:x.note}))}};
 }
 export function createRequest({db},actor,b,ip){
   const title=clean(b?.title,100,'عنوان الطلب',3); const desc=String(b?.description??'').slice(0,500);
@@ -157,14 +159,45 @@ export function submitRequest({db},actor,id,ip){
   if(r.status!=='draft') throw bad('الطلب ليس مسودة.',409,'conflict');
   db.prepare("UPDATE proc_requests SET status='pending', requested_at=? WHERE id=?").run(Date.now(),r.id); audit(db,actor,'إرسال طلب شراء',r.no,ip); return getRequest(db,r.id);
 }
+/* مراحل اعتماد طلب الشراء: إدارة المشتريات دائماً، ثم المالية ورئاسة الجامعة فوق حدودهما في الإعدادات.
+   كل مرحلة بيد شخص مختلف، ولا يعتمد مقدّم الطلب طلبه. */
+const LEVELS = { 1: ['procurement:manage', 'إدارة المشتريات'], 2: ['procurement:approve_finance', 'الاعتماد المالي'], 3: ['procurement:approve_top', 'رئاسة الجامعة'] };
+export function approvalStage(db, r) {
+  const total = Number(db.prepare('SELECT COALESCE(SUM(qty * est_cost), 0) AS v FROM proc_request_lines WHERE request_id = ?').get(r.id).v);
+  const fin = Number(getSetting(db, 'procurement.approval_finance_above')), top = Number(getSetting(db, 'procurement.approval_top_above'));
+  const required = [1, ...(fin > 0 && total > fin ? [2] : []), ...(top > 0 && total > top ? [3] : [])];
+  const done = db.prepare('SELECT a.*, u.display_name AS by_name FROM proc_request_approvals a LEFT JOIN users u ON u.id = a.user_id WHERE a.request_id = ? ORDER BY a.level').all(r.id);
+  const next = r.status === 'pending' ? required.find((l) => !done.some((d) => Number(d.level) === l)) : undefined;
+  return {
+    total, required: required.map((l) => LEVELS[l][1]),
+    done: done.map((d) => ({ level: Number(d.level), label: LEVELS[d.level][1], userId: Number(d.user_id), by: d.by_name, at: Number(d.decided_at), note: d.note })),
+    next: next ? { level: next, label: LEVELS[next][1], perm: LEVELS[next][0], last: next === required[required.length - 1] } : null,
+  };
+}
+const holdersOf = (db, perm) => db.prepare("SELECT * FROM users WHERE role <> 'student' AND active = 1").all().filter((u) => effective(db, u).includes(perm)).map((u) => u.id);
+
 export function decideRequest({db},actor,id,decision,note,ip){
   const r=db.prepare('SELECT * FROM proc_requests WHERE id=?').get(Number(id)); if(!r) throw bad('الطلب غير موجود.',404,'not_found');
   if(r.status!=='pending') throw bad('الطلب ليس قيد المراجعة.',409,'conflict');
   if(!['approved','rejected'].includes(decision)) throw bad('قرار غير صالح.');
+  const st=approvalStage(db,r), next=st.next;
+  if(!actor.can(next.perm)) throw bad(`هذه المرحلة تخص: ${next.label}.`,403,'forbidden');
   if(decision==='approved' && r.requester_id && Number(r.requester_id)===Number(actor?.id)) throw bad('خرق سياسة فصل المهام (SoD): لا يجوز لمقدم طلب الشراء اعتماده بنفسه.',403,'sod_violation');
+  if(decision==='approved' && st.done.some((d)=>d.userId===Number(actor.id))) throw bad('اعتمدت مرحلة سابقة من هذا الطلب؛ تعتمد كل مرحلة يدٌ مختلفة.',403,'sod_violation');
   const n=String(note??'').slice(0,300); if(decision==='rejected' && !n.trim()) throw bad('سبب الرفض مطلوب.');
-  db.prepare('UPDATE proc_requests SET status=?, decided_by=?, decided_at=?, decision_note=? WHERE id=?').run(decision,actor.id,Date.now(),n,r.id);
-  audit(db,actor,decision==='approved'?'اعتماد طلب شراء':'رفض طلب شراء',r.no,ip); return getRequest(db,r.id);
+  return tx(db,()=>{
+    if(decision==='approved') db.prepare('INSERT INTO proc_request_approvals (request_id,level,user_id,note,decided_at) VALUES (?,?,?,?,?)').run(r.id,next.level,actor.id,n,Date.now());
+    if(decision==='rejected' || next.last){
+      db.prepare('UPDATE proc_requests SET status=?, decided_by=?, decided_at=?, decision_note=? WHERE id=?').run(decision,actor.id,Date.now(),n,r.id);
+      audit(db,actor,decision==='approved'?'اعتماد طلب شراء':`رفض طلب شراء (${next.label})`,r.no,ip);
+    } else {
+      const after=approvalStage(db,r).next;
+      audit(db,actor,`اعتماد مرحلي لطلب شراء (${next.label})`,r.no,ip);
+      const ins=db.prepare("INSERT INTO user_notifications (user_id, kind, ref_id, text, url, at) VALUES (?, ?, ?, ?, '', ?) ON CONFLICT DO NOTHING");
+      for(const u of holdersOf(db,after.perm)) if(Number(u)!==Number(r.requester_id)) ins.run(u,`proc_request_${after.level}`,r.id,`طلب الشراء ${r.no} (${r.title}) بانتظار ${after.label}.`,Date.now());
+    }
+    return getRequest(db,r.id);
+  });
 }
 export function cancelRequest({db},actor,id,ip){
   const r=db.prepare('SELECT * FROM proc_requests WHERE id=?').get(Number(id)); if(!r) throw bad('الطلب غير موجود.',404,'not_found');

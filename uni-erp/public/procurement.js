@@ -396,11 +396,11 @@
                 <td>${esc(r.requesterName || '—')}</td>
                 <td>${num((r.lines || []).length)} بنود</td>
                 <td><b>${money(estTotal)}</b></td>
-                <td>${stBadge(REQ_STATUS, r.status)}</td>
+                <td>${stBadge(REQ_STATUS, r.status)}${r.stage ? `<div class="small">بانتظار: ${esc(r.stage)}</div>` : ''}</td>
                 <td style="white-space:nowrap">
                   <button class="btn sm" data-act="proc-view-req" data-id="${r.id}">التفاصيل</button>
                   ${r.status === 'draft' && can('procurement:request') && (r.requester_id === UA.S.me.id || can('procurement:manage')) ? `<button class="btn pri sm" data-act="proc-sub-req" data-id="${r.id}">إرسال للاعتماد</button>` : ''}
-                  ${r.status === 'pending' && can('procurement:manage') ? `<button class="btn pri sm" data-act="proc-app-req" data-id="${r.id}">✓ اعتماد</button> <button class="btn dan sm" data-act="proc-rej-req" data-id="${r.id}">✕ رفض</button>` : ''}
+                  ${r.status === 'pending' && (can('procurement:manage') || can('procurement:approve_finance') || can('procurement:approve_top')) ? `<button class="btn pri sm" data-act="proc-app-req" data-id="${r.id}">✓ اعتماد</button> <button class="btn dan sm" data-act="proc-rej-req" data-id="${r.id}">✕ رفض</button>` : ''}
                   ${r.status === 'approved' && can('procurement:manage') ? `<button class="btn pri sm" data-act="proc-req-to-po" data-id="${r.id}">🚚 تحويل لأمر توريد</button>` : ''}
                 </td>
               </tr>`;
@@ -808,6 +808,7 @@
           <p><b>العنوان:</b> ${esc(r.title)} · <b>مقدم الطلب:</b> ${esc(r.requesterName || '—')}</p>
           ${r.description ? `<p class="mut">${esc(r.description)}</p>` : ''}
           ${r.decisionNote ? `<p><b>ملاحظة القرار:</b> ${esc(r.decisionNote)}</p>` : ''}
+          ${r.approval ? `<p><b>مراحل الاعتماد:</b> ${r.approval.required.map((l) => { const d = r.approval.done.find((x) => x.label === l); return d ? `✓ ${esc(l)} (${esc(d.by || '—')})` : (r.approval.next && r.approval.next.label === l ? `⏳ ${esc(l)}` : esc(l)); }).join(' ← ')}</p>` : ''}
           <table class="tbl"><thead><tr><th>الصنف</th><th>الوصف</th><th>الكمية</th><th>التكلفة التقديرية</th><th>الإجمالي</th></tr></thead><tbody>
             ${r.lines.map((l) => `<tr><td>${esc(l.itemName || '—')}</td><td>${esc(l.description)}</td><td>${num(l.qty)}</td><td>${money(l.estCost)}</td><td><b>${money(l.qty * l.estCost)}</b></td></tr>`).join('')}
           </tbody><tfoot><tr><th colspan="4">الإجمالي التقديري</th><th>${money(total)}</th></tr></tfoot></table>

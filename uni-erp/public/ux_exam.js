@@ -389,6 +389,7 @@
     ];
     if (UA.can('faculty:manage')) tabs.push(['members', 'أعضاء هيئة التدريس']);
     if (UA.can('course:manage')) tabs.push(['sections', 'الشعب والتسجيل']);
+    tabs.push(['teach_calendar', 'التقويم الأكاديمي'], ['teach_lectures', 'إلغاء المحاضرات وتعويضها'], ['teach_absence', 'الغياب والحرمان']);
 
     const bar = `<div class="sub-tabs no-print" role="tablist">
       ${tabs.map(([id, label]) => `<button class="chip" role="tab" data-act="acadtab" data-t="${id}" aria-pressed="${cur === id}">${label}</button>`).join('')}
@@ -397,6 +398,7 @@
     if (cur === 'my_grades' && UA.renderMyGrades) return bar + UA.renderMyGrades();
     if (cur === 'gpa_sim') return bar + renderGpaSimBlock();
     if (cur === 'sections' && UA.renderSectionsAdmin) return bar + UA.renderSectionsAdmin();
+    if (cur.startsWith('teach_') && UA.teaching) return bar + UA.teaching.render(cur.slice(6));
     if (cur === 'members' && UA.facultyView) return bar + UA.facultyView();
     return bar + (origAcadView ? origAcadView().replace(/<div class="sub-tabs[^"]*"[^>]*>[\s\S]*?<\/div>/, '') : '');
   };

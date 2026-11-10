@@ -1,3 +1,5 @@
+import { createEmployeeAccount, endEmployeeAccount } from './employee_accounts.js';
+import { getSetting } from './settings.js';
 import { tx } from '../db.js';
 import { amount, isoDay, required } from '../validate.js';
 import { nextNumber } from './numbering.js';
@@ -657,7 +659,7 @@ export function registerHrIntegratedRoutes(r, { db, cfg }) {
   });
 
   // 1) إضافة موظف جديد متكامل (يتزامن مع hr_employees و hr_salaries و hr_monthly_attendance)
-  r.add('POST', '/api/hr-pro/employees', (c) => {
+  r.add('POST', '/api/hr-pro/employees', async (c) => {
     if (!c.user.can('hr:manage') && c.user.role !== 'admin') throw new HttpError(403, 'لا تملك صلاحية هذا الإجراء.');
     const b = c.body ?? {};
     const name = clean(b.name, 100);
@@ -741,7 +743,8 @@ export function registerHrIntegratedRoutes(r, { db, cfg }) {
     }
 
     audit(db, c.user, 'إضافة موظف في منظومة شؤون الموظفين', employeeNo, c.ip);
-    c.json(201, { id: empId, employeeNo });
+    const account = getSetting(db, 'hr.auto_account') ? await createEmployeeAccount({ db, cfg }, c.user, empId, c.ip) : null;
+    c.json(201, { id: empId, employeeNo, account });
   });
 
   // تعديل بيانات موظف
@@ -782,7 +785,8 @@ export function registerHrIntegratedRoutes(r, { db, cfg }) {
       id
     );
     audit(db, c.user, 'تحديث بيانات موظف (شؤون الموظفين)', emp.employeeNo, c.ip);
-    c.json(200, { ok: true });
+    const closed = statusDb === 'terminated' && emp.status !== 'terminated' ? endEmployeeAccount({ db }, c.user, emp, c.ip) : false;
+    c.json(200, { ok: true, accountClosed: closed });
   });
 
   // 2) تحديث سجل الحضور والانصراف الشهري ونسبة الالتزام

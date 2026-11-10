@@ -5,6 +5,7 @@ import { HttpError } from '../http.js';
 import { tx } from '../db.js';
 import { nextNumber } from './numbering.js';
 import { getSetting } from './settings.js';
+import { assertNotDeprived } from './teaching.js';
 
 export const passMark = (db) => getSetting(db, 'grades.pass_mark');
 // الجهات غير التطبيقية لها علامة نجاح مستقلة؛ وما لم يُدرج (أو طالب بلا جهة) يأخذ علامة التطبيقية الأعلى
@@ -106,6 +107,7 @@ export function enterGrade({ db }, actor, studentId, b, ip) {
   const ay = String(b?.academicYear ?? '');
   const m = /^(\d{4})\/(\d{4})$/.exec(ay);
   if (!m || Number(m[2]) !== Number(m[1]) + 1) throw new HttpError(400, 'العام الدراسي بصيغة 2025/2026.', 'validation');
+  assertNotDeprived(db, studentId, c.id, ay);
   const totalMax = getSetting(db, 'grades.total_max'), practicalMax = getSetting(db, 'grades.practical_max');
   const theory = intIn(b.theory, 0, totalMax, 'العلامة النظرية');
   const practical = b.practical === '' || b.practical === null || b.practical === undefined ? null : intIn(b.practical, 0, practicalMax, 'العلامة العملية');

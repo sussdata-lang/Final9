@@ -1448,11 +1448,16 @@
         taxAmount: Number($id('he-tax').value) || 0,
       };
       if (it && it.id) {
-        await api('PUT', `/api/hr-pro/employees/${it.id}`, body);
-        toast('حُدّثت بيانات الموظف');
+        const u = await api('PUT', `/api/hr-pro/employees/${it.id}`, body);
+        toast(u.accountClosed ? 'حُدّثت بيانات الموظف، وأُغلق حسابه وطُلب استرداد بطاقته' : 'حُدّثت بيانات الموظف');
       } else {
-        await api('POST', '/api/hr-pro/employees', body);
-        toast('أُضيف الموظف الجديد');
+        const r = await api('POST', '/api/hr-pro/employees', body);
+        // تظهر كلمة المرور المؤقتة مرة واحدة؛ يغيّرها الموظف عند أول دخول
+        if (r.account && r.account.tempPassword) window.alert(`أُضيف الموظف وأُنشئ حسابه بصلاحيات دنيا.
+اسم المستخدم: ${r.account.username}
+كلمة المرور المؤقتة: ${r.account.tempPassword}
+امنحه دوره من شاشة الحسابات والصلاحيات.`);
+        toast(r.account && r.account.linked ? 'أُضيف الموظف ورُبط بحسابه القائم' : 'أُضيف الموظف الجديد');
       }
       B.modal = null;
       await reload();

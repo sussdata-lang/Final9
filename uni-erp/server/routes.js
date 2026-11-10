@@ -63,6 +63,7 @@ import { registerEnterpriseSuiteRoutes } from './services/enterprise_suite.js';
 import { registerStudentAffairsSuiteRoutes } from './services/student_affairs_suite.js';
 import { registerStudentRegulationRoutes } from './services/student_regulations.js';
 import { registerCouncilRoutes } from './services/councils.js';
+import { registerTeachingRoutes } from './services/teaching.js';
 import { login, logout, publicUser, changePassword, getSessionCacheStats, invalidateSessionCache } from './services/auth.js';
 import { listStaff, listStaffLight, staffDetail, createUser, updateUser, setUserActive, resetUserPassword, deleteUser } from './services/useradmin.js';
 import { getTranscriptTemplate, setTranscriptTemplate, getSite, saveSite, universityName } from './services/site.js';
@@ -610,6 +611,7 @@ export async function buildRouter(deps) {
   registerStudentAffairsSuiteRoutes(r, deps);
   registerStudentRegulationRoutes(r, deps);
   registerCouncilRoutes(r, deps);
+  registerTeachingRoutes(r, deps);
 
   // ---- محرك الأداء الفائق والضغط العالي (10,000+ مستخدم متزامن + 10+ مراسلات/إضافات مالية بالثانية) ----
   r.add('GET', '/api/v12/high-concurrency/telemetry', (c) => {

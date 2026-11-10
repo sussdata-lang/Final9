@@ -8,7 +8,8 @@ export async function registerProcurement(r, deps){
   const g = (perm, fn, code=200) => async (c) => { need(c, perm); const res = await fn(c, c.body??{}, c.query??{}); if(res==null) return c.json(204,{}); return c.json(code, res); };
   const gc = (perm, fn) => g(perm, fn, 201);
   // مقدّم طلب الشراء يرى الأصناف والمستودعات لتعبئة طلبه، وطلباته هو فقط
-  const canSeeAll = (c) => c.user.can('procurement:read');
+  // معتمدو المراحل المالية والعليا يطّلعون على الطلبات ليبتّوا فيها
+  const canSeeAll = (c) => c.user.can('procurement:read') || c.user.can('procurement:approve_finance') || c.user.can('procurement:approve_top');
   const forRequester = (fn) => async (c) => { if (!canSeeAll(c)) need(c, 'procurement:request'); return c.json(200, await fn(c, c.body ?? {}, c.query ?? {})); };
   r.add('GET','/api/procurement/overview', g('procurement:read', ()=>P.overview(db)));
   r.add('GET','/api/procurement/warehouses', forRequester(()=>({warehouses:P.listWarehouses(db)})));
@@ -33,8 +34,10 @@ export async function registerProcurement(r, deps){
   r.add('POST','/api/procurement/requests', gc('procurement:request', (c,b)=>P.createRequest(deps,c.user,b,c.ip)));
   r.add('PUT','/api/procurement/requests/:id', g('procurement:request', (c,b)=>P.updateRequest(deps,c.user,c.params.id,b,c.ip)));
   r.add('POST','/api/procurement/requests/:id/submit', g('procurement:request', (c)=>P.submitRequest(deps,c.user,c.params.id,c.ip)));
-  r.add('POST','/api/procurement/requests/:id/approve', g('procurement:manage', (c,b)=>P.decideRequest(deps,c.user,c.params.id,'approved', b?.note, c.ip)));
-  r.add('POST','/api/procurement/requests/:id/reject', g('procurement:manage', (c,b)=>P.decideRequest(deps,c.user,c.params.id,'rejected', b?.note, c.ip)));
+  // كل مرحلة اعتماد تتحقق من صلاحيتها داخل decideRequest
+  const approver = (perm, fn) => async (c) => { if (!['procurement:manage', 'procurement:approve_finance', 'procurement:approve_top'].some((p) => c.user.can(p))) throw new HttpError(403, 'لا تملك صلاحية اعتماد طلبات الشراء.', 'forbidden'); return c.json(200, await fn(c, c.body ?? {})); };
+  r.add('POST','/api/procurement/requests/:id/approve', approver('procurement:manage', (c,b)=>P.decideRequest(deps,c.user,c.params.id,'approved', b?.note, c.ip)));
+  r.add('POST','/api/procurement/requests/:id/reject', approver('procurement:manage', (c,b)=>P.decideRequest(deps,c.user,c.params.id,'rejected', b?.note, c.ip)));
   r.add('POST','/api/procurement/requests/:id/cancel', g('procurement:request', (c)=>P.cancelRequest(deps,c.user,c.params.id,c.ip)));
   r.add('GET','/api/procurement/orders', g('procurement:read', (_c,_b,q)=>({orders:P.listOrders(db,q)})));
   r.add('GET','/api/procurement/orders/:id', g('procurement:read', (c)=>P.getOrder(db,c.params.id)));

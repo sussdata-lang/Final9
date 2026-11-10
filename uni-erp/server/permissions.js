@@ -103,6 +103,8 @@ export const PERMISSION_CATALOG = [
       { key: 'procurement:stock', label: 'استلام التوريد وصرف المخزون وتعديل الحركة المخزنية', op: 'edit', module: 'procurement_assets' },
       { key: 'procurement:assets', label: 'إدارة وتعديل الأصول الثابتة وحركاتها (نقل، صيانة، إتلاف)', op: 'delete', module: 'procurement_assets' },
       { key: 'procurement:manage', label: 'اعتماد طلبات الشراء وإنشاء أوامر التوريد وإدارة الموردين', op: 'approve', module: 'procurement_assets' },
+      { key: 'procurement:approve_finance', label: 'الاعتماد المالي لطلبات الشراء التي تتجاوز حدها في الإعدادات', op: 'approve', module: 'procurement_assets' },
+      { key: 'procurement:approve_top', label: 'اعتماد رئاسة الجامعة لطلبات الشراء الكبرى', op: 'approve', module: 'procurement_assets' },
     ],
   },
   {
@@ -893,7 +895,7 @@ export function computeAllowedViews(effectivePerms = [], explicitAllowedViews = 
   if (has('student:register', 'course:manage', 'grade:manage', 'data:export', 'import:groups', 'import:academic', 'import:procurement', 'import:finance', 'import:hr', 'import:student_fin', 'import:misc')) out.push('exchange');
   if (has('comms:read', 'news:manage', 'complaint:manage')) out.push('comms');
   if (role === 'admin' || has('enterprise_ai:use', 'academic:read', 'sa_advising:view', 'sa_advising:edit')) out.push('ai');
-  if (has('procurement:read', 'procurement:request', 'procurement:manage', 'procurement:stock', 'procurement:assets')) out.push('procurement');
+  if (has('procurement:read', 'procurement:request', 'procurement:manage', 'procurement:stock', 'procurement:assets', 'procurement:approve_finance', 'procurement:approve_top')) out.push('procurement');
   if (has('finance:read', 'finance:entry', 'finance:post', 'finance:fees', 'finance:setup')) out.push('finance');
   out.push('admin');
   if (has('user:manage', 'role:manage')) out.push('access');
