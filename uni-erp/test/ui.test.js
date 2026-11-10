@@ -97,13 +97,16 @@ test('السجل 360: قسم المقررات حتى دون علامات، وز�
   t.after(() => page.evaluate(() => { document.body.classList.remove('print-a4'); document.getElementById('a4root')?.replaceChildren(); document.getElementById('layer').innerHTML = ''; }));
   const id = (await api('GET', '/api/students?q=' + encodeURIComponent('ريم'))).j.students[0].id;
   await page.evaluate((id) => UA.actions.strecord(null, { id }), id); await page.waitForSelector('#layer .rec-h');
+  // العناوين تظهر قبل امتلاء الجداول؛ ننتظر جدول المقررات
+  await page.waitForFunction(() => document.querySelector('#layer table')?.innerText.includes('أمن الشبكات'), null, { timeout: 5000 }).catch(() => {});
   const heads = (await page.locator('#layer .rec-h').allInnerTexts()).join('|');
   assert.ok(heads.includes('المقررات') && heads.includes('بيانات الطالب'));
   assert.ok((await page.locator('#layer table').first().innerText()).includes('أمن الشبكات'));
   await page.evaluate(() => { window.print = () => {}; });
   await page.locator('[data-act=r360print]').click();
   // المستند يُبنى في طبقة A4 المستقلة بالترويسة الرسمية
-  await page.waitForFunction(() => document.querySelector('#a4root .rec-print')?.textContent.includes('المقررات'));
+  // الترويسة تُبنى بعد جلب بيانات الموقع، فننتظرها مع نص المستند
+  await page.waitForFunction(() => document.querySelector('#a4root .rec-print')?.textContent.includes('المقررات') && !!document.querySelector('#a4root .a4-head'));
   assert.ok(await page.evaluate(() => !!document.querySelector('#a4root .a4-head') && document.body.classList.contains('print-a4')));
 });
 

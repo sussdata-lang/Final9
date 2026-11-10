@@ -58,6 +58,12 @@ export const PERMISSION_CATALOG = [
     ],
   },
   {
+    group: 'الخدمات الإدارية',
+    items: [
+      { key: 'facilities:manage', label: 'اعتماد حجوزات القاعات وإسناد أوامر الصيانة وتعريف المرافق', op: 'approve', module: 'correspondence' },
+    ],
+  },
+  {
     group: 'المجالس واللجان',
     items: [
       { key: 'council:manage', label: 'تشكيل المجالس واللجان وتعيين أعضائها وإدارة كل اجتماعاتها', op: 'edit', module: 'correspondence' },
@@ -653,6 +659,9 @@ export const ALL_STAFF_VIEWS = [
   { key: 'payroll', label: 'شؤون الموظفين (الرواتب والحضور والبصمة والتقييم)', group: 'الموارد البشرية والديوان' },
   { key: 'corr', label: 'الديوان والمراسلات والطلبات الداخلية', group: 'الموارد البشرية والديوان' },
   { key: 'councils', label: 'المجالس واللجان والقرارات', group: 'الموارد البشرية والديوان' },
+  { key: 'facilities', label: 'الخدمات الإدارية (الصيانة وحجز القاعات)', group: 'الموارد البشرية والديوان' },
+  { key: 'recruitment', label: 'التوظيف (الشواغر والمتقدمون والمقابلات)', group: 'الموارد البشرية والديوان' },
+  { key: 'quotations', label: 'عروض الأسعار وتقييم المورّدين', group: 'المالية والمشتريات' },
   { key: 'finance', label: 'المالية والمحاسبة والرسوم', group: 'المالية والمشتريات' },
   { key: 'procurement', label: 'المشتريات والمخازن والأصول', group: 'المالية والمشتريات' },
   { key: 'dashboard', label: 'الإحصاءات والتقارير', group: 'التقارير والتواصل والذكاء' },
@@ -890,7 +899,9 @@ export function computeAllowedViews(effectivePerms = [], explicitAllowedViews = 
   if (has('hr_emp:view', 'hr_emp:write', 'hr_emp:edit', 'hr_payroll:approve', 'staffatt:self', 'staffatt:manage')) out.push('payroll');
   if (has('corr:use', 'corr:read_all', 'corr:templates', 'request:create_internal')) out.push('corr');
   // كل موظف قد يكون عضواً في مجلس أو مكلفاً بتنفيذ قرار، فيرى مجالسه ومهامه
-  out.push('councils');
+  out.push('councils', 'facilities');
+  if (role === 'admin' || has('hr:manage')) out.push('recruitment');
+  if (has('procurement:read')) out.push('quotations');
   if (has('stats:read', 'hr_emp:view', 'hr_emp:write', 'hr_emp:edit', 'hr_emp:delete', 'hr:manage', 'hr_payroll:approve', 'staffatt:manage', 'audit:read', 'devops:manage', 'settings:manage', 'backup:manage')) out.push('dashboard');
   if (has('student:register', 'course:manage', 'grade:manage', 'data:export', 'import:groups', 'import:academic', 'import:procurement', 'import:finance', 'import:hr', 'import:student_fin', 'import:misc')) out.push('exchange');
   if (has('comms:read', 'news:manage', 'complaint:manage')) out.push('comms');
@@ -903,7 +914,7 @@ export function computeAllowedViews(effectivePerms = [], explicitAllowedViews = 
   // التخصيص يُضيّق ما تتيحه الصلاحيات ولا يوسّعه: شاشة بلا صلاحية لا تظهر ثم تفشل بـ403
   if (Array.isArray(explicitAllowedViews) && explicitAllowedViews.length > 0) {
     const legacy = { desk: 'overview', hr: 'payroll', internal: 'corr', devops: 'audit', units: 'admin', verify: 'admin' };
-    const chosen = new Set(['overview', 'guidelines', 'admin', 'councils', ...explicitAllowedViews.map((k) => legacy[k] ?? k)]);
+    const chosen = new Set(['overview', 'guidelines', 'admin', 'councils', 'facilities', ...explicitAllowedViews.map((k) => legacy[k] ?? k)]);
     return ALL_STAFF_VIEWS.map((v) => v.key).filter((k) => chosen.has(k) && out.includes(k));
   }
   return [...new Set(out)];

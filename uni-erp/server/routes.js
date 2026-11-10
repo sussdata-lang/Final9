@@ -28,6 +28,8 @@ const ROUTE_LOCKS = {
   'POST /api/enterprise/installments/:id/pay': byId('installment'),
   'POST /api/council-items/:id/decide': byId('council_item'), 'POST /api/council-items/:id/recuse': byId('council_item'), 'POST /api/council-meetings/:id/attendance': byId('council_meeting'),
   'POST /api/council-meetings/:id/close': byId('council_meeting'), 'POST /api/council-meetings/:id/schedule': byId('council_meeting'), 'POST /api/council-tasks/:id/done': byId('council_task'),
+  'POST /api/facilities/bookings': () => 'room_booking', 'POST /api/facilities/bookings/:id/decide': () => 'room_booking',
+  'POST /api/procurement/rfqs/:id/award': byId('rfq'), 'POST /api/procurement/rfqs/:id/quotes': byId('rfq'),
   'POST /api/finance/budgets/transfer': () => 'budget', 'POST /api/procurement/orders/:id/order': () => 'budget',
   'POST /api/finance/invoices/:id/match': () => 'billing', 'POST /api/finance/invoices/:id/override': () => 'billing',
   'POST /api/lms/loans': () => 'library', 'POST /api/lms/loans/:id/return': () => 'library',
@@ -64,6 +66,9 @@ import { registerStudentAffairsSuiteRoutes } from './services/student_affairs_su
 import { registerStudentRegulationRoutes } from './services/student_regulations.js';
 import { registerCouncilRoutes } from './services/councils.js';
 import { registerTeachingRoutes } from './services/teaching.js';
+import { registerRecruitmentRoutes } from './services/recruitment.js';
+import { registerFacilitiesRoutes } from './services/facilities.js';
+import { registerQuotationRoutes } from './services/procurement/quotations.js';
 import { login, logout, publicUser, changePassword, getSessionCacheStats, invalidateSessionCache } from './services/auth.js';
 import { listStaff, listStaffLight, staffDetail, createUser, updateUser, setUserActive, resetUserPassword, deleteUser } from './services/useradmin.js';
 import { getTranscriptTemplate, setTranscriptTemplate, getSite, saveSite, universityName } from './services/site.js';
@@ -612,6 +617,9 @@ export async function buildRouter(deps) {
   registerStudentRegulationRoutes(r, deps);
   registerCouncilRoutes(r, deps);
   registerTeachingRoutes(r, deps);
+  registerRecruitmentRoutes(r, deps);
+  registerFacilitiesRoutes(r, deps);
+  registerQuotationRoutes(r, deps);
 
   // ---- محرك الأداء الفائق والضغط العالي (10,000+ مستخدم متزامن + 10+ مراسلات/إضافات مالية بالثانية) ----
   r.add('GET', '/api/v12/high-concurrency/telemetry', (c) => {

@@ -137,6 +137,7 @@ export const SCHEMA = [
     { key: 'finance.receipt_title', label: 'عنوان الإيصال (رأس PDF)', type: 'text', default: 'إيصال استلام رسوم', min: 5, max: 80 },
     { key: 'finance.receipt_footer', label: 'تذييل الإيصال', type: 'text', default: 'شكراً لسدادكم في الوقت المحدد', min: 0, max: 120 },
     { key: 'finance.separate_poster', label: 'فصل المهام: لا يرحّل القيد من أنشأه', type: 'bool', default: false, hint: 'عند تفعيله يُلزم بأن يرحّل شخص مختلف عن منشئ القيد.' },
+    { key: 'procurement.min_quotes', label: 'أقل عدد عروض أسعار قبل الترسية دون تبرير', type: 'int', default: 3, min: 1, max: 10, unit: 'عرض' },
     { key: 'procurement.approval_finance_above', label: 'طلب الشراء فوق هذا المبلغ يحتاج اعتماداً مالياً', type: 'int', default: 1000000, min: 0, max: 100000000000, unit: 'ل.س', hint: 'صفر يلغي هذه المرحلة.' },
     { key: 'procurement.approval_top_above', label: 'طلب الشراء فوق هذا المبلغ يحتاج اعتماد رئاسة الجامعة', type: 'int', default: 10000000, min: 0, max: 100000000000, unit: 'ل.س', hint: 'صفر يلغي هذه المرحلة.' },
     { key: 'finance.budget_control', label: 'الرقابة على الموازنة عند إرسال أمر التوريد', type: 'select', default: 'block', options: opt(['block', 'منع التجاوز'], ['warn', 'تحذير وتسجيل فقط'], ['off', 'بلا رقابة']) },
