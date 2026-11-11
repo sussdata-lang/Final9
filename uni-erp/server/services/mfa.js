@@ -69,7 +69,7 @@ export function verifyCode({ db, cfg }, user, code) {
   return true;
 }
 
-const enforced = (db) => process.env.DEMO_MODE !== '1' && (process.env.NODE_ENV === 'production' || process.env.MFA_ENFORCE === '1') && getSetting(db, 'security.mfa_required');
+const enforced = (db) => process.env.DISABLE_MFA !== '1' && process.env.DEMO_MODE !== '1' && (process.env.NODE_ENV === 'production' || process.env.MFA_ENFORCE === '1') && getSetting(db, 'security.mfa_required');
 export const mfaSetupRequired = (db, user) => !user.mfa_enabled && enforced(db) && (MFA_ROLES.has(user.role) || MFA_ROLES.has(user.role_key));
 
 export function startSetup({ db, cfg }, user) {

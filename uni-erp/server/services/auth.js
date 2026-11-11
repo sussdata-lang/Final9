@@ -214,7 +214,7 @@ export async function login({ db, cfg, limiter }, { username, password, code, ip
     audit(db, null, 'دخول مرفوض', username, ip);
     throw new HttpError(401, 'اسم المستخدم أو كلمة المرور غير صحيحة.', 'bad_credentials');
   }
-  if (u.mfa_enabled) {
+  if (u.mfa_enabled && process.env.DISABLE_MFA !== '1') {
     if (!code) throw new HttpError(401, 'أدخل رمز التحقق من تطبيق المصادقة.', 'mfa_required');
     if (!verifyCode({ db, cfg }, u, code)) {
       const fails = u.failed_logins + 1;
