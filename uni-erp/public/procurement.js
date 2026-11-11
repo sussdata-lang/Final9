@@ -51,6 +51,18 @@
     const [l, c] = map[s] || [s, 'b-mut'];
     return `<span class="badge ${c}">${esc(l)}</span>`;
   };
+  // جداول «الحقل: القيمة» لنماذج الجامعة في العرض والطباعة: زوجان في كل صف
+  const kv4 = (pairs) => {
+    const list = pairs.filter(Boolean); let h = '';
+    for (let i = 0; i < list.length; i += 2) {
+      const [a, b] = [list[i], list[i + 1]];
+      h += `<tr><th>${esc(a[0])}</th><td${b ? '' : ' colspan="3"'}>${esc(a[1] === undefined || a[1] === null || a[1] === '' ? '—' : String(a[1]))}</td>${b ? `<th>${esc(b[0])}</th><td>${esc(b[1] === undefined || b[1] === null || b[1] === '' ? '—' : String(b[1]))}</td>` : ''}</tr>`;
+    }
+    return `<table class="tbl a4-kv a4-kv2"><tbody>${h}</tbody></table>`;
+  };
+  const QUALITY = ['مطابق', 'مطابق جزئيًا', 'غير مطابق'];
+  const CONDITION = ['جديدة', 'مستعملة', 'تالفة'];
+  const THRESHOLDS = ['شراء مباشر', 'استدراج عروض أسعار', 'مناقصة'];
 
   const TABS = [
     ['overview', '📊 لوحة الإمداد والمخازن'],
@@ -466,7 +478,7 @@
               <td>${(r.lines || []).map((l) => `<span class="badge b-ok" style="margin-inline-end:4px">${esc(l.itemName)}: ${num(l.qty)} × ${money(l.unitCost)}</span>`).join(' ')}</td>
               <td>${fmt(r.receivedAt)}</td>
               <td>${esc(r.note || '—')}</td>
-              <td>${UA.rowPrintBtn('مذكرة فحص واستلام مخزني', 'المشتريات والمخازن', 'أمين المستودع|لجنة الفحص والاستلام|مسؤول المشتريات')}</td>
+              <td><button class="btn sm" data-act="proc-view-rcv" data-id="${r.id}">عرض / طباعة</button></td>
             </tr>`).join('') || '<tr><td colspan="7" class="empty">لا توجد مذكرات استلام مسجلة</td></tr>'}
           </tbody></table></div>
         </div>
@@ -481,7 +493,7 @@
               <td>${esc(i.purpose || '—')}</td>
               <td>${(i.lines || []).map((l) => `<span class="badge b-info" style="margin-inline-end:4px">${esc(l.itemName)} (${num(l.qty)})</span>`).join(' ')}</td>
               <td>${fmt(i.issuedAt)}</td>
-              <td>${UA.rowPrintBtn('إذن صرف مخزني', 'المشتريات والمخازن', 'أمين المستودع|المستلم|مسؤول المشتريات')}</td>
+              <td><button class="btn sm" data-act="proc-view-iss" data-id="${i.id}">عرض / طباعة</button></td>
             </tr>`).join('') || '<tr><td colspan="7" class="empty">لا توجد أذونات صرف مخزني</td></tr>'}
           </tbody></table></div>
         </div>
@@ -753,13 +765,22 @@
           steps: [{ label: 'مسودة', state: 'cur' }, { label: 'الاعتماد' }, { label: 'أمر التوريد' }, { label: 'الاستلام' }],
           sections: [
             { title: 'تفاصيل الطلب', html: `<label>عنوان طلب الشراء<input id="pr-title" placeholder="تأمين مستلزمات مخبر الشبكات والأمن السيبراني"></label>
-            <label>المستودع المستفيد<select id="pr-wh"><option value="">— اختر المستودع —</option>${P.warehouses.filter((w) => w.active).map((w) => `<option value="${w.id}">${esc(w.name)}</option>`).join('')}</select></label>` },
+            <label>المستودع المستفيد<select id="pr-wh"><option value="">— اختر المستودع —</option>${P.warehouses.filter((w) => w.active).map((w) => `<option value="${w.id}">${esc(w.name)}</option>`).join('')}</select></label>
+            <label>القسم الطالب<input id="pr-dept" placeholder="المكتبة"></label>
+            <label>المسمى الوظيفي لمقدّم الطلب<input id="pr-job" placeholder="سكرتير"></label>
+            <label>المسؤول المباشر<input id="pr-mgr" placeholder="رئيس القسم"></label>
+            <label>عتبة الشراء<select id="pr-thr"><option value="">— اختر —</option>${THRESHOLDS.map((t) => `<option>${esc(t)}</option>`).join('')}</select></label>
+            <label>تاريخ الحاجة<input id="pr-need" type="date"></label>
+            <label>المبلغ الإجمالي كتابةً<input id="pr-words" placeholder="مليونان وسبعمئة ألف ليرة سورية لا غير"></label>` },
             { title: 'البنود المطلوبة', wide: true, html: `<div id="pr-lines">
-            <div class="form-grid pr-line" style="margin-bottom:6px;grid-template-columns:1.4fr 1.6fr .7fr .9fr">
-              <select class="pr-item"><option value="">— صنف مخزني (اختياري) —</option>${P.items.map((i) => `<option value="${i.id}" data-name="${esc(i.name)}" data-cost="${i.avgCost || 0}">${esc(i.code)} · ${esc(i.name)}</option>`).join('')}</select>
-              <input class="pr-ldesc" placeholder="وصف البند والمواصفات">
-              <input class="pr-qty" type="number" value="5" placeholder="الكمية">
-              <input class="pr-cost" type="number" value="0" placeholder="سعر تقديري">
+            <div class="form-grid pr-line" style="margin-bottom:6px;grid-template-columns:1.2fr 1.2fr 1.3fr .8fr .6fr .5fr .7fr">
+              <select class="pr-item" aria-label="الصنف"><option value="">— صنف مخزني (اختياري) —</option>${P.items.map((i) => `<option value="${i.id}" data-name="${esc(i.name)}" data-cost="${i.avgCost || 0}" data-unit="${esc(i.unit || '')}">${esc(i.code)} · ${esc(i.name)}</option>`).join('')}</select>
+              <input class="pr-ldesc" placeholder="المادة" aria-label="المادة">
+              <input class="pr-specs" placeholder="المواصفات" aria-label="المواصفات">
+              <input class="pr-budget" placeholder="رمز الموازنة" aria-label="رمز الموازنة">
+              <input class="pr-unit" placeholder="الواحدة" aria-label="الواحدة">
+              <input class="pr-qty" type="number" value="5" placeholder="العدد" aria-label="العدد المطلوب">
+              <input class="pr-cost" type="number" value="0" placeholder="السعر الإفرادي" aria-label="السعر الإفرادي">
             </div>
           </div>
           <button class="btn sm" data-act="proc-add-req-line" style="justify-self:start">+ إضافة بند آخر</button>` },
@@ -775,8 +796,7 @@
         const first = c?.querySelector('.pr-line');
         if (c && first) {
           const clone = first.cloneNode(true);
-          clone.querySelectorAll('input').forEach((i) => (i.value = i.classList.contains('pr-qty') ? '1' : '0'));
-          clone.querySelector('.pr-ldesc').value = '';
+          clone.querySelectorAll('input').forEach((i) => (i.value = i.classList.contains('pr-qty') ? '1' : i.classList.contains('pr-cost') ? '0' : ''));
           c.appendChild(clone);
         }
       }
@@ -788,14 +808,19 @@
           return {
             itemId: sel.value || null,
             description: desc,
+            specs: r.querySelector('.pr-specs').value.trim(),
+            budgetCode: r.querySelector('.pr-budget').value.trim(),
+            unit: r.querySelector('.pr-unit').value.trim() || opt?.dataset?.unit || '',
             qty: Number(r.querySelector('.pr-qty').value),
             estCost: Number(r.querySelector('.pr-cost').value || opt?.dataset?.cost || 0)
           };
         });
+        const val = (id) => document.getElementById(id).value.trim();
         await api('POST', '/api/procurement/requests', {
           title: document.getElementById('pr-title').value,
           description: document.getElementById('pr-desc').value,
           warehouseId: document.getElementById('pr-wh').value || null,
+          department: val('pr-dept'), jobTitle: val('pr-job'), directManager: val('pr-mgr'), purchaseThreshold: val('pr-thr'), needDay: val('pr-need'), amountWords: val('pr-words'),
           submit: b.dataset.sub === '1',
           lines
         });
@@ -805,15 +830,16 @@
         const { request: r } = await api('GET', `/api/procurement/requests/${b.dataset.id}`);
         const total = (r.lines || []).reduce((s, l) => s + Number(l.qty || 0) * Number(l.estCost || 0), 0);
         showModal(`<div class="spread"><h3>تفاصيل طلب شراء ${esc(r.no)}</h3>${stBadge(REQ_STATUS, r.status)}</div>
-          <p><b>العنوان:</b> ${esc(r.title)} · <b>مقدم الطلب:</b> ${esc(r.requesterName || '—')}</p>
-          ${r.description ? `<p class="mut">${esc(r.description)}</p>` : ''}
+          ${kv4([['الجهة الطالبة', r.department], ['مقدّم الطلب', r.requesterName], ['المسمى الوظيفي', r.jobTitle], ['المسؤول المباشر', r.directManager], ['عتبة الشراء', r.purchaseThreshold], ['تاريخ الحاجة', r.needDay], ['عنوان الطلب', r.title]])}
+          <p style="margin:8px 0 4px"><b>طلب التوريد والخدمات اللوجستية:</b> يرجى الموافقة على شراء المواد الآتية:</p>
+          <table class="tbl"><thead><tr><th>رقم السطر</th><th>المادة</th><th>الرمز (الموازنة)</th><th>المواصفات</th><th>رصيد المستودع</th><th>الواحدة</th><th>العدد المطلوب</th><th>السعر الإفرادي</th><th>السعر الإجمالي</th><th>ملاحظات</th></tr></thead><tbody>
+            ${r.lines.map((l, i) => `<tr><td>${i + 1}</td><td>${esc(l.description || l.itemName || '—')}</td><td>${esc(l.budgetCode || '—')}</td><td>${esc(l.specs || '—')}</td><td>${l.stockBalance === null || l.stockBalance === undefined ? '—' : num(l.stockBalance)}</td><td>${esc(l.unit || '—')}</td><td>${num(l.qty)}</td><td>${num(l.estCost)}</td><td><b>${num(l.qty * l.estCost)}</b></td><td>${esc(l.note || '—')}</td></tr>`).join('')}
+          </tbody><tfoot><tr><th colspan="8">الإجمالي (ل.س)</th><th>${num(total)}</th><th></th></tr></tfoot></table>
+          ${kv4([['المبلغ كتابةً', r.amountWords], ['سبب الطلب ومبرّراته', r.description]])}
           ${r.decisionNote ? `<p><b>ملاحظة القرار:</b> ${esc(r.decisionNote)}</p>` : ''}
-          ${r.approval ? `<p><b>مراحل الاعتماد:</b> ${r.approval.required.map((l) => { const d = r.approval.done.find((x) => x.label === l); return d ? `✓ ${esc(l)} (${esc(d.by || '—')})` : (r.approval.next && r.approval.next.label === l ? `⏳ ${esc(l)}` : esc(l)); }).join(' ← ')}</p>` : ''}
-          <table class="tbl"><thead><tr><th>الصنف</th><th>الوصف</th><th>الكمية</th><th>التكلفة التقديرية</th><th>الإجمالي</th></tr></thead><tbody>
-            ${r.lines.map((l) => `<tr><td>${esc(l.itemName || '—')}</td><td>${esc(l.description)}</td><td>${num(l.qty)}</td><td>${money(l.estCost)}</td><td><b>${money(l.qty * l.estCost)}</b></td></tr>`).join('')}
-          </tbody><tfoot><tr><th colspan="4">الإجمالي التقديري</th><th>${money(total)}</th></tr></tfoot></table>
+          ${r.approval ? `<p data-print-skip><b>مراحل الاعتماد:</b> ${r.approval.required.map((l) => { const d = r.approval.done.find((x) => x.label === l); return d ? `✓ ${esc(l)} (${esc(d.by || '—')})` : (r.approval.next && r.approval.next.label === l ? `⏳ ${esc(l)}` : esc(l)); }).join(' ← ')}</p>` : ''}
           <div class="row-end" style="margin-top:12px">
-            <button class="btn no-print" data-act="print">طباعة</button><span hidden data-doc-title="طلب شراء" data-doc-dept="المشتريات والمخازن" data-doc-signers="مقدم الطلب:${esc(r.requesterName || '')}|رئيس القسم|مسؤول المشتريات"></span>
+            <button class="btn no-print" data-act="print">طباعة</button><span hidden data-doc-title="طلب شراء" data-doc-no="${esc(r.no)}" data-doc-status="${esc((REQ_STATUS[r.status] || [r.status])[0])}" data-doc-dept="المشتريات والمخازن" data-doc-signers="مقدّم الطلب:${esc(r.requesterName || '')}|المسؤول المباشر:${esc(r.directManager || '')}|مسؤول المشتريات|أمين الجامعة"></span>
             ${r.status === 'approved' && can('procurement:manage') ? `<button class="btn pri" data-act="proc-req-to-po" data-id="${r.id}">🚚 تحويل لأمر توريد (PO)</button>` : ''}
             <button class="btn" data-act="proc-close-modal">إغلاق</button>
           </div>`);
@@ -846,17 +872,35 @@
             <label>ربط بطلب شراء معتمد<select id="po-req"><option value="">— أمر توريد مباشر —</option>${appReqs.map((r) => `<option value="${r.id}" ${preReqId === r.id ? 'selected' : ''}>${esc(r.no)} · ${esc(r.title)}</option>`).join('')}</select></label>
             <label>بند الموازنة<select id="po-budget" data-no-other="1"><option value="">— دون ربط بالموازنة —</option>${(P.budgets || []).map((x) => `<option value="${x.id}">${esc(x.label)} — المتاح ${Number(x.available).toLocaleString('en-US')}</option>`).join('')}</select></label>
             <label style="grid-column:1/-1">شروط التوريد والتسليم<input id="po-note" value="${preReq ? `توريد بنود الطلب ${preReq.no}` : 'تسليم أرض المستودع المركزي خلال 7 أيام'}"></label>
+            <label>طريقة التوصيل<input id="po-dmethod" placeholder="توصيل المورّد"></label>
+            <label>تاريخ التوصيل المطلوب<input id="po-dday" type="date"></label>
+            <label>شروط الدفع<input id="po-pay" placeholder="نقدًا (كاش)"></label>
+            <label>العملة<select id="po-cur"><option>ليرة سورية</option><option>USD</option></select></label>
           </div>
-          <h4>بنود أمر التوريد</h4>
+          <h4>عنوان التوصيل / الاستلام وتحرير الفواتير</h4>
+          <div class="form-grid">
+            <label>شخص التواصل للتوصيل<input id="po-dcon" placeholder="أمين المستودع"></label>
+            <label>البريد الإلكتروني للتوصيل<input id="po-dmail" type="email"></label>
+            <label style="grid-column:1/-1">عنوان التوصيل<input id="po-daddr" placeholder="المخزن الرئيسي — الجامعة السورية للعلوم الأمنية"></label>
+            <label>شخص التواصل للفوترة<input id="po-bcon" placeholder="المحاسب"></label>
+            <label>البريد الإلكتروني للفوترة<input id="po-bmail" type="email"></label>
+          </div>
+          <h4>بنود أمر الشراء</h4>
           <div id="po-lines">
             ${initLines.map((ln) => `
-              <div class="form-grid po-line" style="margin-bottom:6px;grid-template-columns:1.4fr 1.6fr .7fr .9fr">
-                <select class="po-item"><option value="">— اختر الصنف —</option>${P.items.map((i) => `<option value="${i.id}" ${ln.itemId === i.id ? 'selected' : ''}>${esc(i.code)} · ${esc(i.name)}</option>`).join('')}</select>
-                <input class="po-desc" value="${esc(ln.description || '')}" placeholder="وصف البند">
-                <input class="po-qty" type="number" value="${ln.qty || 1}" placeholder="الكمية">
-                <input class="po-cost" type="number" value="${ln.estCost || ln.unitCost || 25000}" placeholder="سعر الوحدة">
+              <div class="form-grid po-line" style="margin-bottom:6px;grid-template-columns:1.3fr 1.6fr .6fr .6fr .9fr">
+                <select class="po-item" aria-label="الصنف"><option value="">— اختر الصنف —</option>${P.items.map((i) => `<option value="${i.id}" ${ln.itemId === i.id ? 'selected' : ''}>${esc(i.code)} · ${esc(i.name)}</option>`).join('')}</select>
+                <input class="po-desc" value="${esc(ln.description || '')}" placeholder="وصف المواد / الخدمات" aria-label="الوصف">
+                <input class="po-unit" value="${esc(ln.unit || '')}" placeholder="الواحدة" aria-label="الواحدة">
+                <input class="po-qty" type="number" value="${ln.qty || 1}" placeholder="الكمية" aria-label="الكمية">
+                <input class="po-cost" type="number" value="${ln.estCost || ln.unitCost || 25000}" placeholder="سعر الواحدة" aria-label="سعر الواحدة">
               </div>
             `).join('')}
+          </div>
+          <div class="form-grid">
+            <label>ضريبة المبيعات (إن وُجدت)<input id="po-stax" type="number" value="0" min="0"></label>
+            <label>ضريبة التوصيل (إن وُجدت)<input id="po-dtax" type="number" value="0" min="0"></label>
+            <label>ضرائب أخرى (إن وُجدت)<input id="po-otax" type="number" value="0" min="0"></label>
           </div>
           <div class="row-end" style="margin-top:12px"><button class="btn" data-act="proc-close-modal">إلغاء</button><button class="btn pri" data-act="proc-save-order">إصدار أمر التوريد</button></div>`);
       }
@@ -864,28 +908,44 @@
         const lines = [...document.querySelectorAll('#po-lines .po-line')].map((r) => ({
           itemId: r.querySelector('.po-item').value || null,
           description: r.querySelector('.po-desc').value,
+          unit: r.querySelector('.po-unit').value.trim(),
           qty: Number(r.querySelector('.po-qty').value),
           unitCost: Number(r.querySelector('.po-cost').value)
         }));
+        const val = (id) => document.getElementById(id).value.trim();
         await api('POST', '/api/procurement/orders', {
           supplierId: Number(document.getElementById('po-sup').value),
           requestId: document.getElementById('po-req').value || null,
           budgetId: Number(document.getElementById('po-budget')?.value) || null,
           note: document.getElementById('po-note').value,
+          deliveryMethod: val('po-dmethod'), deliveryDay: val('po-dday'), paymentTerms: val('po-pay'), currency: val('po-cur'),
+          deliveryContact: val('po-dcon'), deliveryEmail: val('po-dmail'), deliveryAddress: val('po-daddr'), billingContact: val('po-bcon'), billingEmail: val('po-bmail'),
+          salesTax: Number(val('po-stax') || 0), deliveryTax: Number(val('po-dtax') || 0), otherTax: Number(val('po-otax') || 0),
           lines
         });
         toast('تم إصدار أمر التوريد بنجاح'); closeModal(); P.tab = 'cycle'; P.cycleMode = 'orders'; await refresh();
       }
       else if (act === 'proc-view-ord') {
         const { order: o } = await api('GET', `/api/procurement/orders/${b.dataset.id}`);
-        showModal(`<div data-doc-title="أمر توريد" data-doc-no="${esc(o.no)}" data-doc-dept="المشتريات والمخازن" data-doc-status="${esc((ORD_STATUS[o.status] || [o.status])[0] || '')}" data-doc-signers="مسؤول المشتريات|المدير المالي|الآمر بالصرف|المورد (استلام الأمر)"></div><div class="spread"><h3>أمر توريد رقم ${esc(o.no)}</h3>${stBadge(ORD_STATUS, o.status)}</div>
-          <p><b>المورد:</b> ${esc(o.supplierName)} · <b>تاريخ الإصدار:</b> ${fmt(o.createdAt)}</p>
-          ${o.note ? `<p><b>شروط التوريد:</b> ${esc(o.note)}</p>` : ''}
-          <table class="tbl"><thead><tr><th>الصنف</th><th>البيان</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead><tbody>
-            ${(o.lines || []).map((l) => `<tr><td>${esc(l.itemName || '—')}</td><td>${esc(l.description)}</td><td>${num(l.qty)}</td><td>${money(l.unitCost)}</td><td><b>${money(l.lineTotal)}</b></td></tr>`).join('')}
-          </tbody><tfoot><tr><th colspan="4">القيمة الإجمالية لأمر التوريد</th><th>${money(o.totalAmount)}</th></tr></tfoot></table>
+        const sp = o.supplier || {};
+        showModal(`<div data-doc-title="أمر شراء" data-doc-no="${esc(o.no)}" data-doc-dept="المشتريات والمخازن" data-doc-status="${esc((ORD_STATUS[o.status] || [o.status])[0] || '')}" data-doc-signers="نظّمه (مسؤول المشتريات)|حامل الميزانية (بالتفويض)|الآمر بالصرف|موافقة المورّد وختمه"></div><div class="spread"><h3>أمر شراء رقم ${esc(o.no)}</h3>${stBadge(ORD_STATUS, o.status)}</div>
+          <h4 style="margin:8px 0 4px">المورّد</h4>
+          ${kv4([['اسم الشركة', o.supplierName], ['شخص التواصل', sp.contactPerson], ['البريد الإلكتروني', sp.email], ['الهاتف', sp.phone], ['الفاكس', sp.fax], ['الموبايل', sp.mobile], ['العنوان', sp.address]])}
+          <h4 style="margin:8px 0 4px">عنوان التوصيل / الاستلام وتحرير الفواتير</h4>
+          ${kv4([['شخص التواصل للتوصيل', o.deliveryContact], ['البريد الإلكتروني', o.deliveryEmail], ['عنوان التوصيل', o.deliveryAddress], ['جهة الفوترة', 'الجامعة السورية للعلوم الأمنية'], ['شخص التواصل للفوترة', o.billingContact], ['بريد الفوترة', o.billingEmail]])}
+          ${kv4([['طريقة التوصيل', o.deliveryMethod], ['تاريخ التوصيل المطلوب', o.deliveryDay], ['شروط الدفع', o.paymentTerms], ['تاريخ الإصدار', fmt(o.createdAt)], ['شروط التوريد', o.note]])}
+          <table class="tbl"><thead><tr><th>رقم طلب الشراء</th><th>رقم السطر</th><th>وصف المواد / الخدمات</th><th>الواحدة</th><th>الكمية</th><th>العملة</th><th>سعر الواحدة</th><th>السعر الكامل</th></tr></thead><tbody>
+            ${(o.lines || []).map((l, i) => `<tr><td>${esc(o.requestNo || '—')}</td><td>${i + 1}</td><td>${esc(l.description || l.itemName || '—')}</td><td>${esc(l.unit || '—')}</td><td>${num(l.qty)}</td><td>${esc(o.currency || 'ليرة سورية')}</td><td>${num(l.unitCost)}</td><td><b>${num(l.lineTotal)}</b></td></tr>`).join('')}
+          </tbody><tfoot>
+            <tr><th colspan="7">المجموع</th><th>${num(o.totalAmount)}</th></tr>
+            <tr><th colspan="7">ضريبة المبيعات (إن وُجدت)</th><th>${num(o.salesTax)}</th></tr>
+            <tr><th colspan="7">ضريبة التوصيل (إن وُجدت)</th><th>${num(o.deliveryTax)}</th></tr>
+            <tr><th colspan="7">ضرائب أخرى (إن وُجدت)</th><th>${num(o.otherTax)}</th></tr>
+            <tr><th colspan="7">المجموع الكامل</th><th>${num(o.grandTotal ?? o.totalAmount)}</th></tr>
+          </tfoot></table>
+          <p class="small">يجب ذكر رقم طلب الشراء على جميع المراسلات والوثائق، بما فيها مذكرة التسليم والفاتورة.</p>
           <div class="row-end" style="margin-top:12px">
-            <button class="btn no-print" data-act="print">🖨️ طباعة أمر التوريد</button>
+            <button class="btn no-print" data-act="print">🖨️ طباعة أمر الشراء</button>
             <button class="btn pri" data-act="proc-close-modal">إغلاق</button>
           </div>`);
       }
@@ -901,26 +961,52 @@
         if (!ordList.length) { toast('لا توجد أوامر توريد بحالة «مرسل للمورد» بانتظار الاستلام'); return; }
         const preOrdId = act === 'proc-rcv-from-ord' ? Number(b.dataset.id) : ordList[0].id;
         const selOrd = ordList.find((o) => o.id === preOrdId) || ordList[0];
-        const firstLine = selOrd?.lines?.[0] || {};
-        showModal(`<h3>📥 تسجيل مذكرة فحص واستلام مخزني</h3>
+        // بنود الاستلام من بنود أمر الشراء: الكمية المتوقعة والمستلمة وفحص الجودة لكل بند
+        const rcvRows = (o) => (o?.lines || []).filter((l) => l.itemId).map((l) => `
+          <div class="form-grid prc-line" data-item="${l.itemId}" data-expected="${l.qty}" style="margin-bottom:6px;grid-template-columns:1.8fr .7fr .8fr 1fr 1.4fr">
+            <span style="align-self:center"><b>${esc(l.itemName || l.description)}</b> <span class="small">(${esc(l.unit || '')})</span></span>
+            <span style="align-self:center" class="small">المتوقعة: ${num(l.qty)}</span>
+            <input class="prc-qty" type="number" min="0" value="${l.qty}" aria-label="الكمية المستلمة">
+            <select class="prc-quality" aria-label="فحص الجودة">${QUALITY.map((q) => `<option>${esc(q)}</option>`).join('')}</select>
+            <input class="prc-comment" placeholder="تعليقات" aria-label="تعليقات">
+          </div>`).join('') || '<p class="small">لا توجد في هذا الأمر بنود مرتبطة بأصناف مخزنية.</p>';
+        showModal(`<h3>📥 تسجيل مذكرة فحص واستلام مواد</h3>
           <div class="form-grid">
-            <label>أمر التوريد (PO)<select id="prc-ord">${ordList.map((o) => `<option value="${o.id}" ${o.id === selOrd.id ? 'selected' : ''}>${esc(o.no)} · ${esc(o.supplierName)}</option>`).join('')}</select></label>
-            <label>الصنف المستلم للمخزن<select id="prc-item">${P.items.map((i) => `<option value="${i.id}" ${firstLine.itemId === i.id ? 'selected' : ''}>${esc(i.code)} · ${esc(i.name)}</option>`).join('')}</select></label>
-            <label>الكمية المقبولة فعلياً<input id="prc-qty" type="number" value="${firstLine.qty || 10}"></label>
-            <label>سعر التكلفة للوحدة (ل.س)<input id="prc-cost" type="number" value="${firstLine.unitCost || 25000}"></label>
-            <label style="grid-column:1/-1">ملاحظة لجنة الفحص والاستلام<input id="prc-note"></label>
+            <label>أمر الشراء (PO)<select id="prc-ord">${ordList.map((o) => `<option value="${o.id}" ${o.id === selOrd.id ? 'selected' : ''}>${esc(o.no)} · ${esc(o.supplierName)}</option>`).join('')}</select></label>
+            <label>تم الاستلام من (المورّد / المتبرع)<input id="prc-from" placeholder="اسم المورّد افتراضيًا"></label>
+            <label>رقم بيان الشحنة / مذكرة التسليم<input id="prc-dn" placeholder="DN-0000"></label>
+            <label>موقع المستلم<input id="prc-loc" placeholder="المخزن الرئيسي"></label>
           </div>
+          <h4>البنود المستلمة</h4>
+          <div id="prc-lines">${rcvRows(selOrd)}</div>
+          <div class="form-grid">
+            <label style="grid-column:1/-1">ملاحظات الفحص<input id="prc-note"></label>
+            <label>تتوافق جميع البضائع مع المعايير لتمرير الدفعة<select id="prc-ok"><option value="1">نعم</option><option value="0">لا</option></select></label>
+          </div>
+          <p class="small">يجب فحص البضاعة مقابل الكميات والمواصفات المدرجة في طلب الشراء، وتُترك مدة بين الاستلام والدفع للتأكد من الجودة.</p>
           <div class="row-end"><button class="btn" data-act="proc-close-modal">إلغاء</button><button class="btn pri" data-act="proc-save-receipt">اعتماد الاستلام وتحديث الرصيد</button></div>`);
+        document.getElementById('prc-ord')?.addEventListener('change', (e) => {
+          const o = ordList.find((x) => x.id === Number(e.target.value));
+          document.getElementById('prc-lines').innerHTML = rcvRows(o);
+        });
       }
       else if (act === 'proc-save-receipt') {
+        const lines = [...document.querySelectorAll('#prc-lines .prc-line')].map((r) => ({
+          itemId: Number(r.dataset.item),
+          expectedQty: Number(r.dataset.expected),
+          qty: Number(r.querySelector('.prc-qty').value),
+          quality: r.querySelector('.prc-quality').value,
+          comment: r.querySelector('.prc-comment').value.trim()
+        })).filter((l) => l.qty > 0);
+        if (!lines.length) { toast('أدخل كمية مستلمة لبند واحد على الأقل'); return; }
         await api('POST', '/api/procurement/receipts', {
           orderId: Number(document.getElementById('prc-ord').value),
           note: document.getElementById('prc-note').value,
-          lines: [{
-            itemId: Number(document.getElementById('prc-item').value),
-            qty: Number(document.getElementById('prc-qty').value),
-            unitCost: Number(document.getElementById('prc-cost').value)
-          }]
+          receivedFrom: document.getElementById('prc-from').value.trim(),
+          deliveryNoteNo: document.getElementById('prc-dn').value.trim(),
+          location: document.getElementById('prc-loc').value.trim(),
+          compliant: document.getElementById('prc-ok').value === '1',
+          lines
         });
         toast('تم استلام التوريد وتحديث المخزون ومتوسط التكلفة المرجح'); closeModal(); P.tab = 'movements'; P.moveMode = 'receipts'; await refresh();
       }
@@ -930,22 +1016,66 @@
           const [w, it] = await Promise.all([api('GET', '/api/procurement/warehouses'), api('GET', '/api/procurement/items')]);
           P.warehouses = w.warehouses; P.items = it.items;
         }
-        showModal(`<h3>📤 تحرير إذن صرف وإخراج مخزني</h3>
+        showModal(`<h3>📤 تحرير محضر إخراج / صرف مواد من المستودع</h3>
           <div class="form-grid">
             <label>المستودع المصدِّر<select id="pis-wh">${P.warehouses.filter((w) => w.active).map((w) => `<option value="${w.id}">${esc(w.name)}</option>`).join('')}</select></label>
-            <label>الجهة / القسم / الموظف المستلم<input id="pis-to" placeholder="عمادة كلية الهندسة المعلوماتية"></label>
-            <label>الصنف المطلوب صرفه<select id="pis-item">${P.items.filter((i) => i.qtyOnHand > 0).map((i) => `<option value="${i.id}">${esc(i.code)} · ${esc(i.name)} (المتاح: ${num(i.qtyOnHand)})</option>`).join('')}</select></label>
-            <label>الكمية المصروفة<input id="pis-qty" type="number" value="1"></label>
-            <label style="grid-column:1/-1">الغرض من الصرف ورقم الطلب<input id="pis-purpose" placeholder="تأمين مستلزمات القاعات التدريسية"></label>
+            <label>رقم طلب الصرف / الإخراج<input id="pis-ref" placeholder="SR-2026-0001"></label>
+            <label>القسم الطالب<input id="pis-dept" placeholder="المكتبة"></label>
+            <label>اسم المستلم<input id="pis-recv" placeholder="اسم الموظف المستلم"></label>
+            <label style="grid-column:1/-1">الغرض من الإخراج<input id="pis-purpose" placeholder="تأمين مستلزمات القاعات التدريسية"></label>
           </div>
+          <h4>المواد المصروفة</h4>
+          <div id="pis-lines">
+            <div class="form-grid pis-line" style="margin-bottom:6px;grid-template-columns:1.8fr .7fr .7fr .9fr 1.2fr">
+              <select class="pis-item" aria-label="المادة">${P.items.filter((i) => i.qtyOnHand > 0).map((i) => `<option value="${i.id}">${esc(i.code)} · ${esc(i.name)} (المتاح: ${num(i.qtyOnHand)})</option>`).join('')}</select>
+              <input class="pis-req" type="number" min="1" value="1" placeholder="المطلوبة" aria-label="الكمية المطلوبة">
+              <input class="pis-qty" type="number" min="1" value="1" placeholder="المصروفة" aria-label="الكمية المصروفة">
+              <select class="pis-cond" aria-label="حالة المادة">${CONDITION.map((c) => `<option>${esc(c)}</option>`).join('')}</select>
+              <input class="pis-note" placeholder="ملاحظات" aria-label="ملاحظات">
+            </div>
+          </div>
+          <button class="btn sm" data-act="proc-add-issue-line">+ إضافة مادة أخرى</button>
           <div class="row-end"><button class="btn" data-act="proc-close-modal">إلغاء</button><button class="btn pri" data-act="proc-save-issue">اعتماد الصرف وتخفيض الرصيد</button></div>`);
       }
+      else if (act === 'proc-view-rcv') {
+        const r = P.receipts.find((x) => x.id === Number(b.dataset.id)); if (!r) return;
+        showModal(`<div data-doc-title="مذكرة فحص واستلام مواد" data-doc-no="${esc(r.no)}" data-doc-dept="المشتريات والمخازن" data-doc-signers="أمين المستودع (المستلم)|القسم الطالب|لجنة الفحص والاستلام|مسؤول المشتريات"></div>
+          <div class="spread"><h3>مذكرة فحص واستلام مواد ${esc(r.no)}</h3>${r.reversedAt ? '<span class="badge b-err">معكوسة</span>' : ''}</div>
+          ${kv4([['تاريخ استلام السلع', fmt(r.receivedAt)], ['رقم أمر الشراء', r.orderNo], ['تم الاستلام من (المورّد / المتبرع)', r.receivedFrom], ['رقم بيان الشحنة / مذكرة التسليم', r.deliveryNoteNo], ['موقع المستلم', r.location], ['رقم طلب الشراء', r.requestNo]])}
+          <table class="tbl"><thead><tr><th>رقم طلب الشراء</th><th>رقم العنصر</th><th>وصف المواد</th><th>الواحدة</th><th>الكمية المتوقعة</th><th>الكمية المستلمة</th><th>فحص الجودة</th><th>تعليقات</th></tr></thead><tbody>
+            ${(r.lines || []).map((l, i) => `<tr><td>${esc(r.requestNo || '—')}</td><td>${i + 1}</td><td>${esc(l.itemName)}</td><td>${esc(l.unit || '—')}</td><td>${l.expectedQty === null || l.expectedQty === undefined ? '—' : num(l.expectedQty)}</td><td><b>${num(l.qty)}</b></td><td>${esc(l.quality || '—')}</td><td>${esc(l.comment || '—')}</td></tr>`).join('')}
+          </tbody></table>
+          ${kv4([['ملاحظات الفحص', r.note], ['تتوافق جميع البضائع مع المعايير لتمرير الدفعة', r.compliant === null || r.compliant === undefined ? '—' : r.compliant ? 'نعم' : 'لا']])}
+          <p class="small">يجب فحص البضاعة مقابل الكميات والمواصفات المدرجة في طلب الشراء، وتُترك مدة بين الاستلام والدفع للتأكد من الجودة.</p>
+          <div class="row-end" style="margin-top:12px"><button class="btn no-print" data-act="print">🖨️ طباعة المذكرة</button><button class="btn pri" data-act="proc-close-modal">إغلاق</button></div>`);
+      }
+      else if (act === 'proc-view-iss') {
+        const s = P.issues.find((x) => x.id === Number(b.dataset.id)); if (!s) return;
+        showModal(`<div data-doc-title="محضر إخراج / صرف مواد من المستودع" data-doc-no="${esc(s.no)}" data-doc-dept="المشتريات والمخازن" data-doc-orient="landscape" data-doc-signers="أمين المستودع|القسم الطالب|المستلم:${esc(s.receiverName || '')}|المشرف / المسؤول المعتمد"></div>
+          <div class="spread"><h3>محضر إخراج / صرف مواد ${esc(s.no)}</h3>${s.reversedAt ? '<span class="badge b-err">معكوس</span>' : ''}</div>
+          ${kv4([['تاريخ الإخراج', fmt(s.issuedAt)], ['القسم الطالب', s.department || s.issuedTo], ['رقم طلب الصرف / الإخراج', s.requestRef], ['موقع المستودع', [s.warehouseName, s.warehouseLocation].filter(Boolean).join(' — ')], ['اسم المستلم', s.receiverName], ['الغرض من الإخراج', s.purpose]])}
+          <table class="tbl"><thead><tr><th>رقم السطر</th><th>اسم / وصف المادة</th><th>الواحدة</th><th>الكمية المطلوبة</th><th>الكمية المصروفة</th><th>الرصيد بعد الصرف</th><th>حالة المادة</th><th>ملاحظات</th></tr></thead><tbody>
+            ${(s.lines || []).map((l, i) => `<tr><td>${i + 1}</td><td>${esc(l.itemName)}</td><td>${esc(l.unit || '—')}</td><td>${num(l.requestedQty)}</td><td><b>${num(l.qty)}</b></td><td>${l.balanceAfter === null || l.balanceAfter === undefined ? '—' : num(l.balanceAfter)}</td><td>${esc(l.itemCondition || '—')}</td><td>${esc(l.note || '—')}</td></tr>`).join('')}
+          </tbody></table>
+          <h4 style="margin:8px 0 4px">إقرار الاستلام والإخراج</h4>
+          <p>أُقرّ بأن المواد الموضحة أعلاه أُخرجت من المستودع وسُلّمت للجهة أو الشخص المستلم وفق الكميات المسجلة في هذا المحضر، وأنها استُلمت بحالة سليمة ما لم يرد خلاف ذلك في خانة الملاحظات.</p>
+          <p class="small">التوزيع المقترح: المالية (أصل) – المستودع (نسخة) – المشتريات (نسخة).</p>
+          <div class="row-end" style="margin-top:12px"><button class="btn no-print" data-act="print">🖨️ طباعة المحضر</button><button class="btn pri" data-act="proc-close-modal">إغلاق</button></div>`);
+      }
+      else if (act === 'proc-add-issue-line') {
+        const c = document.getElementById('pis-lines'), first = c?.querySelector('.pis-line');
+        if (c && first) { const n = first.cloneNode(true); n.querySelectorAll('input').forEach((i) => (i.value = i.type === 'number' ? '1' : '')); c.appendChild(n); }
+      }
       else if (act === 'proc-save-issue') {
+        const val = (id) => document.getElementById(id).value.trim();
         await api('POST', '/api/procurement/issues', {
           warehouseId: Number(document.getElementById('pis-wh').value),
-          issuedTo: document.getElementById('pis-to').value,
+          requestRef: val('pis-ref'), department: val('pis-dept'), receiverName: val('pis-recv'),
           purpose: document.getElementById('pis-purpose').value,
-          lines: [{ itemId: Number(document.getElementById('pis-item').value), qty: Number(document.getElementById('pis-qty').value) }]
+          lines: [...document.querySelectorAll('#pis-lines .pis-line')].map((r) => ({
+            itemId: Number(r.querySelector('.pis-item').value), requestedQty: Number(r.querySelector('.pis-req').value), qty: Number(r.querySelector('.pis-qty').value),
+            itemCondition: r.querySelector('.pis-cond').value, note: r.querySelector('.pis-note').value.trim()
+          }))
         });
         toast('تم تحرير إذن الصرف وتخفيض الرصيد المخزني'); closeModal(); P.tab = 'movements'; P.moveMode = 'issues'; await refresh();
       }
@@ -1017,6 +1147,10 @@
             <label>البريد الإلكتروني<input id="ps-email" value="${esc(cur?.email || '')}"></label>
             <label>الرقم الضريبي / السجل التجاري<input id="ps-tax" value="${esc(cur?.taxNo || '')}"></label>
             <label>العنوان التفصيلي<input id="ps-addr" value="${esc(cur?.address || '')}"></label>
+            <label>شخص التواصل<input id="ps-contact" value="${esc(cur?.contactPerson || '')}"></label>
+            <label>الموبايل<input id="ps-mobile" value="${esc(cur?.mobile || '')}"></label>
+            <label>الفاكس<input id="ps-fax" value="${esc(cur?.fax || '')}"></label>
+            <label>مجال تخصص المورّد<input id="ps-spec" value="${esc(cur?.specialty || '')}" placeholder="أجهزة ولوازم مكتبية"></label>
           </div>
           <div class="row-end"><button class="btn" data-act="proc-close-modal">إلغاء</button><button class="btn pri" data-act="proc-save-sup" data-id="${cur?.id || ''}">حفظ بيانات المورد</button></div>`);
       }
@@ -1028,7 +1162,11 @@
           phone: document.getElementById('ps-phone').value,
           email: document.getElementById('ps-email').value,
           taxNo: document.getElementById('ps-tax').value,
-          address: document.getElementById('ps-addr').value
+          address: document.getElementById('ps-addr').value,
+          contactPerson: document.getElementById('ps-contact').value,
+          mobile: document.getElementById('ps-mobile').value,
+          fax: document.getElementById('ps-fax').value,
+          specialty: document.getElementById('ps-spec').value
         };
         if (id) await api('PUT', `/api/procurement/suppliers/${id}`, body);
         else await api('POST', '/api/procurement/suppliers', body);

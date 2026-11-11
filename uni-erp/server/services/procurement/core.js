@@ -17,6 +17,11 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 export const isDay = (s) => DAY.test(String(s)) && !isNaN(Date.parse(s+'T00:00:00Z')) && new Date(s+'T00:00:00Z').toISOString().slice(0,10)===s;
 export const today = () => new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Damascus'}).format(new Date());
 export { clean };
+// حقول نماذج الجامعة الاختيارية: الفارغ يُحفظ فارغاً، وغير الفارغ يُنظَّف ويُتحقق منه
+const opt = (v, max, label) => (v === undefined || v === null || String(v).trim() === '') ? '' : clean(v, max, label, 0);
+const optDay = (v, label) => { const s = String(v ?? '').trim(); if (!s) return ''; if (!isDay(s)) throw bad(`«${label}» بصيغة 2026-12-31.`); return s; };
+const optInt = (v, label) => { if (v === undefined || v === null || v === '') return null; const n = Number(v); if (!Number.isFinite(n) || n < 0) throw bad(`«${label}» رقم غير سالب.`); return Math.round(n); };
+const nonNeg = (v, label) => optInt(v, label) ?? 0;
 const nextNo = (db, prefix, table) => {
   const y = today().slice(0,4);
   const head = `${prefix}-${y}-`;
@@ -58,19 +63,20 @@ export function deleteWarehouse({db},actor,id,ip){
 export function listSuppliers(db,q={}){
   const w=[],a=[]; if(q.q){ const l='%'+String(q.q).replace(/[\\%_]/g,'\\$&')+'%'; w.push('(name LIKE ? ESCAPE "\\" OR code LIKE ? ESCAPE "\\")'); a.push(l,l); }
   const where=w.length?'WHERE '+w.join(' AND '):'';
-  return db.prepare(`SELECT * FROM proc_suppliers ${where} ORDER BY name LIMIT 200`).all(...a).map(r=>({id:r.id,code:r.code,name:r.name,phone:r.phone,email:r.email,address:r.address,taxNo:r.tax_no,active:!!r.active,createdAt:r.created_at}));
+  return db.prepare(`SELECT * FROM proc_suppliers ${where} ORDER BY name LIMIT 200`).all(...a).map(r=>({id:r.id,code:r.code,name:r.name,phone:r.phone,email:r.email,address:r.address,taxNo:r.tax_no,contactPerson:r.contact_person,fax:r.fax,mobile:r.mobile,specialty:r.specialty,active:!!r.active,createdAt:r.created_at}));
 }
+const supExtra = (b, cur = {}) => ['contactPerson', 'fax', 'mobile', 'specialty'].map((k, i) => (b?.[k] !== undefined ? opt(b[k], [80, 30, 30, 120][i], ['شخص التواصل', 'الفاكس', 'الموبايل', 'مجال التخصص'][i]) : (cur[['contact_person', 'fax', 'mobile', 'specialty'][i]] ?? '')));
 export function createSupplier({db},actor,b,ip){
   const code=clean(b?.code,20,'رمز المورد'); const name=clean(b?.name,80,'اسم المورد',2);
   if(db.prepare('SELECT 1 FROM proc_suppliers WHERE code=?').get(code)) throw bad('رمز المورد مستخدم.',409,'conflict');
-  const id=Number(db.prepare('INSERT INTO proc_suppliers (code,name,phone,email,address,tax_no,created_at) VALUES (?,?,?,?,?,?,?)').run(code,name,b?.phone??null,b?.email??null,b?.address??null,b?.taxNo??null,Date.now()).lastInsertRowid);
+  const id=Number(db.prepare('INSERT INTO proc_suppliers (code,name,phone,email,address,tax_no,contact_person,fax,mobile,specialty,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)').run(code,name,b?.phone??null,b?.email??null,b?.address??null,b?.taxNo??null,...supExtra(b),Date.now()).lastInsertRowid);
   audit(db,actor,'إضافة مورد',code,ip); return {supplier: db.prepare('SELECT * FROM proc_suppliers WHERE id=?').get(id)};
 }
 export function updateSupplier({db},actor,id,b,ip){
   const cur=db.prepare('SELECT * FROM proc_suppliers WHERE id=?').get(Number(id)); if(!cur) throw bad('المورد غير موجود.',404,'not_found');
   const code=b?.code?clean(b.code,20,'رمز المورد'):cur.code; const name=b?.name?clean(b.name,80,'اسم المورد',2):cur.name;
   if(code!==cur.code && db.prepare('SELECT 1 FROM proc_suppliers WHERE code=? AND id!=?').get(code,cur.id)) throw bad('رمز المورد مستخدم.',409,'conflict');
-  db.prepare('UPDATE proc_suppliers SET code=?,name=?,phone=?,email=?,address=?,tax_no=? WHERE id=?').run(code,name,b?.phone??cur.phone,b?.email??cur.email,b?.address??cur.address,b?.taxNo??cur.tax_no,cur.id);
+  db.prepare('UPDATE proc_suppliers SET code=?,name=?,phone=?,email=?,address=?,tax_no=?,contact_person=?,fax=?,mobile=?,specialty=? WHERE id=?').run(code,name,b?.phone??cur.phone,b?.email??cur.email,b?.address??cur.address,b?.taxNo??cur.tax_no,...supExtra(b,cur),cur.id);
   audit(db,actor,'تعديل مورد',code,ip); return {supplier: db.prepare('SELECT * FROM proc_suppliers WHERE id=?').get(cur.id)};
 }
 export function toggleSupplier({db},actor,id,on,ip){
@@ -129,12 +135,27 @@ export function listRequests(db,q={}){
   const w=[],a=[]; if(q.status) { w.push('r.status=?'); a.push(q.status); } if(q.q){ const l='%'+String(q.q).replace(/[\\%_]/g,'\\$&')+'%'; w.push('(r.no LIKE ? ESCAPE "\\" OR r.title LIKE ? ESCAPE "\\")'); a.push(l,l); }
   if(q.mine) { w.push('r.requester_id=?'); a.push(Number(q.mine)); }
   const where=w.length?'WHERE '+w.join(' AND '):'';
-  return db.prepare(`SELECT r.*, u.display_name requester_name FROM proc_requests r LEFT JOIN users u ON u.id=r.requester_id ${where} ORDER BY r.id DESC LIMIT 300`).all(...a).map(r=>({stage: r.status==='pending' ? (approvalStage(db,r).next?.label ?? null) : null, id:r.id,no:r.no,title:r.title,description:r.description,requesterId:r.requester_id,requesterName:r.requester_name,warehouseId:r.warehouse_id,status:r.status,requestedAt:r.requested_at,decidedBy:r.decided_by,decidedAt:r.decided_at,decisionNote:r.decision_note,createdAt:r.created_at,lines: db.prepare('SELECT l.*, i.name itemName, i.code itemCode FROM proc_request_lines l LEFT JOIN proc_items i ON i.id=l.item_id WHERE l.request_id=? ORDER BY l.id').all(r.id).map(x=>({id:x.id,itemId:x.item_id,itemCode:x.itemCode,itemName:x.itemName,description:x.description,qty:x.qty,estCost:x.est_cost,note:x.note}))}));
+  return db.prepare(`SELECT r.*, u.display_name requester_name FROM proc_requests r LEFT JOIN users u ON u.id=r.requester_id ${where} ORDER BY r.id DESC LIMIT 300`).all(...a).map(r=>({stage: r.status==='pending' ? (approvalStage(db,r).next?.label ?? null) : null, ...reqView(db,r)}));
+}
+const reqLines = (db, id) => db.prepare('SELECT l.*, i.name itemName, i.code itemCode FROM proc_request_lines l LEFT JOIN proc_items i ON i.id=l.item_id WHERE l.request_id=? ORDER BY l.id').all(id)
+  .map(x=>({id:x.id,itemId:x.item_id,itemCode:x.itemCode,itemName:x.itemName,description:x.description,qty:x.qty,estCost:x.est_cost,note:x.note,budgetCode:x.budget_code,specs:x.specs,unit:x.unit,stockBalance:x.stock_balance==null?null:Number(x.stock_balance)}));
+const reqView = (db, r) => ({id:r.id,no:r.no,title:r.title,description:r.description,requesterId:r.requester_id,requesterName:r.requester_name,warehouseId:r.warehouse_id,status:r.status,requestedAt:r.requested_at,decidedBy:r.decided_by,decidedAt:r.decided_at,decisionNote:r.decision_note,createdAt:r.created_at,
+  department:r.department,jobTitle:r.job_title,directManager:r.direct_manager,purchaseThreshold:r.purchase_threshold,needDay:r.need_day,amountWords:r.amount_words,lines:reqLines(db,r.id)});
+// بيانات رأس طلب الشراء من نموذج الجامعة
+const REQ_HEAD = [['department','department',80,'القسم الطالب'],['jobTitle','job_title',80,'المسمى الوظيفي'],['directManager','direct_manager',80,'المسؤول المباشر'],['purchaseThreshold','purchase_threshold',60,'عتبة الشراء'],['amountWords','amount_words',200,'المبلغ كتابةً']];
+const reqHead = (b, cur = {}) => [...REQ_HEAD.map(([k, col, max, label]) => (b?.[k] !== undefined ? opt(b[k], max, label) : (cur[col] ?? ''))), b?.needDay !== undefined ? optDay(b.needDay, 'تاريخ الحاجة') : (cur.need_day ?? '')];
+// البند يحفظ رصيد المستودع لحظة الطلب، ووحدة الصنف إن لم تُذكر
+function insertReqLines(db, id, lines){
+  for(const l of lines){
+    const item = l.itemId ? db.prepare('SELECT qty_on_hand, unit FROM proc_items WHERE id=?').get(Number(l.itemId)) : null;
+    db.prepare('INSERT INTO proc_request_lines (request_id,item_id,description,qty,est_cost,note,budget_code,specs,unit,stock_balance) VALUES (?,?,?,?,?,?,?,?,?,?)')
+      .run(id, l.itemId?Number(l.itemId):null, clean(l.description,100,'وصف البند',1), Number(l.qty), Number(l.estCost??0), String(l.note??'').slice(0,200),
+        opt(l.budgetCode,40,'رمز الموازنة'), opt(l.specs,300,'المواصفات'), opt(l.unit,20,'الواحدة') || item?.unit || '', item ? Number(item.qty_on_hand) : optInt(l.stockBalance,'رصيد المستودع'));
+  }
 }
 export function getRequest(db,id){
   const r=db.prepare('SELECT r.*, u.display_name requester_name FROM proc_requests r LEFT JOIN users u ON u.id=r.requester_id WHERE r.id=?').get(Number(id)); if(!r) throw bad('طلب الشراء غير موجود.',404,'not_found');
-  const lines=db.prepare('SELECT l.*, i.name itemName, i.code itemCode FROM proc_request_lines l LEFT JOIN proc_items i ON i.id=l.item_id WHERE l.request_id=? ORDER BY l.id').all(r.id);
-  return {request:{approval:approvalStage(db,r),id:r.id,no:r.no,title:r.title,description:r.description,requesterId:r.requester_id,requesterName:r.requester_name,warehouseId:r.warehouse_id,status:r.status,requestedAt:r.requested_at,decidedBy:r.decided_by,decidedAt:r.decided_at,decisionNote:r.decision_note,createdAt:r.created_at,lines:lines.map(x=>({id:x.id,itemId:x.item_id,itemCode:x.itemCode,itemName:x.itemName,description:x.description,qty:x.qty,estCost:x.est_cost,note:x.note}))}};
+  return {request:{approval:approvalStage(db,r),...reqView(db,r)}};
 }
 export function createRequest({db},actor,b,ip){
   const title=clean(b?.title,100,'عنوان الطلب',3); const desc=String(b?.description??'').slice(0,500);
@@ -142,10 +163,11 @@ export function createRequest({db},actor,b,ip){
   const lines=b?.lines; if(!Array.isArray(lines)||!lines.length) throw bad('أضف بنداً واحداً على الأقل.');
   if(lines.length>50) throw bad('حتى 50 بنداً للطلب.');
   for(let i=0;i<lines.length;i++){ const l=lines[i]; clean(l?.description,100,`وصف البند ${i+1}`,2); if(Number(l?.qty)<=0) throw bad(`البند ${i+1}: الكمية غير صالحة.`); if(l.itemId && !db.prepare('SELECT 1 FROM proc_items WHERE id=?').get(Number(l.itemId))) throw bad(`البند ${i+1}: الصنف غير موجود.`); }
+  const head = reqHead(b);
   return tx(db,()=>{
     const no=nextNo(db,'PRQ','proc_requests');
-    const id=Number(db.prepare('INSERT INTO proc_requests (no,title,description,requester_id,warehouse_id,status,created_at) VALUES (?,?,?,?,?,?,?)').run(no,title,desc,actor.id,whId,'draft',Date.now()).lastInsertRowid);
-    for(const l of lines) db.prepare('INSERT INTO proc_request_lines (request_id,item_id,description,qty,est_cost,note) VALUES (?,?,?,?,?,?)').run(id, l.itemId?Number(l.itemId):null, clean(l.description,100,'وصف البند',1), Number(l.qty), Number(l.estCost??0), String(l.note??'').slice(0,200));
+    const id=Number(db.prepare('INSERT INTO proc_requests (no,title,description,requester_id,warehouse_id,status,created_at,department,job_title,direct_manager,purchase_threshold,amount_words,need_day) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)').run(no,title,desc,actor.id,whId,'draft',Date.now(),...head).lastInsertRowid);
+    insertReqLines(db, id, lines);
     if(b?.submit){
       db.prepare("UPDATE proc_requests SET status='pending', requested_at=? WHERE id=?").run(Date.now(),id);
       audit(db,actor,'تقديم طلب شراء',no,ip);
@@ -213,10 +235,10 @@ export function updateRequest({db},actor,id,b,ip){
     const title=b?.title?clean(b.title,100,'عنوان الطلب',3):r.title;
     const desc=b?.description!==undefined?String(b.description).slice(0,500):r.description;
     const whId=b?.warehouseId!==undefined?(b.warehouseId?Number(b.warehouseId):null):r.warehouse_id;
-    db.prepare('UPDATE proc_requests SET title=?,description=?,warehouse_id=? WHERE id=?').run(title,desc,whId,r.id);
+    db.prepare('UPDATE proc_requests SET title=?,description=?,warehouse_id=?,department=?,job_title=?,direct_manager=?,purchase_threshold=?,amount_words=?,need_day=? WHERE id=?').run(title,desc,whId,...reqHead(b,r),r.id);
     if(Array.isArray(b?.lines)){
       db.prepare('DELETE FROM proc_request_lines WHERE request_id=?').run(r.id);
-      for(const l of b.lines) db.prepare('INSERT INTO proc_request_lines (request_id,item_id,description,qty,est_cost,note) VALUES (?,?,?,?,?,?)').run(r.id,l.itemId?Number(l.itemId):null,clean(l.description,100,'وصف البند',1),Number(l.qty),Number(l.estCost??0),String(l.note??'').slice(0,200));
+      insertReqLines(db, r.id, b.lines);
     }
     if(b?.submit){ db.prepare("UPDATE proc_requests SET status='pending', requested_at=? WHERE id=?").run(Date.now(),r.id); audit(db,actor,'تعديل وإرسال طلب شراء',r.no,ip); } else audit(db,actor,'تعديل طلب شراء',r.no,ip);
     return getRequest(db,r.id);
@@ -226,12 +248,25 @@ export function updateRequest({db},actor,id,b,ip){
 export function listOrders(db,q={}){
   const w=[],a=[]; if(q.status){w.push('o.status=?');a.push(q.status);} if(q.supplier){w.push('o.supplier_id=?');a.push(Number(q.supplier));}
   const where=w.length?'WHERE '+w.join(' AND '):'';
-  return db.prepare(`SELECT o.*, s.name supplierName, r.no requestNo FROM proc_orders o JOIN proc_suppliers s ON s.id=o.supplier_id LEFT JOIN proc_requests r ON r.id=o.request_id ${where} ORDER BY o.id DESC LIMIT 300`).all(...a).map(r=>({id:r.id,no:r.no,requestId:r.request_id,requestNo:r.requestNo,supplierId:r.supplier_id,supplierName:r.supplierName,status:r.status,totalAmount:r.total_amount,orderedAt:r.ordered_at,receivedAt:r.received_at,note:r.note,createdBy:r.created_by,createdAt:r.created_at,lines:db.prepare('SELECT l.*, i.name itemName, i.code itemCode FROM proc_order_lines l LEFT JOIN proc_items i ON i.id=l.item_id WHERE l.order_id=?').all(r.id).map(x=>({id:x.id,itemId:x.item_id,itemCode:x.itemCode,itemName:x.itemName,description:x.description,qty:x.qty,unitCost:x.unit_cost,lineTotal:x.line_total}))}));
+  return db.prepare(`${ORDER_SELECT} ${where} ORDER BY o.id DESC LIMIT 300`).all(...a).map(r=>orderView(db,r));
 }
+const ORDER_SELECT = `SELECT o.*, s.name supplierName, s.contact_person sup_contact, s.email sup_email, s.phone sup_phone, s.fax sup_fax, s.mobile sup_mobile, s.address sup_address, r.no requestNo
+  FROM proc_orders o JOIN proc_suppliers s ON s.id=o.supplier_id LEFT JOIN proc_requests r ON r.id=o.request_id`;
+// أمر الشراء ببيانات المورّد والتوصيل والفوترة والضرائب كما في نموذج الجامعة
+const orderView = (db, r) => {
+  const taxes = Number(r.sales_tax||0) + Number(r.delivery_tax||0) + Number(r.other_tax||0);
+  return {id:r.id,no:r.no,requestId:r.request_id,requestNo:r.requestNo,supplierId:r.supplier_id,supplierName:r.supplierName,status:r.status,totalAmount:r.total_amount,orderedAt:r.ordered_at,receivedAt:r.received_at,note:r.note,createdBy:r.created_by,createdAt:r.created_at,
+    supplier:{contactPerson:r.sup_contact??'',email:r.sup_email??'',phone:r.sup_phone??'',fax:r.sup_fax??'',mobile:r.sup_mobile??'',address:r.sup_address??''},
+    deliveryMethod:r.delivery_method,deliveryDay:r.delivery_day,paymentTerms:r.payment_terms,currency:r.currency,
+    deliveryContact:r.delivery_contact,deliveryEmail:r.delivery_email,deliveryAddress:r.delivery_address,billingContact:r.billing_contact,billingEmail:r.billing_email,
+    salesTax:Number(r.sales_tax||0),deliveryTax:Number(r.delivery_tax||0),otherTax:Number(r.other_tax||0),grandTotal:Number(r.total_amount||0)+taxes,
+    lines:db.prepare('SELECT l.*, i.name itemName, i.code itemCode FROM proc_order_lines l LEFT JOIN proc_items i ON i.id=l.item_id WHERE l.order_id=? ORDER BY l.id').all(r.id).map(x=>({id:x.id,itemId:x.item_id,itemCode:x.itemCode,itemName:x.itemName,description:x.description,qty:x.qty,unitCost:x.unit_cost,lineTotal:x.line_total,unit:x.unit}))};
+};
+const ORDER_HEAD = [['deliveryMethod','delivery_method',60,'طريقة التوصيل'],['paymentTerms','payment_terms',120,'شروط الدفع'],['currency','currency',20,'العملة'],['deliveryContact','delivery_contact',80,'شخص التواصل للتوصيل'],['deliveryEmail','delivery_email',120,'بريد التوصيل'],['deliveryAddress','delivery_address',160,'عنوان التوصيل'],['billingContact','billing_contact',80,'شخص التواصل للفوترة'],['billingEmail','billing_email',120,'بريد الفوترة']];
+const orderHead = (b) => [...ORDER_HEAD.map(([k, , max, label]) => opt(b?.[k], max, label)), optDay(b?.deliveryDay, 'تاريخ التوصيل المطلوب'), nonNeg(b?.salesTax, 'ضريبة المبيعات'), nonNeg(b?.deliveryTax, 'ضريبة التوصيل'), nonNeg(b?.otherTax, 'الضرائب الأخرى')];
 export function getOrder(db,id){
-  const r=db.prepare('SELECT o.*, s.name supplierName FROM proc_orders o JOIN proc_suppliers s ON s.id=o.supplier_id WHERE o.id=?').get(Number(id)); if(!r) throw bad('أمر التوريد غير موجود.',404,'not_found');
-  const lines=db.prepare('SELECT l.*, i.name itemName FROM proc_order_lines l LEFT JOIN proc_items i ON i.id=l.item_id WHERE l.order_id=?').all(r.id);
-  return {order:{id:r.id,no:r.no,requestId:r.request_id,supplierId:r.supplier_id,supplierName:r.supplierName,status:r.status,totalAmount:r.total_amount,orderedAt:r.ordered_at,receivedAt:r.received_at,note:r.note,createdAt:r.created_at,lines:lines.map(x=>({id:x.id,itemId:x.item_id,itemName:x.itemName,description:x.description,qty:x.qty,unitCost:x.unit_cost,lineTotal:x.line_total}))}};
+  const r=db.prepare(`${ORDER_SELECT} WHERE o.id=?`).get(Number(id)); if(!r) throw bad('أمر التوريد غير موجود.',404,'not_found');
+  return {order:orderView(db,r)};
 }
 export function createOrder({db},actor,b,ip){
   const supId=Number(b?.supplierId); if(!supId || !db.prepare('SELECT 1 FROM proc_suppliers WHERE id=? AND active=1').get(supId)) throw bad('المورد غير موجود أو معطّل.');
@@ -240,11 +275,15 @@ export function createOrder({db},actor,b,ip){
   if(reqId){ const rq=db.prepare('SELECT * FROM proc_requests WHERE id=?').get(reqId); if(!rq) throw bad('طلب الشراء غير موجود.',404,'not_found'); if(rq.status!=='approved') throw bad('طلب الشراء ليس معتمداً.',409,'conflict'); if(db.prepare("SELECT 1 FROM proc_orders WHERE request_id=? AND status!='cancelled' LIMIT 1").get(reqId)) throw bad('يوجد أمر توريد مرتبط بهذا الطلب.',409,'conflict'); }
   const lines=b?.lines; if(!Array.isArray(lines)||!lines.length) throw bad('أضف بنداً واحداً على الأقل.');
   for(let i=0;i<lines.length;i++){ const l=lines[i]; clean(l?.description,100,`وصف البند ${i+1}`,2); if(Number(l?.qty)<=0) throw bad(`البند ${i+1}: الكمية غير صالحة.`); if(Number(l?.unitCost)<0) throw bad(`البند ${i+1}: سعر الوحدة غير صالح.`); }
+  const head = orderHead(b); if (!head[2]) head[2] = 'ليرة سورية';
   return tx(db,()=>{
     const no=nextNo(db,'PO','proc_orders');
     const total=lines.reduce((s,l)=>s+Number(l.qty)*Number(l.unitCost||0),0);
-    const id=Number(db.prepare('INSERT INTO proc_orders (no,request_id,supplier_id,status,total_amount,note,created_by,created_at,budget_id) VALUES (?,?,?,?,?,?,?,?,?)').run(no,reqId,supId,'draft',total,String(b?.note??'').slice(0,300),actor.id,Date.now(),budgetId).lastInsertRowid);
-    for(const l of lines) db.prepare('INSERT INTO proc_order_lines (order_id,item_id,description,qty,unit_cost,line_total) VALUES (?,?,?,?,?,?)').run(id,l.itemId?Number(l.itemId):null,clean(l.description,100,'وصف البند',1),Number(l.qty),Number(l.unitCost||0),Number(l.qty)*Number(l.unitCost||0));
+    const id=Number(db.prepare('INSERT INTO proc_orders (no,request_id,supplier_id,status,total_amount,note,created_by,created_at,budget_id,delivery_method,payment_terms,currency,delivery_contact,delivery_email,delivery_address,billing_contact,billing_email,delivery_day,sales_tax,delivery_tax,other_tax) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(no,reqId,supId,'draft',total,String(b?.note??'').slice(0,300),actor.id,Date.now(),budgetId,...head).lastInsertRowid);
+    for(const l of lines){
+      const unit = opt(l.unit,20,'الواحدة') || (l.itemId ? (db.prepare('SELECT unit FROM proc_items WHERE id=?').get(Number(l.itemId))?.unit ?? '') : '');
+      db.prepare('INSERT INTO proc_order_lines (order_id,item_id,description,qty,unit_cost,line_total,unit) VALUES (?,?,?,?,?,?,?)').run(id,l.itemId?Number(l.itemId):null,clean(l.description,100,'وصف البند',1),Number(l.qty),Number(l.unitCost||0),Number(l.qty)*Number(l.unitCost||0),unit);
+    }
     if(reqId) db.prepare("UPDATE proc_requests SET status='ordered' WHERE id=?").run(reqId);
     audit(db,actor,'إنشاء أمر توريد',no,ip); return getOrder(db,id);
   });
@@ -264,8 +303,11 @@ export function createReceipt({db},actor,b,ip){
   const orderLines=db.prepare('SELECT * FROM proc_order_lines WHERE order_id=?').all(orderId);
   const prevRows=db.prepare('SELECT rl.item_id, COALESCE(SUM(rl.qty),0) AS r_qty FROM proc_receipt_lines rl JOIN proc_receipts r ON r.id=rl.receipt_id WHERE r.order_id=? AND r.reversed_at IS NULL GROUP BY rl.item_id').all(orderId);
   const prevByItem=new Map(prevRows.map(x=>[Number(x.item_id),Number(x.r_qty)]));
+  // بيانات مذكرة فحص واستلام المواد من نموذج الجامعة
+  const supName = db.prepare('SELECT name FROM proc_suppliers WHERE id=?').get(o.supplier_id)?.name ?? '';
+  const rHead = [opt(b?.receivedFrom,120,'تم الاستلام من') || supName, opt(b?.deliveryNoteNo,60,'رقم بيان الشحنة / مذكرة التسليم'), opt(b?.location,120,'موقع المستلم'), b?.compliant === true ? 1 : b?.compliant === false ? 0 : null];
   return tx(db,()=>{
-    const rid=Number(db.prepare('INSERT INTO proc_receipts (order_id,received_at,note,created_by,created_at) VALUES (?,?,?,?,?)').run(orderId,Date.now(),String(b?.note??'').slice(0,300),actor.id,Date.now()).lastInsertRowid);
+    const rid=Number(db.prepare('INSERT INTO proc_receipts (order_id,received_at,note,created_by,created_at,received_from,delivery_note_no,location,compliant) VALUES (?,?,?,?,?,?,?,?,?)').run(orderId,Date.now(),String(b?.note??'').slice(0,300),actor.id,Date.now(),...rHead).lastInsertRowid);
     let receiptTotal=0;
     for(const l of lines){
       const itemId=Number(l.itemId); if(!itemId || !db.prepare('SELECT 1 FROM proc_items WHERE id=?').get(itemId)) throw bad('الصنف غير موجود.');
@@ -284,7 +326,8 @@ export function createReceipt({db},actor,b,ip){
       }
       prevByItem.set(itemId, alreadyReceived+qty);
       receiptTotal += qty * cost;
-      db.prepare('INSERT INTO proc_receipt_lines (receipt_id,item_id,qty,unit_cost) VALUES (?,?,?,?)').run(rid,itemId,qty,cost);
+      const expected = l.expectedQty !== undefined && l.expectedQty !== null && l.expectedQty !== '' ? optInt(l.expectedQty,'الكمية المتوقعة') : (ol ? Number(ol.qty) : null);
+      db.prepare('INSERT INTO proc_receipt_lines (receipt_id,item_id,qty,unit_cost,expected_qty,quality,comment) VALUES (?,?,?,?,?,?,?)').run(rid,itemId,qty,cost,expected,opt(l.quality,30,'فحص الجودة'),opt(l.comment,200,'التعليقات'));
       const it=db.prepare('SELECT qty_on_hand, avg_cost FROM proc_items WHERE id=?').get(itemId);
       const newQty=it.qty_on_hand+qty;
       const newAvg=newQty>0?Math.round((it.avg_cost*it.qty_on_hand + cost*qty)/newQty):cost;
@@ -318,20 +361,26 @@ export function createReceipt({db},actor,b,ip){
 }
 export function listReceipts(db,q={}){
   const where=q.orderId?'WHERE r.order_id=?':''; const a=q.orderId?[Number(q.orderId)]:[];
-  return db.prepare(`SELECT r.*, o.no orderNo, s.name supplierName FROM proc_receipts r JOIN proc_orders o ON o.id=r.order_id JOIN proc_suppliers s ON s.id=o.supplier_id ${where} ORDER BY r.id DESC LIMIT 200`).all(...a).map(r=>({id:r.id,orderId:r.order_id,orderNo:r.orderNo,supplierName:r.supplierName,receivedAt:r.received_at,note:r.note,reversedAt:r.reversed_at,lines:db.prepare('SELECT l.*, i.name itemName, i.code itemCode FROM proc_receipt_lines l JOIN proc_items i ON i.id=l.item_id WHERE l.receipt_id=?').all(r.id).map(x=>({itemId:x.item_id,itemCode:x.itemCode,itemName:x.itemName,qty:x.qty,unitCost:x.unit_cost}))}));
+  return db.prepare(`SELECT r.*, o.no orderNo, s.name supplierName, rq.no requestNo FROM proc_receipts r JOIN proc_orders o ON o.id=r.order_id JOIN proc_suppliers s ON s.id=o.supplier_id LEFT JOIN proc_requests rq ON rq.id=o.request_id ${where} ORDER BY r.id DESC LIMIT 200`).all(...a).map(r=>({id:r.id,no:`RCV-${String(r.id).padStart(4,'0')}`,orderId:r.order_id,orderNo:r.orderNo,requestNo:r.requestNo,supplierName:r.supplierName,receivedAt:r.received_at,note:r.note,reversedAt:r.reversed_at,
+    receivedFrom:r.received_from||r.supplierName,deliveryNoteNo:r.delivery_note_no,location:r.location,compliant:r.compliant==null?null:!!Number(r.compliant),
+    lines:db.prepare('SELECT l.*, i.name itemName, i.code itemCode, i.unit unit FROM proc_receipt_lines l JOIN proc_items i ON i.id=l.item_id WHERE l.receipt_id=? ORDER BY l.id').all(r.id).map(x=>({itemId:x.item_id,itemCode:x.itemCode,itemName:x.itemName,unit:x.unit,qty:x.qty,unitCost:x.unit_cost,expectedQty:x.expected_qty==null?null:Number(x.expected_qty),quality:x.quality,comment:x.comment}))}));
 }
 /* Issues */
 export function createIssue({db},actor,b,ip){
   const whId=Number(b?.warehouseId); if(!whId || !db.prepare('SELECT 1 FROM proc_warehouses WHERE id=?').get(whId)) throw bad('المخزن غير موجود.');
-  const to=clean(b?.issuedTo,60,'الجهة المستلمة',2); const purpose=String(b?.purpose??'').slice(0,200);
+  // محضر إخراج / صرف المواد: القسم الطالب واسم المستلم ورقم طلب الصرف، والمستلم يكفي أحدهما
+  const department=opt(b?.department,80,'القسم الطالب'), receiver=opt(b?.receiverName,80,'اسم المستلم'), requestRef=opt(b?.requestRef,40,'رقم طلب الصرف');
+  const to=clean(b?.issuedTo || [department, receiver].filter(Boolean).join(' — '),60,'الجهة المستلمة',2); const purpose=String(b?.purpose??'').slice(0,200);
   const lines=b?.lines; if(!Array.isArray(lines)||!lines.length) throw bad('أضف بنداً واحداً على الأقل.');
+  for(const l of lines){ const rq=optInt(l.requestedQty,'الكمية المطلوبة'); if(Number(l.qty)<=0) throw bad('الكمية المصروفة غير صالحة.'); if(rq!==null && Number(l.qty)>rq) throw bad('الكمية المصروفة أكبر من المطلوبة.'); }
   return tx(db,()=>{
     for(const l of lines){ const it=db.prepare('SELECT qty_on_hand FROM proc_items WHERE id=?').get(Number(l.itemId)); if(!it) throw bad('الصنف غير موجود.'); if(Number(l.qty)>it.qty_on_hand) throw bad(`الصنف ${l.itemId}: الرصيد لا يكفي (${it.qty_on_hand} متاح).`); }
     const no=nextNo(db,'IS','proc_issues');
-    const id=Number(db.prepare('INSERT INTO proc_issues (no,warehouse_id,issued_to,purpose,issued_at,created_by,created_at) VALUES (?,?,?,?,?,?,?)').run(no,whId,to,purpose,Date.now(),actor.id,Date.now()).lastInsertRowid);
+    const id=Number(db.prepare('INSERT INTO proc_issues (no,warehouse_id,issued_to,purpose,issued_at,created_by,created_at,request_ref,department,receiver_name) VALUES (?,?,?,?,?,?,?,?,?,?)').run(no,whId,to,purpose,Date.now(),actor.id,Date.now(),requestRef,department,receiver).lastInsertRowid);
     for(const l of lines){
-      db.prepare('INSERT INTO proc_issue_lines (issue_id,item_id,qty) VALUES (?,?,?)').run(id,Number(l.itemId),Number(l.qty));
       db.prepare('UPDATE proc_items SET qty_on_hand = qty_on_hand - ? WHERE id=?').run(Number(l.qty),Number(l.itemId));
+      const after=Number(db.prepare('SELECT qty_on_hand FROM proc_items WHERE id=?').get(Number(l.itemId)).qty_on_hand);
+      db.prepare('INSERT INTO proc_issue_lines (issue_id,item_id,qty,requested_qty,balance_after,item_condition,note) VALUES (?,?,?,?,?,?,?)').run(id,Number(l.itemId),Number(l.qty),optInt(l.requestedQty,'الكمية المطلوبة') ?? Number(l.qty),after,opt(l.itemCondition,30,'حالة المادة'),opt(l.note,200,'الملاحظات'));
     }
     audit(db,actor,'صرف مخزني',no,ip); return {issueId:id,no};
   });
@@ -339,7 +388,8 @@ export function createIssue({db},actor,b,ip){
 export function listIssues(db,q={}){
   const w=[],a=[]; if(q.warehouse){w.push('i.warehouse_id=?');a.push(Number(q.warehouse));}
   const where=w.length?'WHERE '+w.join(' AND '):'';
-  return db.prepare(`SELECT i.*, w.name whName FROM proc_issues i JOIN proc_warehouses w ON w.id=i.warehouse_id ${where} ORDER BY i.id DESC LIMIT 200`).all(...a).map(r=>({id:r.id,no:r.no,warehouseId:r.warehouse_id,warehouseName:r.whName,issuedTo:r.issued_to,purpose:r.purpose,issuedAt:r.issued_at,reversedAt:r.reversed_at,lines:db.prepare('SELECT l.*, it.name itemName, it.code itemCode FROM proc_issue_lines l JOIN proc_items it ON it.id=l.item_id WHERE l.issue_id=?').all(r.id).map(x=>({itemId:x.item_id,itemCode:x.itemCode,itemName:x.itemName,qty:x.qty}))}));
+  return db.prepare(`SELECT i.*, w.name whName, w.location whLocation FROM proc_issues i JOIN proc_warehouses w ON w.id=i.warehouse_id ${where} ORDER BY i.id DESC LIMIT 200`).all(...a).map(r=>({id:r.id,no:r.no,warehouseId:r.warehouse_id,warehouseName:r.whName,warehouseLocation:r.whLocation,issuedTo:r.issued_to,purpose:r.purpose,issuedAt:r.issued_at,reversedAt:r.reversed_at,requestRef:r.request_ref,department:r.department,receiverName:r.receiver_name,
+    lines:db.prepare('SELECT l.*, it.name itemName, it.code itemCode, it.unit unit FROM proc_issue_lines l JOIN proc_items it ON it.id=l.item_id WHERE l.issue_id=? ORDER BY l.id').all(r.id).map(x=>({itemId:x.item_id,itemCode:x.itemCode,itemName:x.itemName,unit:x.unit,qty:x.qty,requestedQty:x.requested_qty==null?Number(x.qty):Number(x.requested_qty),balanceAfter:x.balance_after==null?null:Number(x.balance_after),itemCondition:x.item_condition,note:x.note}))}));
 }
 /* Assets */
 export function listAssets(db,q={}){
