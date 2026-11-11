@@ -6,6 +6,7 @@ import zlib from 'node:zlib';
 import { createApp } from '../server/app.js';
 import { hashPassword, resetTieredRateLimit, sha256 } from '../server/security.js';
 import { tx } from '../server/db.js';
+import { seedPassword } from '../server/services/bootstrap.js';
 
 const url = process.env.DATABASE_URL ?? '';
 const host = url ? new URL(url).hostname : '';
@@ -387,6 +388,15 @@ await section('المشتريات والمخزون', async () => {
   let reqs = 0, orders = 0, receipts = 0;
   const requesterRow = one("SELECT id FROM users WHERE role = 'staff' AND role_key = 'head_procure'") ?? one("SELECT id FROM users WHERE role = 'staff' ORDER BY id LIMIT 1");
   const requester = session(Number(requesterRow.id));
+  // اعتماد طلب الشراء ثلاث مراحل بثلاثة أشخاص مختلفين (فصل المهام): إدارة المشتريات (المدير) ← الاعتماد المالي (finance) ← رئاسة الجامعة (president)
+  db.prepare("UPDATE users SET access_mode = 'hybrid', custom_permissions_json = ? WHERE username = 'finance'").run(JSON.stringify(['procurement:approve_finance']));
+  if (!one("SELECT id FROM users WHERE username = 'president'")) {
+    const ph = await hashPassword(seedPassword(), app.cfg.scryptN);
+    db.prepare("INSERT INTO users (username, display_name, password_hash, role, active, must_change_password, access_mode, data_scope, custom_permissions_json, job_title, created_at) VALUES ('president', 'رئيس الجامعة', ?, 'staff', 1, 0, 'custom', 'all', ?, 'رئيس الجامعة', ?)")
+      .run(ph, JSON.stringify(['procurement:approve_top', 'procurement:read', 'stats:read', 'request:read_all', 'document:read_all', 'finance:read', 'corr:use', 'staffatt:self', 'request:create_internal']), NOW);
+  }
+  const approvers = [admin, session(Number(one("SELECT id FROM users WHERE username = 'finance'").id)), session(Number(one("SELECT id FROM users WHERE username = 'president'").id))];
+  const approveAll = async (id) => { for (const who of approvers) { const r = await call(who, 'POST', `${P}/requests/${id}/approve`, { note: 'معتمد' }); if (!r.ok) return r.status === 409 && /ليس قيد المراجعة/.test(r.json?.message ?? ''); } return true; };
   const line = (i, qty) => ({ itemId: items[i]?.id, description: defs[i][0], qty });
   for (let i = 0; i < 18; i++) {
     const idx = [int(0, 19), int(0, 19)].filter((v, k, a) => a.indexOf(v) === k);
@@ -398,7 +408,8 @@ await section('المشتريات والمخزون', async () => {
     await call(requester, 'POST', `${P}/requests/${id}/submit`, {});
     if (i % 6 === 4) continue;                                     // قيد المراجعة
     if (i % 6 === 3) { await call(admin, 'POST', `${P}/requests/${id}/reject`, { note: 'خارج الميزانية الحالية' }); continue; }
-    if (!(await call(admin, 'POST', `${P}/requests/${id}/approve`, { note: 'معتمد' })).ok) continue;
+    if (!(await approveAll(id))) continue;
+    if (i < 2) continue;                                           // معتمد بلا أمر توريد بعد: تُبنى عليه طلبات عروض الأسعار
     const orderLines = idx.map((k) => ({ ...line(k, int(10, 60)), unitCost: defs[k][2] }));
     const o = await call(admin, 'POST', `${P}/orders`, { supplierId: pick(sups)?.id, requestId: id, lines: orderLines });
     const oid = o.json?.order?.id ?? o.json?.id;
@@ -435,7 +446,7 @@ await section('شؤون الطلاب', () => {
     const pIds = programs.map((p) => p.id);
     for (let i = 0; i < 60; i++) { const f = chance(0.35), n = person(f), st = pick(['pending', 'pending', 'accepted', 'rejected']); ins('INSERT INTO sa_applicants (application_no, full_name, national_id, phone, hs_type, hs_score, hs_year, category, pref1_program_id, pref2_program_id, pref3_program_id, accepted_program_id, sorting_status, notes, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', `ADM-${YEAR}-${String(101 + i)}`, `${n.first} ${n.father} ${n.last}`, `A${String(900000000 + i * 7)}`, `0955${String(100000 + i)}`, 'علمي', int(170, 280), YEAR, pick(['general', 'general', 'parallel', 'martyrs', 'transfer']), pick(pIds), pick(pIds), pick(pIds), st === 'accepted' ? pick(pIds) : null, st, '', NOW - i * DAY); }
     for (const [i, s] of some(30, active).entries()) ins('INSERT INTO sa_advising_warnings (student_id, warning_type, severity, gpa_snapshot, absence_rate, failed_courses_count, advisor_name, action_plan, session_date, status, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)', s.id, pick(['academic', 'attendance']), pick(['low', 'medium', 'high']), int(45, 65), int(5, 35), int(0, 4), pick(H.members).name, 'جلسة إرشاد وخطة تحسين', daysAgo(i), pick(['open', 'closed']), NOW);
-    for (const [i, s] of some(15).entries()) ins('INSERT INTO sa_lifecycle_movements (movement_no, student_id, movement_type, academic_year, semester, from_status, to_status, from_program_id, to_program_id, financial_impact, academic_impact, decision_no, reason, status, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', `MOV-${YEAR}-${String(i + 1).padStart(3, '0')}`, s.id, pick(['postponement', 'withdrawal', 'program_transfer']), AY, 1, 'active', pick(['suspended', 'withdrawn', 'active']), s.program.id, s.program.id, 'لا أثر مالي', 'يحفظ الفصل', `قرار ${100 + i}`, 'ظروف موثقة', 'approved', 'شؤون الطلاب', NOW - i * DAY);
+    for (const [i, s] of some(15).entries()) ins('INSERT INTO sa_lifecycle_movements (movement_no, student_id, movement_type, academic_year, semester, from_status, to_status, from_program_id, to_program_id, financial_impact, academic_impact, decision_no, reason, status, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', `MOV-D${YEAR}-${String(i + 1).padStart(3, '0')}`, s.id, pick(['postponement', 'withdrawal', 'program_transfer']), AY, 1, 'active', pick(['suspended', 'withdrawn', 'active']), s.program.id, s.program.id, 'لا أثر مالي', 'يحفظ الفصل', `قرار ${100 + i}`, 'ظروف موثقة', 'approved', 'شؤون الطلاب', NOW - i * DAY);
     for (const [i, s] of some(14, active).entries()) {
       const type = pick(['financial', 'disciplinary', 'library']);
       const hold = ins('INSERT INTO student_holds (student_id, hold_type, note, active, created_by, created_at) VALUES (?,?,?,1,?,?)', s.id, type, 'مانع تجريبي', adminId, NOW);
