@@ -367,6 +367,90 @@ body:has(.site-foot){padding-bottom:0}
 .perm-g legend{font-weight:700;font-size:13.5px;padding:0 6px;color:var(--accent)}
 .perm{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;padding:4px 0;font-weight:500;font-size:14px}
 .perm input{width:auto}.perm.off{opacity:.55}
+
+/* تخصيص الشاشات والتبويبات: تصميم قائمة/تفاصيل (Master–Detail) بدل شبكة بطاقات متساوية */
+.xv-shell{display:grid;grid-template-columns:260px 1fr;gap:12px;align-items:start}
+@media (max-width:700px){.xv-shell{grid-template-columns:1fr}}
+.xv-list{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.xv-row{display:flex;align-items:center;gap:8px;width:100%;text-align:inherit;padding:9px 12px;border:0;border-top:1px solid var(--line);background:transparent;color:var(--fg);font:inherit;font-size:13.5px;font-weight:700;cursor:pointer}
+.xv-list .xv-row:first-child{border-top:0}
+.xv-row:hover{background:var(--surface2)}
+.xv-row[aria-current="true"]{background:var(--surface2);border-inline-start:3px solid var(--accent);padding-inline-start:9px}
+.xv-tri{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
+.xv-tri.full{background:var(--green-m)}
+.xv-tri.partial{background:var(--gold)}
+.xv-tri.none{background:var(--line)}
+.xv-row .xv-name{flex:1;min-width:0}
+.xv-row .xv-count{font-size:11.5px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.xv-detail{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px}
+.xv-detail-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.xv-item{display:flex;align-items:flex-start;gap:10px;padding:9px 2px;border-top:1px solid var(--line)}
+.xv-item:first-child{border-top:0}
+.xv-item .xv-text{flex:1;min-width:0}
+.xv-item .xv-label{font-weight:700;font-size:13.5px;display:flex;align-items:center;gap:6px}
+/* تبويبات فرعية جنباً إلى جنب (التفاف تلقائي) بدل سطر واحد لكل بند، فلا يطول ارتفاع القائمة مع كثرة التبويبات */
+.xv-subtabs{margin:6px 0 0 20px;display:flex;flex-wrap:wrap;gap:4px 16px}
+.xv-sub{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);padding:3px 0;cursor:pointer}
+.xv-sub.off{opacity:.75;cursor:default}
+.xv-sub .xv-sw{flex:0 0 auto}
+/* مفتاح تبديل بسيط موحّد القياس. inset-inline-start (لا end) لموضع الراحة: يطابق اتجاه الصفحة (RTL افتراضياً) بلا خروج الدائرة عن حدود المفتاح عند التبديل */
+.xv-sw{position:relative;width:38px;height:22px;flex:0 0 auto}
+.xv-sw input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+.xv-sw .xv-track{position:absolute;inset:0;background:var(--line);border-radius:999px;transition:background .15s;pointer-events:none}
+.xv-sw .xv-thumb{position:absolute;top:3px;inset-inline-start:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .15s;box-shadow:0 1px 2px rgba(0,0,0,.25);pointer-events:none}
+.xv-sw input:checked+.xv-track{background:var(--green-m)}
+.xv-sw input:checked+.xv-track+.xv-thumb{transform:translateX(-16px)}
+.xv-sw input:disabled+.xv-track{opacity:.6}
+/* نسخة مصغّرة من المفتاح للتبويبات الفرعية المتداخلة تحت كل شاشة */
+.xv-sw.sm{width:30px;height:18px}
+.xv-sw.sm .xv-thumb{width:12px;height:12px;top:3px}
+.xv-sw.sm input:checked+.xv-track+.xv-thumb{transform:translateX(-12px)}
+/* شريط الأدوات العلوي: بحث + فلتر + قالب جاهز، ثابت خارج اللوحة القابلة لإعادة الرسم فلا يفقد البحث تركيزه */
+.xv-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.xv-search{flex:1 1 200px;min-width:160px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg);font:inherit;font-size:13.5px}
+.xv-chip{border:1px solid var(--line);background:var(--surface2);color:var(--fg);border-radius:999px;padding:7px 14px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}
+.xv-chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.xv-tpl{border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:8px;font:inherit;font-size:12.5px;padding:7px 10px}
+/* شريط التغييرات غير المحفوظة لهذا القسم فقط؛ يُظهر العدد ويمرّر إلى زر حفظ الحساب الفعلي بدل أن يملك زر حفظ مستقلاً يُربك */
+.xv-savebar{position:sticky;bottom:8px;margin-top:10px;display:flex;align-items:center;gap:10px;background:var(--accent);color:var(--accent-fg);border-radius:10px;padding:10px 14px;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.xv-savebar .btn{border-color:rgba(255,255,255,.35)}
+.xv-savebar .btn.pri{background:var(--gold);color:#10211D;border-color:var(--gold)}
+/* مخطط الهيكل التنظيمي: الجذر أعلى، الإدارات شبكة أعمدة تلتف، وفروع كل إدارة شجرة رأسية بخط جانبي.
+   الخطوط كلها حدود وأبعاد منطقية (inline-start) بلا transform، فتنعكس صحيحاً بين العربية والإنجليزية. */
+.oc-chart{display:grid;gap:14px;padding:12px 2px}
+.oc-top{display:flex;flex-direction:column;align-items:center;gap:6px}
+.oc-top .oc-box{min-width:280px;justify-content:space-between}
+.oc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;border-top:2px solid var(--accent);padding-top:14px}
+.oc-dept{background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:10px;min-width:0}
+.oc-box{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:7px 9px}
+.oc-root-box{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.oc-root-box .small{color:inherit;opacity:.85}
+.oc-dept-box{border-color:var(--accent);border-inline-start-width:4px}
+.oc-box.oc-off{opacity:.55;border-style:dashed}
+.oc-node-main{display:flex;flex-direction:column;gap:1px;min-width:0}
+.oc-node-main b{font-size:13px;line-height:1.35}
+.oc-node-actions{display:flex;gap:1px;margin-inline-start:auto;flex:0 0 auto}
+.oc-node-actions .btn{padding:3px 5px;font-size:11px;line-height:1}
+.oc-tree{list-style:none;margin:0;padding:0;padding-inline-start:18px;margin-inline-start:12px}
+.oc-tree li{position:relative;padding-top:8px}
+/* خط أفقي إلى كل بند، وخط رأسي يمتد بطول البند؛ يتوقف عند آخر بند فلا يتدلّى تحته */
+.oc-tree li::before{content:'';position:absolute;top:26px;inset-inline-start:-18px;width:16px;border-top:2px solid var(--muted)}
+.oc-tree li::after{content:'';position:absolute;top:0;bottom:0;inset-inline-start:-18px;border-inline-start:2px solid var(--muted)}
+.oc-tree li:last-child::after{bottom:auto;height:27px}
+.oc-leaf .oc-node-main b{font-size:12.5px;font-weight:600}
+/* الرصد السريع للعلامات */
+.gg-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:12px}
+.gg-box{background:var(--surface);color:var(--fg);border-radius:14px;padding:16px;width:min(1000px,100%);max-height:94vh;overflow:auto}
+.gg-in{width:72px;padding:5px 6px;text-align:center;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--fg);font-variant-numeric:tabular-nums}
+.gg-in:focus{outline:2px solid var(--accent);outline-offset:0}
+.gg-in.gg-bad{border-color:var(--bad);background:var(--bad-soft)}
+.gg-table tr.gg-dep{opacity:.55}
+.gg-table tr.gg-rowbad td{background:var(--bad-soft)}
+.gg-table tr.gg-out td{background:var(--warn-soft)}
+.gg-total{font-variant-numeric:tabular-nums;text-align:center}
+.gg-stats{display:flex;gap:16px;flex-wrap:wrap;align-items:center;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:13px}
+.gg-stats .gg-warn{color:var(--warn)}.gg-stats .gg-err{color:var(--bad)}
+.gg-notes{flex-basis:100%;font-size:12.5px;color:var(--bad);display:grid;gap:2px}
 .link-list li{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;padding:6px 0;border-bottom:1px dashed var(--line)}
 .chk{display:flex;gap:8px;align-items:center;font-weight:500}.chk input{width:auto}
 table.matrix th.mx,table.matrix td.mx{text-align:center;min-width:92px}
@@ -949,6 +1033,34 @@ body:has(.demo-bar) .sx-top{top:0}
 .idc-wait{margin:0;font-size:12px;color:#8A6A1B}
 .idc-f{padding:7px 16px;text-align:center;font-size:11px;color:#E6CB84;background:#054239}
 .cred .idc{margin-block:4px 0}
+/* البطاقة الشخصية ISO ID-1 (85.6×54 مم): مصمَّمة بالمليمتر فتُطبع بحجمها الحقيقي، وتُكبَّر على الشاشة فقط (.sc-stage) */
+.sc{width:85.6mm;height:54mm;box-sizing:border-box;border-radius:3.2mm;overflow:hidden;position:relative;isolation:isolate;display:grid;grid-template-rows:12.5mm 1fr 6mm;text-align:right;direction:rtl;font-family:var(--f-ui);color:#fff;background:linear-gradient(135deg,#042f28 0%,#095246 100%);border:.4mm solid #D5B65D;box-shadow:0 6px 18px rgba(0,0,0,.18);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.sc-wm{position:absolute;z-index:-1;left:50%;top:58%;width:30mm;height:auto;transform:translate(-50%,-50%);opacity:.09;filter:grayscale(1) brightness(2.2);pointer-events:none}
+.sc-back{grid-template-rows:1fr 6mm}.sc-back .sc-wm{top:50%;width:38mm;opacity:.11}
+.sc-h{display:flex;align-items:center;gap:2mm;padding:0 3mm;background:rgba(0,0,0,.18);border-bottom:.4mm solid rgba(213,182,93,.7)}
+.sc-logo{width:8mm;height:9.4mm;flex:none;object-fit:contain}
+.sc-h b{display:block;font-size:3.1mm;font-weight:800;line-height:1.25}.sc-h small{display:block;font-size:2.15mm;font-weight:600;color:#E6CB84;line-height:1.3}
+.sc-nfc{width:4.6mm;height:4.6mm;flex:none;margin-inline-start:auto;color:#E6CB84}
+.sc-tag{margin-inline-start:1.5mm;font-size:2mm;font-weight:800;color:#032E28;background:#C9A24B;padding:.5mm 1.8mm;border-radius:9mm;white-space:nowrap}
+.sc-b{display:grid;grid-template-columns:19mm 1fr 15mm;gap:2.4mm;padding:2.4mm 3mm;align-items:start;min-height:0}
+.sc-ph{width:19mm;height:24mm;box-sizing:border-box;border-radius:1.4mm;border:.3mm solid #D5B65D;background:rgba(255,255,255,.12);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:9mm;font-weight:800;color:#E6CB84}
+.sc-ph img{width:100%;height:100%;object-fit:cover;display:block}
+.sc-d{min-width:0}.sc-n{font-size:3.5mm;font-weight:800;line-height:1.3;margin-bottom:.8mm;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sc-r{display:grid;grid-template-columns:auto 1fr;gap:.2mm 1.6mm;margin:0;font-size:2.15mm;line-height:1.45}
+.sc-r dt{color:#A8D8BE;font-weight:600}.sc-r dd{margin:0;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sc-r .sc-no{font-family:ui-monospace,Consolas,monospace;letter-spacing:.2mm;color:#E6CB84;text-align:right}
+.sc-qr{width:15mm;height:15mm;background:#fff;border-radius:1mm;overflow:hidden}.sc-qr svg{width:100%;height:100%;display:block}
+.sc-q small{display:block;margin-top:.6mm;font-size:1.7mm;color:#A8D8BE;text-align:center}
+.sc-f{display:flex;align-items:center;justify-content:space-between;gap:2mm;padding:0 3mm;font-size:1.9mm;font-weight:600;color:#E6CB84;background:rgba(0,0,0,.25);border-top:.3mm solid rgba(213,182,93,.5)}
+.sc-bc{display:block;width:34mm;height:4.2mm;box-sizing:border-box;padding:.4mm 1mm;background:#fff;border-radius:.6mm}.sc-bc .bc128{width:100%;height:100%;display:block}.sc-bc span{display:none!important}
+.sc-bk{display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:2.2mm 5mm;font-size:1.85mm;font-weight:600;line-height:1.5;color:#DDEFE6;min-height:0}
+.sc-bk>b{font-size:2.4mm;font-weight:800;color:#E6CB84}
+.sc-bk ol{margin:.5mm 0 0;padding:0;list-style-position:inside}.sc-bk li{margin-bottom:.3mm}
+.sc-found{margin-top:1.3mm;max-width:68mm;padding:.9mm 1.6mm;border:.3mm solid #D5B65D;border-radius:1mm;background:rgba(213,182,93,.14);color:#fff}.sc-found b{color:#E6CB84;font-weight:800}
+.sc-stage{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;margin:12px 0 24px}
+.sc-stage figure{margin:0;text-align:center}.sc-stage figcaption{margin-top:6px;font-size:12px;color:var(--muted,#566660)}
+.sc-stage .sc{zoom:1.45}
+@media(max-width:1100px){.sc-stage .sc{zoom:1.25}}@media(max-width:560px){.sc-stage .sc{zoom:1}}
 @media(max-width:520px){.idc-k{grid-template-columns:1fr}.idc-top{flex-direction:column;align-items:center}.idc-rows{width:100%}.idc-vb{flex-direction:column}.idc-vb dl{width:100%}}
 /* صورة الطالب في أعلى سجله: مستطيلة 3:4 */
 .st-top{align-items:flex-start}
@@ -1192,6 +1304,10 @@ body.sx-grouped .sub-tabs{display:none}
 .sd-badge{display:inline-block;border:1px solid var(--sd-g);color:#F3E3B5;border-radius:999px;padding:2px 12px;font-size:12.5px;letter-spacing:.2px}
 .sd-faculty .sd-badge{color:#F6D4DC}
 .sd-ornament{position:absolute;inset-inline-start:-40px;top:-40px;width:200px;height:200px;border-radius:50%;border:26px solid rgba(255,255,255,.06);pointer-events:none}
+/* شعار الجامعة علامةً مائية في وسط الترويسة، خلف المحتوى (isolation يُبقيه فوق التدرج وتحت النصوص) */
+.sd-hero{isolation:isolate}
+.sd-hero::after{content:"";position:absolute;z-index:-1;top:8%;bottom:8%;left:50%;width:240px;transform:translateX(-50%);background:url(/brand/crest.svg) no-repeat center/contain;opacity:.09;filter:grayscale(1) brightness(2.2);pointer-events:none}
+@media (max-width:640px){.sd-hero::after{width:170px;opacity:.07}}
 .sd-faculty .sd-ornament{border-radius:0;transform:rotate(45deg);border-width:2px;box-shadow:0 0 0 14px rgba(255,255,255,.04),0 0 0 30px rgba(255,255,255,.03)}
 .sd-faculty .sd-hero{border-radius:6px;border-bottom-width:0;box-shadow:inset 0 -5px 0 var(--sd-g),inset 0 -9px 0 rgba(255,255,255,.18)}
 .sd-faculty .card h3,.sd-faculty .sd-list b{font-family:var(--f-doc)}
@@ -2089,6 +2205,19 @@ html[dir="ltr"] .ux-dev-switch{transform:translateX(-50%)}
 .sg-pick-head{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin:10px 0}
 .sg-pick-head label{flex:1 1 240px}
 .sg-split{display:grid;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.sg-sched-h{margin:16px 0 2px;font-size:1rem;color:var(--accent);border-inline-start:3px solid var(--gold);padding-inline-start:10px}
+.sg-sched-h + .hint{margin:0 0 10px;padding-inline-start:13px}
+.sg-sched{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:14px;margin-bottom:16px}
+.sg-slot-card{border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:grid;gap:10px;align-content:start;background:var(--surface)}
+.sg-slot-head{display:flex;align-items:center;gap:10px;font-weight:800;color:var(--accent)}
+.sg-slot-ico{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:9px;background:var(--accent-soft);color:var(--accent);flex:none}
+.sg-slot{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.sg-slot:last-of-type{border-bottom:0;padding-bottom:0}
+.sg-slot-when{font-weight:700}
+.sg-slot-where{font-size:.88rem;color:var(--muted)}
+.sg-slot .actions{margin:0}
+.sg-slot-empty{border:1.5px dashed var(--line);border-radius:10px;padding:14px;text-align:center;display:grid;justify-items:center;gap:10px;color:var(--muted);font-size:.9rem}
+.sg-slot-form{border-top:1px solid var(--line);padding-top:10px}
 
 /* طباعة البطاقات على ورقة عادية: بحجمها الحقيقي، وعدة بطاقات في الصفحة */
 @media print{

@@ -35,6 +35,8 @@
   function openTarget(url) {
     const m = /[?&]view=lms&tab=assignments&id=(\d+)/.exec(url || '');
     if (m) { UA.lmsDeepLink = { id: Number(m[1]) }; return UA.go('lms'); }
+    // تنبيهات مركز الأمان تفتح تبويبه في شاشة التدقيق
+    if (/[?&]view=audit&tab=siem/.test(url || '')) { if (UA.S) UA.S.auditTab = 'siem'; return UA.go('audit'); }
     return undefined;
   }
 
@@ -58,7 +60,7 @@
     if (userId === me.id) return;
     userId = me.id;
     refresh();
-    if (/[?&]view=lms&tab=assignments&id=\d+/.test(location.search) && UA.go) {
+    if (/[?&]view=(lms&tab=assignments&id=\d+|audit&tab=siem)/.test(location.search) && UA.go) {
       const url = location.search;
       history.replaceState(null, '', location.pathname);
       openTarget(url);

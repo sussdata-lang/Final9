@@ -58,8 +58,10 @@ export function createCharge(deps, actor, input, ip) {
   const { db } = deps; ready(db);
   const stu = db.prepare("SELECT * FROM users WHERE id=? AND role='student'").get(Number(input?.studentId)); if (!stu) throw bad('الطالب غير موجود.', 404, 'not_found');
   const ft = db.prepare('SELECT * FROM fin_fee_types WHERE id=? AND active=1').get(Number(input?.feeTypeId)); if (!ft) throw bad('نوع الرسم غير موجود أو معطّل.', 404, 'not_found');
-  // المؤجل والموقوف قيده لا تصدر عليه رسوم جديدة حتى إعادة القيد؛ الخصومات والمنح تبقى ممكنة
-  if (ft.kind === 'fee' && db.prepare('SELECT status FROM student_profiles WHERE user_id = ?').get(stu.id)?.status === 'suspended') throw bad('قيد الطالب مؤجل أو موقوف، فلا تصدر عليه رسوم جديدة.', 409, 'student_suspended');
+  // المؤجل والموقوف والمنسحب لا تصدر عليهم رسوم جديدة حتى إعادة القيد؛ الخصومات والمنح تبقى ممكنة
+  const status = ft.kind === 'fee' ? db.prepare('SELECT status FROM student_profiles WHERE user_id = ?').get(stu.id)?.status : null;
+  if (status === 'suspended') throw bad('قيد الطالب مؤجل أو موقوف، فلا تصدر عليه رسوم جديدة.', 409, 'student_suspended');
+  if (status === 'withdrawn') throw bad('الطالب منسحب، فلا تصدر عليه رسوم جديدة.', 409, 'student_withdrawn');
   const amt = toMinor(input?.amount ?? ft.default_amount);
   if (!Number.isFinite(amt) || amt <= 0) throw bad('مبلغ الاستحقاق غير صالح.');
   const due = String(input?.dueDay ?? today()); if (!isDay(due)) throw bad('تاريخ الاستحقاق غير صالح.');

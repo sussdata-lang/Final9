@@ -7,6 +7,7 @@ import { writeZip } from '../lib/zip.js';
 import { passMarkResolver } from './academics.js';
 import { logsForExport, KINDS as HALL_KINDS } from './attendance.js';
 import { sections, STATUS_LABEL, levelLabel, programLabel } from './students.js';
+import { decryptField } from '../lib/data_crypto.js';
 
 const MAX_ROWS = 100_000;
 const REQ_LABEL = { review: 'قيد المراجعة', approved: 'معتمد', rejected: 'مرفوض' };
@@ -107,12 +108,12 @@ function requestsSet(db, f) {
     rows: rows.map((r) => [r.no, r.student_no ?? '', fullName(r), r.faculty ?? '', r.slabel, REQ_LABEL[r.status] ?? r.status, r.reject_reason ?? '', r.unit ?? '', day(r.created_at), day(r.decided_at), r.decided_at ? Math.round(((r.decided_at - r.created_at) / 3600000) * 10) / 10 : '']) };
 }
 
-function holdsSet(db, f) {
+function holdsSet(db, f, cfg) {
   const { w, a } = studentWhere(f);
   const rows = db.prepare(`SELECT h.*, u.student_no, sp.first_name, sp.father_name, sp.last_name, g.faculty
     FROM student_holds h JOIN users u ON u.id = h.student_id LEFT JOIN student_profiles sp ON sp.user_id = u.id LEFT JOIN programs g ON g.id = sp.program_id LEFT JOIN faculties fa ON fa.id = g.faculty_id ${where(w)} ORDER BY h.id`).all(...a);
   return { id: 'holds', title: 'العقوبات', textCols: [0], headers: ['الرقم الجامعي', 'اسم الطالب', 'الكلية / المعهد', 'النوع', 'الملاحظة', 'الحالة', 'تاريخ التسجيل', 'تاريخ التسوية'],
-    rows: rows.map((r) => [r.student_no, fullName(r), r.faculty ?? '', HOLD_LABEL[r.hold_type] ?? r.hold_type, r.note ?? '', r.active ? 'قائمة' : 'مسددة', day(r.created_at), day(r.cleared_at)]) };
+    rows: rows.map((r) => [r.student_no, fullName(r), r.faculty ?? '', HOLD_LABEL[r.hold_type] ?? r.hold_type, decryptField(cfg, r.note) ?? '', r.active ? 'قائمة' : 'مسددة', day(r.created_at), day(r.cleared_at)]) };
 }
 
 function complaintsSet(db, f) {
@@ -155,10 +156,10 @@ function lecturesSet(db) {
 
 const BUILD = { students: studentsSet, grades: gradesSet, courses: coursesSet, requests: requestsSet, holds: holdsSet, complaints: complaintsSet, attendance: attendanceSet, housing: housingSet, handouts: handoutsSet, quizzes: quizzesSet, lectures: lecturesSet };
 
-function buildSets(db, dataset, filters) {
+function buildSets(db, dataset, filters, cfg) {
   const ids = dataset === 'all' ? Object.keys(BUILD) : [dataset];
   if (!ids.every((i) => BUILD[i])) throw new HttpError(400, 'مجموعة بيانات غير معروفة.', 'validation');
-  const sets = ids.map((i) => BUILD[i](db, filters));
+  const sets = ids.map((i) => BUILD[i](db, filters, cfg));
   for (const s of sets) if (s.rows.length > MAX_ROWS) throw new HttpError(413, `«${s.title}» أكبر من ${MAX_ROWS} صف؛ ضيّق المرشحات.`, 'too_large');
   return sets;
 }
@@ -177,8 +178,8 @@ export function exportOptions(db) {
   };
 }
 
-export function preview(db, dataset, q) {
-  const sets = buildSets(db, dataset, parseFilters(q)), limit = Math.min(Math.max(Number(q.limit) || 500, 1), 5000);
+export function preview(db, dataset, q, cfg) {
+  const sets = buildSets(db, dataset, parseFilters(q), cfg), limit = Math.min(Math.max(Number(q.limit) || 500, 1), 5000);
   return { sets: sets.map((s) => ({ id: s.id, title: s.title, headers: s.headers, total: s.rows.length, rows: s.rows.slice(0, limit) })) };
 }
 
@@ -202,9 +203,9 @@ function xlsxSheets(sets, layout) {
   return out;
 }
 
-export function renderExport(db, { dataset, format, layout }, q) {
+export function renderExport(db, { dataset, format, layout }, q, cfg) {
   if (!FORMATS.includes(format)) throw new HttpError(400, 'صيغة تصدير غير مدعومة.', 'validation');
-  const f = parseFilters(q), sets = buildSets(db, dataset, f), stamp = new Date().toISOString().slice(0, 10), base = `export-${dataset}-${stamp}`;
+  const f = parseFilters(q), sets = buildSets(db, dataset, f, cfg), stamp = new Date().toISOString().slice(0, 10), base = `export-${dataset}-${stamp}`;
   const total = sets.reduce((n, s) => n + s.rows.length, 0);
   if (format === 'xlsx') return { total, name: `${base}.xlsx`, mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buf: writeXlsx(xlsxSheets(sets, layout), { title: 'تصدير البيانات' }) };
   if (format === 'json') {

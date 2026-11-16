@@ -16,6 +16,8 @@ import { ensureCoreAccounts, seedPassword, hasConfiguredSeedPassword } from './s
 import { ensureStructure, STRUCTURE, FACULTY_ROLE } from './services/structure.js';
 import { startAssignmentScheduler } from './services/lms_assignment_notify.js';
 import { expireDisciplinaryHolds } from './services/student_affairs_suite.js';
+import { encryptLegacyAppealText } from './services/student_regulations.js';
+import { captureSnapshot } from './services/warehouse.js';
 import { escalateOverdueRequests } from './services/escalation.js';
 import { remindOverdueCouncilTasks } from './services/councils.js';
 import { ensureForms } from './services/forms/index.js';
@@ -28,7 +30,8 @@ import { purgeIdempotencyKeys } from './services/idempotency.js';
 import { isClustered, publish, startBus, startRateSync } from './services/bus.js';
 import { applyRateTotals, takeRateDeltas } from './security.js';
 import { flushSessionTouches, invalidateSessionCache } from './services/auth.js';
-import { applySharedBan, setWafBanListener } from './waf.js';
+import { applySharedBan, setWafBanListener, setWafBanLog } from './waf.js';
+import { recordSecurityEvent, runDetection } from './services/security_center.js';
 import { registerMutationListener } from './db.js';
 import { extractMutatedTableFromSql, flushAllCaches, getInvalidatedNamespacesForTable, invalidateCacheForSql } from './cache.js';
 import { getSetting } from './services/settings.js';
@@ -89,6 +92,8 @@ export async function createApp(overrides = {}) {
     db.prepare('UPDATE users SET active = 1, must_change_password = 0, failed_logins = 0, locked_until = 0, password_hash = ?').run(hash);
     }
     try { financeReady(db); } catch (_) {}
+    // تشفير نصوص تظلمات انضباطية قديمة أُدخلت قبل هذا التشفير؛ آمن التكرار ولا يفعل شيئاً إن كانت كلها مشفَّرة
+    try { encryptLegacyAppealText(db, cfg); } catch (encErr) { console.error('data encryption backfill:', encErr); }
     try {
       // تدقيق وربط العلاقات المرجعية بين الوحدات التنظيمية والبرامج والموظفين والحسابات
       const rootUnit = db.prepare("SELECT id FROM org_units WHERE kind = 'university' ORDER BY id LIMIT 1").get()
@@ -126,6 +131,11 @@ export async function createApp(overrides = {}) {
   };
   const holdsFirst = scheduler ? setTimeout(expireHolds, 5_000) : null, holdsTimer = scheduler ? setInterval(expireHolds, 3600_000) : null;
   holdsFirst?.unref(); holdsTimer?.unref();
+  // مركز الأمان: كل حجب من جدار الحماية يُسجَّل، وقواعد الكشف تُطبَّق كل دقيقة
+  setWafBanLog(({ ip, until, reason, path: p, banCount }) => { try { recordSecurityEvent(db, { kind: 'waf_ban', severity: banCount > 1 ? 'high' : 'medium', ip, subject: ip, detail: `${reason || ''} ${p || ''} حتى ${new Date(until).toISOString()} (المرة ${banCount})`.trim() }); } catch (e) { console.warn('security event:', e.message); } });
+  const siemTick = () => { try { runDetection(db, Date.now(), { db, cfg }); } catch (e) { console.warn('security center:', e.message); } };
+  const siemTimer = scheduler ? setInterval(siemTick, 60_000) : null;
+  siemTimer?.unref();
   const stopBackups = scheduler ? startBackupScheduler({ db, cfg }) : () => {};
   const stopAssignmentTick = scheduler ? startAssignmentScheduler({ db, cfg }) : () => {};
   // ما يتغير في عملية يُبطَل من ذاكرة بقية العمليات
@@ -160,5 +170,9 @@ export async function createApp(overrides = {}) {
   const auditPurge = () => { try { purgeIdempotencyKeys(db); } catch (e) { console.warn('idempotency purge:', e.message); } try { const r = purgeAuditLog(db, getSetting(db, 'audit.retention_years')); if (r.removed) console.log(`سجل التدقيق: حُذف ${r.removed} صفاً تجاوز مدة الاحتفاظ.`); } catch (e) { console.error('audit purge:', e.message); } };
   const purgeFirst = scheduler ? setTimeout(auditPurge, 120_000) : null, purgeTimer = scheduler ? setInterval(auditPurge, 24 * 3600_000) : null;
   purgeFirst?.unref(); purgeTimer?.unref();
-  return { server, db, cfg, limiter, router, close: async () => { stopBus(); clearInterval(touchTimer); try { flushSessionTouches(db); } catch {} clearInterval(timer); clearTimeout(holdsFirst); clearInterval(holdsTimer); clearTimeout(purgeFirst); clearInterval(purgeTimer); stopBackups(); stopAssignmentTick(); stopLoopWatch(); await drainCertificates(db); await drainPush(); await heavy.close(); await new Promise((res) => server.close(() => { db.close(); res(); })); await closeLogger(); } };
+  // مستودع البيانات: لقطة الشهر الحالي تُعاد كل يوم (آمنة التكرار)، فتثبت أرقامه عند نهايته
+  const whTick = () => { try { captureSnapshot(db); } catch (e) { console.warn('warehouse snapshot:', e.message); } };
+  const whFirst = scheduler ? setTimeout(whTick, 30_000) : null, whTimer = scheduler ? setInterval(whTick, 24 * 3600_000) : null;
+  whFirst?.unref(); whTimer?.unref();
+  return { server, db, cfg, limiter, router, close: async () => { stopBus(); clearInterval(touchTimer); try { flushSessionTouches(db); } catch {} clearInterval(timer); clearInterval(siemTimer); setWafBanLog(null); clearTimeout(holdsFirst); clearInterval(holdsTimer); clearTimeout(purgeFirst); clearInterval(purgeTimer); clearTimeout(whFirst); clearInterval(whTimer); stopBackups(); stopAssignmentTick(); stopLoopWatch(); await drainCertificates(db); await drainPush(); await heavy.close(); await new Promise((res) => server.close(() => { db.close(); res(); })); await closeLogger(); } };
 }

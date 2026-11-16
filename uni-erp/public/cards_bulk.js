@@ -122,17 +122,19 @@
   Object.assign(UA.actions, {
     'card-print': async () => {
       if (!C.list || !C.list.total) return;
-      const list = (await api('GET', `/api/cards/students?${query()}`)).students;
-      UA.printHtml(list.map((st) => UA.digitalCardHtml(st)), { card: true });
+      const list = (await api('GET', `/api/cards/students?qr=1&${query()}`)).students;
+      UA.printHtml(list.map((st) => UA.cardSides(st)), { card: true });
     },
     'card-print-certs': async () => {
       if (!C.list || !C.list.total) return;
       await printCertificates({ filters: C.filters }, C.list.total);
     },
     'card-cert-one': async (el, d) => { await printCertificates({ studentIds: [Number(d.id)] }, 1); },
-    'card-print-one': (el, d) => {
-      const st = C.list && C.list.students.find((s) => s.id === Number(d.id));
-      if (st) UA.printHtml([UA.digitalCardHtml(st)], { card: true });
+    'card-print-one': async (el, d) => {
+      try {
+        const st = (await api('GET', `/api/cards/students?qr=1&id=${Number(d.id)}`)).students[0];
+        if (st) UA.printHtml([UA.cardSides(st)], { card: true });
+      } catch (e) { if (!e.status) throw e; toast(e.message); }
     },
     'card-batch': async () => {
       const label = await askText('دفعة بطاقات جديدة', { label: 'اسم الدفعة', placeholder: 'بطاقات السنة الأولى 2026', submit: 'إنشاء الدفعة' });

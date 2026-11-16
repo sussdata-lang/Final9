@@ -2,10 +2,15 @@
 import { tx } from '../db.js';
 import { audit } from '../audit.js';
 import { HttpError } from '../http.js';
+import { groupSlots, saveGroupSlot, removeGroupSlot } from './schedule.js';
 
 export const GROUP_KINDS = { lecture: 'محاضرات', lab: 'مختبرات', exam: 'امتحانات', other: 'أخرى' };
 const READ = ['student:update', 'course:manage', 'attendance:manage', 'grade:manage', 'grade:approve', 'exams_housing:view', 'exams_housing:write', 'exams_housing:edit', 'exams_housing:approve', 'audit:read'];
 const WRITE = ['student:update', 'course:manage'];
+// مطابقة لصلاحيات شاشتي جدول المحاضرات وجدولة الامتحانات
+const LAB = ['course:manage', 'attendance:manage'];
+const EXAM_WRITE = ['exams_housing:write', 'exams_housing:edit', 'exams_housing:approve', 'course:manage', 'grade:manage'];
+const EXAM_READ = [...EXAM_WRITE, 'exams_housing:view', 'academic:read'];
 const MAX_IDS = 2000;
 const bad = (message, field) => new HttpError(400, message, 'validation', field);
 const needAny = (c, perms) => { if (!perms.some((p) => c.user.can(p))) throw new HttpError(403, 'لا تملك صلاحية هذا الإجراء.', 'forbidden'); };
@@ -103,6 +108,15 @@ function splitIntoGroups({ db }, actor, b, ip) {
   return { groups: created.map((id) => view(getGroup(db, id))) };
 }
 
+function groupSchedule(db, user, id) {
+  const g = getGroup(db, id), any = (perms) => perms.some((p) => user.can(p));
+  const canLab = any(LAB), readExam = any(EXAM_READ), canExam = any(EXAM_WRITE);
+  const exams = readExam ? db.prepare('SELECT id, course_code, course_name, exam_type, academic_year, semester, exam_date, start_time, end_time, hall_name, capacity, proctor_name FROM exam_schedules WHERE group_id = ? ORDER BY exam_date, start_time').all(g.id) : null;
+  const courses = canLab || canExam ? db.prepare('SELECT id, code, name, program_id FROM courses WHERE active = 1 ORDER BY CASE WHEN program_id = ? THEN 0 ELSE 1 END, name LIMIT 3000').all(g.program_id ?? 0)
+    .map((c) => ({ id: c.id, code: c.code ?? '', name: c.name })) : [];
+  return { labs: canLab ? groupSlots(db, g.id) : null, exams, courses, canLab, canExam };
+}
+
 export function registerStudentGroupRoutes(r, deps) {
   const { db } = deps;
   r.add('GET', '/api/student-groups', (c) => { needAny(c, READ); c.json(200, { groups: listGroups(db), kinds: GROUP_KINDS }); });
@@ -111,6 +125,18 @@ export function registerStudentGroupRoutes(r, deps) {
   r.add('GET', '/api/student-groups/:id', (c) => { needAny(c, READ); c.json(200, { group: view(getGroup(db, c.params.id)), members: membersOf(db, c.params.id) }); });
   r.add('PUT', '/api/student-groups/:id', (c) => { needAny(c, WRITE); c.json(200, { group: updateGroup(deps, c.user, c.params.id, c.body, c.ip) }); });
   r.add('DELETE', '/api/student-groups/:id', (c) => { needAny(c, WRITE); deleteGroup(deps, c.user, c.params.id, c.ip); c.json(200, { ok: true }); });
+  r.add('GET', '/api/student-groups/:id/schedule', (c) => { needAny(c, READ); c.json(200, groupSchedule(db, c.user, c.params.id)); });
+  r.add('PUT', '/api/student-groups/:id/labs', (c) => { needAny(c, LAB); getGroup(db, c.params.id); c.json(200, saveGroupSlot(deps, c.user, c.params.id, c.body ?? {}, c.ip)); });
+  r.add('DELETE', '/api/student-groups/:id/labs/:slotId', (c) => { needAny(c, LAB); c.json(200, removeGroupSlot(deps, c.user, c.params.id, c.params.slotId, c.ip)); });
+  r.add('DELETE', '/api/student-groups/:id/exams/:examId', (c) => {
+    needAny(c, EXAM_WRITE);
+    const g = getGroup(db, c.params.id);
+    const ex = db.prepare('SELECT id, course_name, course_code, exam_date FROM exam_schedules WHERE id = ? AND group_id = ?').get(Number(c.params.examId), g.id);
+    if (!ex) throw new HttpError(404, 'الامتحان غير موجود في هذه الفئة.', 'not_found');
+    db.prepare('DELETE FROM exam_schedules WHERE id = ?').run(ex.id);
+    audit(db, c.user, 'حذف موعد امتحان فئة', `${g.name}: ${ex.course_name || ex.course_code} ${ex.exam_date}`, c.ip);
+    c.json(200, groupSchedule(db, c.user, g.id));
+  });
   r.add('PUT', '/api/student-groups/:id/members', (c) => { needAny(c, WRITE); c.json(200, changeMembers(deps, c.user, c.params.id, c.body, c.ip)); });
   r.add('GET', '/api/me/groups', (c) => { c.json(200, { groups: c.user.role === 'student' ? groupsOfStudent(db, c.user.id) : [] }); });
 }

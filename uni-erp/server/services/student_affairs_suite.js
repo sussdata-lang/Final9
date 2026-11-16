@@ -13,6 +13,7 @@ import { tx } from '../db.js';
 import { ready as readyFinance } from './finance/core.js';
 import { getSetting } from './settings.js';
 import { issueDocument } from './documents.js';
+import { encryptField, decryptField } from '../lib/data_crypto.js';
 
 /* ============================================================================
    1. الدوال النقية (Pure Decoupled Business Logic — Unit-Testable)
@@ -320,7 +321,7 @@ export function buildFiveStageRequestTracker(request, appointment = null) {
 const LIST_MAX = 500;
 
 export function getStudentAffairsSuiteOverview(deps, query = {}) {
-  const { db } = deps;
+  const { db, cfg } = deps;
   const own = query.ownOnly ? Number(query.studentId) : null;
   const scoped = (column, sqlBody, tail) => (own ? db.prepare(`${sqlBody} WHERE ${column} = ? ${tail}`).all(own) : db.prepare(`${sqlBody} ${tail} LIMIT ${LIST_MAX}`).all());
   const count = (sql) => Number(db.prepare(sql).get().c);
@@ -457,7 +458,8 @@ export function getStudentAffairsSuiteOverview(deps, query = {}) {
              d.penalty_level AS penaltyLevel, d.blocks_documents AS blocksDocuments, d.expires_at AS expiresAt
       FROM student_holds h
       JOIN users u ON u.id = h.student_id
-      LEFT JOIN sa_disciplinary_details d ON d.hold_id = h.id`, 'ORDER BY h.active DESC, h.id DESC');
+      LEFT JOIN sa_disciplinary_details d ON d.hold_id = h.id`, 'ORDER BY h.active DESC, h.id DESC')
+    .map((r) => ({ ...r, note: decryptField(cfg, r.note) }));
 
   // 5. المنح والإعفاءات والرعاية الطلابية (مدمجة مع المالية fin_charges)
   const scholarships = scoped('s.student_id', `SELECT s.*, u.display_name AS studentName, u.student_no AS studentNo,
@@ -1197,7 +1199,7 @@ function movementQueue(db, actor) {
   });
 }
 
-export function createDisciplinaryRecord({ db }, actor, body, ip) {
+export function createDisciplinaryRecord({ db, cfg }, actor, body, ip) {
   if (!actor || (actor.role !== 'admin' && !actor.can?.('holds:manage'))) {
     throw new HttpError(403, 'لا تملك صلاحية فرض عقوبة انضباطية أو حجب وثائق (يتطلب صلاحية holds:manage).', 'forbidden');
   }
@@ -1222,9 +1224,10 @@ export function createDisciplinaryRecord({ db }, actor, body, ip) {
   // القرار والحركة معاً أو لا شيء: تعذر الحركة (حالة غير مناسبة أو حركة قائمة) يلغي القرار
   return withLock(db, `lifecycle:${studentId}`, () => {
     // إدراج في جدول student_holds الرسمي ليتم تطبيق الحجب الآلي للوثائق في كامل النظام
+    // ملاحظة المانع نص شخصي حساس (وقائع المخالفة) فتُحفظ مشفَّرة
     const holdRes = db
       .prepare("INSERT INTO student_holds (student_id, hold_type, note, active, created_by, created_at) VALUES (?, 'disciplinary', ?, 1, ?, ?)")
-      .run(studentId, `[${decisionNo}] ${note}`.slice(0, 200), actor.id, Date.now());
+      .run(studentId, encryptField(cfg, `[${decisionNo}] ${note}`.slice(0, 200)), actor.id, Date.now());
     const holdId = Number(holdRes.lastInsertRowid);
 
     db.prepare(`

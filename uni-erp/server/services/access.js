@@ -13,6 +13,8 @@ import {
   PLATFORM_MODULES_MATRIX,
   DEPARTMENT_ROLE_PRESETS,
   ALL_STAFF_VIEWS,
+  knownViewsFor,
+  editableViewList,
   safeJsonParse,
   resolveModulePermissions,
   } from '../permissions.js';
@@ -111,7 +113,7 @@ function listUnits(db) {
     const units = snap.units.map((u) => {
       const defaultModuleAccess = safeJsonParse(u.default_module_access_json, {});
       const defaultPermissions = safeJsonParse(u.default_permissions_json, []);
-      const allowedViews = safeJsonParse(u.allowed_views_json, []);
+      const allowedViews = editableViewList(safeJsonParse(u.allowed_views_json, []), safeJsonParse(u.views_known_json, null));
       const mergedPerms = [...new Set([...defaultPermissions, ...resolveModulePermissions(defaultModuleAccess)])];
       return {
         id: u.id,
@@ -229,8 +231,8 @@ export function createUnit({ db }, actor, input, ip) {
   const allowedViews = sanitizeUnitViews(input?.allowedViews);
   const id = tx(db, () => {
     const r = Number(
-      db.prepare('INSERT INTO org_units (name, kind, parent_id, description, default_permissions_json, default_module_access_json, allowed_views_json) VALUES (?,?,?,?,?,?,?)')
-        .run(name, kind, parent, description, JSON.stringify(defaultPermissions), JSON.stringify(defaultModuleAccess), JSON.stringify(allowedViews)).lastInsertRowid
+      db.prepare('INSERT INTO org_units (name, kind, parent_id, description, default_permissions_json, default_module_access_json, allowed_views_json, views_known_json) VALUES (?,?,?,?,?,?,?,?)')
+        .run(name, kind, parent, description, JSON.stringify(defaultPermissions), JSON.stringify(defaultModuleAccess), JSON.stringify(allowedViews), JSON.stringify(knownViewsFor(allowedViews))).lastInsertRowid
     );
     audit(db, actor, `إضافة وحدة إدارية: ${name}`, String(r), ip);
     return r;
@@ -263,14 +265,16 @@ export function updateUnit({ db }, actor, id, input, ip) {
   const allowedViews = input?.allowedViews !== undefined
     ? sanitizeUnitViews(input.allowedViews)
     : safeJsonParse(u.allowed_views_json, []);
+  // ختم الشاشات الموجودة يتبع القائمة: يتجدد مع قائمة جديدة، ويُنقل كما هو إلى حسابات الوحدة
+  const knownViews = input?.allowedViews !== undefined ? knownViewsFor(allowedViews) : safeJsonParse(u.views_known_json, null);
 
   tx(db, () => {
-    db.prepare('UPDATE org_units SET name = ?, parent_id = ?, active = ?, description = ?, default_permissions_json = ?, default_module_access_json = ?, allowed_views_json = ? WHERE id = ?')
-      .run(name, parent, active, description, JSON.stringify(defaultPermissions), JSON.stringify(defaultModuleAccess), JSON.stringify(allowedViews), u.id);
+    db.prepare('UPDATE org_units SET name = ?, parent_id = ?, active = ?, description = ?, default_permissions_json = ?, default_module_access_json = ?, allowed_views_json = ?, views_known_json = ? WHERE id = ?')
+      .run(name, parent, active, description, JSON.stringify(defaultPermissions), JSON.stringify(defaultModuleAccess), JSON.stringify(allowedViews), JSON.stringify(knownViews), u.id);
 
     if (input?.applyToUnitUsers) {
-      db.prepare("UPDATE users SET module_access_json = ?, custom_permissions_json = ?, allowed_views_json = ? WHERE unit_id = ? AND role != 'admin'")
-        .run(JSON.stringify(defaultModuleAccess), JSON.stringify(defaultPermissions), JSON.stringify(allowedViews), u.id);
+      db.prepare("UPDATE users SET module_access_json = ?, custom_permissions_json = ?, allowed_views_json = ?, views_known_json = ? WHERE unit_id = ? AND role != 'admin'")
+        .run(JSON.stringify(defaultModuleAccess), JSON.stringify(defaultPermissions), JSON.stringify(allowedViews), JSON.stringify(knownViews), u.id);
     }
 
     if (input?.defaultPermissions !== undefined || input?.defaultModuleAccess !== undefined || input?.allowedViews !== undefined) {

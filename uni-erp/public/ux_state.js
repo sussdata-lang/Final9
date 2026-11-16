@@ -8,8 +8,8 @@
   /* ---------- حالة الوحدات الموحدة ---------- */
   const U = {
     mainTab: 'unified', // unified | work | myprofile
-    hrSection: 'payroll', // payroll | att_leaves | biometrics | appraisals | enterprise_hr
-    auditSection: 'chain', // chain | logs | devops | exec_offline
+    hrSection: 'payroll', // payroll | att_leaves | biometrics | appraisals
+    auditSection: 'chain', // chain | logs | devops
     guideMode: 'depts', // depts | hierarchy | lifecycle | corr_rules | governance
     guideSection: 'all',
     guideDeptFilter: 'all',

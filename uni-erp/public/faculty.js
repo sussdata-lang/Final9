@@ -3,7 +3,7 @@
    ونافذة إسناد/فك إسناد المقررات. الصلاحية: faculty:manage. */
 (function () {
   const UA = window.UA, { S, api, esc, val, toast } = UA;
-  const F = { list: null, options: null, summary: null, q: '', rank: '', status: '', modal: null, assign: null, courses: null };
+  const F = { list: null, options: null, summary: null, q: '', rank: '', status: '', modal: null, assign: null, courses: null, links: [] };
   const DEF_LV = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة'];
   const getLV = () => ((UA.S.limits && UA.S.limits.levels) || DEF_LV);
   const LV = DEF_LV;
@@ -25,11 +25,32 @@
   const pill = (st) => `<span class="pill ${st === 'active' ? 'p-approved' : st === 'leave' ? 'p-review' : 'p-rejected'}">${esc((F.options.statuses && F.options.statuses[st]) || st)}</span>`;
   const RSTAT = { active: ['on', 'فعّال'], leave: ['on', 'في إجازة'], inactive: ['off', 'معطَّل'] };
 
+  const KIND_FALLBACK = { theory: 'القسم النظري', practical: 'التطبيقات العملية', lab: 'التدريبات المخبرية', field: 'التدريب الميداني والشرطي', military: 'التدريب العسكري والأمني والبدني' };
+  const kinds = () => (F.options && F.options.teachingKinds) || KIND_FALLBACK;
+  // مواد التخصص مجمّعة: اسم المادة وتحته أنواع تدريسها؛ العضو القديم بلا مواد يبقى نص تخصصه كما هو
+  function specialtiesCell(m) {
+    if (!m.specialties || !m.specialties.length) return esc(m.specialty || '—');
+    const by = new Map();
+    for (const s of m.specialties) { if (!by.has(s.courseId)) by.set(s.courseId, { name: s.name, kinds: [] }); by.get(s.courseId).kinds.push(s.kindLabel); }
+    return [...by.values()].map((c) => `<div><b>${esc(c.name)}</b> <span class="small">${esc(c.kinds.join(' · '))}</span></div>`).join('');
+  }
+  const courseLabel = (c) => `${c.name}${c.code ? ` (${c.code})` : ''}${c.program ? ` — ${c.program}` : ''}`;
+  // صفوف اختيار مواد التخصص داخل نموذج العضو: تُرسم في حاويتها وحدها كي لا تضيع بقية الحقول المكتوبة
+  function linksHtml() {
+    const courses = F.courses || [], ks = Object.entries(kinds());
+    const rows = F.links.map((l, i) => `<div class="inline-form" style="margin:0 0 6px;align-items:flex-end">
+      <label class="grow">المادة<select data-fmsp="course" data-i="${i}">${opts(courses.map((c) => [c.id, courseLabel(c)]), l.courseId, '— اختر مادة —')}</select></label>
+      <label>نوع التدريس<select data-fmsp="kind" data-i="${i}" data-no-combo="1">${opts(ks, l.kind)}</select></label>
+      <button class="btn sm bad" type="button" data-act="fmsprm" data-i="${i}" aria-label="حذف المادة">✕</button></div>`).join('');
+    return `${rows || '<p class="small" style="margin:0 0 6px">لم تُضف مواد بعد.</p>'}<button class="btn sm" type="button" data-act="fmspadd">＋ إضافة مادة</button>`;
+  }
+  const redrawLinks = () => { const el = document.getElementById('fm-sp'); if (el) el.innerHTML = linksHtml(); };
+
   function memberRows() {
     const term = F.q.trim().toLowerCase();
     return F.list.filter((m) => !term || [m.name, m.specialty, m.rank, m.unit].some((x) => String(x).toLowerCase().includes(term)))
       .map((m) => `<tr><td class="nm"><b>${esc(m.name)}</b>${m.email ? ` <span class="small" dir="ltr">${esc(m.email)}</span>` : ''}</td><td class="nowrap">${esc(m.rank)}</td><td class="nm">${esc(m.unit || '—')}</td>
-        <td class="nm">${esc(m.specialty || '—')}</td><td>${esc(m.officeHours || '—')}</td>
+        <td class="nm">${specialtiesCell(m)}</td><td>${esc(m.officeHours || '—')}</td>
         <td class="nowrap">${m.courses ? `<button class="link" data-act="fmassign" data-id="${m.id}" title="عرض وإدارة المواد المسندة"><b>${m.hours}</b> ساعة · ${m.courses} مقرر</button>` : '<button class="link small" data-act="fmassign" data-id="' + m.id + '">إسناد مواد</button>'}</td>
         <td>${pill(m.status)}</td>
         <td class="nowrap"><button class="btn sm" data-act="fmedit" data-id="${m.id}">تعديل</button> <button class="btn sm" data-act="fmtoggle" data-id="${m.id}" data-on="${RSTAT[m.status][0] === 'on' ? 0 : 1}">${RSTAT[m.status][0] === 'on' ? 'تعطيل' : 'تفعيل'}</button> <button class="btn sm bad" data-act="fmdel" data-id="${m.id}">حذف</button></td></tr>`).join('')
@@ -61,8 +82,8 @@
       <form class="form" id="fmform" style="border:0;margin:0;padding:0">
         <div class="two"><label>الاسم<input id="fm-name" maxlength="80" required value="${v('name')}" placeholder="الاسم الثلاثي"></label>
           <label>الدرجة العلمية<select id="fm-rank" required>${opts(o.ranks.map((r) => [r, r]), m && m.rank, '— اختر —')}</select></label></div>
-        <div class="two"><label>القسم / الإدارة<select id="fm-unit">${opts(o.units.map((u) => [u.id, u.name]), m && m.unitId, '— بدون —')}</select></label>
-          <label>التخصص<input id="fm-spec" maxlength="100" value="${v('specialty')}" placeholder="مثال: أمن الشبكات"></label></div>
+        <div class="two"><label>القسم / الإدارة<select id="fm-unit">${opts(o.units.map((u) => [u.id, u.name]), m && m.unitId, '— بدون —')}</select></label></div>
+        <fieldset class="perm-g"><legend>التخصص (مواد من النظام ونوع تدريس كل منها)</legend><div id="fm-sp">${linksHtml()}</div></fieldset>
         <div class="two"><label>البريد الإلكتروني<input id="fm-mail" type="email" maxlength="100" dir="ltr" value="${v('email')}"></label>
           <label>الهاتف<input id="fm-phone" maxlength="20" dir="ltr" value="${v('phone')}"></label></div>
         <div class="two"><label>الساعات المكتبية<input id="fm-office" maxlength="200" value="${v('officeHours')}" placeholder="مثال: الأحد والثلاثاء 10:00 – 12:00"></label>
@@ -95,7 +116,7 @@
     const body = F.assign ? assignModal() : formModal();
     return `<div class="modal-back" data-act="fmclose"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="fmttl">${body}</div></div>`;
   }
-  UA.facultyView = membersTab;
+  UA.facultyView = () => membersTab() + (F.list && UA.esCards ? UA.esCards.overload() : '');
   UA.loadFacultyMembers = loadMembers;
 
   // تغليف محمّل وأحداث التبويب بعد تسجيلهما في staff.js — لا يُسقط واجهة المواد والعلامات عند فشل الهيئة التدريسية
@@ -120,8 +141,15 @@
   const run = async (fn) => { try { await fn(); } catch (e) { if (!e.status) { console.error(e); toast(String(e.message || e)); return; } toast(e.message); } };
   const refreshBody = () => { const el = document.getElementById('fm-body'); if (el && F.list) el.innerHTML = memberRows(); };
   Object.assign(UA.actions, {
-    fmnew: () => { F.assign = null; F.modal = { edit: null }; UA.render(); window.scrollTo(0, 0); },
-    fmedit: (el, d) => { F.assign = null; F.modal = { edit: Number(d.id) }; UA.render(); window.scrollTo(0, 0); },
+    fmnew: () => run(async () => { if (!F.courses) F.courses = (await api('GET', '/api/courses')).courses; F.links = []; F.assign = null; F.modal = { edit: null }; UA.render(); window.scrollTo(0, 0); }),
+    fmedit: (el, d) => run(async () => {
+      if (!F.courses) F.courses = (await api('GET', '/api/courses')).courses;
+      const m = F.list.find((x) => x.id === Number(d.id));
+      F.links = ((m && m.specialties) || []).map((s) => ({ courseId: s.courseId, kind: s.kind }));
+      F.assign = null; F.modal = { edit: Number(d.id) }; UA.render(); window.scrollTo(0, 0);
+    }),
+    fmspadd: () => { F.links.push({ courseId: '', kind: 'theory' }); redrawLinks(); },
+    fmsprm: (el, d) => { F.links.splice(Number(d.i), 1); redrawLinks(); },
     // النقر داخل النافذة يصعد إلى الخلفية (data-act="fmclose") فكان يغلقها فور فتحها؛ نتجاهله كما تفعل نوافذ الحضور والموظفين
     fmclose: (el, d, e) => { if (e && e.target.closest('.modal') && el.classList.contains('modal-back')) return; F.modal = null; F.assign = null; UA.render(); },
     fmtoggle: (el, d) => run(async () => {
@@ -158,7 +186,7 @@
       const name = val('fm-name').trim();
       if (name.length < 2) { toast('الاسم يجب أن يكون حرفين على الأقل'); return; }
       const body = { name, rank, unitId: val('fm-unit') ? Number(val('fm-unit')) : null,
-        specialty: val('fm-spec'), email: val('fm-mail'), phone: val('fm-phone'), officeHours: val('fm-office'),
+        specialties: F.links.filter((l) => l.courseId).map((l) => ({ courseId: Number(l.courseId), kind: l.kind })), email: val('fm-mail'), phone: val('fm-phone'), officeHours: val('fm-office'),
         officeLocation: val('fm-loc'), account: document.getElementById('fm-account').value, hireDate: hire ? Date.parse(hire + 'T00:00:00') : null, status: val('fm-status') || 'active', notes: val('fm-notes') };
       const edit = F.modal && F.modal.edit;
       if (edit) await api('PUT', '/api/faculty/' + edit, body); else await api('POST', '/api/faculty', body);
@@ -175,7 +203,9 @@
     refreshBody();
   });
   document.addEventListener('change', async (e) => {
-    const t = e.target; if (!t || !t.dataset || !t.dataset.fm) return;
+    const t = e.target;
+    if (t && t.dataset && t.dataset.fmsp) { const l = F.links[Number(t.dataset.i)]; if (l) { if (t.dataset.fmsp === 'course') l.courseId = t.value; else l.kind = t.value; } return; }
+    if (!t || !t.dataset || !t.dataset.fm) return;
     F[t.dataset.fm] = t.value; await run(loadMembers()); refreshBody();
   });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && (F.modal || F.assign)) { F.modal = null; F.assign = null; UA.render(); } });

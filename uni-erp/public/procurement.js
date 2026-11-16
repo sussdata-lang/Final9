@@ -70,13 +70,18 @@
     ['cycle', '🛒 دورة الشراء وأوامر التوريد'],
     ['movements', '📦 الحركة المخزنية (إدخال/صرف)'],
     ['assets', '🏷️ سجل الأصول الثابتة والعهد'],
-    ['suppliers', '🤝 الموردون المعتمدون']
+    ['suppliers', '🤝 الموردون المعتمدون'],
+    ['quotes', '💲 عروض الأسعار وتقييم المورّدين']
   ];
 
   async function loadTab() {
+    if (UA.procTab) { P.tab = UA.procTab; UA.procTab = null; }   // دخول من go('quotations')
     if (!can('procurement:read') && P.tab !== 'cycle') P.tab = 'cycle';   // مقدّم الطلب: طلباته فقط
     const t = P.tab;
-    if (t === 'overview') {
+    if (t === 'quotes') {
+      // شاشة عروض الأسعار (operations.js) صارت تبويباً هنا؛ إجراءاتها تعيد تحميل UA.loaders.quotations ثم UA.render
+      if (UA.loaders.quotations) await UA.loaders.quotations();
+    } else if (t === 'overview') {
       P.ov = await api('GET', '/api/procurement/overview');
     } else if (t === 'stock') {
       const qs = new URLSearchParams();
@@ -589,6 +594,7 @@
     if (P.tab === 'movements') return viewMovements();
     if (P.tab === 'assets') return viewAssets();
     if (P.tab === 'suppliers') return viewSuppliers();
+    if (P.tab === 'quotes') return UA.views.quotations ? UA.views.quotations() : '';
     return '';
   }
 

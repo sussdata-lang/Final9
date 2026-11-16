@@ -64,12 +64,12 @@
     requests: 'clipboard', list: 'users', new: 'cap', groups: 'layers', digital_card: 'idcard', advising: 'compass', lifecycle: 'exchange', scholarships: 'wallet', desk_queue: 'clock',
     my_grades: 'chart', courses: 'book', grades: 'bars', gpa_sim: 'graduation', members: 'users',
     scan: 'idcard', log: 'audit', smart_schedule: 'calendar',
-    payroll: 'wallet', att_leaves: 'clock', biometrics: 'key', appraisals: 'quality', enterprise_hr: 'briefcase',
+    payroll: 'wallet', att_leaves: 'clock', biometrics: 'key', appraisals: 'quality',
     in: 'download', out: 'upload', internal_requests: 'clipboard', internal_new: 'file', pending_all: 'check', new_corr: 'mail', tpl: 'layers', notifs: 'spark',
     stats: 'chart', departments: 'hall', devops: 'settings', import: 'upload', export: 'download', news: 'news', complaints: 'mail',
     general: 'settings', mysettings: 'idcard', rules: 'check', programs: 'graduation', units: 'grid', verify: 'shield', backup: 'box', identity: 'spark', services: 'briefcase', waf: 'shield',
     users: 'users', roles: 'idcard', matrix: 'layers',
-    chain: 'audit', hc_perf: 'chart', archify: 'layers', logs: 'file', exec_offline: 'quality',
+    chain: 'audit', hc_perf: 'chart', archify: 'layers', logs: 'file',
     depts: 'hall', hierarchy: 'layers', corr_rules: 'mail', governance: 'shield',
   };
   const SUB_WORD = [

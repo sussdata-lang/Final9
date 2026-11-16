@@ -2,9 +2,9 @@
 (function () {
   const UA = window.UA, { S, api, esc, toast } = UA;
   const PAL = ['#054239', '#C9A24B', '#4DB6A0', '#0A5A4D', '#8A6A1B', '#1B7F4B', '#E6CB84', '#566660'];
-  const D = { tab: '', data: null, faculty: '', year: '', timer: null, paused: false, loading: false, err: '', exporting: '' };
+  const D = { tab: '', data: null, faculty: '', year: '', timer: null, paused: false, loading: false, err: '', exporting: '', whData: null, whErr: '' };
   const prevReset = UA.reset;
-  UA.reset = () => { if (prevReset) prevReset(); stop(); Object.assign(D, { tab: '', data: null, faculty: '', year: '', paused: false, err: '', exporting: '' }); };
+  UA.reset = () => { if (prevReset) prevReset(); stop(); Object.assign(D, { tab: '', data: null, faculty: '', year: '', paused: false, err: '', exporting: '', whData: null, whErr: '' }); };
   const nf = new Intl.NumberFormat('en-US');
   const fmt = (v) => (v === null || v === undefined ? '—' : nf.format(v));
   const short = (s, n = 22) => (String(s).length > n ? String(s).slice(0, n - 1) + '…' : String(s));
@@ -118,6 +118,33 @@
       <div class="vis-grid">${a.tables.map((t) => `<section class="vis ${SPAN[t.id] || ''}" data-vis="${t.id}"><header><h3>${esc(t.title)}</h3>${t.selectable ? '<span class="small no-print">انقر عموداً لتصفية اللوحة</span>' : ''}</header><div class="vis-body">${chart(t)}</div></section>`).join('')}</div></div>`;
   }
 
+  /* ---------- مستودع البيانات المؤسسي: لقطة شهرية عابرة للوحدات (أكاديمية ومالية وموارد بشرية ومشتريات)، بتاريخ طويل لا تحتفظ به الإحصاءات الحية ---------- */
+  async function loadWarehouse() {
+    D.whErr = '';
+    try { D.whData = await api('GET', '/api/warehouse/overview'); }
+    catch (e) { if (!e.status) throw e; D.whErr = e.message; }
+  }
+  function warehouseView() {
+    const w = D.whData;
+    if (!w) return `<div class="empty">${D.whErr ? esc(D.whErr) : 'جارٍ تحميل مستودع البيانات…'}</div>`;
+    const canCapture = S.me && S.me.role === 'admin';
+    if (!w.hasData) {
+      return `<div class="empty">لم تُحفظ أي لقطة بعد. تُحفظ تلقائياً كل يوم للشهر الحالي${canCapture ? '، أو احسبها الآن:' : '.'}
+        ${canCapture ? '<div style="margin-top:10px"><button class="btn pri sm" data-act="whcapture">احسب لقطة الآن</button></div>' : ''}</div>`;
+    }
+    const chg = (v) => (v === null || v === undefined ? '' : `<span class="small" style="color:${v >= 0 ? '#1B7F4B' : '#B3261E'}">${v >= 0 ? '▲' : '▼'} ${Math.abs(v)}%</span>`);
+    const kpis = w.kpis.map((k) => kpiTile({ id: k.code, label: k.label, value: k.value, unit: k.unit, hint: `${k.kind === 'stock' ? 'حتى الآن' : 'هذا الشهر'} ${chg(k.change) ? '· ' : ''}`, spark: k.series.filter((v) => v !== null) }));
+    const lines = w.kpis.filter((k) => k.series.some((v) => v !== null)).map((k) => {
+      const t = { id: k.code, title: `${k.label}${k.unit ? ` (${k.unit})` : ''}`, type: 'line', headers: ['الشهر', k.label], rows: w.periods.map((p, i) => [p.slice(2), k.series[i] ?? 0]) };
+      return `<section class="vis" data-vis="${t.id}"><header><h3>${esc(t.title)}</h3></header><div class="vis-body">${chart(t)}</div></section>`;
+    }).join('');
+    return `<div class="dash" id="dash-wh">
+      <div class="dash-bar no-print"><p class="hint" style="margin:0">لقطة شهرية ثابتة لا تتغير بعد انتهاء شهرها، فتصلح لمقارنة سنوات؛ الشهر الحالي يُحدَّث يومياً حتى ينتهي.</p>
+        <div class="dash-live">${canCapture ? '<button class="btn sm" data-act="whcapture">احسب لقطة الآن</button>' : ''}</div></div>
+      <div class="kpis">${kpis.join('')}</div>
+      <div class="vis-grid">${lines}</div></div>`;
+  }
+
   /* ---------- التحميل والتحديث الدوري ---------- */
   const qs = () => new URLSearchParams({ ...(D.faculty ? { faculty: D.faculty } : {}), ...(D.year ? { year: D.year } : {}) }).toString();
   async function load(silent) {
@@ -139,6 +166,7 @@
     const me = S.me || {}, has = (l) => me.role === 'admin' || l.some((p) => (me.permissions || []).includes(p));
     const out = [];
     if (has(['stats:read'])) out.push(['stats', 'الإحصاءات الأكاديمية']);
+    if (has(['stats:read'])) out.push(['warehouse', 'مستودع البيانات المؤسسي']);
     if (has(HR_ANALYTICS)) out.push(['departments', 'الأقسام والموارد']);
     if (has(DEVOPS_ANALYTICS)) out.push(['devops', 'أخطاء DevOps']);
     return out;
@@ -148,13 +176,14 @@
     const t = curTab();
     if (t === 'stats') { await load(true); start(); return; }
     stop();
+    if (t === 'warehouse') { await loadWarehouse(); return; }
     if (t) await UA.analyticsPanel.load(t);
   }
   UA.views.dashboard = () => {
     const l = pageTabs(), t = curTab();
     if (!t) return '<div class="empty">لا تملك صلاحية عرض الإحصاءات.</div>';
     const bar = l.length > 1 ? `<div class="sub-tabs no-print" role="tablist" style="margin-bottom:14px">${l.map((x) => `<button class="chip" role="tab" data-act="dtab" data-t="${x[0]}" aria-pressed="${x[0] === t}">${esc(x[1])}</button>`).join('')}</div>` : '';
-    return bar + (t === 'stats' ? view() : UA.analyticsPanel.html(t));
+    return bar + (t === 'stats' ? view() : t === 'warehouse' ? warehouseView() : UA.analyticsPanel.html(t));
   };
   UA.loaders.dashboard = loadTab;
   // الأزرار في الموارد البشرية والبنية التحتية تنقل إلى التبويب المناسب في هذه الصفحة
@@ -199,6 +228,10 @@
       } catch (e) { if (!e.status) throw e; toast(e.message); } finally { D.exporting = ''; UA.render(); }
     },
     dtab: async (el, d) => { D.tab = d.t; UA.render(); await loadTab(); UA.render(); },
+    whcapture: async () => {
+      try { await api('POST', '/api/warehouse/capture', {}); toast('أُعيد حساب لقطة الشهر الحالي'); await loadWarehouse(); UA.render(); }
+      catch (e) { if (!e.status) throw e; toast(e.message); }
+    },
   });
   window.addEventListener('change', async (e) => { if (e.target && e.target.dataset && e.target.dataset.chg === 'dfilter') { D.faculty = document.getElementById('d-fac').value; D.year = document.getElementById('d-year').value; await load(false); } });
 })();

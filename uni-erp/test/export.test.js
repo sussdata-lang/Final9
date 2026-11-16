@@ -9,6 +9,7 @@ import { verifyAuditChain } from '../server/audit.js';
 import { readXlsx } from '../server/lib/xlsx.js';
 import { readZip } from '../server/lib/zip.js';
 import { resetWaf } from '../server/waf.js';
+import { encryptField } from '../server/lib/data_crypto.js';
 
 const PW = 'Test#Pass12345';
 let app, base, staff, auditor, stu, stuId;
@@ -100,6 +101,21 @@ test('الصيغ: xlsx (ورقة لكل سنة وفصل)، csv بـ BOM وتحي
   const all = readXlsx((await raw('/api/export/file?dataset=all&format=xlsx', staff)).buf); assert.equal(all.sheets.length, 11);
 
   assert.equal((await api('GET', '/api/export/file?dataset=grades&format=exe', { cookie: staff })).status, 400);
+});
+
+test('تصدير الموانع: ملاحظة المانع الانضباطي المشفَّرة تظهر صريحة في التصدير لمن يملك الصلاحية', async () => {
+  app.db.prepare("INSERT INTO student_holds (student_id, hold_type, note, created_at) VALUES (?, 'disciplinary', ?, ?)")
+    .run(stuId, encryptField(app.cfg, 'وقائع تجريبية سرية'), Date.now());
+  const storedNote = app.db.prepare("SELECT note FROM student_holds WHERE student_id = ? AND hold_type = 'disciplinary'").get(stuId).note;
+  assert.match(storedNote, /^enc1:/, 'مخزَّنة مشفَّرة');
+
+  const p = await api('GET', '/api/export/preview?dataset=holds', { cookie: staff });
+  assert.equal(p.status, 200);
+  const row = p.json.sets[0].rows.find((r) => r[3] === 'تأديبية');
+  assert.equal(row[4], 'وقائع تجريبية سرية', 'المعاينة تعرض النص الصريح لا الشيفرة');
+
+  const x = readXlsx((await raw('/api/export/file?dataset=holds&format=xlsx', staff)).buf);
+  assert.ok(x.sheets[0].rows.some((r) => r.includes('وقائع تجريبية سرية')));
 });
 
 test('التدقيق: كل تصدير يُسجَّل والسلسلة سليمة', async () => {

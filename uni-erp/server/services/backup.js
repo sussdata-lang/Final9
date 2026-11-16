@@ -89,7 +89,7 @@ export async function createBackup({ db, cfg }, { reason = 'auto', actor = null,
     await pgDump(pgUrl, tmp);
     // النسخة غير المشفرة لا تحمل مفتاح التوقيع ولا الشهادة، فمن يصل إليها لا يستطيع توقيع وثائق صحيحة
     const noSecrets = !cfg.backupPassphrase;
-    const skip = (full, e) => full === dir || inside(full, dir) || e.name.startsWith('.tmp-') || (noSecrets && (e.name === 'secret.key' || e.name === 'audit.key' || e.name === 'pki')) || notInBackup(cfg, full);
+    const skip = (full, e) => full === dir || inside(full, dir) || e.name.startsWith('.tmp-') || (noSecrets && (e.name === 'secret.key' || e.name === 'audit.key' || e.name === 'data.key' || e.name === 'pki')) || notInBackup(cfg, full);
     const extra = walk(dataDir, 'data', skip);
     if (!inside(cfg.uploadDir, dataDir) && cfg.uploadDir !== dataDir) extra.push(...walk(cfg.uploadDir, 'uploads', (full) => notInBackup(cfg, full)));
     const name = `backup-${stamp}${reason === 'auto' ? '' : '-' + reason.replace(/[^a-z]/g, '')}.zip${cfg.backupPassphrase ? '.enc' : ''}`;

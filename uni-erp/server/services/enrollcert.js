@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { audit } from '../audit.js';
+import { decryptField } from '../lib/data_crypto.js';
 import { HttpError } from '../http.js';
 import { makeQr } from '../qr.js';
 import { buildPdf, prepareSigning } from '../lib/pdf.js';
@@ -60,7 +61,7 @@ function paint(d, p, code, url, qr, signAt, ident, payloadHash, hdr) {
 // ينشئ الشهادة إن لم توجد (idempotent). now لتثبيت الوقت في الاختبارات.
 export async function issueEnrollmentCertificate({ db, cfg }, studentId, { now = new Date(), fetchImpl = fetch } = {}) {
   const activeHold = db.prepare('SELECT hold_type, note FROM student_holds WHERE student_id = ? AND cleared_at IS NULL AND (active IS NULL OR active = 1) LIMIT 1').get(Number(studentId));
-  if (activeHold) throw new HttpError(403, `محجوب: يوجد مانع أو ذمة فعالة على الطالب (${activeHold.note || activeHold.hold_type || 'مانع فعال'}).`, 'student_hold_active');
+  if (activeHold) throw new HttpError(403, `محجوب: يوجد مانع أو ذمة فعالة على الطالب (${decryptField(cfg, activeHold.note) || activeHold.hold_type || 'مانع فعال'}).`, 'student_hold_active');
   const have = db.prepare('SELECT * FROM student_certs WHERE student_id = ?').get(Number(studentId)); if (have) return have;
   const payload = payloadFor(db, cfg, studentId), json = JSON.stringify(payload), payloadHash = sha256(Buffer.from(json)).toString('hex');
   let code; do code = `SC-${rnd(4)}-${rnd(4)}`; while (db.prepare('SELECT 1 FROM student_certs WHERE code = ?').get(code));

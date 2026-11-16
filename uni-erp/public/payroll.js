@@ -1313,6 +1313,26 @@
     UA.render();
   };
 
+  // تجديد عقود المحددين دفعة واحدة (من شريط التحديد المتعدد): كل عقد يبدأ بعد نهايته الحالية بنوعه وراتبه حتى التاريخ المحدد
+  (UA.bulkActs = UA.bulkActs || {}).hrrenewopen = {
+    label: 'تجديد العقود',
+    run: async (items) => {
+      const end = String(window.prompt(`تاريخ نهاية العقود الجديدة لـ ${items.length} عقد (مثال 2027-12-31):`) || '').trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(end)) { toast('اكتب التاريخ بصيغة 2027-12-31'); return 0; }
+      let ok = 0; const fail = [];
+      for (const d of items) {
+        const ct = (B.data.contracts || []).find((x) => x.id === Number(d.id));
+        if (!ct) continue;
+        const start = new Date(Date.parse(ct.endDate) + 86400000).toISOString().slice(0, 10);
+        if (end <= start) { fail.push(`${ct.employeeName}: التاريخ قبل نهاية عقده الحالية`); continue; }
+        try { await api('POST', `/api/hr-pro/contracts/${ct.id}/renew`, { contractTypeAr: ct.contractTypeAr, salary: ct.salary, startDate: start, endDate: end }); ok++; } catch (e) { fail.push(`${ct.employeeName}: ${e.message}`); }
+      }
+      await reload();
+      toast(`جُدّد ${ok} عقداً${fail.length ? ` وتعذّر ${fail.length}: ${fail[0]}` : ''}`);
+      return ok;
+    },
+  };
+
   Object.assign(UA.actions, {
     hrtab: async (el, d) => {
       B.tab = d.t;

@@ -156,7 +156,13 @@
     </section>`;
   }
 
-  UA.views.attendance = () => bar([['scan', 'مسح الدخول والخروج'], ['log', 'السجل'], ['smart_schedule', 'الجدول الدراسي ومنع التضارب']], A.tab, 'attab') + (A.tab === 'scan' ? scanTab() : A.tab === 'smart_schedule' ? smartScheduleTab() : logTab()) + modalHtml();
+  const canCommittee = () => UA.esCards && (UA.can('attendance:manage') || UA.can('grade:manage'));
+  UA.views.attendance = () => {
+    const tabs = [['scan', 'مسح الدخول والخروج'], ['log', 'السجل'], ['smart_schedule', 'الجدول الدراسي ومنع التضارب']];
+    if (canCommittee()) tabs.push(['committee', 'حضور اللجان الامتحانية']);
+    const body = A.tab === 'scan' ? scanTab() : A.tab === 'smart_schedule' ? smartScheduleTab() : A.tab === 'committee' && canCommittee() ? UA.esCards.committee() : logTab();
+    return bar(tabs, A.tab, 'attab') + body + modalHtml();
+  };
 
   /* ---------- الأحداث ---------- */
   let timer = null;

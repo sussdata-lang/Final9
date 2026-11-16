@@ -6,12 +6,12 @@ import zlib from 'node:zlib';
 import { createApp } from '../server/app.js';
 import { hashPassword, resetTieredRateLimit, sha256 } from '../server/security.js';
 import { tx } from '../server/db.js';
+import { effective } from '../server/permissions.js';
 
 const url = process.env.DATABASE_URL ?? '';
 const host = url ? new URL(url).hostname : '';
-const hostOk = ['127.0.0.1', 'localhost', '::1'].includes(host) || (process.env.ALLOW_REMOTE_DEMO === '1' && process.argv.includes('--allow-remote'));
-if (!process.argv.includes('--confirm') || !hostOk || process.env.NODE_ENV === 'production' || process.env.DEMO_MODE !== '1') {
-  console.error('يعمل محليًا فقط: قاعدة على هذا الجهاز، وDEMO_MODE=1، و--confirm. (لقاعدة بعيدة تجريبية: ALLOW_REMOTE_DEMO=1 و--allow-remote)');
+if (!process.argv.includes('--confirm') || !['127.0.0.1', 'localhost', '::1'].includes(host) || process.env.NODE_ENV === 'production' || process.env.DEMO_MODE !== '1') {
+  console.error('يعمل محليًا فقط: قاعدة على هذا الجهاز، وDEMO_MODE=1، و--confirm.');
   process.exit(1);
 }
 
@@ -279,7 +279,9 @@ const feeTuition = () => { const t = one("SELECT id FROM fin_fee_types WHERE kin
 await section('المالية: فواتير الطلاب والدفعات', async () => {
   const fee = feeTuition();
   let invoices = 0, paid = 0;
-  for (const s of S) {
+  // المؤجل والموقوف والمنسحب لا تصدر عليه رسوم جديدة
+  const billable = new Set(rows("SELECT user_id FROM student_profiles WHERE status = 'active'").map((x) => Number(x.user_id)));
+  for (const s of S.filter((x) => billable.has(Number(x.id)))) {
     const amount = /معهد/.test(s.program.name) ? 900000 : 1500000;
     const r = await call(admin, 'POST', '/api/finance/student-invoices', { studentNo: s.no, academicYear: AY, feeTypeId: fee, totalAmount: amount, installmentsCount: 2, firstDueDay: `${YEAR}-09-15` });
     if (!r.ok) { problems.push(`فاتورة ${s.no}: ${r.json?.message}`.slice(0, 120)); continue; }
@@ -389,6 +391,32 @@ await section('المشتريات والمخزون', async () => {
   const requesterRow = one("SELECT id FROM users WHERE role = 'staff' AND role_key = 'head_procure'") ?? one("SELECT id FROM users WHERE role = 'staff' ORDER BY id LIMIT 1");
   const requester = session(Number(requesterRow.id));
   const line = (i, qty) => ({ itemId: items[i]?.id, description: defs[i][0], qty });
+  // اعتماد طلب الشراء على مراحله (المشتريات ثم المالي ثم الرئاسة بحسب القيمة)، وكل مرحلة يعتمدها مستخدم مختلف يملك صلاحيتها
+  // لا يحمل دور مدمج صلاحيتي الاعتماد المالي والرئاسة (يمنحهما المدير)، فتُمنحان هنا لحسابين تجريبيين
+  for (const [key, perm] of [['head_finance', 'procurement:approve_finance'], ['head_admin_aff', 'procurement:approve_top']]) {
+    const u = one('SELECT id, custom_permissions_json FROM users WHERE role_key = ? AND active = 1 ORDER BY id LIMIT 1', key);
+    if (!u) { problems.push(`لا حساب بدور ${key} لمنحه ${perm}`); continue; }
+    let cur = []; try { cur = JSON.parse(u.custom_permissions_json || '[]'); } catch { /* */ }
+    if (!cur.includes(perm)) db.prepare('UPDATE users SET custom_permissions_json = ? WHERE id = ?').run(JSON.stringify([...cur, perm]), u.id);
+  }
+  const staffRows = rows("SELECT * FROM users WHERE role <> 'student' AND active = 1 ORDER BY CASE WHEN role = 'admin' THEN 0 ELSE 1 END, id");
+  const holders = (perm) => staffRows.filter((u) => effective(db, u).includes(perm)).map((u) => Number(u.id));
+  const sessions = new Map();
+  const approveStaged = async (id, requesterId) => {
+    const used = new Set([requesterId]);
+    for (let k = 0; k < 3; k++) {
+      const g = (await call(admin, 'GET', `${P}/requests/${id}`)).json?.request;
+      if (!g || g.status !== 'pending') return g?.status === 'approved';
+      const next = g.approval?.next; if (!next) return false;
+      const who = holders(next.perm).find((u) => !used.has(u));
+      if (!who) { problems.push(`طلب شراء ${g.no}: لا مستخدم آخر يملك صلاحية ${next.label}`); return false; }
+      used.add(who);
+      if (!sessions.has(who)) sessions.set(who, session(who));
+      const r = await call(sessions.get(who), 'POST', `${P}/requests/${id}/approve`, { note: 'معتمد' });
+      if (!r.ok) { problems.push(`طلب شراء ${g.no}: ${r.json?.message}`.slice(0, 120)); return false; }
+    }
+    return (await call(admin, 'GET', `${P}/requests/${id}`)).json?.request?.status === 'approved';
+  };
   for (let i = 0; i < 18; i++) {
     const idx = [int(0, 19), int(0, 19)].filter((v, k, a) => a.indexOf(v) === k);
     const r = await call(requester, 'POST', `${P}/requests`, { title: `طلب توريد ${i + 1}: ${defs[idx[0]][0]}`, description: 'طلب شراء تجريبي', warehouseId: wh[i % 3]?.id, lines: idx.map((k) => ({ ...line(k, int(5, 40)), estCost: defs[k][2] })) });
@@ -399,7 +427,7 @@ await section('المشتريات والمخزون', async () => {
     await call(requester, 'POST', `${P}/requests/${id}/submit`, {});
     if (i % 6 === 4) continue;                                     // قيد المراجعة
     if (i % 6 === 3) { await call(admin, 'POST', `${P}/requests/${id}/reject`, { note: 'خارج الميزانية الحالية' }); continue; }
-    if (!(await call(admin, 'POST', `${P}/requests/${id}/approve`, { note: 'معتمد' })).ok) continue;
+    if (!(await approveStaged(id, Number(requesterRow.id)))) continue;
     const orderLines = idx.map((k) => ({ ...line(k, int(10, 60)), unitCost: defs[k][2] }));
     const o = await call(admin, 'POST', `${P}/orders`, { supplierId: pick(sups)?.id, requestId: id, lines: orderLines });
     const oid = o.json?.order?.id ?? o.json?.id;
@@ -436,7 +464,8 @@ await section('شؤون الطلاب', () => {
     const pIds = programs.map((p) => p.id);
     for (let i = 0; i < 60; i++) { const f = chance(0.35), n = person(f), st = pick(['pending', 'pending', 'accepted', 'rejected']); ins('INSERT INTO sa_applicants (application_no, full_name, national_id, phone, hs_type, hs_score, hs_year, category, pref1_program_id, pref2_program_id, pref3_program_id, accepted_program_id, sorting_status, notes, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', `ADM-${YEAR}-${String(101 + i)}`, `${n.first} ${n.father} ${n.last}`, `A${String(900000000 + i * 7)}`, `0955${String(100000 + i)}`, 'علمي', int(170, 280), YEAR, pick(['general', 'general', 'parallel', 'martyrs', 'transfer']), pick(pIds), pick(pIds), pick(pIds), st === 'accepted' ? pick(pIds) : null, st, '', NOW - i * DAY); }
     for (const [i, s] of some(30, active).entries()) ins('INSERT INTO sa_advising_warnings (student_id, warning_type, severity, gpa_snapshot, absence_rate, failed_courses_count, advisor_name, action_plan, session_date, status, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)', s.id, pick(['academic', 'attendance']), pick(['low', 'medium', 'high']), int(45, 65), int(5, 35), int(0, 4), pick(H.members).name, 'جلسة إرشاد وخطة تحسين', daysAgo(i), pick(['open', 'closed']), NOW);
-    for (const [i, s] of some(15).entries()) ins('INSERT INTO sa_lifecycle_movements (movement_no, student_id, movement_type, academic_year, semester, from_status, to_status, from_program_id, to_program_id, financial_impact, academic_impact, decision_no, reason, status, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', `MOV-${YEAR}-${String(i + 1).padStart(3, '0')}`, s.id, pick(['postponement', 'withdrawal', 'program_transfer']), AY, 1, 'active', pick(['suspended', 'withdrawn', 'active']), s.program.id, s.program.id, 'لا أثر مالي', 'يحفظ الفصل', `قرار ${100 + i}`, 'ظروف موثقة', 'approved', 'شؤون الطلاب', NOW - i * DAY);
+    const movBase = Number(one("SELECT COUNT(*) AS n FROM sa_lifecycle_movements WHERE movement_no LIKE ?", `MOV-${YEAR}-%`).n);
+    for (const [i, s] of some(15).entries()) ins('INSERT INTO sa_lifecycle_movements (movement_no, student_id, movement_type, academic_year, semester, from_status, to_status, from_program_id, to_program_id, financial_impact, academic_impact, decision_no, reason, status, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', `MOV-${YEAR}-${String(movBase + i + 1).padStart(3, '0')}`, s.id, pick(['postponement', 'withdrawal', 'program_transfer']), AY, 1, 'active', pick(['suspended', 'withdrawn', 'active']), s.program.id, s.program.id, 'لا أثر مالي', 'يحفظ الفصل', `قرار ${100 + i}`, 'ظروف موثقة', 'approved', 'شؤون الطلاب', NOW - i * DAY);
     for (const [i, s] of some(14, active).entries()) {
       const type = pick(['financial', 'disciplinary', 'library']);
       const hold = ins('INSERT INTO student_holds (student_id, hold_type, note, active, created_by, created_at) VALUES (?,?,?,1,?,?)', s.id, type, 'مانع تجريبي', adminId, NOW);

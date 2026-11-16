@@ -2,6 +2,26 @@
 (function () {
   const UA = window.UA, { S, api, esc, val, toast } = UA;
 
+  // الشكل الموحَّد لحالة «مُنشئ الصلاحيات»، يُستخدم عند تأسيس حساب جديد وعند تعديل حساب قائم معاً،
+  // بدل نسختين منفصلتين قد تنحرف إحداهما عن الأخرى كلما أُضيف حقل جديد
+  const builderStateShape = (overrides = {}) => ({
+    roleKey: 'staff',
+    accessMode: 'hybrid',
+    dataScope: 'unit',
+    scopeFaculty: '',
+    customPerms: new Set(),
+    revokedPerms: new Set(),
+    allowedViews: new Set(),
+    hiddenTabs: new Set(),
+    showAdvancedCatalog: false,
+    viewsGroup: null,
+    viewsSearch: '',
+    viewsOnlyActive: false,
+    viewsSnapshot: null,
+    initialized: false,
+    ...overrides,
+  });
+
   const fresh = () => ({
     tab: null,
     data: null,
@@ -13,17 +33,9 @@
     userUnitFilter: '',
     userModeFilter: '',
     matrixFilter: '',
+    unitsView: 'list',
     // حالة مُنشئ صلاحيات الحساب الجديد (Account Creation Permission Builder)
-    builder: {
-      roleKey: 'staff',
-      accessMode: 'hybrid',
-      dataScope: 'unit',
-      customPerms: new Set(),
-      revokedPerms: new Set(),
-      allowedViews: new Set(),
-      showAdvancedCatalog: false,
-      initialized: false,
-    },
+    builder: builderStateShape(),
     // حالة مُحرّر صلاحيات الحساب القائم (Existing Account Permission Editor)
     editBuilder: null,
   });
@@ -58,9 +70,10 @@
     own: 'السجلات والمعاملات الشخصية فقط',
     self: 'السجلات والمعاملات الشخصية فقط',
   };
+  // 'role' قيمة قديمة محفوظة في قاعدة بيانات بعض الحسابات؛ تُعامَل كمرادف لـ'hybrid' (نفس المنطق فعلياً في الخادم)
   const MODE_LABELS = {
-    role: 'تلقائي حسب الدور والقسم',
-    hybrid: 'مدمج (الدور + تخصيص الأقسام)',
+    role: 'موروث من الدور والقسم',
+    hybrid: 'موروث من الدور والقسم',
     custom: 'مخصص بالكامل لهذا الحساب',
   };
   const ACTION_META = [
@@ -88,22 +101,12 @@
     return r ? r.permissions || [] : [];
   }
 
-  // «تخصيص الشاشات» كان ينغلق بعد كل اختيار لأن اللوحة تُعاد كتابتها؛ نحفظ حالة الفتح ونعيدها عند كل رسم
-  document.addEventListener('toggle', (e) => {
-    const d = e.target;
-    if (d && d.matches && d.matches('details[data-keep="views"]')) X.viewsOpen = d.open;
-  }, true);
-
   // صلاحيات الحساب قيد التخصيص، لتعليم التبويبات التي لا يملكها
   function builderPerms(bState) {
     const set = new Set([...getRolePerms(bState.roleKey), ...bState.customPerms]);
     for (const p of bState.revokedPerms) set.delete(p);
     return set;
   }
-  const paintChoice = (input) => {
-    const box = input.closest('label');
-    if (box) { box.style.borderColor = input.checked ? '#054239' : '#DCE3DD'; box.style.background = input.checked ? 'rgba(5,66,57,0.06)' : '#fff'; }
-  };
   const keepHybrid = (bState, target) => {
     if (bState.accessMode !== 'role') return;
     bState.accessMode = 'hybrid';
@@ -121,6 +124,7 @@
       X.builder.hiddenTabs = new Set();
       X.builder.allowedViews = new Set(['desk', 'overview', 'affairs', 'internal', 'corr', 'dashboard', 'exchange', 'verify']);
       X.builder.initialized = true;
+      X.builder.viewsSnapshot = { views: new Set(X.builder.allowedViews), tabs: new Set(X.builder.hiddenTabs) };
     }
   }
 
@@ -223,13 +227,122 @@
       .map((u) => `<option value="${u.id}"${String(u.id) === String(sel) ? ' selected' : ''}>${esc(u.name)} (${KIND[u.kind] || u.kind})</option>`)
       .join('');
 
+  /* ---------- قسم «تخصيص الشاشات والتبويبات»: تصميم قائمة/تفاصيل (مجموعات الشاشات يميناً، شاشات المجموعة المختارة وتبويباتها يساراً) ---------- */
+  const viewsGroupsOf = (allViews) => {
+    const seen = [];
+    for (const v of allViews) if (!seen.includes(v.group)) seen.push(v.group);
+    return seen;
+  };
+  const viewsGroupStats = (bState, allViews, group) => {
+    const inGroup = allViews.filter((v) => v.group === group);
+    const on = inGroup.filter((v) => bState.allowedViews.size === 0 || bState.allowedViews.has(v.key)).length;
+    return { total: inGroup.length, on };
+  };
+  // عدد التغييرات منذ فتح لوحة هذا الحساب (للمقارنة مع لقطة الحفظ الأخيرة)
+  function viewsDirtyCount(bState) {
+    const snap = bState.viewsSnapshot;
+    if (!snap) return 0;
+    const symDiff = (a, b) => [...a].filter((x) => !b.has(x)).length + [...b].filter((x) => !a.has(x)).length;
+    return symDiff(bState.allowedViews, snap.views) + symDiff(bState.hiddenTabs || new Set(), snap.tabs);
+  }
+  // المحتوى القابل لإعادة الرسم وحده (القائمة والتفاصيل وشريط التغييرات) دون شريط الأدوات العلوي،
+  // كي لا يفقد حقل البحث التركيز أثناء الكتابة فيه عند كل تبديل
+  function renderViewsBody(bState, targetMode) {
+    const allViews = X.data.allViews || [];
+    const allGroups = viewsGroupsOf(allViews);
+    const q = (bState.viewsSearch || '').trim().toLowerCase();
+    const matches = (v) => !q || v.label.toLowerCase().includes(q) || v.group.toLowerCase().includes(q);
+    const groups = allGroups.filter((g) => {
+      const inGroup = allViews.filter((v) => v.group === g);
+      if (q && !inGroup.some(matches) && !g.toLowerCase().includes(q)) return false;
+      if (bState.viewsOnlyActive) {
+        const { on } = viewsGroupStats(bState, allViews, g);
+        if (on === 0) return false;
+      }
+      return true;
+    });
+    if (!bState.viewsGroup || !groups.includes(bState.viewsGroup)) bState.viewsGroup = groups[0] || allGroups[0] || null;
+    const perms = builderPerms(bState), hiddenTabs = bState.hiddenTabs || new Set();
+    const totalOn = allViews.filter((v) => bState.allowedViews.size === 0 || bState.allowedViews.has(v.key)).length;
+    const dirty = viewsDirtyCount(bState);
+
+    const listRows = groups
+      .map((g) => {
+        const { total, on } = viewsGroupStats(bState, allViews, g);
+        const st = on === 0 ? 'none' : on === total ? 'full' : 'partial';
+        return `<button type="button" class="xv-row" aria-current="${g === bState.viewsGroup}" data-act="xviewsgsel" data-target="${targetMode}" data-g="${esc(g)}">
+          <span class="xv-tri ${st}"></span><span class="xv-name">${esc(g)}</span><span class="xv-count">${on}/${total}</span>
+        </button>`;
+      })
+      .join('');
+
+    const activeGroup = bState.viewsGroup;
+    const activeViews = allViews.filter((v) => v.group === activeGroup && matches(v));
+    const itemRows = activeViews
+      .map((v) => {
+        const isChecked = bState.allowedViews.size === 0 || bState.allowedViews.has(v.key);
+        const tabs = (UA.gate && UA.gate.TABS[v.key]) || [];
+        const tabBoxes = tabs
+          .map(([a, t, label, need]) => {
+            const key = `${a}:${t}`, owned = !need || need.some((p) => perms.has(p)), on = owned && !hiddenTabs.has(key);
+            if (!owned) return `<div class="xv-sub off"><span class="xv-sw sm" style="filter:grayscale(1);opacity:.5"><input type="checkbox" disabled><span class="xv-track"></span><span class="xv-thumb"></span></span>🔒 ${esc(label)} <span>(بلا صلاحية لهذا التبويب)</span></div>`;
+            return `<label class="xv-sub"><span class="xv-sw sm"><input type="checkbox" data-act="xtabchk" data-target="${targetMode}" data-key="${esc(key)}"${on ? ' checked' : ''}><span class="xv-track"></span><span class="xv-thumb"></span></span> ${esc(label)}</label>`;
+          })
+          .join('');
+        return `<div class="xv-item">
+          <div class="xv-text"><div class="xv-label">${esc(v.label)}</div>${tabBoxes ? `<div class="xv-subtabs">${tabBoxes}</div>` : ''}</div>
+          <label class="xv-sw"><input type="checkbox" data-act="xviewchk" data-target="${targetMode}" data-vk="${esc(v.key)}"${isChecked ? ' checked' : ''}><span class="xv-track"></span><span class="xv-thumb"></span></label>
+        </div>`;
+      })
+      .join('');
+
+    return `<div data-xv-body="${targetMode}">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:6px"><span class="small">${totalOn}/${allViews.length} شاشة مسموحة</span></div>
+      <p class="small" style="margin:0 0 10px">التخصيص يُضيّق ما تتيحه صلاحيات الحساب ولا يوسّعه: الشاشة أو التبويب بلا صلاحية يبقى مخفياً مهما اخترت.</p>
+      <div class="actions" style="margin:0 0 10px">
+        <button type="button" class="btn sm" data-act="xviewsall" data-target="${targetMode}" data-on="1">تفعيل كل الشاشات</button>
+        <button type="button" class="btn sm" data-act="xviewsall" data-target="${targetMode}" data-on="0">الشاشات المرتبطة بصلاحياته فقط</button>
+      </div>
+      <div class="xv-shell">
+        <nav class="xv-list" aria-label="مجموعات الشاشات">${listRows || '<div class="empty" style="padding:10px">لا نتائج</div>'}</nav>
+        <section class="xv-detail">
+          <div class="xv-detail-head">
+            <h3 style="margin:0;font-size:14px;color:#054239">${esc(activeGroup || '')}</h3>
+            <div style="display:flex;gap:10px">
+              <button type="button" class="link small" data-act="xviewsgroupall" data-target="${targetMode}" data-g="${esc(activeGroup || '')}" data-on="1">تفعيل الكل</button>
+              <button type="button" class="link small" data-act="xviewsgroupall" data-target="${targetMode}" data-g="${esc(activeGroup || '')}" data-on="0">إلغاء الكل</button>
+            </div>
+          </div>
+          ${itemRows || '<div class="empty">لا شاشات في هذه المجموعة.</div>'}
+        </section>
+      </div>
+      ${dirty > 0 ? `<div class="xv-savebar"><b>${dirty} تغييرات غير محفوظة في الشاشات</b><span style="flex:1"></span>
+        <button type="button" class="btn sm" data-act="xviewsundo" data-target="${targetMode}">تراجع</button>
+        <button type="button" class="btn sm pri" data-act="xviewssave" data-target="${targetMode}">حفظ الحساب الآن ↑</button>
+      </div>` : ''}
+    </div>`;
+  }
+
+  function renderViewsShell(bState, targetMode) {
+    const presetOpts = (X.data.rolePresets || [])
+      .map((p) => `<option value="${esc(p.id)}">${esc(p.label)}</option>`)
+      .join('');
+    return `<div data-xv-root="${targetMode}">
+      <div class="xv-toolbar">
+        <input type="text" class="xv-search" placeholder="ابحث عن وحدة أو شاشة..." value="${esc(bState.viewsSearch || '')}" data-act="xviewssearch" data-target="${targetMode}">
+        <button type="button" class="xv-chip" aria-pressed="${!!bState.viewsOnlyActive}" data-act="xviewsonlyactive" data-target="${targetMode}">المفعّل فقط</button>
+        <select class="xv-tpl" data-act="xviewstpl" data-target="${targetMode}"><option value="">قالب جاهز (للشاشات فقط)...</option>${presetOpts}</select>
+      </div>
+      ${renderViewsBody(bState, targetMode)}
+    </div>`;
+  }
+
   /* ---------- مكوّن مصفوفة تحديد الصلاحيات والسماحيات المتكاملة (لإنشاء أو تعديل حساب) ---------- */
   function renderGranularPermissionBuilder(targetMode) {
     const isEdit = targetMode === 'edit';
     const bState = activeBuilderState(isEdit);
     const modules = X.data.modulesMatrix || [];
     const presets = X.data.rolePresets || [];
-    const allViews = X.data.allViews || [];
     const m = mine();
 
     // إحصائيات حية لما تم منحه في هذا الحساب
@@ -292,29 +405,6 @@
       })
       .join('');
 
-    const perms = builderPerms(bState), hiddenTabs = bState.hiddenTabs || new Set();
-    const viewCheckboxes = allViews
-      .map((v) => {
-        const isChecked = bState.allowedViews.size === 0 || bState.allowedViews.has(v.key);
-        const tabs = (UA.gate && UA.gate.TABS[v.key]) || [];
-        const tabBoxes = tabs
-          .map(([a, t, label, need]) => {
-            const key = `${a}:${t}`, owned = !need || need.some((p) => perms.has(p)), on = owned && !hiddenTabs.has(key);
-            return `<label class="small" style="display:flex;align-items:center;gap:6px;padding:2px 0${owned ? '' : ';opacity:.55'}"${owned ? '' : ' title="الحساب لا يملك صلاحية هذا التبويب، فلا يظهر له"'}>
-              <input type="checkbox" data-act="xtabchk" data-target="${targetMode}" data-key="${esc(key)}"${on ? ' checked' : ''}${owned ? '' : ' disabled'}>
-              <span>${esc(label)}${owned ? '' : ' (بلا صلاحية)'}</span></label>`;
-          })
-          .join('');
-        return `<div style="padding:8px 10px;border:1px solid #DCE3DD;border-radius:8px;background:#fff">
-          <label class="perm" style="padding:6px 8px;border:1px solid ${isChecked ? '#054239' : '#DCE3DD'};border-radius:8px;background:${isChecked ? 'rgba(5,66,57,0.06)' : '#fff'}">
-            <input type="checkbox" data-act="xviewchk" data-target="${targetMode}" data-vk="${esc(v.key)}" ${isChecked ? 'checked' : ''}>
-            <span><b>${esc(v.label)}</b> <span class="small">(${esc(v.group)})</span></span>
-          </label>
-          ${tabBoxes ? `<div style="margin:6px 12px 0">${tabBoxes}</div>` : ''}
-        </div>`;
-      })
-      .join('');
-
     const catalogBoxes = bState.showAdvancedCatalog
       ? `<div style="margin-top:12px">${X.data.catalog
           .map(
@@ -355,10 +445,10 @@
       <div class="inline-form" style="background:#fff;padding:12px;border-radius:10px;border:1px solid #DCE3DD">
         <label style="flex:1;min-width:220px">آلية تطبيق الصلاحيات على الحساب
           <select id="${isEdit ? 'xe-mode' : 'xn-mode'}" data-act="xmodechg" data-target="${targetMode}">
-            <option value="hybrid"${bState.accessMode === 'hybrid' ? ' selected' : ''}>مدمج (يرث الدور والقسم + التخصيصات أدناه)</option>
-            <option value="custom"${bState.accessMode === 'custom' ? ' selected' : ''}>مخصص بالكامل (يعمل فقط بالصلاحيات المحددة أدناه)</option>
-            <option value="role"${bState.accessMode === 'role' ? ' selected' : ''}>تلقائي قياسي (يتبع الدور الأساسي والقسم فقط)</option>
+            <option value="hybrid"${bState.accessMode !== 'custom' ? ' selected' : ''}>موروث من الدور والقسم (قابل للتخصيص أدناه لهذا الحساب)</option>
+            <option value="custom"${bState.accessMode === 'custom' ? ' selected' : ''}>مخصص بالكامل (يعمل فقط بالصلاحيات المحددة أدناه، دون أي وراثة)</option>
           </select>
+          <small class="small" style="display:block;margin-top:4px">لإعادة الحساب لصلاحيات دوره وقسمه الافتراضية دون أي تخصيص إضافي: زر «🔄 مطابقة مع الدور والقسم» أدناه.</small>
         </label>
         <label style="flex:1;min-width:220px">نطاق الوصول للبيانات والسجلات (Data Scope)
           <select id="${isEdit ? 'xe-scope' : 'xn-scope'}" data-act="xscopechg" data-target="${targetMode}">
@@ -367,6 +457,7 @@
             <option value="unit"${bState.dataScope === 'unit' ? ' selected' : ''}>🏢 نطاق القسم / الوحدة الإدارية فقط</option>
             <option value="own"${bState.dataScope === 'own' ? ' selected' : ''}>👤 السجلات والمعاملات الشخصية فقط</option>
           </select>
+          <small class="small" style="display:block;margin-top:4px">تنبيه: «نطاق الكلية» مطبَّق فعلياً على سجلات الطلاب فقط حالياً. «القسم» و«الشخصي» توصيف تنظيمي للحساب، وتعتمد التصفية الفعلية للبيانات على الصلاحيات المحددة أدناه لكل قسم.</small>
         </label>
         <label style="flex:1;min-width:200px">الكلية أو المعهد (لنطاق الكلية)
           <input id="${isEdit ? 'xe-scope-fac' : 'xn-scope-fac'}" value="${esc(bState.scopeFaculty || '')}" maxlength="120" placeholder="كما هو في البرامج الدراسية">
@@ -418,16 +509,8 @@
         </table>
       </div>
 
-      <!-- تحديد الشاشات المسموح ظهورها في القائمة الجانبية -->
-      <details data-keep="views" ${X.viewsOpen ? 'open' : ''} style="background:#fff;padding:12px;border-radius:10px;border:1px solid #DCE3DD">
-        <summary style="cursor:pointer;font-weight:700;color:#054239">🖥️ تخصيص الشاشات والتبويبات الظاهرة للموظف (<span data-views-count="${targetMode}">${bState.allowedViews.size || allViews.length}</span> شاشة مسموحة)</summary>
-        <p class="small" style="margin:8px 0 0">التخصيص يُضيّق ما تتيحه صلاحيات الحساب ولا يوسّعه: الشاشة أو التبويب بلا صلاحية يبقى مخفياً مهما اخترت.</p>
-        <div class="actions" style="margin:10px 0">
-          <button type="button" class="btn sm" data-act="xviewsall" data-target="${targetMode}" data-on="1">تفعيل كل الشاشات</button>
-          <button type="button" class="btn sm" data-act="xviewsall" data-target="${targetMode}" data-on="0">تحديد الشاشات المرتبطة بصلاحياته فقط</button>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;align-items:start">${viewCheckboxes}</div>
-      </details>
+      <!-- تحديد الشاشات المسموح ظهورها في القائمة الجانبية: تصميم قائمة/تفاصيل بدل شبكة بطاقات متساوية -->
+      <div style="background:#fff;padding:12px;border-radius:10px;border:1px solid #DCE3DD">${renderViewsShell(bState, targetMode)}</div>
 
       <!-- الفهرس التفصيلي لكافة الصلاحيات الفردية -->
       <div style="background:#fff;padding:12px;border-radius:10px;border:1px solid #DCE3DD">
@@ -492,7 +575,11 @@
 
     const filteredUsers = X.data.users.filter((u) => {
       if (X.userUnitFilter && String(u.unit?.id || '') !== String(X.userUnitFilter)) return false;
-      if (X.userModeFilter && (u.accessMode || 'role') !== X.userModeFilter) return false;
+      if (X.userModeFilter) {
+        const m = u.accessMode || 'role';
+        const bucket = m === 'custom' ? 'custom' : 'hybrid'; // 'role' قيمة قديمة تُعامَل كموروث أيضاً
+        if (bucket !== X.userModeFilter) return false;
+      }
       if (X.userSearch) {
         const q = X.userSearch.trim().toLowerCase();
         const hay = `${u.username} ${u.name} ${u.roleLabel} ${u.unit?.name || ''} ${u.jobTitle || ''}`.toLowerCase();
@@ -581,8 +668,7 @@
             <select id="xu-unit-f" data-act="xufFilter"><option value="">كل الأقسام والوحدات</option>${X.data.units.map((u) => `<option value="${u.id}"${String(u.id) === String(X.userUnitFilter) ? ' selected' : ''}>${esc(u.name)}</option>`).join('')}</select>
             <select id="xu-mode-f" data-act="xufFilter">
               <option value="">كل أنماط الصلاحيات</option>
-              <option value="role"${X.userModeFilter === 'role' ? ' selected' : ''}>تلقائي حسب الدور</option>
-              <option value="hybrid"${X.userModeFilter === 'hybrid' ? ' selected' : ''}>مدمج (دور + تخصيص)</option>
+              <option value="hybrid"${X.userModeFilter === 'hybrid' ? ' selected' : ''}>موروث من الدور والقسم</option>
               <option value="custom"${X.userModeFilter === 'custom' ? ' selected' : ''}>مخصص بالكامل</option>
             </select>
           </div>
@@ -608,15 +694,18 @@
   }
 
   /* ---------- تبويب 2: الأدوار والقوالب الوظيفية ---------- */
-  function permBoxes(sel, locked) {
+  // شبكة اختيار صلاحيات الفهرس الكامل (15 مجموعة)، مشتركة بين محرر الدور ومحرر صلاحيات القسم بدل تكرارها لكل منهما:
+  // sel مصفوفة أو Set، وact اختياري (data-act) لتبديل فوري عند كل نقرة بدل قراءتها عند إرسال النموذج فقط
+  function permBoxes(sel, locked, act) {
     const m = mine();
+    const has = sel && typeof sel.has === 'function' ? (k) => sel.has(k) : (k) => (sel || []).includes(k);
     return X.data.catalog
       .map(
         (g) =>
           `<fieldset class="perm-g"><legend>${esc(g.group)}</legend>${g.items
             .map((i) => {
               const ok = m.has(i.key) && !locked;
-              return `<label class="perm${ok ? '' : ' off'}"><input type="checkbox" data-perm="${esc(i.key)}"${sel.includes(i.key) ? ' checked' : ''}${ok ? '' : ' disabled'}> <span>${esc(i.label)}</span><span class="mono small" dir="ltr">${esc(i.key)}</span></label>`;
+              return `<label class="perm${ok ? '' : ' off'}"><input type="checkbox"${act ? ` data-act="${act}"` : ''} data-perm="${esc(i.key)}"${has(i.key) ? ' checked' : ''}${ok ? '' : ' disabled'}> <span>${esc(i.label)}</span><span class="mono small" dir="ltr">${esc(i.key)}</span></label>`;
             })
             .join('')}</fieldset>`
       )
@@ -708,6 +797,43 @@
   }
 
   /* ---------- تبويب 3: الوحدات الإدارية وصلاحيات الأقسام ---------- */
+  // مخطط الهيكل التنظيمي: نفس بيانات الوحدات الحية التي يحرّرها الجدول أدناه، بعرض بصري بدل صفوف جدول
+  // الجذر في الأعلى، والإدارات المباشرة تحته في شبكة أعمدة تلتف تلقائياً، وتحت كل إدارة فروعها شجرة رأسية.
+  // الشجرة الأفقية الكلاسيكية تصير بعرض آلاف البكسلات حين يتبع الجذرَ عشرات الإدارات، فتضيع الفروع خارج الشاشة.
+  function renderOrgChart(units) {
+    const kids = (p) => units.filter((u) => (u.parentId ?? null) === p);
+    const count = (u) => kids(u.id).reduce((n, c) => n + 1 + count(c), 0);
+    const actions = (u) => `<div class="oc-node-actions">
+        <button type="button" class="btn sm" data-act="xurename" data-id="${u.id}" title="إعادة تسمية">✏️</button>
+        <button type="button" class="btn sm" data-act="xupermedit" data-id="${u.id}" title="صلاحيات القسم">⚙️</button>
+        <button type="button" class="btn sm" data-act="xuntoggle" data-id="${u.id}" data-on="${u.active ? 0 : 1}" title="${u.active ? 'تعطيل' : 'تفعيل'}">${u.active ? '⏸️' : '▶️'}</button>
+      </div>`;
+    const box = (u, cls) => `<div class="oc-box ${cls}${u.active ? '' : ' oc-off'}">
+        <div class="oc-node-main">
+          <b>${esc(u.name)}</b>
+          <span class="small">${KIND[u.kind] || ''}${u.active ? '' : ' · معطّلة'}${(u.heads || []).length ? ' · ' + u.heads.map((h) => esc(h.username)).join('، ') : ''}</span>
+        </div>
+        ${actions(u)}
+      </div>`;
+    const branch = (list) => list.length
+      ? `<ul class="oc-tree">${list.map((c) => `<li>${box(c, 'oc-leaf')}${branch(kids(c.id))}</li>`).join('')}</ul>`
+      : '';
+
+    const roots = kids(null);
+    if (!roots.length) return '<div class="empty">لا وحدات بعد.</div>';
+    return roots
+      .map((r) => {
+        const depts = kids(r.id);
+        return `<div class="oc-chart">
+          <div class="oc-top">${box(r, 'oc-root-box')}<span class="small">${depts.length} إدارة مباشرة · ${count(r)} وحدة إجمالاً</span></div>
+          ${depts.length ? `<div class="oc-grid">${depts
+            .map((d) => `<section class="oc-dept">${box(d, 'oc-dept-box')}${branch(kids(d.id))}</section>`)
+            .join('')}</div>` : ''}
+        </div>`;
+      })
+      .join('');
+  }
+
   function unitsTab() {
     const d = X.data;
     const kids = (p) => d.units.filter((u) => (u.parentId ?? null) === p);
@@ -717,18 +843,7 @@
       const uObj = d.units.find((u) => u.id === X.unitPermEdit.id);
       if (uObj) {
         const selSet = X.unitPermEdit.perms;
-        const m = mine();
-        const boxes = d.catalog
-          .map(
-            (g) =>
-              `<fieldset class="perm-g"><legend>${esc(g.group)}</legend>${g.items
-                .map((i) => {
-                  const ok = m.has(i.key);
-                  return `<label class="perm${ok ? '' : ' off'}"><input type="checkbox" data-act="xupermchk" data-perm="${esc(i.key)}"${selSet.has(i.key) ? ' checked' : ''}${ok ? '' : ' disabled'}> <span>${esc(i.label)}</span></label>`;
-                })
-                .join('')}</fieldset>`
-          )
-          .join('');
+        const boxes = permBoxes(selSet, false, 'xupermchk');
         unitPermModal = `<section class="card" style="border:2px solid #054239;margin-bottom:16px">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
             <div>
@@ -786,9 +901,17 @@
     return `<div class="stack">
       ${unitPermModal}
       <section class="card">
-        <h2>الأقسام والوحدات الإدارية وصلاحياتها الافتراضية</h2>
-        <p class="hint" style="margin-top:0">يمكنك تحديد حزمة صلاحيات افتراضية لكل قسم أو كلية أو مكتب عبر زر «صلاحيات القسم ⚙️»، بحيث تُمنح تلقائياً لموظفي ذلك القسم.</p>
-        <div class="tbl-wrap"><table><thead><tr><th>الوحدة / القسم</th><th>صلاحيات القسم</th><th>الحسابات الفعالة</th><th>طلبات معلّقة</th><th>إجراءات</th></tr></thead><tbody>${tree(null, 0)}</tbody></table></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+          <h2 style="margin:0">الهيكل التنظيمي للجامعة وصلاحياتها الافتراضية</h2>
+          <div class="sub-tabs no-print" role="tablist">
+            <button class="chip" role="tab" data-act="xunitsview" data-v="list" aria-pressed="${X.unitsView !== 'chart'}">📋 جدول</button>
+            <button class="chip" role="tab" data-act="xunitsview" data-v="chart" aria-pressed="${X.unitsView === 'chart'}">🗂️ مخطط الهيكل</button>
+          </div>
+        </div>
+        <p class="hint" style="margin-top:4px">يمكنك تحديد حزمة صلاحيات افتراضية لكل قسم أو كلية أو مكتب عبر زر «صلاحيات القسم ⚙️»، بحيث تُمنح تلقائياً لموظفي ذلك القسم. أي تعديل هنا (تسمية، تفعيل، صلاحيات، إضافة أو حذف) يسري فوراً على كامل الموقع، لأن كل شاشة تعرض الأقسام تقرأ من نفس هذا الهيكل.</p>
+        ${X.unitsView === 'chart'
+          ? `<div class="tbl-wrap" style="overflow-x:auto">${renderOrgChart(d.units)}</div>`
+          : `<div class="tbl-wrap"><table><thead><tr><th>الوحدة / القسم</th><th>صلاحيات القسم</th><th>الحسابات الفعالة</th><th>طلبات معلّقة</th><th>إجراءات</th></tr></thead><tbody>${tree(null, 0)}</tbody></table></div>`}
         <h2 style="margin-top:18px">إضافة قسم / وحدة إدارية جديدة</h2>
         <form class="inline-form" id="xunit">
           <label>الاسم<input id="xun-name" maxlength="80" required></label>
@@ -948,6 +1071,16 @@
       X.userUnitFilter = val('xu-unit-f');
       X.userModeFilter = val('xu-mode-f');
       UA.render();
+    } else if (act === 'xviewstpl') {
+      const bState = activeBuilderState(el.dataset.target === 'edit');
+      const preset = (X.data.rolePresets || []).find((p) => p.id === el.value);
+      if (preset) {
+        bState.allowedViews = new Set(preset.allowedViews || []);
+        keepHybrid(bState, el.dataset.target);
+        el.value = '';
+        const body = document.querySelector(`[data-xv-body="${el.dataset.target}"]`);
+        if (body) body.outerHTML = renderViewsBody(bState, el.dataset.target);
+      }
     }
   });
 
@@ -970,6 +1103,11 @@
         inp.focus();
         inp.setSelectionRange(inp.value.length, inp.value.length);
       }
+    } else if (el.dataset.act === 'xviewssearch') {
+      const bState = activeBuilderState(el.dataset.target === 'edit');
+      bState.viewsSearch = el.value;
+      const body = document.querySelector(`[data-xv-body="${el.dataset.target}"]`);
+      if (body) body.outerHTML = renderViewsBody(bState, el.dataset.target);
     }
   });
 
@@ -1034,7 +1172,7 @@
       if (d.op === 'sync_role') {
         const rKey = d.target === 'edit' ? val('xe-role') || bState.roleKey : val('xn-role') || bState.roleKey;
         const uId = d.target === 'edit' ? val('xe-unit') : val('xn-unit');
-        bState.accessMode = 'role';
+        bState.accessMode = 'hybrid';
         syncBuilderFromRoleAndUnit(bState, rKey, uId);
         toast('تمت مطابقة الصلاحيات مع الدور والقسم');
       } else if (d.op === 'read_all') {
@@ -1055,6 +1193,14 @@
       UA.render();
     },
     // الاختيار لا يعيد رسم الشاشة حتى يبقى موضع التمرير والقسم المفتوح كما هما
+    // تخصيص الشاشات: استبدال لوحة الشاشات وحدها (outerHTML) بدل إعادة رسم كامل الصفحة، فلا يفقد المستخدم موضع التمرير داخل نموذج الحساب الطويل
+    // تحديث لوحة الشاشات وحدها (data-xv-body)، لا الجذر كله بما فيه حقل البحث، فلا يفقد التركيز أثناء الكتابة فيه
+    xviewsgsel: (el, d) => {
+      const bState = activeBuilderState(d.target === 'edit');
+      bState.viewsGroup = d.g;
+      const body = document.querySelector(`[data-xv-body="${d.target}"]`);
+      if (body) body.outerHTML = renderViewsBody(bState, d.target);
+    },
     xviewchk: (el, d) => {
       const bState = activeBuilderState(d.target === 'edit');
       if (bState.allowedViews.size === 0) {
@@ -1063,9 +1209,8 @@
       if (el.checked) bState.allowedViews.add(d.vk);
       else bState.allowedViews.delete(d.vk);
       keepHybrid(bState, d.target);
-      paintChoice(el);
-      const counter = document.querySelector(`[data-views-count="${d.target}"]`);
-      if (counter) counter.textContent = bState.allowedViews.size;
+      const body = document.querySelector(`[data-xv-body="${d.target}"]`);
+      if (body) body.outerHTML = renderViewsBody(bState, d.target);
     },
     xtabchk: (el, d) => {
       const bState = activeBuilderState(d.target === 'edit');
@@ -1073,13 +1218,63 @@
       if (el.checked) bState.hiddenTabs.delete(d.key);
       else bState.hiddenTabs.add(d.key);
       keepHybrid(bState, d.target);
+      // إعادة رسم اللوحة لتحديث عدّاد «تغييرات غير محفوظة» فقط؛ تمر بمهلة قصيرة كي لا يُقاطع التبديل نفسه وهو يحدث
+      const body = document.querySelector(`[data-xv-body="${d.target}"]`);
+      if (body) body.outerHTML = renderViewsBody(bState, d.target);
     },
+    // «تفعيل كل الشاشات» تُزيل أي تقييد. «الشاشات المرتبطة بصلاحياته فقط» تحصر الشاشات بما ترتبط فعلاً
+    // بأقسام منصة يملك فيها الحساب أي مستوى وصول حالياً (عبر mod.viewKeys)، بدل تفريغها بلا تمييز كما كان سابقاً
     xviewsall: (el, d) => {
-      const bState = activeBuilderState(d.target === 'edit'), all = (X.data.allViews || []).map((v) => v.key);
-      bState.allowedViews = d.on === '1' ? new Set(all) : new Set();
-      document.querySelectorAll(`input[data-act="xviewchk"][data-target="${d.target}"]`).forEach((box) => { box.checked = true; paintChoice(box); });
-      const counter = document.querySelector(`[data-views-count="${d.target}"]`);
-      if (counter) counter.textContent = all.length;
+      const bState = activeBuilderState(d.target === 'edit');
+      const all = (X.data.allViews || []).map((v) => v.key);
+      if (d.on === '1') {
+        bState.allowedViews = new Set(all);
+      } else {
+        const owned = new Set();
+        for (const mod of X.data.modulesMatrix || []) {
+          const active = ['view', 'write', 'edit', 'approve', 'delete'].some((k) => getModuleActionState(bState, mod, k));
+          if (active) for (const vk of mod.viewKeys || []) owned.add(vk);
+        }
+        bState.allowedViews = owned.size ? owned : new Set(['desk']);
+      }
+      keepHybrid(bState, d.target);
+      const body = document.querySelector(`[data-xv-body="${d.target}"]`);
+      if (body) body.outerHTML = renderViewsBody(bState, d.target);
+    },
+    xviewsgroupall: (el, d) => {
+      const bState = activeBuilderState(d.target === 'edit');
+      if (bState.allowedViews.size === 0) {
+        for (const v of X.data.allViews || []) bState.allowedViews.add(v.key);
+      }
+      for (const v of X.data.allViews || []) {
+        if (v.group !== d.g) continue;
+        if (d.on === '1') bState.allowedViews.add(v.key);
+        else bState.allowedViews.delete(v.key);
+      }
+      keepHybrid(bState, d.target);
+      const body = document.querySelector(`[data-xv-body="${d.target}"]`);
+      if (body) body.outerHTML = renderViewsBody(bState, d.target);
+    },
+    xviewsonlyactive: (el, d) => {
+      const bState = activeBuilderState(d.target === 'edit');
+      bState.viewsOnlyActive = !bState.viewsOnlyActive;
+      el.setAttribute('aria-pressed', String(bState.viewsOnlyActive));
+      const body = document.querySelector(`[data-xv-body="${d.target}"]`);
+      if (body) body.outerHTML = renderViewsBody(bState, d.target);
+    },
+    xviewsundo: (el, d) => {
+      const bState = activeBuilderState(d.target === 'edit');
+      const snap = bState.viewsSnapshot;
+      if (snap) { bState.allowedViews = new Set(snap.views); bState.hiddenTabs = new Set(snap.tabs); }
+      const body = document.querySelector(`[data-xv-body="${d.target}"]`);
+      if (body) body.outerHTML = renderViewsBody(bState, d.target);
+    },
+    xviewssave: (el, d) => {
+      const saveBtn = document.querySelector(d.target === 'edit' ? '[data-act="xusave"]' : 'form#xuser button[type="submit"]');
+      if (!saveBtn) return;
+      saveBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      saveBtn.style.outline = '3px solid #C9A24B';
+      setTimeout(() => { saveBtn.style.outline = ''; }, 1500);
     },
     // إعدادات بوابة الطالب: تسري على كل حسابات الطلاب
     xstudtoggle: (el, d) =>
@@ -1113,7 +1308,7 @@
       // تفاصيل صلاحيات الحساب لا تأتي مع القائمة
       const { user: u } = await api('GET', `/api/admin/users/${uid}/access`);
       X.edit = uid;
-      X.editBuilder = {
+      X.editBuilder = builderStateShape({
         roleKey: u.roleKey || u.role,
         accessMode: u.accessMode || 'role',
         dataScope: u.dataScope || 'unit',
@@ -1122,8 +1317,9 @@
         revokedPerms: new Set(u.revokedPermissions || []),
         allowedViews: new Set(u.explicitAllowedViews && u.explicitAllowedViews.length ? u.explicitAllowedViews : u.allowedViews || []),
         hiddenTabs: new Set(u.hiddenTabs || []),
-        showAdvancedCatalog: false,
-      };
+        viewsSnapshot: { views: new Set(u.explicitAllowedViews && u.explicitAllowedViews.length ? u.explicitAllowedViews : u.allowedViews || []), tabs: new Set(u.hiddenTabs || []) },
+        initialized: true,
+      });
       UA.render();
       const panel = $id('xedit-panel');
       if (panel && panel.scrollIntoView) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1276,6 +1472,10 @@
         await api('PUT', `/api/admin/units/${d.id}`, { active: d.on === '1' });
         await reload();
       }),
+    xunitsview: async (el, d) => {
+      X.unitsView = d.v;
+      UA.render();
+    },
     xldel: (el, d) =>
       run(async () => {
         if (!confirm('حذف هذا الرابط؟ لن تُحال الطلبات بين الوحدتين بعدها.')) return;

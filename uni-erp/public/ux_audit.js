@@ -130,20 +130,30 @@
   }
 
   UA.views.audit = () => {
-    const tab = S.auditTab || U.auditSection || 'chain';
+    // من يملك مراقبة الأمن دون سجل التدقيق يبدأ بمركز الأمان
+    let tab = S.auditTab || U.auditSection || 'chain';
+    if (tab === 'exec_offline') tab = 'chain';
+    if (tab === 'chain' && UA.can && !UA.can('audit:read') && UA.can('security:monitor')) tab = 'siem';
     U.auditSection = tab;
     const tabs = [
-      ['chain', '1. سجل التدقيق وسلسلة البصمات (Hash Chain)'],
-      ['hc_perf', '2. أداء النظام والاختبار الحي'],
-      ['archify', '3. خرائط المعمارية التفاعلية (Archify Diagrams)'],
-      ['logs', '4. سجل أحداث النظام والخادم'],
-      ['devops', '5. البنية التحتية والتوسع والمراقبة الحية (DevOps)'],
-      ['exec_offline', '6. آليات المراقبة المؤسسية'],
+      ['siem', '1. مركز الأمان والتنبيهات'],
+      ['privacy', '2. تصنيف البيانات والموافقات'],
+      ['chain', '3. سجل التدقيق وسلسلة البصمات (Hash Chain)'],
+      ['hc_perf', '4. أداء النظام والاختبار الحي'],
+      ['archify', '5. خرائط المعمارية التفاعلية (Archify Diagrams)'],
+      ['logs', '6. سجل أحداث النظام والخادم'],
+      ['devops', '7. البنية التحتية والتوسع والمراقبة الحية (DevOps)'],
     ];
     const bar = `<div class="sub-tabs no-print" role="tablist" style="margin-bottom:14px">
       ${tabs.map((t) => `<button class="chip" role="tab" data-act="audtab2" data-t="${t[0]}" aria-pressed="${tab === t[0]}">${esc(t[1])}</button>`).join('')}
     </div>`;
 
+    if (tab === 'siem') {
+      return bar + (UA.securityCenter ? UA.securityCenter.render() : '');
+    }
+    if (tab === 'privacy') {
+      return bar + (UA.privacyCenter ? UA.privacyCenter.render() : '');
+    }
     if (tab === 'archify') {
       return bar + renderArchifyDiagramsBlock();
     }
@@ -162,10 +172,6 @@
     }
     if (tab === 'devops') {
       return bar + `<div id="audit-devops-mount"></div>`;
-    }
-    if (tab === 'exec_offline') {
-      const esHtml = UA.renderEnterpriseSection ? UA.renderEnterpriseSection('ux_offline') : '';
-      return bar + `<div id="audit-enterprise-mount" data-mounted="${esHtml ? '1' : ''}">${esHtml}</div>`;
     }
     const c = S.chain;
     return bar + `<section class="card">

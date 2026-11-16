@@ -3,6 +3,7 @@ import { log } from '../lib/logger.js';
 import { getStudent } from './students.js';
 import { gradesFor, passMarkFor } from './academics.js';
 import { detectScheduleConflicts } from './schedule.js';
+import { decryptField } from '../lib/data_crypto.js';
 
 // المعدل التراكمي: متوسط أحدث محاولة معتمدة لكل مقرر موزونة بالساعات
 function gpaOf(db, studentId) {
@@ -21,7 +22,7 @@ function safe(warnings, name, fn, fallback) {
 }
 
 export function getUnifiedStudentRecord(deps, id) {
-  const { db } = deps, student = getStudent(deps, id), sid = Number(id), warnings = [];
+  const { db, cfg } = deps, student = getStudent(deps, id), sid = Number(id), warnings = [];
   const me = safe(warnings, 'العلامات', () => gpaOf(db, sid), { gpa: null, grades: [], summary: { average: null, passed: 0 }, totalHours: 0, earnedHours: 0 });
   // الترتيب ضمن الدفعة: الطلاب الفعّالون في البرنامج نفسه وسنة القيد نفسها، ممن لهم علامات معتمدة
   const { scored, rank } = safe(warnings, 'الترتيب', () => {
@@ -36,7 +37,7 @@ export function getUnifiedStudentRecord(deps, id) {
   if (me.gpa !== null && me.gpa < passMarkFor(db, sid)) academicAlert = { level: 'danger', label: 'إنذار أكاديمي', message: `المعدل التراكمي ${me.gpa}% أقل من حد النجاح (${passMarkFor(db, sid)}%).` };
   else if (failed) academicAlert = { level: 'warning', label: 'مقررات راسبة', message: `لدى الطالب ${failed} مقرر/مقررات لم ينجح فيها بعد.` };
   const requests = safe(warnings, 'الطلبات', () => db.prepare(`SELECT r.id, r.no, r.status, r.created_at createdAt, st.label service FROM requests r LEFT JOIN service_types st ON st.code = r.service_code WHERE r.student_id = ? ORDER BY r.created_at DESC LIMIT 20`).all(sid), []);
-  const holds = safe(warnings, 'العقوبات', () => db.prepare('SELECT id, hold_type type, note, created_at createdAt FROM student_holds WHERE student_id = ? AND active = 1 ORDER BY id DESC').all(sid), []);
+  const holds = safe(warnings, 'العقوبات', () => db.prepare('SELECT id, hold_type type, note, created_at createdAt FROM student_holds WHERE student_id = ? AND active = 1 ORDER BY id DESC').all(sid).map((h) => ({ ...h, note: decryptField(cfg, h.note) })), []);
   const hallLogs = safe(warnings, 'حضور القاعات', () => db.prepare('SELECT id, kind, subject, hall, entered_at enteredAt, exited_at exitedAt FROM hall_logs WHERE student_id = ? ORDER BY entered_at DESC LIMIT 10').all(sid), []);
   const staffGrades = safe(warnings, 'جدول العلامات', () => gradesFor(db, sid, null).grades, []);
   const scheduleConflicts = safe(warnings, 'تعارض الجداول', () => detectScheduleConflicts(db, sid), { studentId: sid, level: null, checkedCourses: 0, withoutSchedule: 0, conflicts: [] });

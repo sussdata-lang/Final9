@@ -5,6 +5,7 @@ import { HttpError } from '../http.js';
 import { academicYear, docNo } from '../lib/doc_no.js';
 import { getSetting } from './settings.js';
 import { withLock } from './numbering.js';
+import { encryptField, decryptField } from '../lib/data_crypto.js';
 import { passSql } from './academics.js';
 import { financialDue } from './student_affairs_suite.js';
 
@@ -146,7 +147,7 @@ function myDecisions(db, studentId) {
     .map((d) => ({ holdId: d.hold_id, decisionNo: d.decisionNo, penaltyLevel: d.penaltyLevel, appealStatus: d.appealStatus ?? null, deadline: appealDeadline(db, d), canAppeal: !d.appealStatus && !!getSetting(db, APPEAL_SETTING[d.penaltyLevel] ?? 'reg.appeal_warning') && Date.now() <= appealDeadline(db, d) }));
 }
 export function submitAppeal(deps, actor, body, ip) {
-  const { db } = deps;
+  const { db, cfg } = deps;
   if (actor?.role !== 'student') throw new HttpError(403, 'التظلم يقدمه الطالب صاحب القرار.', 'forbidden');
   const holdId = Number(body?.holdId), reason = String(body?.reason ?? '').trim().slice(0, 1000);
   if (reason.length < 5) throw new HttpError(400, 'اكتب أسباب التظلم (5 أحرف على الأقل).', 'validation');
@@ -157,14 +158,15 @@ export function submitAppeal(deps, actor, body, ip) {
     if (Date.now() > appealDeadline(db, d)) throw new HttpError(409, `انتهت مهلة التظلم (${n(db, 'reg.appeal_days')} يوماً من تاريخ القرار).`, 'conflict');
     if (db.prepare('SELECT 1 AS x FROM sa_disciplinary_appeals WHERE hold_id = ?').get(holdId)) throw new HttpError(409, 'قُدّم تظلم على هذا القرار مسبقاً.', 'conflict');
     const no = docNo(`APL-${new Date().getFullYear()}`);
-    const id = Number(db.prepare("INSERT INTO sa_disciplinary_appeals (appeal_no, hold_id, student_id, reason, status, created_at) VALUES (?, ?, ?, ?, 'pending', ?) RETURNING id").get(no, holdId, actor.id, reason, Date.now()).id);
+    // أسباب التظلم نص شخصي حساس فتُحفظ مشفَّرة؛ decisionNo في سجل التدقيق رقم قرار لا نص شخصي
+    const id = Number(db.prepare("INSERT INTO sa_disciplinary_appeals (appeal_no, hold_id, student_id, reason, status, created_at) VALUES (?, ?, ?, ?, 'pending', ?) RETURNING id").get(no, holdId, actor.id, encryptField(cfg, reason), Date.now()).id);
     audit(db, actor, 'تقديم تظلم من قرار انضباطي', `${no} — ${d.committee_decision_no}`, ip);
     return { id, appealNo: no };
   });
 }
 export function decideAppeal(deps, actor, id, body, ip) {
   need(actor, ['sa_lifecycle:final']);
-  const { db } = deps, outcome = String(body?.outcome ?? ''), note = String(body?.note ?? '').trim().slice(0, 500);
+  const { db, cfg } = deps, outcome = String(body?.outcome ?? ''), note = String(body?.note ?? '').trim().slice(0, 500);
   if (!['upheld', 'reduced', 'cancelled'].includes(outcome)) throw new HttpError(400, 'نتيجة التظلم غير معروفة.', 'validation');
   if (note.length < 3) throw new HttpError(400, 'اكتب مسوغات القرار (3 أحرف على الأقل).', 'validation');
   return withLock(db, `appeal-decide:${Number(id)}`, () => {
@@ -172,7 +174,8 @@ export function decideAppeal(deps, actor, id, body, ip) {
     if (!a) throw new HttpError(404, 'التظلم غير موجود.', 'not_found');
     if (a.status !== 'pending') throw new HttpError(409, 'تم البت في هذا التظلم مسبقاً.', 'conflict');
     const d = db.prepare('SELECT * FROM sa_disciplinary_details WHERE hold_id = ?').get(a.hold_id), now = Date.now();
-    db.prepare('UPDATE sa_disciplinary_appeals SET status = ?, decision_note = ?, decided_by = ?, decided_by_id = ?, decided_at = ? WHERE id = ?').run(outcome, note, actorName(actor), actor.id ?? null, now, a.id);
+    // مسوغات القرار نص شخصي حساس فتُحفظ مشفَّرة
+    db.prepare('UPDATE sa_disciplinary_appeals SET status = ?, decision_note = ?, decided_by = ?, decided_by_id = ?, decided_at = ? WHERE id = ?').run(outcome, encryptField(cfg, note), actorName(actor), actor.id ?? null, now, a.id);
     let reinstatementNeeded = false;
     if (outcome !== 'upheld') {
       // الحركة المعلقة بهذا القرار تسقط، والمنفذة تحتاج حركة إعادة قيد عبر السلسلة
@@ -192,9 +195,20 @@ export function appealBlocksMovement(db, movement) {
   return !!db.prepare("SELECT 1 AS x FROM sa_disciplinary_appeals a JOIN sa_disciplinary_details d ON d.hold_id = a.hold_id WHERE a.status = 'pending' AND a.student_id = ? AND d.committee_decision_no = ?").get(movement.student_id, movement.decision_no);
 }
 
+// تشفير نصوص تظلمات قديمة أُدخلت قبل هذا التشفير (لا تبدأ بـ"enc1:")؛ آمن التكرار، يعمل عند كل إقلاع
+export function encryptLegacyAppealText(db, cfg) {
+  const plain = (v) => v !== null && v !== undefined && v !== '' && !String(v).startsWith('enc1:');
+  const rows = db.prepare("SELECT id, reason, decision_note FROM sa_disciplinary_appeals WHERE (reason IS NOT NULL AND reason <> '' AND reason NOT LIKE 'enc1:%') OR (decision_note IS NOT NULL AND decision_note <> '' AND decision_note NOT LIKE 'enc1:%')").all();
+  for (const r of rows) {
+    db.prepare('UPDATE sa_disciplinary_appeals SET reason = ?, decision_note = ? WHERE id = ?')
+      .run(plain(r.reason) ? encryptField(cfg, r.reason) : r.reason, plain(r.decision_note) ? encryptField(cfg, r.decision_note) : r.decision_note, r.id);
+  }
+  return rows.length;
+}
+
 /* ---------- المسارات ---------- */
 export function registerStudentRegulationRoutes(r, deps) {
-  const { db } = deps, B = '/api/student-regulations';
+  const { db, cfg } = deps, B = '/api/student-regulations';
   r.add('GET', `${B}/me`, (c) => {
     if (c.user?.role !== 'student') throw new HttpError(403, 'هذه الخدمة للطلاب.', 'forbidden');
     c.json(200, { renewal: renewalState(db, c.user.id), decisions: myDecisions(db, c.user.id), appealDays: n(db, 'reg.appeal_days') });
@@ -207,7 +221,9 @@ export function registerStudentRegulationRoutes(r, deps) {
   r.add('POST', `${B}/exhaustion/notify`, (c) => c.json(200, notifyExhaustion(deps, c.user, c.ip)));
   r.add('GET', `${B}/appeals`, (c) => {
     need(c.user, ['sa_discipline:view', 'sa_lifecycle:final']);
-    c.json(200, { appeals: db.prepare(`${APPEAL_SQL} ORDER BY a.id DESC LIMIT 300`).all(), canDecide: allowed(c.user, ['sa_lifecycle:final']) });
+    const appeals = db.prepare(`${APPEAL_SQL} ORDER BY a.id DESC LIMIT 300`).all()
+      .map((a) => ({ ...a, reason: decryptField(cfg, a.reason), decision_note: decryptField(cfg, a.decision_note) }));
+    c.json(200, { appeals, canDecide: allowed(c.user, ['sa_lifecycle:final']) });
   });
   r.add('POST', `${B}/appeals`, (c) => c.json(201, submitAppeal(deps, c.user, c.body, c.ip)));
   r.add('POST', `${B}/appeals/:id/decide`, (c) => c.json(200, decideAppeal(deps, c.user, c.params.id, c.body, c.ip)));

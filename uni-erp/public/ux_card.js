@@ -72,6 +72,20 @@
     },
   });
 
+  // بيانات البطاقة الكاملة للطالب المختار (الصورة، الكلية، الحالة، رمز QR للتحقق) من خدمة البطاقات
+  const cardInfo = new Map(), cardAsked = new Set();
+  function cardData(st) {
+    if (!st) return null;
+    if (!cardInfo.has(st.id) && !cardAsked.has(st.id) && UA.can('student:read')) {
+      cardAsked.add(st.id);
+      api('GET', `/api/cards/students?id=${Number(st.id)}&qr=1`)
+        .then((r) => { if (r.students && r.students[0]) { cardInfo.set(st.id, r.students[0]); UA.render(); } })
+        .catch(() => {});
+    }
+    return { ...st, ...(cardInfo.get(st.id) || {}) };
+  }
+  UA.cardSubject = () => cardData(S.stSel || ((S.stList && S.stList.students) || [])[0]);
+
   UA.renderDigitalCardSection = () => {
     const stList = (S.stList && S.stList.students) || [];
     // قائمة الطلاب لا تكون محمّلة إن فُتح هذا التبويب قبل «سجل الطلاب»
@@ -145,7 +159,7 @@
 
       <p class="small" style="margin:0 0 10px">رمز البطاقة الثابت: <b class="mono" dir="ltr">${esc(UA.generateStudentSecureBarcode(st.studentNo))}</b> · رمز NFC الثابت: <b class="mono" dir="ltr">${esc(UA.studentNfcCode(st.studentNo))}</b></p>
       ${cardBlockHtml(st)}
-      ${UA.digitalCardHtml(st, { screen: true })}
+      <div class="sc-stage">${(() => { const cd = cardData(st); return `<figure>${UA.digitalCardHtml(cd, { screen: true })}<figcaption>الوجه</figcaption></figure><figure>${UA.digitalCardBackHtml(cd)}<figcaption>الظهر</figcaption></figure>`; })()}</div>
 
       <!-- ==========================================================================
            واجهة سجل نشاط البطاقة الرقمية (Check-in / Check-out Activity Log)

@@ -94,6 +94,7 @@ function addThreatScore(ip, points, reason, path) {
     rec.banCount++;
     rec.score = 0;
     wafBanListener?.(ip, rec.banUntil);
+    try { wafBanLog?.({ ip, until: rec.banUntil, reason, path, banCount: rec.banCount }); } catch {}
     return { banned: true, until: rec.banUntil, duration };
   }
   return { banned: false };
@@ -310,6 +311,17 @@ export function unbanIp(ip) {
 // الحظر يسري على كل عمليات الخادم
 let wafBanListener = null;
 export const setWafBanListener = (fn) => { wafBanListener = fn; };
+// تسجيل كل حجب في جدول أحداث الأمان (مركز الأمان)، لأن حالة الجدار في الذاكرة فقط
+let wafBanLog = null;
+export const setWafBanLog = (fn) => { wafBanLog = fn; };
+// حجب يدوي من مركز الأمان: يسري فوراً، ويُبث لبقية العمليات كالحجب التلقائي، ولا يُسجَّل حدثاً تلقائياً
+export function banIp(ip, until, reason = 'manual') {
+  const rec = getIpRecord(ip), now = Date.now();
+  rec.banUntil = until; rec.bannedAt = now; rec.banCount++; rec.lastSeen = now;
+  rec.violations.push({ type: reason, path: '', at: now });
+  if (rec.violations.length > 50) rec.violations = rec.violations.slice(-50);
+  wafBanListener?.(ip, until);
+}
 export function applySharedBan(ip, until) {
   if (!ipRegistry.has(ip) && !until) return;
   const rec = getIpRecord(ip);

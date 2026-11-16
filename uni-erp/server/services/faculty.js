@@ -7,6 +7,14 @@ import { HttpError } from '../http.js';
 import { getSetting } from './settings.js';
 const ranksOf = (db) => getSetting(db, 'faculty.ranks');
 export const STATUS = { active: 'على رأس العمل', leave: 'في إجازة', inactive: 'منتهي الخدمة' };
+// أنواع التدريس التي يُربط بها عضو الهيئة بمادة تخصصه
+export const TEACHING_KINDS = {
+  theory: 'القسم النظري',
+  practical: 'التطبيقات العملية',
+  lab: 'التدريبات المخبرية',
+  field: 'التدريب الميداني والشرطي',
+  military: 'التدريب العسكري والأمني والبدني',
+};
 const bad = (m, f) => new HttpError(400, m, 'validation', f);
 const CTRL = /[\u0000-\u001f\u007f<>]/;
 const text = (v, label, { min = 1, max = 60 } = {}) => {
@@ -58,6 +66,37 @@ const view = (r) => ({ id: r.id, name: r.name, rank: r.rank, unitId: r.unit_id, 
   status: r.status, statusLabel: STATUS[r.status] ?? r.status, hireDate: r.hire_date, notes: r.notes ?? '', createdAt: r.created_at,
   courses: r.courses, hours: r.hours, activeCourses: r.active_courses, account: r.account ?? '' });
 
+// التخصص = مواد من النظام مرتبطة بالعضو بنوع تدريس لكل ربط. نص «التخصص» المخزَّن يُشتق منها فيبقى صالحاً للبحث والتقارير
+function saveSpecialties(db, memberId, b) {
+  if (b?.specialties === undefined) return;
+  const list = Array.isArray(b.specialties) ? b.specialties : [];
+  if (list.length > 60) throw bad('لا أكثر من 60 مادة تخصص للعضو.', 'specialties');
+  const seen = new Set(), rows = [];
+  for (const x of list) {
+    const courseId = Number(x?.courseId), kind = String(x?.kind ?? '');
+    if (!Number.isInteger(courseId) || !db.prepare('SELECT 1 AS x FROM courses WHERE id = ?').get(courseId)) throw bad('المادة غير موجودة في النظام.', 'specialties');
+    if (!TEACHING_KINDS[kind]) throw bad('اختر نوع التدريس من القائمة.', 'specialties');
+    const key = `${courseId}:${kind}`;
+    if (seen.has(key)) continue;
+    seen.add(key); rows.push([courseId, kind]);
+  }
+  db.prepare('DELETE FROM faculty_specialties WHERE member_id = ?').run(memberId);
+  const ins = db.prepare('INSERT INTO faculty_specialties (member_id, course_id, teaching_kind, created_at) VALUES (?,?,?,?)');
+  for (const [courseId, kind] of rows) ins.run(memberId, courseId, kind, Date.now());
+  const names = [...new Set(rows.map(([c]) => db.prepare('SELECT name FROM courses WHERE id = ?').get(c).name))];
+  db.prepare('UPDATE faculty_members SET specialty = ? WHERE id = ?').run(names.join('، ').slice(0, 100) || null, memberId);
+}
+const withSpecialties = (db, members) => {
+  const ids = members.map((m) => m.id);
+  if (!ids.length) return members;
+  const by = new Map();
+  for (const r of db.prepare(`SELECT s.member_id, s.course_id, s.teaching_kind, c.name, c.code FROM faculty_specialties s JOIN courses c ON c.id = s.course_id WHERE s.member_id IN (${ids.map(() => '?').join(',')}) ORDER BY c.name, s.id`).all(...ids)) {
+    if (!by.has(r.member_id)) by.set(r.member_id, []);
+    by.get(r.member_id).push({ courseId: Number(r.course_id), name: r.name, code: r.code ?? '', kind: r.teaching_kind, kindLabel: TEACHING_KINDS[r.teaching_kind] });
+  }
+  return members.map((m) => ({ ...m, specialties: by.get(m.id) ?? [] }));
+};
+
 // حساب الدخول: به يعرف النظام مقررات عضو الهيئة فيعتمد علاماتها
 function linkAccount(db, memberId, b) {
   if (b?.account === undefined) return;
@@ -71,10 +110,10 @@ function linkAccount(db, memberId, b) {
 
 export function options(db) {
   try {
-    return { ranks: ranksOf(db), statuses: STATUS,
+    return { ranks: ranksOf(db), statuses: STATUS, teachingKinds: TEACHING_KINDS,
       units: db.prepare("SELECT id, name FROM org_units WHERE active = 1 AND kind != 'university' ORDER BY name").all() };
   } catch {
-    return { ranks: ['أستاذ','أستاذ مشارك','أستاذ مساعد','محاضر','معيد'], statuses: STATUS, units: [] };
+    return { ranks: ['أستاذ','أستاذ مشارك','أستاذ مساعد','محاضر','معيد'], statuses: STATUS, teachingKinds: TEACHING_KINDS, units: [] };
   }
 }
 
@@ -82,7 +121,12 @@ const likeEsc = (s) => '%' + s.replace(/[\\%_]/g, '\\$&') + '%';
 export function listFaculty({ db }, q = {}) {
   const w = [], a = [];
   const term = String(q.q ?? '').replace(/\s+/g, ' ').trim().slice(0, 60);
-  if (term) { const l = likeEsc(term); w.push(`(m.name LIKE ? ESCAPE '\\' OR m.specialty LIKE ? ESCAPE '\\' OR m.rank LIKE ? ESCAPE '\\' OR u.name LIKE ? ESCAPE '\\')`); a.push(l, l, l, l); }
+  if (term) {
+    const l = likeEsc(term);
+    w.push(`(m.name LIKE ? ESCAPE '\\' OR m.specialty LIKE ? ESCAPE '\\' OR m.rank LIKE ? ESCAPE '\\' OR u.name LIKE ? ESCAPE '\\'
+      OR m.id IN (SELECT s.member_id FROM faculty_specialties s JOIN courses c ON c.id = s.course_id WHERE c.name LIKE ? ESCAPE '\\'))`);
+    a.push(l, l, l, l, l);
+  }
   if (q.rank) { w.push('m.rank = ?'); a.push(q.rank); }
   if (STATUS[q.status]) { w.push('m.status = ?'); a.push(q.status); }
   if (Number(q.unit) > 0) { w.push('m.unit_id = ?'); a.push(Number(q.unit)); }
@@ -91,7 +135,7 @@ export function listFaculty({ db }, q = {}) {
   const sum = db.prepare(`SELECT COUNT(*) total, COALESCE(SUM(hours), 0) hours FROM (${SEL})`).get();
   const unassigned = db.prepare('SELECT COUNT(*) n FROM courses WHERE member_id IS NULL AND active = 1').get().n;
   const active = db.prepare("SELECT COUNT(*) n FROM faculty_members WHERE status = 'active'").get().n;
-  return { members: rows.map(view), options: options(db), summary: { total: sum.total, active, hours: sum.hours, unassigned } };
+  return { members: withSpecialties(db, rows.map(view)), options: options(db), summary: { total: sum.total, active, hours: sum.hours, unassigned } };
 }
 
 const one = (db, id) => db.prepare(`${SEL} WHERE m.id = ?`).get(Number(id));
@@ -102,8 +146,9 @@ export function createFaculty({ db }, actor, b, ip) {
     const id = Number(db.prepare(`INSERT INTO faculty_members (name, rank, unit_id, specialty, email, phone, office_hours, office_location, status, hire_date, notes, created_at)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).run(d.name, d.rank, d.unitId, d.specialty, d.email, d.phone, d.officeHours, d.officeLocation, d.status, d.hireDate, d.notes, Date.now()).lastInsertRowid);
     linkAccount(db, id, b);
+    saveSpecialties(db, id, b);
     audit(db, actor, 'إضافة عضو هيئة تدريس', d.name, ip);
-    return { member: view(one(db, id)) };
+    return { member: withSpecialties(db, [view(one(db, id))])[0] };
   });
 }
 
@@ -115,8 +160,9 @@ export function updateFaculty({ db }, actor, id, b, ip) {
     db.prepare('UPDATE faculty_members SET name = ?, rank = ?, unit_id = ?, specialty = ?, email = ?, phone = ?, office_hours = ?, office_location = ?, status = ?, hire_date = ?, notes = ? WHERE id = ?')
       .run(d.name, d.rank, d.unitId, d.specialty, d.email, d.phone, d.officeHours, d.officeLocation, d.status, d.hireDate, d.notes, cur.id);
     linkAccount(db, cur.id, b);
+    saveSpecialties(db, cur.id, b);
     audit(db, actor, 'تعديل عضو هيئة تدريس', d.name, ip);
-    return { member: view(one(db, cur.id)) };
+    return { member: withSpecialties(db, [view(one(db, cur.id))])[0] };
   });
 }
 

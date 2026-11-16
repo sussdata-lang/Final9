@@ -107,7 +107,7 @@
   }
   function gradesTab() {
     const g = A.gt, o = (g.data && g.data.options) || { faculties: [], years: [] };
-    return `<section class="card"><div class="tool-row"><h2 style="margin:0">جدول العلامات</h2>${UA.can('grade:manage') ? '<button class="btn pri" data-act="gtnew">＋ إدخال علامات جديدة</button>' : ''}</div>
+    return `<section class="card"><div class="tool-row"><h2 style="margin:0">جدول العلامات</h2>${UA.can('grade:manage') ? '<span style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-act="ggopen">⚡ رصد سريع (جدول)</button><button class="btn pri" data-act="gtnew">＋ إدخال علامات جديدة</button></span>' : ''}</div>
       <div class="filters no-print"><label class="grow">بحث<input data-gt="q" id="gt-q" value="${esc(g.q)}" placeholder="اسم الطالب، الرقم الجامعي، الكلية أو المعهد، المادة…" maxlength="80" autocomplete="off"></label>
         <label>الكلية / المعهد<select data-gt="faculty">${opts(o.faculties.map((x) => [x.id, x.name]), g.faculty, 'الكل')}</select></label>
         <label>السنة<select data-gt="level">${opts(lvlList(), g.level, 'الكل')}</select></label>
@@ -286,7 +286,12 @@
       <div class="tbl-wrap"><table><thead><tr><th>الموضوع</th><th>الطالب</th><th>الحالة</th><th>التاريخ</th></tr></thead><tbody>${rows || '<tr><td colspan="4" class="empty">لا شكاوى في هذا التصنيف.</td></tr>'}</tbody></table></div></section>
       <section class="card"><h2>تفاصيل الشكوى</h2>${det}${sel ? `<div class="actions no-print"><button class="btn bad" data-act="cmpdel" data-id="${sel.id}">حذف الشكوى</button></div>` : ''}</section></div>`;
   }
-  UA.views.comms = () => bar([['news', 'الأخبار'], ['complaints', 'الشكاوى']], A.ctab || 'news', 'cmtab') + ((A.ctab || 'news') === 'news' ? newsTab() : complaintsTab());
+  UA.views.comms = () => {
+    const tabs = [['news', 'الأخبار'], ['complaints', 'الشكاوى']], notify = UA.esCards && UA.can('news:manage');
+    if (notify) tabs.push(['notify', 'إرسال إشعار']);
+    const t = A.ctab || 'news';
+    return bar(tabs, t, 'cmtab') + (t === 'notify' && notify ? UA.esCards.notify() : t === 'complaints' ? complaintsTab() : newsTab());
+  };
   Object.assign(UA.actions, {
     cmtab: async (el, d) => { A.ctab = d.t; UA.render(); },
     cmpflt: async (el, d) => { A.cfilter = d.f; A.csel = null; await UA.loaders.comms(); UA.render(); },

@@ -44,13 +44,20 @@
       const pick = `<div class="inline-form"><label style="flex:2">المقرر<select id="ta-course" data-no-other="1">${opts(courses.map((c) => [c.id, `${c.name}${c.code ? ` (${c.code})` : ''}`]), T.absenceCourse)}</select></label>
         <button class="btn" type="button" data-act="tashow">عرض</button></div>`;
       if (!T.absenceCourse) return `<section class="card"><h2>الغياب والحرمان</h2><p class="small">لا مقررات تدرّسها.</p></section>`;
+      const ov = await UA.api('GET', '/api/teaching/absence-overview');
+      const wizard = `<section class="card" style="border:2px solid #054239;margin-bottom:16px"><h2>معالج الحرمان الشامل</h2>
+        <p class="hint">كل الطلاب الذين تجاوز غيابهم ${ov.maxPercent}% في أي من مقرراتك (${ov.courses} مقرراً) (${esc(ov.term)}): ${ov.students.length} طالباً في ${ov.deprivationCount} حالة حرمان، و${ov.warnCount} حالة بلغت نصف الحد.</p>
+        <div class="actions"><button class="btn" type="button" data-act="taoverall">تحديد الكل / إلغاء التحديد</button><button class="btn" type="button" data-act="taoverwarn"${ov.warnCount ? '' : ' disabled'}>إنذار مبكر لمن بلغ نصف الحد (${ov.warnCount})</button>
+          <button class="btn dan" type="button" data-act="taoverdeprive"${ov.students.length ? '' : ' disabled'}>حرمان المحددين دفعة واحدة</button></div>
+        ${table(['', 'الطالب', 'المقررات المتجاوزة'], ov.students.map((s) => `<tr><td><input type="checkbox" class="ta-ov" value="${s.studentId}" aria-label="اختيار"></td>
+          <td><b>${esc(s.name)}</b> <span class="mono small">${esc(s.studentNo)}</span></td><td>${s.courses.map((c) => `${esc(c.name)} <b style="color:#B3261E">${c.percent}%</b>`).join(' · ')}</td></tr>`).join(''), 'لا طالب تجاوز الحد حالياً.')}</section>`;
       const r = await UA.api('GET', `/api/teaching/absence/${T.absenceCourse}`);
       const rows = r.rows.map((x) => `<tr>
         <td>${x.overLimit && !x.deprivationId ? `<input type="checkbox" class="ta-pick" value="${x.studentId}" aria-label="اختيار">` : ''}</td>
         <td><b>${esc(x.name)}</b> <span class="mono small">${esc(x.studentNo)}</span></td><td>${x.present}</td><td>${x.absent}</td>
         <td><b style="color:${x.overLimit ? '#B3261E' : x.warn ? '#8A6A1B' : '#1B7F4B'}">${x.percent}%</b></td>
         <td>${x.deprivationId ? `<span class="pill p-rejected">محروم</span>${UA.can('course:manage') ? ` <button class="btn sm" type="button" data-act="talift" data-id="${x.deprivationId}">رفع الحرمان</button>` : ''}` : x.overLimit ? '<span class="pill p-rejected">تجاوز الحد</span>' : x.warn ? '<span class="pill p-review">تنبيه</span>' : '—'}</td></tr>`).join('');
-      return `<section class="card"><h2>الغياب والحرمان</h2>${pick}
+      return `${wizard}<section class="card"><h2>الغياب والحرمان</h2>${pick}
         <p class="hint">${esc(r.term)} · الفترة ${esc(r.window.from)} إلى ${esc(r.window.to)}${r.window.fromCalendar ? '' : ' (لم تُحدد في التقويم؛ آخر 120 يوماً)'} · انعقد المقرر ${r.held} يوماً · الحد ${r.maxPercent}% ويُحسب بعد ${r.minSessions} محاضرات.</p>
         ${table(['', 'الطالب', 'حضر', 'غاب', 'نسبة الغياب', 'الحالة'], rows, 'لا طلاب.')}
         <div class="actions"><button class="btn" type="button" data-act="tawarn">تنبيه من بلغ نصف الحد</button><button class="btn dan" type="button" data-act="tadeprive">حرمان المحددين</button></div></section>`;
@@ -88,6 +95,14 @@
     tladd: async () => {
       const r = await UA.api('POST', '/api/teaching/lecture-changes', { courseId: Number(val('tl-course')), kind: val('tl-kind'), lectureDay: val('tl-day'), start: val('tl-start'), end: val('tl-end'), makeupDay: val('tl-mday'), makeupStart: val('tl-mstart'), makeupEnd: val('tl-mend'), makeupHall: val('tl-mhall'), reason: val('tl-reason') });
       toast(`حُفظ التغيير وأُبلغ ${r.notified} طالباً`); await again();
+    },
+    taoverall: async () => { const all = [...document.querySelectorAll('.ta-ov')], on = all.some((x) => !x.checked); all.forEach((x) => { x.checked = on; }); },
+    taoverwarn: async () => { const r = await UA.api('POST', '/api/teaching/absence-overview/warn', {}); toast(`أُرسل الإنذار المبكر إلى ${r.warned} حالة`); await again(); },
+    taoverdeprive: async () => {
+      const studentIds = [...document.querySelectorAll('.ta-ov:checked')].map((x) => Number(x.value));
+      if (!studentIds.length) { toast('حدد الطلاب أولاً.'); return; }
+      if (!confirm(`حرمان ${studentIds.length} طالباً من كل مقرر تجاوزوا فيه الحد؟ يُبلَّغ كل منهم.`)) return;
+      const r = await UA.api('POST', '/api/teaching/absence-overview/deprive', { studentIds }); toast(`صدر ${r.deprived} قرار حرمان في ${r.courses} مقرر`); await again();
     },
     tashow: async () => { T.absenceCourse = val('ta-course'); await again(); },
     tawarn: async () => { const r = await UA.api('POST', `/api/teaching/absence/${T.absenceCourse}/warn`, {}); toast(`أُرسل التنبيه إلى ${r.warned} طالباً`); },

@@ -13,6 +13,8 @@ import {
   safeJsonParse,
   resolveModulePermissions,
   computeAllowedViews,
+  knownViewsFor,
+  editableViewList,
   summarizeUserAccessProfile,
 } from '../permissions.js';
 import { cacheGetOrSet, getCachedRoleByKey, getCachedUnitById } from '../cache.js';
@@ -126,9 +128,9 @@ const view = (db, u) => {
     derivedModuleAccess: profile.moduleAccess,
     customPermissions: safeJsonParse(u.custom_permissions_json, []),
     revokedPermissions: safeJsonParse(u.revoked_permissions_json, []),
-    explicitAllowedViews: explicitViews,
+    explicitAllowedViews: editableViewList(explicitViews, safeJsonParse(u.views_known_json, null)),
     hiddenTabs: safeJsonParse(u.hidden_tabs_json, []),
-    allowedViews: computeAllowedViews(perms, explicitViews, u.role, u.role === 'student' ? studentViewsOf(db, u.id) : null),
+    allowedViews: computeAllowedViews(perms, explicitViews, u.role, u.role === 'student' ? studentViewsOf(db, u.id) : null, safeJsonParse(u.views_known_json, null)),
     effectivePermissions: perms,
     permissions: perms,
     accessProfile: profile,
@@ -203,8 +205,8 @@ export async function createUser({ db, cfg }, actor, input, ip) {
           username, display_name, password_hash, role, role_key, unit_id,
           must_change_password, created_at, staff_kind, job_title,
           access_mode, data_scope, custom_permissions_json, revoked_permissions_json,
-          allowed_views_json, module_access_json, hidden_tabs_json
-        ) VALUES (?,?,?,?,?,?,1,?,?,?,?,?,?,?,?,?,?)
+          allowed_views_json, module_access_json, hidden_tabs_json, views_known_json
+        ) VALUES (?,?,?,?,?,?,1,?,?,?,?,?,?,?,?,?,?,?)
       `)
       .run(
         username,
@@ -222,7 +224,8 @@ export async function createUser({ db, cfg }, actor, input, ip) {
         JSON.stringify(revokedPerms),
         JSON.stringify(allowedViews),
         JSON.stringify(moduleAccess),
-        JSON.stringify(hiddenTabs)
+        JSON.stringify(hiddenTabs),
+        JSON.stringify(knownViewsFor(allowedViews))
       );
     setScopeFaculty(db, Number(r.lastInsertRowid), dataScope, input?.scopeFaculty);
     audit(db, actor, `إنشاء حساب إداري (${rk.role_key ?? rk.role} · ${accessMode})`, username, ip);
@@ -271,6 +274,8 @@ export function updateUser({ db }, actor, id, input, ip) {
   const allowedViews = input?.allowedViews !== undefined
     ? sanitizeAllowedViews(input.allowedViews)
     : safeJsonParse(u.allowed_views_json, []);
+  // قائمة جديدة تُختم بالشاشات الموجودة الآن، وبقاؤها كما هي يبقي ختمها القديم
+  const knownViews = input?.allowedViews !== undefined ? knownViewsFor(allowedViews) : safeJsonParse(u.views_known_json, null);
   const hiddenTabs = input?.hiddenTabs !== undefined ? sanitizeHiddenTabs(input.hiddenTabs) : safeJsonParse(u.hidden_tabs_json, []);
 
   const roleChanged = (rk.role_key ?? rk.role) !== cur;
@@ -287,7 +292,7 @@ export function updateUser({ db }, actor, id, input, ip) {
       UPDATE users
       SET display_name = ?, role = ?, role_key = ?, unit_id = ?, staff_kind = ?, job_title = ?,
           access_mode = ?, data_scope = ?, module_access_json = ?,
-          custom_permissions_json = ?, revoked_permissions_json = ?, allowed_views_json = ?, hidden_tabs_json = ?
+          custom_permissions_json = ?, revoked_permissions_json = ?, allowed_views_json = ?, hidden_tabs_json = ?, views_known_json = ?
       WHERE id = ?
     `).run(
       name,
@@ -303,6 +308,7 @@ export function updateUser({ db }, actor, id, input, ip) {
       JSON.stringify(revokedPerms),
       JSON.stringify(allowedViews),
       JSON.stringify(hiddenTabs),
+      JSON.stringify(knownViews),
       u.id
     );
     if (input?.scopeFaculty !== undefined || input?.dataScope !== undefined) setScopeFaculty(db, u.id, dataScope, input?.scopeFaculty ?? u.scope_faculty);

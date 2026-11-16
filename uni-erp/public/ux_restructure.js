@@ -119,51 +119,44 @@
     `;
   }
 
+  /* ---------- البطاقة الشخصية (ISO ID-1: 85.6×54 مم) — وجه وظهر، مصمَّمة بالمليمتر فتُطبع بحجمها الحقيقي دون تصغير ---------- */
+  const SC_STATUS = { active: 'مقيَّد', suspended: 'موقوف', graduated: 'خريج', withdrawn: 'منسحب' };
+  // العام الدراسي يبدأ في أيلول، والبطاقة صالحة حتى نهاية آب من العام التالي
+  const scYear = (now = new Date()) => { const y = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1; return { label: `${y} / ${y + 1}`, ends: `31/08/${y + 1}` }; };
+  const scDate = (d = new Date()) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+  const NFC_ICON = '<svg class="sc-nfc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" role="img" aria-label="بطاقة لا تلامسية NFC"><path d="M8.5 8.5a5 5 0 0 1 0 7"/><path d="M12 6a8.5 8.5 0 0 1 0 12"/><path d="M15.5 3.5a12 12 0 0 1 0 17"/><circle cx="5" cy="12" r="1.3" fill="currentColor"/></svg>';
   UA.digitalCardHtml = (st, o = {}) => {
-    const secureBarcode = UA.generateStudentSecureBarcode ? UA.generateStudentSecureBarcode(st.studentNo, st.nationalId || '2026') : `SUSS-${st.studentNo}-SEC94`;
-    return `      <div style="max-width:540px;margin:10px auto 24px;background:linear-gradient(135deg,#042f28 0%,#095246 100%);color:#fff;border-radius:18px;padding:22px;border:2px solid #D5B65D;box-shadow:0 14px 34px rgba(4,47,40,.24);position:relative;overflow:hidden" ${o.screen ? 'id="official-digital-card" ' : ''}data-digital-card>
-        <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(213,182,93,.4);padding-bottom:12px;margin-bottom:14px">
-          <div style="display:flex;align-items:center;gap:10px">
-            <img src="/brand/crest.svg" alt="" width="38" height="44" style="filter:drop-shadow(0 2px 4px rgba(0,0,0,.3))">
-            <div>
-              <strong style="font-size:15px;display:block;color:#fff">الجامعة السورية للعلوم الأمنية</strong>
-              <small style="color:#D5B65D;font-weight:700">البطاقة الجامعية الرقمية الذكية المصدقة</small>
-            </div>
-          </div>
-          <span style="background:#D5B65D;color:#042f28;font-weight:800;font-size:11px;padding:3px 9px;border-radius:99px">صالحة 2026 / 2027</span>
-        </div>
-
-        <div style="display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center">
-          <div>
-            <div style="font-size:19px;font-weight:800;margin-bottom:4px;color:#fff">${esc(st.name)}</div>
-            <div style="font-size:13px;color:#A8D8BE">الرقم الجامعي: <b class="mono" style="color:#C9A24B;letter-spacing:1px">${esc(st.studentNo)}</b></div>
-            <div style="font-size:12.5px;color:#A8D8BE;margin-top:2px">${esc((st.program && st.program.name) || (typeof st.program === 'string' ? st.program : ''))}${st.levelLabel ? ` · ${esc(st.levelLabel)}` : ''}</div>
-            <div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap">
-              ${st.statusLabel ? `<span style="background:rgba(27,127,75,.25);color:#a7f3d0;padding:3px 8px;border-radius:6px;font-size:11px">${esc(st.statusLabel)}</span>` : ''}
-            </div>
-          </div>
-          <div style="background:#fff;color:#042f28;padding:8px;border-radius:10px;text-align:center;width:96px">
-            <svg viewBox="0 0 80 80" width="80" height="80" style="display:block;margin:0 auto">
-              <rect width="80" height="80" fill="#fff"/>
-              <rect x="6" y="6" width="22" height="22" fill="#042f28"/><rect x="10" y="10" width="14" height="14" fill="#fff"/><rect x="13" y="13" width="8" height="8" fill="#042f28"/>
-              <rect x="52" y="6" width="22" height="22" fill="#042f28"/><rect x="56" y="10" width="14" height="14" fill="#fff"/><rect x="59" y="13" width="8" height="8" fill="#042f28"/>
-              <rect x="6" y="52" width="22" height="22" fill="#042f28"/><rect x="10" y="56" width="14" height="14" fill="#fff"/><rect x="13" y="59" width="8" height="8" fill="#042f28"/>
-              <rect x="34" y="12" width="6" height="6" fill="#042f28"/><rect x="34" y="24" width="12" height="6" fill="#042f28"/>
-              <rect x="12" y="34" width="18" height="6" fill="#042f28"/><rect x="36" y="36" width="14" height="14" fill="#D5B65D"/>
-              <rect x="54" y="44" width="8" height="8" fill="#042f28"/><rect x="42" y="56" width="14" height="6" fill="#042f28"/>
-            </svg>
-            <small style="font-size:9px;font-family:monospace;font-weight:700;display:block;margin-top:2px;color:#042f28">PKI SHA-256</small>
-          </div>
-        </div>
-
-        <!-- باركود أمني فريد مشفر ومضاد للتزوير (بدون إظهار اسم المستخدم تحته أبداً) -->
-        <div style="margin-top:16px;padding-top:12px;border-top:1px dashed rgba(213,182,93,.4);text-align:center">
-          <div class="idc-bc" style="background:#fff;padding:8px 12px;border-radius:8px;display:inline-block;width:100%;max-width:380px" title="تكويد الباركود الأمني الفريد المضاد للتزوير">
-            ${UA.code128 ? UA.code128(secureBarcode) : ''}
-          </div>
-        </div>
-      </div>`;
+    const pr = typeof st.program === 'object' && st.program ? st.program : { name: st.program || '' };
+    const faculty = pr.faculty || st.faculty || st.facultyName || '';
+    const program = pr.name && pr.name !== faculty ? pr.name : (pr.degree || '');
+    const yr = scYear();
+    const status = st.statusLabel || SC_STATUS[st.status] || '';
+    const rows = [['الرقم الجامعي', st.studentNo, 'sc-no'], ['الكلية', faculty], ['البرنامج', program], ['السنة', st.levelLabel], ['تنتهي في', yr.ends]].filter((r) => r[1]);
+    const initial = String(st.name || '؟').trim()[0] || '؟';
+    const secure = UA.generateStudentSecureBarcode ? UA.generateStudentSecureBarcode(st.studentNo) : '';
+    return `<div class="sc" ${o.screen ? 'id="official-digital-card" ' : ''}data-digital-card>
+      <img class="sc-wm" src="/brand/crest.svg" alt="">
+      <div class="sc-h"><img class="sc-logo" src="/brand/crest.svg" alt=""><div><b>الجامعة السورية للعلوم الأمنية</b><small>بطاقة طالب جامعية</small></div>${NFC_ICON}<span class="sc-tag">${esc(yr.label)}</span></div>
+      <div class="sc-b">
+        <div class="sc-ph">${st.photoUrl ? `<img src="${esc(st.photoUrl)}" alt="">` : `<span aria-hidden="true">${esc(initial)}</span>`}</div>
+        <div class="sc-d"><div class="sc-n">${esc(st.name)}</div><dl class="sc-r">${rows.map((r) => `<dt>${esc(r[0])}</dt><dd${r[2] ? ` class="${r[2]}" dir="ltr"` : ''}>${esc(r[1])}</dd>`).join('')}</dl></div>
+        ${st.qrSvg ? `<div class="sc-q"><div class="sc-qr">${st.qrSvg}</div><small>امسح للتحقق</small></div>` : '<div class="sc-q"></div>'}
+      </div>
+      <div class="sc-f"><span>${esc(status)}</span><span class="sc-bc" title="باركود التحقق المشفر المضاد للتزوير">${UA.code128 && secure ? UA.code128(secure) : ''}</span></div>
+    </div>`;
   };
+  UA.digitalCardBackHtml = (st, o = {}) => `<div class="sc sc-back" data-digital-card>
+      <img class="sc-wm" src="/brand/crest.svg" alt="">
+      <div class="sc-bk"><b>تعليمات</b><ol>
+        <li>هذه البطاقة ملك للجامعة السورية للعلوم الأمنية، وهي شخصية لا يجوز إعارتها أو التنازل عنها.</li>
+        <li>تُبرز عند الطلب، ولدخول الحرم الجامعي والقاعات والامتحانات.</li>
+        <li>يُمنع العبث بالبطاقة أو تعديل بياناتها أو نسخ شريحتها، ويعرّض ذلك حاملها للمساءلة.</li>
+        <li>عند فقدانها يُبلَّغ قسم شؤون الطلاب فوراً لإيقافها وإصدار بديل.</li></ol>
+        <div class="sc-found"><b>من يعثر على هذه البطاقة</b> يُرجى تسليمها إلى أقرب قسم أو مركز أمني، أو إلى الجامعة، مع الشكر.</div></div>
+      <div class="sc-f"><span>الرقم الجامعي: <span dir="ltr">${esc(st.studentNo)}</span></span><span>تاريخ الإصدار: ${esc(o.issued || scDate())}</span></div>
+    </div>`;
+  // وجه البطاقة وظهرها معاً؛ الطباعة تضع كل وجه في صفحة (طابعة البطاقات) أو الوجهين على ورقة واحدة
+  UA.cardSides = (st) => [UA.digitalCardHtml(st), UA.digitalCardBackHtml(st)];
 
   UA.views.overview = () => {
     if (S.mainDashTab) {
@@ -229,11 +222,14 @@
   const origHrLoader = UA.loaders.hr;
   const origHrView = UA.views.hr;
 
+  const canRecruit = () => S.me && (S.me.role === 'admin' || UA.can('hr:manage'));
   UA.loaders.payroll = async () => {
     await Promise.all([
       origPayrollLoader ? origPayrollLoader().catch(() => {}) : Promise.resolve(),
       origHrLoader ? origHrLoader().catch(() => {}) : Promise.resolve(),
       UA.loaders.enterprise ? UA.loaders.enterprise().catch(() => {}) : Promise.resolve(),
+      // التوظيف قسم هنا الآن: يُحمَّل عند فتحه (الدخول من go('recruitment') أو من التبويب)
+      (U.hrSection === 'recruitment' || S.hrUnifiedTab === 'recruitment') && canRecruit() && UA.loaders.recruitment ? UA.loaders.recruitment().catch(() => {}) : Promise.resolve(),
     ]);
   };
 
@@ -320,8 +316,9 @@
       ['att_leaves', 'الحضور والإجازات'],
       ['biometrics', 'البصمة وأجهزة الحضور الحيوي'],
       ['appraisals', 'تقييم الموظفين والأداء الوظيفي (KPIs)'],
-      ['enterprise_hr', 'التطوير المؤسسي للموارد البشرية والعبء التدريسي'],
+      ...(canRecruit() ? [['recruitment', 'التوظيف (الشواغر والمتقدمون والمقابلات)']] : []),
     ] : [['att_leaves', 'الحضور والإجازات']];
+    if (U.hrSection === 'recruitment' && !canRecruit()) U.hrSection = 'payroll';
     const topBar = `<div class="sub-tabs no-print" role="tablist" style="margin-bottom:14px">
       ${sections.map((s) => `<button class="chip" role="tab" data-act="hrunified" data-t="${s[0]}" aria-pressed="${U.hrSection === s[0]}">${esc(s[1])}</button>`).join('')}
     </div>`;
@@ -340,13 +337,13 @@
     if (U.hrSection === 'appraisals') {
       return topBar + renderAppraisalsTab();
     }
-    if (U.hrSection === 'enterprise_hr') {
-      const esHtml = UA.renderEnterpriseSection ? UA.renderEnterpriseSection('hr_finance') : '';
-      return topBar + `<div id="es-hr-mount" data-mounted="${esHtml ? '1' : ''}">${esHtml}</div>`;
+    if (U.hrSection === 'recruitment') {
+      return topBar + (UA.views.recruitment ? UA.views.recruitment() : '');
     }
     const rawPayroll = origPayrollView ? (origPayrollView() || '') : '';
     const cleanPayroll = rawPayroll.replace(/<div class="sub-tabs[^"]*"[^>]*>[\s\S]*?<\/div>/, '');
-    return topBar + cleanPayroll;
+    const signed = UA.esCards && (UA.can('hr:manage') || UA.can('hr_payroll:approve')) ? UA.esCards.payslips() : '';
+    return topBar + cleanPayroll + signed;
   };
 
   /* ==========================================================================
@@ -453,30 +450,10 @@
   }
 
   function mountSplitEnterpriseBlocks() {
-    const esHr = document.getElementById('es-hr-mount');
-    if (esHr && !esHr.dataset.mounted && UA.renderEnterpriseSection) {
-      esHr.dataset.mounted = '1';
-      esHr.innerHTML = UA.renderEnterpriseSection('hr_finance');
-    }
     const audDevops = document.getElementById('audit-devops-mount');
     if (audDevops && !audDevops.dataset.mounted && UA.views.devops) {
       audDevops.dataset.mounted = '1';
       UA.views.devops(audDevops, S.me);
-    }
-    const audEnt = document.getElementById('audit-enterprise-mount');
-    if (audEnt && !audEnt.dataset.mounted && UA.renderEnterpriseSection) {
-      audEnt.dataset.mounted = '1';
-      audEnt.innerHTML = UA.renderEnterpriseSection('ux_offline');
-    }
-    const acadEnt = document.getElementById('acad-enterprise-mount');
-    if (acadEnt && !acadEnt.dataset.mounted && UA.renderEnterpriseSection) {
-      acadEnt.dataset.mounted = '1';
-      acadEnt.innerHTML = UA.renderEnterpriseSection('academics');
-    }
-    const saPki = document.getElementById('sa-enterprise-pki-mount');
-    if (saPki && !saPki.dataset.mounted && UA.renderEnterpriseSection) {
-      saPki.dataset.mounted = '1';
-      saPki.innerHTML = UA.renderEnterpriseSection('student_pki');
     }
   }
 
@@ -534,8 +511,8 @@
     if (view === 'overview') return { subAct: 'maindashtab', subVal: U.mainTab || 'unified', subLabel: U.mainTab === 'myprofile' ? 'ملفي' : U.mainTab === 'work' ? 'أعمالي' : 'الرئيسية' };
     if (view === 'affairs') return { subAct: 'sttab', subVal: S.stTab || 'requests', subLabel: S.stTab === 'list' ? 'سجل الطلاب' : S.stTab === 'new' ? 'طالب جديد' : 'الطلبات' };
     if (view === 'corr' || view === 'internal') return { subAct: 'corrunified', subVal: U.corrUnifiedTab || 'in', subLabel: U.corrUnifiedTab === 'pending_all' ? 'جميع المعلقة' : U.corrUnifiedTab === 'internal_requests' ? 'الطلبات الداخلية' : U.corrUnifiedTab === 'out' ? 'الصادر' : 'الوارد' };
-    if (view === 'payroll' || view === 'hr') return { subAct: 'hrunified', subVal: U.hrSection || 'payroll', subLabel: U.hrSection === 'biometrics' ? 'البصمة' : U.hrSection === 'appraisals' ? 'تقييم الأداء' : U.hrSection === 'att_leaves' ? 'الحضور والإجازات' : U.hrSection === 'enterprise_hr' ? 'التطوير المؤسسي للموارد البشرية' : 'الرواتب' };
-    if (view === 'audit') return { subAct: 'audtab2', subVal: U.auditSection || 'chain', subLabel: U.auditSection === 'hc_perf' ? 'الأداء الفائق' : U.auditSection === 'exec_offline' ? 'المراقبة المؤسسية' : U.auditSection === 'devops' ? 'البنية التحتية DevOps' : U.auditSection === 'waf_sec' ? 'جدار الحماية WAF' : 'السلسلة' };
+    if (view === 'payroll' || view === 'hr') return { subAct: 'hrunified', subVal: U.hrSection || 'payroll', subLabel: U.hrSection === 'biometrics' ? 'البصمة' : U.hrSection === 'appraisals' ? 'تقييم الأداء' : U.hrSection === 'att_leaves' ? 'الحضور والإجازات' : 'الرواتب' };
+    if (view === 'audit') return { subAct: 'audtab2', subVal: U.auditSection || 'chain', subLabel: U.auditSection === 'hc_perf' ? 'الأداء الفائق' : U.auditSection === 'devops' ? 'البنية التحتية DevOps' : U.auditSection === 'waf_sec' ? 'جدار الحماية WAF' : 'السلسلة' };
     if (view === 'admin') return { subAct: 'admtab', subVal: S.adminTab || 'general', subLabel: S.adminTab === 'verify_merged' ? 'التحقق العام' : S.adminTab === 'units_merged' ? 'الهيكل والصلاحيات' : S.adminTab === 'mysettings' ? 'إعداداتي' : 'الإعدادات' };
     if (view === 'academics') return { subAct: 'actab', subVal: S.acTab || 'courses', subLabel: 'المقررات والعلامات' };
     if (view === 'guidelines') return { subAct: 'guidetab', subVal: U.guideMode || 'depts', subLabel: U.guideMode === 'hierarchy' ? 'الهيكل التنظيمي' : U.guideMode === 'lifecycle' ? 'دورة الطلبات' : U.guideMode === 'archify' ? 'خرائط Archify' : 'الأقسام' };
@@ -788,7 +765,6 @@
       { cat: 'شؤون الموظفين', title: '🕒 شؤون الموظفين · الحضور والانصراف والإجازات', view: 'payroll', act: 'hrunified', val: 'att_leaves' },
       { cat: 'شؤون الموظفين', title: '🔐 شؤون الموظفين · منظومة البصمة وأجهزة الحضور الحيوي', view: 'payroll', act: 'hrunified', val: 'biometrics' },
       { cat: 'شؤون الموظفين', title: '⭐ شؤون الموظفين · تقييم الموظفين ومؤشرات الأداء (KPIs)', view: 'payroll', act: 'hrunified', val: 'appraisals' },
-      { cat: 'شؤون الموظفين', title: '✨ شؤون الموظفين · التطوير المؤسسي للموارد البشرية والعبء التدريسي', view: 'payroll', act: 'hrunified', val: 'enterprise_hr' },
       { cat: 'المالية والمشتريات', title: '💰 المالية والمحاسبة · شجرة الحسابات والقيود المزدوجة', view: 'finance' },
       { cat: 'المالية والمشتريات', title: '📦 المشتريات والمخازن والعهد والأصول', view: 'procurement' },
       { cat: 'الاستيراد والتصدير', title: '📥 مركز الاستيراد الموحد (إكسل + قواعد البيانات)', view: 'exchange', act: 'extab', val: 'import' },
@@ -810,27 +786,62 @@
     ];
     // لا تظهر إلا الأقسام التي يملك الحساب فتحها، تليها نتائج الطلاب من الخادم
     const allowed = new Set(UA.viewsFor(S.me.role).map((v) => v[0]));
-    return [...items.filter((it) => !it.view || allowed.has(it.view)), ...(wsState.cmdStudents || [])];
+    return [...(wsState.cmdStudents || []), ...items.filter((it) => !it.view || allowed.has(it.view))];
   }
 
   const cmdNorm = (s) => String(s || '').toLowerCase().replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').trim();
   let cmdStudentTimer = null;
+  /* ---------- البحث الشامل: كل نتيجة تفتح سجلها نفسه (ملف الطالب، الطلب، المراسلة…) لا صفحتها العامة ---------- */
+  const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+  async function waitFor(sel, ms = 3000) { const t = Date.now(); while (Date.now() - t < ms) { const el = document.querySelector(sel); if (el) return el; await pause(80); } return null; }
+  // يطلق إجراء الواجهة كأن زرّه نُقر (تعمل بها الإجراءات المعرَّفة في UA.actions وتلك التي في موزّع النقر الرئيسي)
+  const fireAct = (act, data = {}) => { const b = document.createElement('button'); b.dataset.act = act; Object.assign(b.dataset, data); b.hidden = true; document.body.appendChild(b); b.click(); b.remove(); };
+  async function openTab(view, act, t) {
+    await UA.go(view);
+    const btn = await waitFor(`[data-act="${act}"][data-t="${t}"]`, 2500);
+    if (btn) { btn.click(); await pause(500); }
+  }
+  // حقل البحث في الصفحة المفتوحة يُعبَّأ باستعلام المستخدم فيظهر السجل مصفّى حين لا توجد نافذة فتح مباشرة
+  async function prefillSearch(q) {
+    await pause(300);
+    const inp = document.querySelector('.sx-page input[type="search"]:not(#sx-q), .sx-page input[data-fmq], .sx-page input[id$="-q"], .sx-page input[placeholder*="بحث"]');
+    if (inp) { inp.value = q; inp.dispatchEvent(new Event('input', { bubbles: true })); inp.focus(); }
+  }
+  const OPENERS = {
+    student: { cat: 'الطلاب', ico: '👤', run: async (r) => { S.stList.q = r.sub.split(' · ')[0]; S.stTab = 'list'; S.stSel = null; await UA.go('affairs'); fireAct('stsel', { id: r.id }); } },
+    request: { cat: 'الطلبات', ico: '📨', run: async (r) => {
+      S.stTab = 'requests'; await UA.go('affairs');
+      if (!(S.requests || []).some((x) => x.id === r.id)) { try { const d = await api('GET', '/api/requests/' + r.id); S.requests = [d.request, ...(S.requests || [])]; } catch { /* خارج نطاقه */ } }
+      S.sel = Number(r.id); UA.render();
+    } },
+    employee: { cat: 'الموظفون', ico: '👥', run: async (r) => { await openTab('payroll', 'hrunified', 'payroll'); await prefillSearch(r.title); } },
+    vacancy: { cat: 'التوظيف', ico: '🧑‍💼', run: async (r) => { await UA.go('recruitment'); await pause(700); fireAct('rcopen', { id: r.id }); } },
+    applicant: { cat: 'التوظيف', ico: '🧑‍💼', run: async (r) => { await UA.go('recruitment'); await pause(700); fireAct('rcopen', { id: r.vacancyId }); } },
+    faculty: { cat: 'الهيئة التدريسية', ico: '🎓', run: async (r) => { await UA.go('academics'); await openTab('academics', 'acadtab', 'members'); await waitFor('[data-act="fmedit"]', 3000); fireAct('fmedit', { id: r.id }); } },
+    course: { cat: 'المواد', ico: '📚', run: async (r) => { await UA.go('academics'); await prefillSearch(r.sub || r.title); } },
+    supplier: { cat: 'المشتريات', ico: '🤝', run: async (r) => { await UA.go('procurement'); fireAct('proc-tab', { t: 'suppliers' }); await prefillSearch(r.title); } },
+    porder: { cat: 'المشتريات', ico: '🛒', run: async (r) => { await UA.go('procurement'); fireAct('proc-pipe-go', { t: 'cycle', mode: 'orders' }); await waitFor('[data-act="proc-view-ord"]', 3000); fireAct('proc-view-ord', { id: r.id }); } },
+    preq: { cat: 'المشتريات', ico: '🛒', run: async (r) => { await UA.go('procurement'); fireAct('proc-pipe-go', { t: 'cycle', mode: 'requests' }); await waitFor('[data-act="proc-view-req"]', 3000); fireAct('proc-view-req', { id: r.id }); } },
+    rfq: { cat: 'المشتريات', ico: '💲', run: async () => { await UA.go('quotations'); } },
+    corr: { cat: 'المراسلات', ico: '✉️', run: async (r) => { await UA.go('corr'); await pause(600); fireAct('cropen', { id: r.id }); } },
+    account: { cat: 'الحسابات', ico: '🔑', run: async (r) => { await UA.go('access'); await waitFor('[data-act="xuedit"]', 3000); fireAct('xuedit', { id: r.id }); } },
+  };
   function searchCommandStudents(q) {
     clearTimeout(cmdStudentTimer);
     wsState.cmdStudents = [];
-    if (!UA.can('student:read') || q.trim().length < 2) return;
+    if (!S.me || S.me.role === 'student' || q.trim().length < 2) return;
     cmdStudentTimer = setTimeout(async () => {
       try {
-        const r = await api('GET', '/api/students?' + new URLSearchParams({ q: q.trim(), limit: '6' }));
+        const r = await api('GET', '/api/search?' + new URLSearchParams({ q: q.trim() }));
         if (wsState.cmdQuery !== q) return;
-        wsState.cmdStudents = (r.students || []).map((s) => ({
-          cat: 'الطلاب',
-          title: `👤 ${s.name} — ${s.studentNo}`,
+        wsState.cmdStudents = (r.results || []).filter((x) => OPENERS[x.type]).map((x) => ({
+          cat: OPENERS[x.type].cat,
+          title: `${OPENERS[x.type].ico} ${x.title}${x.sub ? ' — ' + x.sub : ''}`,
           always: true,
-          run: async () => { S.stList.q = s.studentNo; S.stTab = 'list'; S.stSel = null; await UA.go('affairs'); },
+          run: () => OPENERS[x.type].run(x),
         }));
         renderCommandPaletteResults();
-      } catch { /* نتائج الطلاب إضافية؛ فشلها لا يعطّل البحث في الأقسام */ }
+      } catch { /* نتائج السجلات إضافية؛ فشلها لا يعطّل البحث في الأقسام */ }
     }, 200);
   }
 
@@ -844,7 +855,7 @@
     ov.innerHTML = `<div class="sx-cmd-box" role="dialog" aria-modal="true" aria-label="نافذة الأوامر والبحث الشامل">
       <div class="sx-cmd-head">
         <span style="font-size:18px">⚡</span>
-        <input id="sx-cmd-input" type="search" placeholder="ابحث عن أي قسم، تبويب فرعي، طلب، أو إجراء سريع..." autocomplete="off">
+        <input id="sx-cmd-input" type="search" placeholder="ابحث في كل الموقع: طالب، طلب، موظف، مادة، مورد، مراسلة، حساب، أو قسم..." autocomplete="off">
         <kbd class="sx-kbd-hint" style="font-size:11px;padding:2px 6px">ESC</kbd>
       </div>
       <div id="sx-cmd-results" class="sx-cmd-list" role="listbox"></div>
@@ -1242,10 +1253,7 @@
       if (U.hrSection === 'biometrics' || U.hrSection === 'appraisals') await loadHrExtras();
       if (U.hrSection === 'att_leaves' && origHrLoader) await origHrLoader().catch(() => {});
       if (U.hrSection === 'payroll' && origPayrollLoader) await origPayrollLoader().catch(() => {});
-      if (U.hrSection === 'enterprise_hr') {
-        if (UA.setEnterpriseTab) UA.setEnterpriseTab('hr_finance');
-        if (UA.loaders.enterprise) await UA.loaders.enterprise().catch(() => {});
-      }
+      if (U.hrSection === 'recruitment' && UA.loaders.recruitment) await UA.loaders.recruitment().catch(() => {});
       UA.render();
     },
     biosync: async () => {
@@ -1263,10 +1271,6 @@
       }
       if (t === 'hc_perf') {
         try { U.hcTelemetry = await api('GET', '/api/v12/high-concurrency/telemetry'); } catch {}
-      }
-      if (t === 'exec_offline') {
-        if (UA.setEnterpriseTab) UA.setEnterpriseTab('ux_offline');
-        if (UA.loaders.enterprise) await UA.loaders.enterprise().catch(() => {});
       }
       UA.render();
     },
@@ -1333,12 +1337,9 @@
       }
     },
     printdigicard: () => {
-      const cardEl = document.getElementById('official-digital-card');
-      if (cardEl && UA.printHtml) {
-        UA.printHtml([cardEl.outerHTML], { card: true });
-      } else {
-        window.print();
-      }
+      const st = UA.cardSubject ? UA.cardSubject() : null;
+      if (st && UA.printHtml) UA.printHtml([UA.cardSides(st)], { card: true });
+      else window.print();
     },
     simcardcheckin: async () => {
       const where = await recordCardEvent('check_in', 'granted', 'تسجيل يدوي');

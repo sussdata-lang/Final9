@@ -143,6 +143,10 @@ test('مسارات الوحدات الموسعة وشؤون الطلاب وال�
   const STUDENT_WRITES = new Set([
     'PUT /api/me/profile', 'POST /api/complaints', 'POST /api/requests', 'POST /api/push/subscribe', 'POST /api/push/unsubscribe', 'POST /api/push/test',
     'POST /api/alumni/applications', 'POST /api/expansions/appeals', 'POST /api/expansions/office-bookings', 'POST /api/ai/advisor/ask',
+    // موافقات الطالب على معالجة بياناته: يسجّلها لنفسه فقط
+    'POST /api/consent/me',
+    // محفظته الجامعية: رمزه السري وسداد رسومه منها (التحصيل والإرجاع لمحصّلي نقاط البيع فقط)
+    'POST /api/wallet/me/pin', 'POST /api/wallet/me/pay-fees',
     // تجديد الطالب قيده وتظلمه من قراره هما خدمتان له
     'POST /api/student-regulations/renew', 'POST /api/student-regulations/appeals',
     'POST /api/lms/quizzes/1/submit', 'POST /api/lms/quizzes/1/start', 'POST /api/enterprise/gpa-simulate', 'POST /api/enterprise/self-enroll', 'POST /api/student-affairs-suite/queue/book',

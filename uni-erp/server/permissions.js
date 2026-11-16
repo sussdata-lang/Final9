@@ -176,6 +176,7 @@ export const PERMISSION_CATALOG = [
       { key: 'user:manage', label: 'تأسيس وإدارة الحسابات وتخصيص صلاحيات الموظفين', op: 'write', module: 'governance_system' },
       { key: 'role:manage', label: 'إدارة الأدوار والأقسام الإدارية ومصفوفة الصلاحيات', op: 'approve', module: 'governance_system' },
       { key: 'audit:read', label: 'عرض سجل التدقيق الأمني وفحص سلامة السلسلة', op: 'view', module: 'governance_system' },
+      { key: 'security:monitor', label: 'مركز الأمان: متابعة التنبيهات الأمنية وإغلاقها وتصديرها', op: 'approve', module: 'governance_system' },
       { key: 'backup:manage', label: 'إنشاء وتنزيل وحذف النسخ الاحتياطية لقاعدة البيانات', op: 'delete', module: 'governance_system' },
       { key: 'settings:manage', label: 'تعديل إعدادات النظام والحدود والسياسات والمظهر', op: 'edit', module: 'governance_system' },
       { key: 'devops:manage', label: 'إدارة البنية التحتية والخوادم وسجل الجاهزية', op: 'approve', module: 'governance_system' },
@@ -186,7 +187,7 @@ export const PERMISSION_CATALOG = [
 export const ASSIGNABLE = new Set(PERMISSION_CATALOG.flatMap((g) => g.items.map((i) => i.key)));
 
 // مصفوفة أقسام المنصة الـ 14 مع تقسيم العمليات الخمس (عرض / كتابة / تعديل / اعتماد / حذف وتصدير)
-export const PLATFORM_MODULES_MATRIX = [
+const RAW_PLATFORM_MODULES = [
   {
     id: 'student_affairs',
     title: 'شؤون الطلاب والسجل الأكاديمي 360°',
@@ -381,70 +382,6 @@ export const PLATFORM_MODULES_MATRIX = [
   },
   {
     id: 'qa_enterprise',
-    title: 'الجودة والاعتماد المؤسسي والذكاء الاصطناعي',
-    label: 'الجودة والاعتماد المؤسسي والذكاء الاصطناعي',
-    department: 'مركز ضمان الجودة والتطوير المؤسسي',
-    description: 'مؤشرات الأداء KPIs، الاعتماد الأكاديمي، منظومة التطوير الشامل (15 ميزة)، والمساعد الذكي',
-    viewKeys: ['qa', 'enterprise', 'ai'],
-    views: ['qa', 'enterprise', 'ai'],
-    actions: {
-      view: { label: 'عرض مؤشرات الجودة والتطوير', perms: ['qa_inst:view', 'stats:read'] },
-      write: { label: 'استخدام المساعد الذكي والتطوير', perms: ['enterprise_ai:use'] },
-      edit: { label: 'تحديث معايير الجودة ومؤشرات الأداء', perms: ['qa_inst:edit'] },
-      approve: { label: 'اعتماد تقارير الجودة والمؤسسة', perms: ['qa_inst:approve'] },
-      delete: { label: 'تصدير تقارير الجودة الشاملة', perms: ['data:export'] },
-    },
-  },
-  {
-    id: 'comms_reports',
-    title: 'التواصل الجامعي والأخبار والشكاوى والإحصاءات',
-    label: 'التواصل الجامعي والأخبار والشكاوى والإحصاءات',
-    department: 'مديرية العلاقات العامة والإعلام والتقارير',
-    description: 'الأخبار والإعلانات الرسمية، معالجة شكاوى الطلاب، ولوحات الإحصاءات التنفيذية',
-    viewKeys: ['comms', 'dashboard'],
-    views: ['comms', 'dashboard'],
-    actions: {
-      view: { label: 'عرض الإحصاءات والأخبار والشكاوى', perms: ['stats:read', 'comms:read'] },
-      write: { label: 'نشر وتحرير الأخبار والإعلانات', perms: ['news:manage'] },
-      edit: { label: 'معالجة الشكاوى والرد عليها', perms: ['complaint:manage'] },
-      approve: { label: 'اعتماد الإغلاق والتقارير', perms: ['complaint:manage', 'stats:read'] },
-      delete: { label: 'تصدير التقارير الإحصائية', perms: ['data:export'] },
-    },
-  },
-  {
-    id: 'governance_system',
-    title: 'الإدارة العليا والحوكمة والصلاحيات والبنية التحتية',
-    label: 'الإدارة العليا والحوكمة والصلاحيات والبنية التحتية',
-    department: 'رئاسة الجامعة وأمن المعلومات والحوكمة',
-    description: 'إدارة الحسابات والأدوار، القواعد الآلية، سجل التدقيق الأمني، النسخ الاحتياطي، والخوادم',
-    viewKeys: ['admin', 'access', 'audit', 'devops', 'units'],
-    views: ['admin', 'access', 'audit', 'devops', 'units'],
-    actions: {
-      view: { label: 'عرض سجل التدقيق الأمني والنظام', perms: ['audit:read'] },
-      write: { label: 'تأسيس وإدارة حسابات الموظفين', perms: ['user:manage'] },
-      edit: { label: 'تعديل الإعدادات والقواعد والبرامج', perms: ['settings:manage', 'rules:manage', 'program:manage'] },
-      approve: { label: 'إدارة الأدوار والأقسام والبنية', perms: ['role:manage', 'devops:manage'] },
-      delete: { label: 'إدارة النسخ الاحتياطي والذمم', perms: ['backup:manage', 'holds:manage'] },
-    },
-  },
-].slice(0, 14); // Wait: let's keep all 14 or combine comms_reports with qa_enterprise so length === 14!
-
-// Let's make sure PLATFORM_MODULES_MATRIX has exact length 14 covering every group cleanly!
-export const PLATFORM_MODULES = [
-  PLATFORM_MODULES_MATRIX[0], // 1. student_affairs
-  PLATFORM_MODULES_MATRIX[1], // 2. admissions_advising
-  PLATFORM_MODULES_MATRIX[2], // 3. requests_docs
-  PLATFORM_MODULES_MATRIX[3], // 4. academics
-  PLATFORM_MODULES_MATRIX[4], // 5. hr_integrated
-  PLATFORM_MODULES_MATRIX[5], // 6. finance_accounting
-  PLATFORM_MODULES_MATRIX[6], // 7. procurement_assets
-  PLATFORM_MODULES_MATRIX[7], // 8. correspondence
-  PLATFORM_MODULES_MATRIX[8], // 9. exams_housing
-  PLATFORM_MODULES_MATRIX[9], // 10. lms_library
-  PLATFORM_MODULES_MATRIX[10], // 11. research_grad
-  PLATFORM_MODULES_MATRIX[11], // 12. alumni_career
-  {
-    id: 'qa_enterprise',
     title: 'الجودة والتطوير المؤسسي والتواصل والإحصاءات',
     label: 'الجودة والتطوير المؤسسي والتواصل والإحصاءات',
     department: 'مركز ضمان الجودة والتطوير والعلاقات العامة',
@@ -477,17 +414,19 @@ export const PLATFORM_MODULES = [
   },
 ];
 
-// Sync PLATFORM_MODULES_MATRIX with PLATFORM_MODULES (14 items) and attach .levels and .viewKey for compatibility
-PLATFORM_MODULES_MATRIX.length = 0;
-for (const mod of PLATFORM_MODULES) {
+// تُشتق .levels (الصلاحيات المتراكمة بحسب المستوى: عرض⊂كتابة⊂تعديل⊂كامل) و.viewKey لكل قسم مرة واحدة
+for (const mod of RAW_PLATFORM_MODULES) {
   const v = mod.actions.view.perms;
   const w = [...new Set([...v, ...mod.actions.write.perms])];
   const e = [...new Set([...w, ...mod.actions.edit.perms])];
   const f = [...new Set([...e, ...mod.actions.approve.perms, ...mod.actions.delete.perms])];
   mod.levels = { read: v, write: w, edit: e, full: f };
   mod.viewKey = mod.viewKeys?.[0] || 'desk';
-  PLATFORM_MODULES_MATRIX.push(mod);
 }
+
+// الاسمان يشيران لنفس المصفوفة الواحدة من أقسام المنصة (14 قسماً)؛ كانا سابقاً نُسختين منفصلتين
+export const PLATFORM_MODULES_MATRIX = RAW_PLATFORM_MODULES;
+export const PLATFORM_MODULES = RAW_PLATFORM_MODULES;
 
 // قوالب وظيفية جاهزة للأقسام لتسهيل إسناد الصلاحيات بنقرة واحدة عند تأسيس الحساب
 export const DEPARTMENT_ROLE_PRESETS = [
@@ -879,7 +818,17 @@ export function summarizeOperationCapabilities(effectivePerms = []) {
   };
 }
 
-export function computeAllowedViews(effectivePerms = [], explicitAllowedViews = [], role = 'staff', studentViews = null) {
+// الشاشات الموجودة لحظة حفظ تخصيص حساب: ما يُضاف بعدها لم يختره المدير ولم يحجبه، فيظهر لمن يملك صلاحيته
+export const staffViewKeys = () => ALL_STAFF_VIEWS.map((v) => v.key);
+export const knownViewsFor = (allowedViews) => (Array.isArray(allowedViews) && allowedViews.length ? staffViewKeys() : null);
+// القائمة كما يجب أن يعرضها المحرّر: المختار مع ما أُضيف بعد الحفظ، فإعادة الحفظ لا تحجب الشاشات الجديدة
+export function editableViewList(allowedViews, knownViews) {
+  if (!Array.isArray(allowedViews) || !allowedViews.length || !Array.isArray(knownViews) || !knownViews.length) return Array.isArray(allowedViews) ? allowedViews : [];
+  const known = new Set(knownViews);
+  return [...new Set([...allowedViews, ...staffViewKeys().filter((k) => !known.has(k))])];
+}
+
+export function computeAllowedViews(effectivePerms = [], explicitAllowedViews = [], role = 'staff', studentViews = null, knownViews = null) {
   if (role === 'student') {
     return Array.isArray(studentViews) ? studentViews : ['home', 'enterprise', 'guide', 'grades', 'fees', 'lms', 'expansions', 'student_life', 'alumni', 'ai', 'news', 'tx'];
   }
@@ -911,12 +860,14 @@ export function computeAllowedViews(effectivePerms = [], explicitAllowedViews = 
   if (has('finance:read', 'finance:entry', 'finance:post', 'finance:fees', 'finance:setup')) out.push('finance');
   out.push('admin');
   if (has('user:manage', 'role:manage')) out.push('access');
-  if (role === 'admin' || has('audit:read', 'devops:manage', 'settings:manage', 'backup:manage')) out.push('audit');
-  // التخصيص يُضيّق ما تتيحه الصلاحيات ولا يوسّعه: شاشة بلا صلاحية لا تظهر ثم تفشل بـ403
+  if (role === 'admin' || has('audit:read', 'security:monitor', 'devops:manage', 'settings:manage', 'backup:manage')) out.push('audit');
+  // التخصيص يُضيّق ما تتيحه الصلاحيات ولا يوسّعه: شاشة بلا صلاحية لا تظهر ثم تفشل بـ403.
+  // ويحجب فقط ما كان موجوداً عند حفظه (knownViews)؛ بلا هذه القائمة يبقى السلوك القديم: كل ما لم يُختر محجوب
   if (Array.isArray(explicitAllowedViews) && explicitAllowedViews.length > 0) {
     const legacy = { desk: 'overview', hr: 'payroll', internal: 'corr', devops: 'audit', units: 'admin', verify: 'admin' };
     const chosen = new Set(['overview', 'guidelines', 'admin', 'councils', 'facilities', ...explicitAllowedViews.map((k) => legacy[k] ?? k)]);
-    return ALL_STAFF_VIEWS.map((v) => v.key).filter((k) => chosen.has(k) && out.includes(k));
+    const known = Array.isArray(knownViews) && knownViews.length ? new Set(knownViews.map((k) => legacy[k] ?? k)) : null;
+    return staffViewKeys().filter((k) => out.includes(k) && (chosen.has(k) || (known !== null && !known.has(k))));
   }
   return [...new Set(out)];
 }

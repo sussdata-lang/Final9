@@ -51,12 +51,12 @@ test('مؤشرات الرئاسة: تبويب في الامتحانات والت
   assert.deepEqual(errs, []);
 });
 
-test('مؤشرات الرئاسة: لم تعد ضمن تبويبات منظومة التطوير في التدقيق', async (t) => {
+test('آليات المراقبة والتدقيق: لا تعرض منظومة التطوير المؤسسي، والتبويب القديم يعود إلى سجل التدقيق', async (t) => {
   if (!pw) return t.skip('Playwright غير متوفر');
   await page.evaluate(() => { UA.S.auditTab = 'exec_offline'; return UA.go('audit'); });
-  await page.waitForSelector('#audit-enterprise-mount .es-tabs');
-  const txt = await page.evaluate(() => document.querySelector('#audit-enterprise-mount').textContent);
-  assert.doesNotMatch(txt, /مؤشرات الرئاسة|Executive KPIs/);
-  assert.match(txt, /الإشعارات وحضور اللجان/);
+  await page.waitForSelector('[data-act="audtab2"]');
+  const info = await page.evaluate(() => ({ tabs: [...document.querySelectorAll('[data-act="audtab2"]')].map((b) => b.dataset.t), suite: !!document.querySelector('.es-tabs, #audit-enterprise-mount') }));
+  assert.ok(!info.tabs.includes('exec_offline'));
+  assert.equal(info.suite, false);
   assert.deepEqual(errs, []);
 });

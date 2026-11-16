@@ -145,7 +145,7 @@
     const latest = T.news && T.news[0];
     const i = (n, z = 18) => sx().ico(n, z);
     const notif = { count: pending, text: [pending ? `لديك ${pending} معاملة قيد المراجعة.` : 'لا توجد معاملات قيد المراجعة.', latest ? `آخر خبر: ${esc(latest.title)}` : ''].filter(Boolean).join('<br>'), btn: '<button data-act="snav" data-v="tx">عرض معاملاتي</button>' };
-    const menu = `<button class="sx-menu-item" data-act="drawer">${i('users')} الملف الشخصي</button><button class="sx-menu-item" data-act="acctopen">${i('settings')} تعديل معلومات الحساب</button><button class="sx-menu-item" data-act="pwopen">${i('shield')} تعديل كلمة المرور</button><button class="sx-menu-item" data-act="cmpopen">${i('news')} إضافة شكوى</button><button class="sx-menu-item" data-act="goverify2">${i('check')} التحقق من وثيقة</button><button class="sx-menu-item" data-act="logout">${i('out')} تسجيل الخروج</button>`;
+    const menu = `<button class="sx-menu-item" data-act="drawer">${i('users')} الملف الشخصي</button><button class="sx-menu-item" data-act="acctopen">${i('settings')} تعديل معلومات الحساب</button><button class="sx-menu-item" data-act="pwopen">${i('shield')} تعديل كلمة المرور</button><button class="sx-menu-item" data-act="cmpopen">${i('news')} إضافة شكوى</button><button class="sx-menu-item" data-act="walletopen">${i('file')} محفظتي الجامعية</button><button class="sx-menu-item" data-act="privopen">${i('shield')} الخصوصية والموافقات</button><button class="sx-menu-item" data-act="goverify2">${i('check')} التحقق من وثيقة</button><button class="sx-menu-item" data-act="logout">${i('out')} تسجيل الخروج</button>`;
     const help = `<div class="sx-help"><i>${i('file', 22)}</i><strong>شهادة التسجيل</strong><p>نزّل شهادة تسجيلك موقَّعة رقمياً بصيغة PDF.</p><button data-act="certdl">تنزيل الشهادة ${i('download', 15)}</button></div>`;
     const label = S.view === 'verify' ? 'التحقق من وثيقة' : (nav.find((v) => v[0] === act) || [])[1] || '';
     return UA.shell(page, { views: nav, act: 'snav', active: act, label, root: 'بوابة خدمات الطلاب', search: false, notif, menu, help, badges: { tx: pending }, student: true });
@@ -262,6 +262,40 @@
       <label>العنوان التفصيلي<input id="ac-addr" value="${esc(p.address || '')}" required maxlength="200"></label><label>هاتف آخر للطوارئ<input id="ac-emer" type="tel" dir="ltr" value="${esc(p.emergency_phone || '')}"></label>
       ${err ? `<div class="err" role="alert">${esc(err)}</div>` : ''}<button class="m-btn" type="submit">حفظ</button></form>`);
   }
+  async function drawConsent() {
+    T.consents = (await api('GET', '/api/consent/me')).purposes;
+    const rows = T.consents.map((p) => `<article class="m-card"><b>${esc(p.label)}</b>${p.hint ? `<p class="small">${esc(p.hint)}</p>` : ''}
+      <div class="m-kv"><small>الحالة</small><b>${p.required ? 'أساسي (لا يُسحَب)' : (p.granted ? 'موافق' : 'غير موافق')}</b></div>
+      ${p.recordedAt ? `<small class="hint">آخر تحديث: ${esc(day(p.recordedAt))}</small>` : ''}
+      ${p.required ? '' : `<button class="m-btn" type="button" data-act="constoggle" data-code="${esc(p.code)}" data-grant="${p.granted ? '0' : '1'}">${p.granted ? 'سحب الموافقة' : 'الموافقة'}</button>`}
+      </article>`).join('');
+    sheet('الخصوصية والموافقات', `<p class="m-lead">موافقتك على معالجة بياناتك لأغراض غير أساسية. اسحبها في أي وقت دون أن يؤثر ذلك على خدماتك الأساسية.</p>${rows}`);
+  }
+  // المحفظة الجامعية: الرصيد والحركات، وسداد الرسوم منها، والرمز السري للدفع في نقاط البيع
+  const money = (v) => `${Number(v || 0).toLocaleString('en-US')} ل.س`;
+  const WK = { topup: 'شحن', fee_payment: 'سداد رسوم', purchase: 'شراء', purchase_refund: 'إرجاع', cash_refund: 'رد نقدي' };
+  async function drawWallet(err = '', ok = '') {
+    const w = T.wallet = (await api('GET', '/api/wallet/me'));
+    const rows = w.txns.length ? w.txns.map((t) => `<article class="m-card"><span class="pill ${t.amount > 0 ? 'p-approved' : ''}" style="float:inline-end">${t.amount > 0 ? '+' : ''}${esc(money(t.amount))}</span>
+      <b>${esc(WK[t.kind] || t.kindLabel)}${t.merchant ? ` — ${esc(t.merchant)}` : ''}</b><small>${esc(t.no)} · ${esc(fmt(t.at))}${t.refunded ? ' · أُرجعت' : ''}</small>${t.description && !t.merchant ? `<small>${esc(t.description)}</small>` : ''}</article>`).join('')
+      : '<p class="hint">لا حركات بعد. تُشحن المحفظة نقداً في المكتب المالي.</p>';
+    const state = w.status === 'frozen' ? `<div class="reason">المحفظة موقوفة${w.frozenReason ? `: ${esc(w.frozenReason)}` : ''}. راجع المكتب المالي.</div>`
+      : w.locked ? '<div class="reason">المحفظة مقفلة مؤقتاً بعد محاولات رمز خاطئة.</div>' : '';
+    const pay = w.dues > 0 && w.balance > 0 && w.hasPin && w.status !== 'frozen' ? `<form id="wpayform" class="m-form"><h3 class="m-h3">سداد الرسوم من المحفظة</h3>
+      <p class="small">المستحق عليك ${esc(money(w.dues))}.</p>
+      <label>المبلغ<input id="wp-amt" type="number" min="1" max="${Math.min(w.dues, w.balance)}" value="${Math.min(w.dues, w.balance)}" required></label>
+      <label>الرمز السري<input id="wp-pin" type="password" inputmode="numeric" autocomplete="off" maxlength="6" required></label>
+      <button class="m-btn" type="submit">سداد</button></form>` : '';
+    const pin = `<form id="wpinform" class="m-form"><h3 class="m-h3">${w.hasPin ? 'تغيير الرمز السري' : 'تعيين رمز سري للدفع'}</h3>
+      <p class="small">يُطلب عند الدفع في نقاط البيع داخل الحرم وعند سداد الرسوم. من 4 إلى 6 أرقام، لا تكرره ولا تجعله متسلسلاً، ولا تخبر به أحداً.</p>
+      ${w.hasPin ? '<label>الرمز الحالي<input id="wpin-cur" type="password" inputmode="numeric" autocomplete="off" maxlength="6" required></label>' : ''}
+      <label>الرمز الجديد<input id="wpin-new" type="password" inputmode="numeric" autocomplete="off" maxlength="6" required></label>
+      <button class="m-btn" type="submit">حفظ الرمز</button></form>`;
+    sheet('محفظتي الجامعية', `<div class="m-kv"><small>الرصيد</small><b style="font-size:1.6rem">${esc(money(w.balance))}</b></div>
+      <p class="small">محفظة مغلقة تُصرف داخل الجامعة فقط: الرسوم ونقاط البيع في الحرم. تُشحن نقداً في المكتب المالي، ويُرد رصيدها عند التخرج.</p>
+      ${state}${err ? `<div class="err" role="alert">${esc(err)}</div>` : ''}${ok ? `<div class="small" role="status" style="color:#1B7F4B;font-weight:700">${esc(ok)}</div>` : ''}
+      ${pay}${pin}<h3 class="m-h3">آخر الحركات</h3>${rows}`);
+  }
   function drawPassword(err = '') {
     sheet('تعديل كلمة المرور', `<form id="pwform2" class="m-form"><label>كلمة المرور الحالية<input id="pw2-cur" type="password" autocomplete="current-password" required></label><label>كلمة المرور الجديدة<input id="pw2-new" type="password" autocomplete="new-password" minlength="10" required></label>
       <label>تأكيد كلمة المرور الجديدة<input id="pw2-new2" type="password" autocomplete="new-password" minlength="10" required></label><div class="small">10 أحرف على الأقل، وتحوي حروفاً وأرقاماً.</div>${err ? `<div class="err" role="alert">${esc(err)}</div>` : ''}<button class="m-btn" type="submit">حفظ كلمة المرور</button></form>`);
@@ -283,6 +317,15 @@
     cmpopen: async () => { await drawComplaints(); },
     acctopen: async () => { await ensureProfile(); drawAccount(); },
     pwopen: async () => { drawPassword(); },
+    privopen: async () => { await drawConsent(); },
+    walletopen: async () => { await drawWallet(); },
+    constoggle: async (el, d) => {
+      try {
+        const r = await api('POST', '/api/consent/me', { code: d.code, granted: d.grant === '1' });
+        toast(r.granted ? 'سُجِّلت موافقتك' : 'سُحبت موافقتك');
+        await drawConsent();
+      } catch (e) { if (!e.status) throw e; toast(e.message); }
+    },
     certdl: async () => {
       try {
         const res = await fetch('/api/me/certificate.pdf', { credentials: 'same-origin' });
@@ -324,6 +367,15 @@
     acctform: async () => {
       try { T.profile = (await api('PUT', '/api/me/profile', { phone: val('ac-phone'), email: val('ac-email'), governorate: val('ac-gov'), city: val('ac-city'), address: val('ac-addr'), emergency_phone: val('ac-emer') })).profile; close(); toast('حُفظت المعلومات'); }
       catch (e) { if (!e.status) throw e; drawAccount(e.message); }
+    },
+    wpayform: async () => {
+      const btn = document.querySelector('#wpayform button'); if (btn) btn.disabled = true;
+      try { const r = await api('POST', '/api/wallet/me/pay-fees', { amount: Number(val('wp-amt')), pin: val('wp-pin') }); T.fees = null; await drawWallet('', `سُدد ${money(Number(val('wp-amt')) || 0)}. رقم الإيصال ${r.receiptNo}`); }
+      catch (e) { if (!e.status) throw e; await drawWallet(e.message); }
+    },
+    wpinform: async () => {
+      try { await api('POST', '/api/wallet/me/pin', { pin: val('wpin-new'), current: document.getElementById('wpin-cur') ? val('wpin-cur') : undefined }); await drawWallet('', 'حُفظ الرمز السري.'); }
+      catch (e) { if (!e.status) throw e; await drawWallet(e.message); }
     },
     pwform2: async () => {
       if (val('pw2-new') !== val('pw2-new2')) { drawPassword('تأكيد كلمة المرور غير مطابق.'); return; }

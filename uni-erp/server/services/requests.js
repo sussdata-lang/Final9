@@ -5,6 +5,7 @@ import { tx } from '../db.js';
 import { nextNumber } from './numbering.js';
 import { readUpload, saveUpload } from './staging.js';
 import { audit } from '../audit.js';
+import { decryptField } from '../lib/data_crypto.js';
 import { sha256 } from '../security.js';
 import { getSetting } from './settings.js';
 import { HttpError } from '../http.js';
@@ -250,7 +251,7 @@ export function decide({ db, cfg }, user, id, action, reason, ip) {
         }
         const activeHold = db.prepare("SELECT hold_type, note FROM student_holds WHERE student_id = ? AND cleared_at IS NULL AND (active IS NULL OR active = 1) LIMIT 1").get(r.student_id);
         if (activeHold && (svc?.issues_document || svc?.blocks_on_hold !== 0)) {
-          throw new HttpError(409, `لا يمكن اعتماد الطلب وإصدار الوثيقة لوجود ذمة أو إيقاف فعال على الطالب (${activeHold.note || activeHold.hold_type || 'مانع فعال'}).`, 'active_hold');
+          throw new HttpError(409, `لا يمكن اعتماد الطلب وإصدار الوثيقة لوجود ذمة أو إيقاف فعال على الطالب (${decryptField(cfg, activeHold.note) || activeHold.hold_type || 'مانع فعال'}).`, 'active_hold');
         }
       }
       // طلبات حركات القيد لا تُعتمد هنا: تدخل سلسلة الاعتماد ويبقى الطلب قيد المراجعة حتى القرار النهائي

@@ -5,8 +5,9 @@ import { HttpError } from '../http.js';
 import { tx } from '../db.js';
 import { nextNumber } from './numbering.js';
 import { getSetting } from './settings.js';
-import { assertNotDeprived } from './teaching.js';
-import { componentMarks, saveComponentMarks, assertEditable } from './grading.js';
+import { assertNotDeprived, courseStudents } from './teaching.js';
+import { componentMarks, saveComponentMarks, assertEditable, courseComponents, isLocked } from './grading.js';
+import { academicYear } from '../lib/doc_no.js';
 
 export const passMark = (db) => getSetting(db, 'grades.pass_mark');
 // الجهات غير التطبيقية لها علامة نجاح مستقلة؛ وما لم يُدرج (أو طالب بلا جهة) يأخذ علامة التطبيقية الأعلى
@@ -146,6 +147,43 @@ export function enterGrade({ db }, actor, studentId, b, ip) {
     }
     return gradesFor(db, Number(studentId), null);
   });
+}
+
+/* ---------------- الرصد السريع: كشف مقرر كامل في جدول، وحفظه دفعة واحدة ---------------- */
+export function gradeSheet({ db }, courseId, yearInput) {
+  const c = db.prepare('SELECT * FROM courses WHERE id = ?').get(Number(courseId));
+  if (!c) throw new HttpError(404, 'المقرر غير موجود.', 'not_found');
+  const year = /^\d{4}\/\d{4}$/.test(String(yearInput ?? '')) ? String(yearInput) : academicYear();
+  const comps = courseComponents(db, c.id);
+  const gradeRows = new Map(db.prepare('SELECT * FROM grades WHERE course_id = ? AND academic_year = ?').all(c.id, year).map((g) => [Number(g.student_id), g]));
+  const compMarks = new Map();
+  for (const m of db.prepare('SELECT m.grade_id, m.component_id, m.mark FROM grade_component_marks m JOIN grades g ON g.id = m.grade_id WHERE g.course_id = ? AND g.academic_year = ?').all(c.id, year)) {
+    if (!compMarks.has(Number(m.grade_id))) compMarks.set(Number(m.grade_id), {});
+    compMarks.get(Number(m.grade_id))[Number(m.component_id)] = Number(m.mark);
+  }
+  const deprived = new Set(db.prepare("SELECT student_id FROM course_deprivations WHERE course_id = ? AND status = 'active' AND term LIKE ?").all(c.id, `%${year}`).map((x) => Number(x.student_id)));
+  const ids = [...new Set([...courseStudents(db, c), ...gradeRows.keys()])];
+  const rows = ids.map((id) => {
+    const u = db.prepare('SELECT display_name, student_no FROM users WHERE id = ?').get(id) ?? {}, g = gradeRows.get(id);
+    return { studentId: id, name: u.display_name, studentNo: u.student_no, theory: g?.theory_mark ?? null, practical: g?.practical_mark ?? null, total: g?.mark ?? null, status: g?.workflow_status ?? null, marks: g ? (compMarks.get(Number(g.id)) ?? {}) : {}, deprived: deprived.has(id) };
+  }).sort((a, b) => String(a.name ?? '').localeCompare(String(b.name ?? ''), 'ar'));
+  return { course: { id: Number(c.id), name: c.name, code: c.code }, year, components: comps, locked: isLocked(db, c.id, year), totalMax: Number(getSetting(db, 'grades.total_max')), practicalMax: Number(getSetting(db, 'grades.practical_max')), passMark: Number(getSetting(db, 'grades.pass_mark')), rows };
+}
+
+// كل صف يمر بقواعد enterGrade نفسها (الحرمان، القفل، الحدود)؛ الصف المرفوض لا يمنع بقية الصفوف
+export function saveGradeSheet(deps, actor, courseId, b, ip) {
+  const year = String(b?.year ?? ''), rows = Array.isArray(b?.rows) ? b.rows.slice(0, 1000) : [];
+  const saved = [], errors = [];
+  for (const r of rows) {
+    const blank = (v) => v === '' || v === null || v === undefined;
+    const compVals = r.components && typeof r.components === 'object' ? Object.values(r.components) : [];
+    if (blank(r.theory) && compVals.every(blank)) continue;
+    try {
+      enterGrade(deps, actor, r.studentId, { courseId: Number(courseId), academicYear: year, theory: r.theory, practical: r.practical, components: r.components, justification: b?.justification }, ip);
+      saved.push(Number(r.studentId));
+    } catch (e) { errors.push({ studentId: Number(r.studentId), message: e?.message ?? 'تعذّر الحفظ.' }); }
+  }
+  return { saved: saved.length, savedIds: saved, errors };
 }
 
 /* ---------------- قرار التظلم ---------------- */

@@ -143,6 +143,9 @@ test('التظلم: في المهلة وللقرارات القابلة فقط،
     assert.throws(() => submitAppeal(t.deps, admin, { holdId: dis.holdId, reason: 'موظف يتظلم' }, '::1'), is(403));
     const ap = submitAppeal(t.deps, stu(11), { holdId: dis.holdId, reason: 'لم أرتكب المخالفة' }, '::1');
     assert.throws(() => submitAppeal(t.deps, stu(11), { holdId: dis.holdId, reason: 'مرة ثانية' }, '::1'), is(409));
+    const rawReason = t.db.prepare('SELECT reason FROM sa_disciplinary_appeals WHERE id = ?').get(ap.id).reason;
+    assert.match(rawReason, /^enc1:/, 'أسباب التظلم تُحفظ مشفَّرة لا نصاً صريحاً');
+    assert.doesNotMatch(rawReason, /لم أرتكب/, 'النص الصريح غير موجود في القاعدة');
 
     set(t, { 'reg.appeal_suspends': true });
     assert.throws(() => finishChain(t, dis.movement.id), (e) => e.status === 409 && /تظلم/.test(e.message), 'التظلم يوقف التنفيذ عند تفعيله');
@@ -152,6 +155,8 @@ test('التظلم: في المهلة وللقرارات القابلة فقط،
     assert.throws(() => decideAppeal(t.deps, staffWith('student:read'), ap.id, { outcome: 'cancelled', note: 'ثبت خطأ' }, '::1'), is(403));
     assert.throws(() => decideAppeal(t.deps, chief, ap.id, { outcome: 'cancelled' }, '::1'), is(400));
     decideAppeal(t.deps, chief, ap.id, { outcome: 'cancelled', note: 'ثبت الخطأ' }, '::1');
+    const rawNote = t.db.prepare('SELECT decision_note FROM sa_disciplinary_appeals WHERE id = ?').get(ap.id).decision_note;
+    assert.match(rawNote, /^enc1:/, 'مسوغات القرار تُحفظ مشفَّرة لا نصاً صريحاً');
     assert.equal(Number(t.db.prepare('SELECT active FROM student_holds WHERE id = ?').get(dis.holdId).active), 0);
     assert.equal(t.db.prepare('SELECT status FROM sa_lifecycle_movements WHERE id = ?').get(dis.movement.id).status, 'rejected');
     assert.throws(() => decideAppeal(t.deps, chief, ap.id, { outcome: 'upheld', note: 'تكرار' }, '::1'), is(409));

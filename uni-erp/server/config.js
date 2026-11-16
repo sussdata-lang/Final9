@@ -86,6 +86,16 @@ export function loadConfig(overrides = {}) {
     }
     setAuditKey(cfg.auditKey);
   }
+  // مفتاح تشفير الحقول الحساسة (ملفات الانضباط): DATA_KEY، وإلا يُولَّد مرة واحدة بجوار مفتاح التدقيق. مستقل عنهما
+  {
+    const dataKeyFile = path.join(path.dirname(signingKeyFile(cfg)), 'data.key');
+    if (env.DATA_KEY) cfg.dataKey = env.DATA_KEY;
+    else {
+      fs.mkdirSync(path.dirname(dataKeyFile), { recursive: true, mode: 0o700 });
+      if (!fs.existsSync(dataKeyFile)) fs.writeFileSync(dataKeyFile, crypto.randomBytes(32).toString('hex'), { mode: 0o600 });
+      cfg.dataKey = fs.readFileSync(dataKeyFile, 'utf8').trim();
+    }
+  }
   if (!cfg.signingKey) {
     // مفتاح التوقيع: يُولَّد مرة واحدة ويُحفظ بصلاحيات مقيّدة (0o700 للمجلد و0o600 للملف).
     // فحص استباقي لمنع تسريب سلسلة اتصال PostgreSQL (DATABASE_URL) إلى مسار الملفات المحلي.

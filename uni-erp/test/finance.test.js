@@ -557,3 +557,23 @@ test('student invoices are paged and searchable with correct totals for each pag
   assert.equal((await req('GET', '/api/finance/student-invoices?q=NOBODY', null, adminCookie)).body.total, 0);
   assert.equal((await req('GET', '/api/finance/charges?limit=5', null, adminCookie)).body.charges.length, 5);
 });
+
+test('لا تصدر رسوم جديدة على الموقوف أو المنسحب، وتصدر بعد إعادة القيد', async () => {
+  const db = testApp.db, now = Date.now();
+  const stuId = Number(db.prepare("INSERT INTO users (username, display_name, password_hash, role, student_no, created_at) VALUES ('wd1', 'طالب منسحب', 'x', 'student', 'WD-1', ?)").run(now).lastInsertRowid);
+  const prog = db.prepare('SELECT id FROM programs ORDER BY id LIMIT 1').get().id;
+  db.prepare(`INSERT INTO student_profiles (user_id, first_name, father_name, last_name, mother_name, national_id, gender, birth_date, birth_place, nationality, phone, governorate, city, address, hs_type, hs_year, hs_score, program_id, admission_type, enroll_year, enroll_term, study_level, guardian_name, guardian_relation, guardian_phone, status, created_at, updated_at)
+    VALUES (?, 'سامر','خالد','العلي','هدى','22222222222','ذكر','2004-01-01','دمشق','سورية','0944000333','دمشق','المزة','x','x',2022,200,?,'x',2022,'الفصل الأول',2,'خالد','الأب','0933000333','withdrawn',?,?)`).run(stuId, prog, now, now);
+  const types = (await req('GET', '/api/finance/fee-types', null, adminCookie)).body;
+  const fee = (types.feeTypes ?? types.types ?? types).find((f) => f.kind === 'fee' && f.active);
+  const charge = () => req('POST', '/api/finance/charges', { studentId: stuId, feeTypeId: fee.id, amount: 1000, dueDay: new Date().toISOString().slice(0, 10), academicYear: '2026/2027' }, adminCookie);
+
+  let r = await charge();
+  assert.equal(r.status, 409); assert.equal(r.body.error, 'student_withdrawn');
+  db.prepare("UPDATE student_profiles SET status = 'suspended' WHERE user_id = ?").run(stuId);
+  r = await charge();
+  assert.equal(r.status, 409); assert.equal(r.body.error, 'student_suspended');
+  db.prepare("UPDATE student_profiles SET status = 'active' WHERE user_id = ?").run(stuId);
+  assert.equal((await charge()).status, 201);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM fin_charges WHERE student_id = ?').get(stuId).n, 1);
+});

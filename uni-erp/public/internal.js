@@ -173,9 +173,10 @@
         <td>${esc(r.unit ? r.unit.name : '—')}</td>
         <td><span class="pill p-${r.status}">${ST[r.status] || r.status}</span>${r.escalationLevel ? ` <span class="pill p-rejected">مصعّد ${r.escalationLevel}</span>` : ''}</td>
         <td>${fmt(r.createdAt)}</td>
+        <td>${UA.slaCell ? UA.slaCell(r) : ''}</td>
         <td><button class="btn sm" data-act="inopen" data-id="${r.id}">${B.open === r.id ? 'إخفاء المسار' : 'التفاصيل والمسار'}</button> <button class="btn sm" data-act="reqprint" data-id="${r.id}">طباعة النموذج</button></td>
       </tr>
-      ${B.open === r.id ? `<tr><td colspan="6" style="background:#F6F8F5;padding:12px">${detail(r)}</td></tr>` : ''}`).join('');
+      ${B.open === r.id ? `<tr><td colspan="7" style="background:#F6F8F5;padding:12px">${detail(r)}</td></tr>` : ''}`).join('');
 
     return `<section class="card">
       <div class="spread" style="margin-bottom:12px;flex-wrap:wrap;gap:8px">
@@ -188,7 +189,7 @@
           <button class="btn sm" data-act="insearch">بحث</button>
         </div>
       </div>
-      <div class="tbl-wrap"><table><thead><tr><th>رقم الطلب</th><th>نوع النموذج</th><th>الجهة المختصة</th><th>الحالة</th><th>تاريخ التقديم</th><th>إجراءات</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="hint">لا توجد طلبات مطابقة.</td></tr>'}</tbody></table></div>
+      <div class="tbl-wrap"><table><thead><tr><th>رقم الطلب</th><th>نوع النموذج</th><th>الجهة المختصة</th><th>الحالة</th><th>تاريخ التقديم</th><th>مؤشر المهلة (SLA)</th><th>إجراءات</th></tr></thead><tbody>${rows || '<tr><td colspan="7" class="hint">لا توجد طلبات مطابقة.</td></tr>'}</tbody></table></div>
     </section>`;
   }
 

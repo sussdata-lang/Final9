@@ -3,8 +3,7 @@
   const UA = window.UA, { esc, S, api, toast } = UA;
 
   /* ---------- طباعة عنصر واحد: ننسخه إلى جذر طباعة مستقل بدل إخفاء الصفحة (الإخفاء كان يقصّ البطاقة داخل النوافذ المنبثقة) ---------- */
-  // بطاقة بمقاس ISO ID-1 (85.6×54 مم): تُصغَّر لتملأ صفحة بحجم البطاقة، وصفحة لكل طالب في الطباعة الجماعية
-  const CARD_W = 540, PAGE_W = 323.5, PAGE_H = 204.1;
+  // بطاقة بمقاس ISO ID-1 (85.6×54 مم) مصمَّمة بالمليمتر، فتُطبع بحجمها الحقيقي دون تصغير
   // ورقة عادية: البطاقة بحجمها الحقيقي وهوامش الصفحة صفر، فلا يبقى للمتصفح مكان يطبع فيه العنوان والتاريخ والرابط.
   // مقاس البطاقة: للحفظ PDF ولطابعات البطاقات؛ على طابعة ورق عادية يضعها المتصفح وسط الورقة ويطبع معها الرؤوس.
   const MODE_KEY = 'ux_card_print_mode';
@@ -39,19 +38,19 @@
     Promise.all([...imgs, doc.fonts ? doc.fonts.ready : null]).then(() => setTimeout(() => { win.focus(); win.print(); }, 60));
   }
   UA.printDocument = printInFrame;
-  // البطاقة الشخصية بحجمها الحقيقي 85.6×54 مم، كل بطاقة في صفحة
-  function printCards(cards) {
+  // البطاقة الشخصية بحجمها الحقيقي 85.6×54 مم. العنصر: وجه فقط، أو [وجه، ظهر].
+  // طابعة البطاقات / PDF: كل وجه في صفحة بمقاس البطاقة (الوجه ثم الظهر للطباعة على الوجهين).
+  // ورقة A4: الوجه والظهر لكل طالب على ورقة واحدة، بإطار يدل على خط القص.
+  function printCards(items) {
     const sheet = cardMode() === 'sheet';
-    const css = `.c{width:85.6mm;height:54mm;overflow:hidden;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#042f28,#095246);break-after:page;${sheet ? 'margin:12mm auto 0' : ''}}.c:last-child{break-after:auto}
-      .i{width:${CARD_W}px;flex:none;zoom:var(--z,.59)}.i>[data-digital-card]{max-width:none!important;margin:0!important;border:0!important;border-radius:0!important;box-shadow:none!important}`;
-    const probe = document.createElement('div');
-    probe.style.cssText = `position:fixed;left:-9999px;top:0;visibility:hidden;width:${CARD_W}px`;
-    probe.innerHTML = cards[0];
-    document.body.appendChild(probe);
-    const tall = probe.firstElementChild ? probe.firstElementChild.offsetHeight : 1;
-    probe.remove();
-    const zoom = Math.min(PAGE_W / CARD_W, PAGE_H / (tall || 1)).toFixed(4);
-    printInFrame(cards.map((h) => `<div class="c"><div class="i" style="--z:${zoom}">${h}</div></div>`).join(''), sheet ? '@page{size:A4 portrait;margin:0}' : '@page{size:85.6mm 54mm;margin:0}', css);
+    const sides = items.map((x) => (Array.isArray(x) ? x : [x]));
+    const css = cssOf((s) => /\.sc(?![a-z])/.test(s) && !/sc-stage/.test(s));
+    // متغير خط الموقع معرَّف على :root في الصفحة الأم، فننقله إلى وثيقة الطباعة
+    const font = getComputedStyle(document.documentElement).getPropertyValue('--f-ui').trim() || '"TRCairo","Cairo",Tahoma,sans-serif';
+    const extra = `:root{--f-ui:${font}}.pg{break-after:page}.pg:last-child{break-after:auto}.sc{margin:0!important;box-shadow:none!important}
+      ${sheet ? '.pg{display:flex;flex-direction:column;align-items:center;gap:8mm;padding-top:14mm}' : '.pg{width:85.6mm;height:54mm;overflow:hidden}.sc{border-radius:0!important}'}`;
+    const body = sheet ? sides.map((p) => `<div class="pg">${p.join('')}</div>`).join('') : sides.flat().map((h) => `<div class="pg">${h}</div>`).join('');
+    printInFrame(body, sheet ? '@page{size:A4 portrait;margin:0}' : '@page{size:85.6mm 54mm;margin:0}', css + extra);
   }
   // شهادة التسجيل: كل طالب في صفحة A4
   UA.printCertificates = (list) => {

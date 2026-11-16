@@ -175,6 +175,47 @@ export function depriveStudents({ db }, actor, courseId, b, ip) {
   return { deprived: n };
 }
 
+// معالج الحرمان الشامل: كل من تجاوز الحد في أي مقرر يملك المستخدم إدارته، دفعة واحدة بدل مراجعة كل مقرر على حدة
+function manageableCourses(db, actor) {
+  const all = actor.can?.('course:manage') || actor.can?.('academic:read');
+  return all ? db.prepare('SELECT id FROM courses WHERE active = 1 ORDER BY name').all()
+    : db.prepare('SELECT c.id FROM courses c JOIN faculty_members m ON m.id = c.member_id WHERE m.user_id = ? AND c.active = 1 ORDER BY c.name').all(actor.id);
+}
+export function absenceOverview(deps, actor) {
+  const byStudent = new Map();
+  let term = currentTerm(deps.db), maxPercent = Number(getSetting(deps.db, 'academic.max_absence_percent')), warnCount = 0, courses = 0;
+  for (const { id } of manageableCourses(deps.db, actor)) {
+    let rep;
+    try { rep = absenceReport(deps, actor, id); } catch { continue; }
+    courses++; term = rep.term; maxPercent = rep.maxPercent;
+    for (const r of rep.rows) {
+      if (r.warn && !r.deprivationId) warnCount++;
+      if (!r.overLimit || r.deprivationId) continue;
+      if (!byStudent.has(r.studentId)) byStudent.set(r.studentId, { studentId: r.studentId, name: r.name, studentNo: r.studentNo, courses: [] });
+      byStudent.get(r.studentId).courses.push({ courseId: rep.course.id, name: rep.course.name, percent: r.percent });
+    }
+  }
+  const students = [...byStudent.values()].sort((a, b) => b.courses.length - a.courses.length || b.courses[0].percent - a.courses[0].percent);
+  return { term, maxPercent, courses, warnCount, students, deprivationCount: students.reduce((n, s) => n + s.courses.length, 0) };
+}
+export function warnAbsenceAll(deps, actor) {
+  let warned = 0;
+  for (const { id } of manageableCourses(deps.db, actor)) { try { warned += warnAbsence(deps, actor, id).warned; } catch { /* خارج صلاحية هذا المقرر */ } }
+  return { warned };
+}
+export function depriveAll(deps, actor, b, ip) {
+  const wanted = Array.isArray(b?.studentIds) ? new Set(b.studentIds.map(Number)) : null;
+  const ov = absenceOverview(deps, actor), perCourse = new Map();
+  for (const s of ov.students) {
+    if (wanted && !wanted.has(s.studentId)) continue;
+    for (const c of s.courses) { if (!perCourse.has(c.courseId)) perCourse.set(c.courseId, []); perCourse.get(c.courseId).push(s.studentId); }
+  }
+  if (!perCourse.size) throw bad('لا طلاب لحرمانهم.');
+  let deprived = 0;
+  for (const [courseId, studentIds] of perCourse) deprived += depriveStudents(deps, actor, courseId, { studentIds }, ip).deprived;
+  return { deprived, courses: perCourse.size };
+}
+
 export function liftDeprivation({ db }, actor, id, b, ip) {
   const d = db.prepare("SELECT * FROM course_deprivations WHERE id = ? AND status = 'active'").get(Number(id));
   if (!d) throw bad('الحرمان غير موجود أو مرفوع.', 404, 'not_found');
@@ -221,7 +262,10 @@ export function registerTeachingRoutes(r, deps) {
   r.add('POST', '/api/teaching/calendar/:id/cancel', (c) => c.json(200, cancelCalendarEvent(deps, perm(c, 'course:manage'), c.params.id, c.ip)));
   r.add('GET', '/api/teaching/lecture-changes', (c) => c.json(200, listLectureChanges(deps, auth(c))));
   r.add('POST', '/api/teaching/lecture-changes', (c) => c.json(201, addLectureChange(deps, staff(c), c.body, c.ip)));
-  r.add('GET', '/api/teaching/absence/:courseId', (c) => c.json(200, absenceReport(deps, staff(c), c.params.courseId)));
+  r.add('GET', '/api/teaching/absence-overview', (c) => c.json(200, absenceOverview(deps, staff(c))));
+  r.add('POST', '/api/teaching/absence-overview/warn', (c) => c.json(200, warnAbsenceAll(deps, staff(c))));
+  r.add('POST', '/api/teaching/absence-overview/deprive', (c) => c.json(200, depriveAll(deps, staff(c), c.body, c.ip)));
+  r.add('GET', '/api/teaching/absence/:courseId',(c) => c.json(200, absenceReport(deps, staff(c), c.params.courseId)));
   r.add('POST', '/api/teaching/absence/:courseId/warn', (c) => c.json(200, warnAbsence(deps, staff(c), c.params.courseId)));
   r.add('POST', '/api/teaching/absence/:courseId/deprive', (c) => c.json(200, depriveStudents(deps, staff(c), c.params.courseId, c.body, c.ip)));
   r.add('POST', '/api/teaching/deprivations/:id/lift', (c) => c.json(200, liftDeprivation(deps, perm(c, 'course:manage'), c.params.id, c.body, c.ip)));

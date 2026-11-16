@@ -111,3 +111,36 @@ test('حذف الطالب يخرجه من فئاته', async () => {
   assert.equal((await call('DELETE', `/api/students/${sid}`, { cookie: adm })).status, 200);
   assert.equal(Number(app.db.prepare('SELECT COUNT(*) c FROM student_group_members WHERE student_id = ?').get(sid).c), 0);
 });
+
+test('مواعيد الفئة: موعد المختبر يضاف ويعدّل ويحذف دون المساس بفئة أخرى، وموعد الامتحان يظهر في الفئة', async () => {
+  const mk = async (name) => (await call('POST', '/api/student-groups', { cookie: adm, body: { name, kind: 'lab', studentIds: [ids[0]] } })).json.group;
+  const a = await mk('مختبر مواعيد 1'), b = await mk('مختبر مواعيد 2');
+  const cid = Number(app.db.prepare("INSERT INTO courses (program_id, level, semester, name, code, hours) SELECT id, 1, 1, 'شبكات عملي', 'NET-LAB', 2 FROM programs ORDER BY id LIMIT 1").run().lastInsertRowid);
+  const put = (g, body) => call('PUT', `/api/student-groups/${g.id}/labs`, { cookie: adm, body: { courseId: cid, ...body } });
+  assert.equal((await put(a, { day: 1, start: '10:00', end: '11:30', hall: 'مختبر 2' })).status, 200);
+  assert.equal((await put(b, { day: 2, start: '10:00', end: '11:30', hall: 'مختبر 2' })).status, 200);
+  let sa = (await call('GET', `/api/student-groups/${a.id}/schedule`, { cookie: adm })).json;
+  assert.equal(sa.labs.length, 1); assert.equal(sa.labs[0].courseName, 'شبكات عملي'); assert.ok(sa.canLab && sa.canExam);
+  assert.ok(sa.courses.some((c) => c.id === cid));
+  const ed = await put(a, { slotId: sa.labs[0].id, day: 3, start: '12:00', end: '13:00', hall: 'مختبر 3' });
+  assert.equal(ed.status, 200, JSON.stringify(ed.json));
+  assert.equal(ed.json.slots[0].dayLabel, 'الثلاثاء');
+  const sb = (await call('GET', `/api/student-groups/${b.id}/schedule`, { cookie: adm })).json;
+  assert.equal(sb.labs.length, 1); assert.equal(sb.labs[0].day, 2);
+  assert.equal((await put(b, { slotId: ed.json.slots[0].id, day: 1, start: '09:00', end: '10:00' })).status, 404);
+  assert.equal((await call('DELETE', `/api/student-groups/${a.id}/labs/${ed.json.slots[0].id}`, { cookie: adm })).json.slots.length, 0);
+  assert.equal(Number(app.db.prepare('SELECT COUNT(*) c FROM course_schedules WHERE course_id = ?').get(cid).c), 1);
+
+  const ex = await call('POST', '/api/expansions/exams/bulk', { cookie: adm, body: { exam_type: 'نهائي', academic_year: '2026/2027', semester: 'الفصل الأول', items: [{ course_code: 'NET-LAB', course_name: 'شبكات عملي', exam_date: '2026-12-15', start_time: '09:00', end_time: '11:00', hall_name: 'قاعة 1', group_id: a.id }] } });
+  assert.equal(ex.status, 200, JSON.stringify(ex.json));
+  sa = (await call('GET', `/api/student-groups/${a.id}/schedule`, { cookie: adm })).json;
+  assert.equal(sa.exams.length, 1); assert.equal(sa.exams[0].hall_name, 'قاعة 1');
+  assert.equal((await call('DELETE', `/api/student-groups/${b.id}/exams/${sa.exams[0].id}`, { cookie: adm })).status, 404);
+  assert.equal((await call('DELETE', `/api/student-groups/${a.id}/exams/${sa.exams[0].id}`, { cookie: viewer })).status, 403);
+  const del = await call('DELETE', `/api/student-groups/${a.id}/exams/${sa.exams[0].id}`, { cookie: adm });
+  assert.equal(del.status, 200); assert.equal(del.json.exams.length, 0);
+
+  const v = (await call('GET', `/api/student-groups/${a.id}/schedule`, { cookie: viewer })).json;
+  assert.equal(v.labs, null); assert.equal(v.canLab, false);
+  assert.equal((await call('PUT', `/api/student-groups/${a.id}/labs`, { cookie: viewer, body: { courseId: cid, day: 1, start: '10:00', end: '11:00' } })).status, 403);
+});

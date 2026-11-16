@@ -44,6 +44,35 @@ export function addSlot(deps, actor, courseId, slot, ip) {
   return setSlots(deps, actor, courseId, [...current, slot], ip);
 }
 
+// مواعيد فئة واحدة في كل المقررات
+export function groupSlots(db, groupId) {
+  return db.prepare(`SELECT s.id, s.course_id, s.day, s.start_min, s.end_min, s.hall, c.code, c.name
+    FROM course_schedules s JOIN courses c ON c.id = s.course_id WHERE s.group_id = ? ORDER BY s.day, s.start_min`).all(Number(groupId))
+    .map((r) => ({ id: r.id, courseId: r.course_id, courseCode: r.code ?? '', courseName: r.name, day: r.day, dayLabel: DAYS[r.day], start: hm(r.start_min), end: hm(r.end_min), hall: r.hall ?? '' }));
+}
+
+// يضيف موعد الفئة إلى جدول المقرر أو يعدّله، وتبقى مواعيد الفئات الأخرى في المقرر كما هي
+export function saveGroupSlot(deps, actor, groupId, b, ip) {
+  const gid = Number(groupId), slotId = Number(b?.slotId) || 0;
+  const current = getSlots(deps.db, b?.courseId);
+  if (slotId && !current.some((s) => s.id === slotId && s.groupId === gid)) throw new HttpError(404, 'الموعد غير موجود في هذه الفئة.', 'not_found');
+  const mine = { day: b.day, start: b.start, end: b.end, hall: b.hall, groupId: gid };
+  const keep = (s) => ({ day: s.day, start: s.start, end: s.end, hall: s.hall, groupId: s.groupId });
+  const next = current.map((s) => (s.id === slotId ? mine : keep(s)));
+  if (!slotId) next.push(mine);
+  setSlots(deps, actor, b.courseId, next, ip);
+  return { slots: groupSlots(deps.db, gid) };
+}
+
+export function removeGroupSlot(deps, actor, groupId, slotId, ip) {
+  const gid = Number(groupId);
+  const row = deps.db.prepare('SELECT course_id FROM course_schedules WHERE id = ? AND group_id = ?').get(Number(slotId), gid);
+  if (!row) throw new HttpError(404, 'الموعد غير موجود في هذه الفئة.', 'not_found');
+  const rest = getSlots(deps.db, row.course_id).filter((s) => s.id !== Number(slotId)).map((s) => ({ day: s.day, start: s.start, end: s.end, hall: s.hall, groupId: s.groupId }));
+  setSlots(deps, actor, row.course_id, rest, ip);
+  return { slots: groupSlots(deps.db, gid) };
+}
+
 export function setSlots({ db }, actor, courseId, slots, ip) {
   const c = db.prepare('SELECT id, name, member_id, instructor FROM courses WHERE id = ?').get(Number(courseId));
   if (!c) throw new HttpError(404, 'المقرر غير موجود.', 'not_found');

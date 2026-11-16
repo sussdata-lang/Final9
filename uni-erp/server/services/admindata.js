@@ -4,15 +4,18 @@ import { tx } from '../db.js';
 import { audit } from '../audit.js';
 import { HttpError } from '../http.js';
 import { cleanRuleParams } from './rules.js';
+import { encryptField, decryptField } from '../lib/data_crypto.js';
 
 const HOLD_TYPES = ['financial', 'disciplinary', 'library'];
 
-export function updateHold({ db }, actor, id, b, ip) {
+export function updateHold({ db, cfg }, actor, id, b, ip) {
   const h = db.prepare('SELECT h.*, u.student_no FROM student_holds h JOIN users u ON u.id = h.student_id WHERE h.id = ?').get(Number(id));
   if (!h) throw new HttpError(404, 'الذمة غير موجودة.', 'not_found');
   const type = b?.holdType ?? h.hold_type;
   if (!HOLD_TYPES.includes(type)) throw bad('نوع الذمة غير صالح.');
-  const note = b?.note === undefined ? (h.note ?? '') : String(b.note).replace(/\s+/g, ' ').trim().slice(0, 200);
+  // النص المرسل دائماً صريح؛ غياب b.note يعني الإبقاء على ما كان (يُفَكّ أولاً لئلا يُشفَّر مرتين إن بقي النوع انضباطياً)
+  const plain = b?.note === undefined ? decryptField(cfg, h.note ?? '') : String(b.note).replace(/\s+/g, ' ').trim().slice(0, 200);
+  const note = type === 'disciplinary' ? encryptField(cfg, plain) : plain;
   tx(db, () => { db.prepare('UPDATE student_holds SET hold_type = ?, note = ? WHERE id = ?').run(type, note, h.id); audit(db, actor, `تعديل ذمة (${type})`, h.student_no, ip); });
 }
 

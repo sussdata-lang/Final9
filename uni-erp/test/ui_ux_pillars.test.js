@@ -94,9 +94,10 @@ test('5. إصلاح ظهور تبويب التطوير المؤسسي للموا
   const esJs = await esRes.text();
   const uxJs = await uxRes.text();
 
-  assert.ok(esJs.includes('UA.renderEnterpriseSection'), 'يجب أن يوفر enterprise_suite.js دالة UA.renderEnterpriseSection لعرض أقسام التطوير المؤسسي مباشرة');
-  assert.ok(esJs.includes('ensureEnterpriseDataLoaded'), 'يجب أن يجلب enterprise_suite.js بيانات التطوير المؤسسي تلقائياً عند فتح التبويب');
-  assert.ok(uxJs.includes("UA.renderEnterpriseSection('hr_finance')"), 'يجب أن يعرض تبويب التطوير المؤسسي للموارد البشرية قسم hr_finance مباشرة');
+  assert.ok(esJs.includes('UA.esCards'), 'يجب أن يوفر enterprise_suite.js بطاقات مستقلة UA.esCards تُعرض كلٌّ في قسمها');
+  assert.ok(esJs.includes('ensureEnterpriseDataLoaded'), 'يجب أن يجلب enterprise_suite.js بيانات البطاقات تلقائياً عند فتح القسم');
+  assert.ok(!esJs.includes('renderEnterpriseSection') && !esJs.includes('es-banner'), 'لا تُعرض المنظومة مجمّعة بشريطها وتبويباتها في أي قسم');
+  assert.ok(uxJs.includes('UA.esCards.payslips()'), 'قسائم الرواتب الموقعة تُعرض في شؤون الموظفين ← الرواتب');
 
   const mountFnStart = uxJs.indexOf('function mountSplitEnterpriseBlocks()');
   const mountFnEnd = uxJs.indexOf('UA.renderWorkspaceTabsBar', mountFnStart);

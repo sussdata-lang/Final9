@@ -167,8 +167,6 @@ Object.assign(window.UA, {
     }
     v.push(['councils', tr('المجالس واللجان')]);
     v.push(['facilities', tr('الخدمات الإدارية')]);
-    if (can('hr:manage') || (S.me && S.me.role === 'admin')) v.push(['recruitment', tr('التوظيف')]);
-    if (can('procurement:read')) v.push(['quotations', tr('عروض الأسعار')]);
     // 5) التقارير والبيانات والذكاء الاصطناعي
     if (['stats:read', 'hr_emp:view', 'hr_emp:write', 'hr_emp:edit', 'hr_emp:delete', 'hr:manage', 'hr_payroll:approve', 'staffatt:manage', 'audit:read', 'devops:manage', 'settings:manage', 'backup:manage'].some(can)) v.push(['dashboard', tr('الإحصاءات والتقارير')]);
     if (can('student:register') || can('course:manage') || can('grade:manage') || can('data:export') || can('request:import') || ['import:academic', 'import:procurement', 'import:finance', 'import:hr', 'import:student_fin', 'import:misc'].some(can)) v.push(['exchange', tr('الاستيراد والتصدير')]);
@@ -300,11 +298,11 @@ Object.assign(window.UA, {
     const fl = [['all', 'الكل'], ['review', 'قيد المراجعة'], ['approved', 'معتمدة'], ['rejected', 'مرفوضة']];
     const list = S.requests.filter((r) => S.filter === 'all' || r.status === S.filter);
     const sel = S.requests.find((r) => r.id === S.sel);
-    const rows = list.map((r) => `<tr class="row" tabindex="0" data-act="sel" data-id="${r.id}" aria-selected="${S.sel === r.id}"><td>${esc(r.service.label)}${r.escalationLevel ? ` <span class="pill p-rejected">مصعّد ${r.escalationLevel}</span>` : ''}${r.unit ? `<div class="small">عند: ${esc(r.unit.name)}</div>` : ''}</td><td>${esc(r.student.name)}</td><td>${pill(r)}${UA.flow && UA.flow.isPending(r.id) ? ' <span class="small ux-pending-tag">بانتظار مهلة التراجع</span>' : ''}</td><td class="hint" style="white-space:nowrap">${fmt(r.createdAt)}</td></tr>`).join('');
+    const rows = list.map((r) => `<tr class="row" tabindex="0" data-act="sel" data-id="${r.id}" aria-selected="${S.sel === r.id}"><td>${esc(r.service.label)}${r.escalationLevel ? ` <span class="pill p-rejected">مصعّد ${r.escalationLevel}</span>` : ''}${r.unit ? `<div class="small">عند: ${esc(r.unit.name)}</div>` : ''}</td><td>${esc(r.student.name)}</td><td>${pill(r)}${UA.flow && UA.flow.isPending(r.id) ? ' <span class="small ux-pending-tag">بانتظار مهلة التراجع</span>' : ''}</td><td class="hint" style="white-space:nowrap">${fmt(r.createdAt)}</td><td>${UA.slaCell ? UA.slaCell(r) : ''}</td></tr>`).join('');
     const fresh = sel && S.drawerFor !== sel.id;
     S.drawerFor = sel ? sel.id : null;
     return `<div><section class="card"><h2>سجل الطلبات</h2><p class="hint" style="margin-top:0">اختر طلباً لعرض تفاصيله وإجراءاته في اللوحة الجانبية.</p><div class="chips">${fl.map((f) => `<button class="chip" data-act="flt" data-f="${f[0]}" aria-pressed="${S.filter === f[0]}">${f[1]}</button>`).join('')}</div>
-      <div class="tbl-wrap"><table><thead><tr><th>الخدمة</th><th>الطالب</th><th>الحالة</th><th>التاريخ</th></tr></thead><tbody>${rows || '<tr><td colspan="4" class="empty">لا طلبات في هذا التصنيف.</td></tr>'}</tbody></table></div></section>
+      <div class="tbl-wrap"><table><thead><tr><th>الخدمة</th><th>الطالب</th><th>الحالة</th><th>التاريخ</th><th>مؤشر المهلة (SLA)</th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="empty">لا طلبات في هذا التصنيف.</td></tr>'}</tbody></table></div></section>
       ${sel ? `<aside class="ux-drawer no-print" aria-label="تفاصيل الطلب"${fresh ? ' data-fresh="1"' : ''}><header><h2 tabindex="-1">تفاصيل الطلب</h2><span style="display:flex;gap:6px"><button type="button" class="btn sm" data-act="reqprint" data-id="${sel.id}">طباعة النموذج</button><button type="button" class="btn sm" data-act="reqclose" aria-label="إغلاق تفاصيل الطلب">إغلاق</button></span></header><div class="ux-drawer-body">${staffDetail(sel, canDecide)}</div></aside>` : ''}</div>`;
   }
   function staffDetail(r, canDecide) {
@@ -679,7 +677,7 @@ Object.assign(window.UA, {
         const [holds, rules, pg, fc] = await Promise.all([g('holds:manage', '/api/admin/holds', 'holds'), g('rules:manage', '/api/admin/rules', 'rules'), g('program:manage', '/api/programs', 'programs'), g('program:manage', '/api/faculties', 'faculties')]);
         S.admin = { holds, rules, programs: pg, faculties: fc, backup: can('backup:manage') ? await api('GET', '/api/admin/backups') : null };
         if (can('settings:manage') && UA.general) await UA.general.load();
-      } else if (view === 'audit') { S.audit = (await api('GET', '/api/audit?limit=500')).entries; S.logs = (await api('GET', '/api/admin/logs?limit=300')).entries; }
+      } else if (view === 'audit' && can('audit:read')) { S.audit = (await api('GET', '/api/audit?limit=500')).entries; S.logs = (await api('GET', '/api/admin/logs?limit=300')).entries; }
     } catch (e) { if (e.status !== 401) toast(e.message); }
   }
   async function loadStudents() {
@@ -703,6 +701,9 @@ Object.assign(window.UA, {
     if (view === 'import' || view === 'export') { S.exTab = view; view = 'exchange'; }
     if (view === 'desk' && S.me && S.me.role !== 'student') { S.mainDashTab = 'unified'; view = 'overview'; }
     if (view === 'hr') { S.hrUnifiedTab = 'att'; view = 'payroll'; }
+    // التوظيف قسم داخل شؤون الموظفين، وعروض الأسعار تبويب داخل المشتريات والمخازن
+    if (view === 'recruitment') { S.hrUnifiedTab = 'recruitment'; view = 'payroll'; }
+    if (view === 'quotations') { UA.procTab = 'quotes'; view = 'procurement'; }
     if (view === 'devops') { S.auditTab = 'devops'; view = 'audit'; }
     if (view === 'units') { S.adminTab = 'units'; view = 'admin'; }
     if (view === 'verify' && S.me) { S.adminTab = 'verify'; view = 'admin'; }

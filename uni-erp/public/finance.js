@@ -813,7 +813,7 @@
     if (F.tab === 'treasury') return viewTreasury();
     if (F.tab === 'budget') return viewBudget();
     if (F.tab === 'reports') return viewReports();
-    if (F.tab === 'student_fees') return viewStudentFees();
+    if (F.tab === 'student_fees') return viewStudentFees() + (UA.esCards ? UA.esCards.installments() : '');
     if (F.tab === 'payroll_fin') return viewPayrollFin();
     return '';
   }
@@ -823,6 +823,7 @@
     el.innerHTML = `
       <div class="sub-tabs" style="margin-bottom:14px">
         ${TABS.map(([k, l]) => `<button class="tab ${F.tab === k ? 'on' : ''}" data-act="fin-tab" data-t="${k}" aria-pressed="${F.tab === k}">${l}</button>`).join('')}
+        <a class="tab" href="/wallet.html" title="شحن محافظ الطلاب والرد النقدي ونقاط البيع">المحفظة الجامعية</a>
       </div>
       <div id="fin-body">${renderBody()}</div>
       <div id="fin-modal"></div>`;

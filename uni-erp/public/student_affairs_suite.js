@@ -832,7 +832,7 @@
     kpiStrip: suiteKpiStrip,
     renderTab: (tab) => {
       if (tab === 'admissions') return listNote(['applicants', 'equivalences']) + renderAdmissionsTab();
-      if (tab === 'advising') return listNote(['warnings']) + renderAdvisingTab();
+      if (tab === 'advising') return listNote(['warnings']) + renderAdvisingTab() + (UA.esCards ? UA.esCards.gpa() : '');
       if (tab === 'lifecycle') return listNote(['movements', 'disciplinary']) + renderLifecycleTab();
       if (tab === 'scholarships') return listNote(['scholarships']) + renderScholarshipsTab();
       if (tab === 'desk_queue') return listNote(['appointments']) + renderDeskQueueSection({ compact: false });

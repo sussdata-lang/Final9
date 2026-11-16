@@ -70,6 +70,13 @@ import { registerTeachingRoutes } from './services/teaching.js';
 import { registerRecruitmentRoutes } from './services/recruitment.js';
 import { registerFacilitiesRoutes } from './services/facilities.js';
 import { registerGradingRoutes } from './services/grading.js';
+import { globalSearch } from './services/global_search.js';
+import { registerSecurityCenterRoutes } from './services/security_center.js';
+import { registerConsentRoutes } from './services/consent.js';
+import { registerWarehouseRoutes } from './services/warehouse.js';
+import { registerContainmentRoutes } from './services/security_containment.js';
+import { registerWalletRoutes } from './services/wallet.js';
+import { DATA_CLASSIFICATION, SENSITIVITY } from './lib/data_classification.js';
 import { registerQuotationRoutes } from './services/procurement/quotations.js';
 import { login, logout, publicUser, changePassword, getSessionCacheStats, invalidateSessionCache } from './services/auth.js';
 import { listStaff, listStaffLight, staffDetail, createUser, updateUser, setUserActive, resetUserPassword, deleteUser } from './services/useradmin.js';
@@ -107,7 +114,7 @@ import { issueEnrollmentCertificate, certFor, certSummary, readCertPdf, verifyEn
 import { qrSvg } from './qr.js';
 import { overview, createRole, updateRole, deleteRole, createUnit, updateUnit, deleteUnit, createLink, deleteLink, linkedTargets, matrixXlsx } from './services/access.js';
 import { registrationOptions, registerStudent, listStudents, listStudentsTable, getStudent, updateStudent, resetStudentPassword, myProfile, updateOwnContact, listPrograms, addProgram, toggleProgram, listFaculties, addFaculty, toggleFaculty, updateFaculty, deleteFaculty, updateProgram, deleteProgram, deleteStudent, assertStudentInScope } from './services/students.js';
-import { listCourses, listGradesTable, createCourse, toggleCourse, updateCourse, deleteCourse, myGrades, gradesFor, enterGrade, deleteGrade, listNews, createNews, updateNews, deleteNews, createComplaint, listComplaints, respondComplaint, deleteComplaint } from './services/academics.js';
+import { listCourses, listGradesTable, createCourse, toggleCourse, updateCourse, deleteCourse, myGrades, gradesFor, enterGrade, gradeSheet, saveGradeSheet, deleteGrade, listNews, createNews, updateNews, deleteNews, createComplaint, listComplaints, respondComplaint, deleteComplaint } from './services/academics.js';
 import { transitionGrades, gradeHistory, workflowOn, setWorkflow, myCourseGrades } from './services/workflow.js';
 import { getSlots, setSlots, addSlot, detectScheduleConflicts, studentTimetable, DAYS } from './services/schedule.js';
 import { getUnifiedStudentRecord } from './services/record360.js';
@@ -115,6 +122,7 @@ import { expandFields, requesterKind, createRequest, listRequests, getRequest, d
 import { getDocument, verifyPublic } from './services/documents.js';
 import { exportOptions, preview as exportPreview, renderExport } from './services/dataexport.js';
 import { audit, verifyAuditChain } from './audit.js';
+import { encryptField, decryptField } from './lib/data_crypto.js';
 import { recentLogs } from './lib/logger.js';
 
 const need = (ctx, perm) => { if (!ctx.user.can(perm)) throw new HttpError(403, 'لا تملك صلاحية هذا الإجراء.', 'forbidden'); };
@@ -193,7 +201,14 @@ export async function buildRouter(deps) {
     if (!workflowOn(db)) notifyGrade(deps, Number(c.params.id), db.prepare('SELECT name FROM courses WHERE id = ?').get(Number(c.body?.courseId))?.name);
     c.json(200, out);
   });
-  r.add('DELETE', '/api/students/:id/grades/:gid', (c) => { need(c, 'grade:manage'); c.json(200, deleteGrade(deps, c.user, c.params.id, c.params.gid, c.ip, c.query.justification)); });
+  r.add('GET', '/api/search', async (c) => { if (!c.user || c.user.role === 'student') throw new HttpError(403, 'البحث الشامل للموظفين.', 'forbidden'); c.json(200, await globalSearch(deps, c.user, c.query?.q)); });
+  r.add('GET', '/api/courses/:id/grade-sheet', (c) => { need(c, 'grade:manage'); c.json(200, gradeSheet(deps, c.params.id, c.query?.year)); });
+  r.add('POST', '/api/courses/:id/grade-sheet', (c) => {
+    need(c, 'grade:manage'); const out = saveGradeSheet(deps, c.user, c.params.id, c.body, c.ip);
+    if (!workflowOn(db)) { const name = db.prepare('SELECT name FROM courses WHERE id = ?').get(Number(c.params.id))?.name; for (const id of out.savedIds) notifyGrade(deps, id, name); }
+    c.json(200, { saved: out.saved, errors: out.errors });
+  });
+  r.add('DELETE', '/api/students/:id/grades/:gid',(c) => { need(c, 'grade:manage'); c.json(200, deleteGrade(deps, c.user, c.params.id, c.params.gid, c.ip, c.query.justification)); });
   // ---- مراحل اعتماد العلامات، جدول المحاضرات، السجل الموحّد ----
   r.add('GET', '/api/faculty/my-grades', (c) => { need(c, 'grade:approve_own'); c.json(200, myCourseGrades(deps, c.user)); });
   r.add('POST', '/api/grades/workflow', async (c) => {
@@ -507,7 +522,7 @@ export async function buildRouter(deps) {
   const sendCert = async (c, studentId, studentNo) => {
     const activeHold = db.prepare('SELECT hold_type, note FROM student_holds WHERE student_id = ? AND cleared_at IS NULL AND (active IS NULL OR active = 1) LIMIT 1').get(Number(studentId));
     if (activeHold) {
-      throw new HttpError(403, `لا يمكن إصدار أو تنزيل شهادة التسجيل لوجود إيقاف أو ذمة فعالة على الطالب (${activeHold.note || activeHold.hold_type || 'مانع فعال'}).`, 'student_hold_active');
+      throw new HttpError(403, `لا يمكن إصدار أو تنزيل شهادة التسجيل لوجود إيقاف أو ذمة فعالة على الطالب (${decryptField(cfg, activeHold.note) || activeHold.hold_type || 'مانع فعال'}).`, 'student_hold_active');
     }
     const prof = db.prepare('SELECT status FROM student_profiles WHERE user_id = ?').get(Number(studentId));
     if (prof && ['withdrawn', 'suspended', 'dismissed'].includes(prof.status)) {
@@ -560,16 +575,20 @@ export async function buildRouter(deps) {
   r.add('DELETE', '/api/admin/links/:id', (c) => { need(c, 'role:manage'); c.json(200, deleteLink(deps, c.user, c.params.id, c.ip)); });
   r.add('GET', '/api/admin/holds', (c) => {
     need(c, 'holds:manage');
-    c.json(200, { holds: db.prepare(`SELECT h.id, h.hold_type AS holdType, h.note, h.active, h.created_at AS createdAt, u.display_name AS student, u.student_no AS studentNo
-                                     FROM student_holds h JOIN users u ON u.id = h.student_id ORDER BY h.id DESC LIMIT 200`).all() });
+    const holds = db.prepare(`SELECT h.id, h.hold_type AS holdType, h.note, h.active, h.created_at AS createdAt, u.display_name AS student, u.student_no AS studentNo
+                                     FROM student_holds h JOIN users u ON u.id = h.student_id ORDER BY h.id DESC LIMIT 200`).all()
+      .map((h) => ({ ...h, note: decryptField(cfg, h.note) }));
+    c.json(200, { holds });
   });
   r.add('POST', '/api/admin/holds', (c) => {
     need(c, 'holds:manage');
     const s = db.prepare("SELECT id FROM users WHERE student_no = ? COLLATE NOCASE AND role = 'student'").get(String(c.body.studentNo ?? '').trim());
     if (!s) throw new HttpError(404, 'لا يوجد طالب بهذا الرقم الجامعي.', 'not_found');
     if (!['financial', 'disciplinary', 'library'].includes(c.body.holdType)) throw new HttpError(400, 'نوع الذمة غير صالح.', 'validation');
+    const note = String(c.body.note ?? '').slice(0, 200);
+    // ملاحظة المانع الانضباطي نص شخصي حساس فتُحفظ مشفَّرة؛ غيرها (مالية أو مكتبة) يبقى صريحاً كما يحتاجه الاستيراد الجماعي
     const res = db.prepare('INSERT INTO student_holds (student_id, hold_type, note, created_by, created_at) VALUES (?,?,?,?,?)')
-      .run(s.id, c.body.holdType, String(c.body.note ?? '').slice(0, 200), c.user.id, Date.now());
+      .run(s.id, c.body.holdType, c.body.holdType === 'disciplinary' ? encryptField(cfg, note) : note, c.user.id, Date.now());
     audit(db, c.user, `تسجيل ذمة (${c.body.holdType})`, c.body.studentNo, c.ip);
     c.json(201, { id: Number(res.lastInsertRowid) });
   });
@@ -622,6 +641,15 @@ export async function buildRouter(deps) {
   registerRecruitmentRoutes(r, deps);
   registerFacilitiesRoutes(r, deps);
   registerGradingRoutes(r, deps);
+  registerSecurityCenterRoutes(r, deps);
+  registerConsentRoutes(r, deps);
+  registerWarehouseRoutes(r, deps);
+  registerContainmentRoutes(r, deps);
+  registerWalletRoutes(r, deps);
+  r.add('GET', '/api/privacy/classification', (c) => {
+    if (!(c.user.role === 'admin' || c.user.can('audit:read'))) throw new HttpError(403, 'لا تملك صلاحية هذا الإجراء.', 'forbidden');
+    c.json(200, { items: DATA_CLASSIFICATION, sensitivity: SENSITIVITY });
+  });
   registerQuotationRoutes(r, deps);
 
   // ---- محرك الأداء الفائق والضغط العالي (10,000+ مستخدم متزامن + 10+ مراسلات/إضافات مالية بالثانية) ----

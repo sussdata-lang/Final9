@@ -17,6 +17,11 @@ export const IDEMPOTENT_ROUTES = new Set([
   'POST /api/enterprise/installments/:id/pay',
   'POST /api/enterprise/payslips/issue',
   'POST /api/student-affairs-suite/scholarships',
+  // المحفظة الجامعية: ضغطة مزدوجة عند الشحن أو التحصيل لا تُسجَّل مرتين
+  'POST /api/wallet/admin/topup',
+  'POST /api/wallet/admin/refund',
+  'POST /api/wallet/me/pay-fees',
+  'POST /api/wallet/pos/charge',
 ]);
 
 const KEY = /^[A-Za-z0-9_-]{8,80}$/;

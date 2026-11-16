@@ -1,30 +1,12 @@
-/* ==========================================================================
-   منظومة التطوير المؤسسي الشاملة (Enterprise Suite v12.8 — 15 منظومة متكاملة)
-   تشمل:
-   1. المولد الذكي للجداول الدراسية ومنع التضارب (Auto-Scheduler)
-   2. بنك الأسئلة والامتحانات الإلكترونية والتصحيح الفوري (Online Quizzes)
-   3. الإرشاد الأكاديمي التفاعلي ومحاكي المعدل التراكمي (Advising Tree & GPA Simulator)
-   4. بوابة التحقق العلني الفوري من الوثائق والـ QR (Public PKI QR Verification)
-   5. التسجيل الذاتي للمقررات الدراسية (Student Self-Enrollment)
-   6. البطاقة الجامعية الرقمية الذكية (NFC / Dynamic QR Pass)
-   7. قسائم الرواتب (Signed PDF Payslips)
-   8. الحساب الآلي للعبء التدريسي الإضافي (Faculty Overload Payroll)
-   9. بوابة الدفع الإلكتروني وتقسيط الرسوم (E-Payment & Installments)
-   10. مركز الإشعارات الفورية متعدد القنوات (Multi-Channel Notification Hub)
-   11. نافذة الأوامر والبحث الشامل الفوري (Command Palette Ctrl+\`)
-   12. رصد حضور اللجان الامتحانية
-   13. منشئ التقارير المخصص والتصدير الفوري (Custom Report Builder CSV/Print)
-   14. لوحة مؤشرات الأداء الاستراتيجية لرئاسة الجامعة (Executive KPIs)
-   15. النسخ الاحتياطي المجدول والمشفر والاسترجاع الزمني (AES-256-GCM Snapshots)
-   ========================================================================== */
+/* بطاقات «التطوير المؤسسي»: كل بطاقة تُعرض في القسم الذي يخصها عبر UA.esCards
+   (محاكي المعدل، قسائم الرواتب الموقعة، العبء التدريسي، أقساط الرسوم، إرسال الإشعارات، حضور اللجان)،
+   إضافة إلى الشعب والتسجيل ومؤشرات الرئاسة ومنشئ التقارير ونافذة الأوامر. */
 (function () {
   const UA = window.UA;
   if (!UA) return;
   const { S, api, esc, toast, render } = UA;
 
   const E = {
-    tab: 'academics', // 'academics' | 'student_pki' | 'hr_finance' | 'ux_offline' | 'exec_devops'
-    context: '',
     loading: false,
     data: null,
     quizAnswers: {},
@@ -99,27 +81,12 @@
       });
   }
 
-  const TABS = [
-    ['academics', '1. الجدولة والاختبارات والإرشاد (1–3)'],
-    ['student_pki', '2. التسجيل الذاتي والبطاقة والتحقق (4–6)'],
-    ['hr_finance', '3. قسائم الرواتب والعبء والأقساط (7–9)'],
-    ['ux_offline', '4. الإشعارات وحضور اللجان (10–12)'],
-  ];
-
   function injectStyles() {
     if (document.getElementById('es-suite-css')) return;
     const st = document.createElement('style');
     st.id = 'es-suite-css';
     st.textContent = `
       .es-wrap { display: grid; gap: 16px; }
-      .es-banner { background: linear-gradient(135deg, #042f28 0%, #095246 100%); color: #fff; border-radius: 16px; padding: 20px 24px; border: 1px solid #D5B65D; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 14px; box-shadow: 0 10px 28px rgba(4,47,40,.18); }
-      .es-banner h1 { margin: 0 0 6px; font-size: 20px; color: #fff; display: flex; align-items: center; gap: 10px; }
-      .es-banner p { margin: 0; font-size: 13px; color: #A8D8BE; opacity: .92; }
-      .es-badge { background: #D5B65D; color: #042f28; font-weight: 800; font-size: 11.5px; padding: 4px 10px; border-radius: 99px; }
-      .es-tabs { display: flex; flex-wrap: wrap; gap: 8px; background: var(--surface, #fff); padding: 10px; border-radius: 14px; border: 1px solid var(--line, #dce3dd); }
-      .es-tab { border: 1px solid transparent; background: rgba(14,102,85,.07); color: var(--ink, #16302a); padding: 9px 14px; border-radius: 10px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .15s; }
-      .es-tab:hover { background: rgba(14,102,85,.14); }
-      .es-tab[aria-selected="true"] { background: #054239; color: #D5B65D; border-color: #D5B65D; box-shadow: 0 4px 12px rgba(5,66,57,.22); }
       .es-grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; }
       .es-grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
       .es-card { background: var(--surface, #fff); border: 1px solid var(--line, #dce3dd); border-radius: 14px; padding: 18px; box-shadow: 0 2px 8px rgba(0,0,0,.03); }
@@ -130,11 +97,6 @@
       .es-kpi { background: var(--surface, #fff); border: 1px solid var(--line, #dce3dd); border-inline-start: 4px solid #0e6655; border-radius: 12px; padding: 12px 14px; }
       .es-kpi small { display: block; font-size: 11.5px; opacity: .75; }
       .es-kpi strong { font-size: 22px; color: #054239; display: block; margin-top: 2px; }
-      .es-idcard { background: linear-gradient(135deg, #042f28 0%, #0b5345 100%); color: #fff; border-radius: 16px; padding: 18px; border: 2px solid #D5B65D; position: relative; overflow: hidden; }
-      .es-idcard-head { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(213,182,93,.35); padding-bottom: 10px; margin-bottom: 12px; }
-      .es-idcard-body { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center; }
-      .es-qrbox { background: #fff; color: #042f28; padding: 10px; border-radius: 10px; text-align: center; font-family: monospace; font-size: 10px; font-weight: 700; width: 108px; }
-      .es-tree-item { display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line, #dce3dd); margin-bottom: 8px; background: rgba(14,102,85,.03); }
       .es-cmd-modal { position: fixed; inset: 0; z-index: 9998; background: rgba(4,25,20,.68); backdrop-filter: blur(3px); display: flex; align-items: flex-start; justify-content: center; padding-top: 8vh; }
       .es-cmd-box { width: min(680px, 94vw); background: var(--surface, #fff); color: var(--ink, #16302a); border-radius: 16px; border: 2px solid #D5B65D; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,.4); }
       .es-cmd-input { width: 100%; border: 0; border-bottom: 1px solid var(--line, #dce3dd); padding: 16px 18px; font: inherit; font-size: 15px; background: rgba(14,102,85,.05); color: inherit; outline: none; }
@@ -145,57 +107,31 @@
     document.head.appendChild(st);
   }
 
-  /* ---------- التبويب 1: الشؤون الأكاديمية والامتحانات (1-3) ---------- */
-  function viewAcademics(D) {
-    const plan = D.advisingPlan || [];
+  /* ---------- محاكي المعدل التراكمي (في «الخطة والإرشاد والإنذار») ---------- */
+  function gpaCard() {
     const gpa = E.gpaResult;
-
-    return `
-      <!-- 3. شجرة الإرشاد الأكاديمي التفاعلي ومحاكي المعدل التراكمي -->
-      <section class="es-card">
-        <h2><span>🎓 شجرة الإرشاد الأكاديمي التفاعلي ومحاكي المعدل التراكمي (GPA Simulator)</span><span class="es-num">ميزة #3</span></h2>
-        <p class="sub">خريطة الخطة الدراسية وترابط المتطلبات السابقة مع محاكاة فورية للمعدل التراكمي المتوقع نهاية الفصل.</p>
-        <div class="es-grid2">
-          <div>
-            <h3 style="font-size:14px;margin:0 0 10px">شجرة الخطة الدراسية والمتطلبات السابقة (Prerequisites)</h3>
-            ${plan.map((item) => {
-              const cls = item.status === 'منجز' ? 'p-approved' : item.status === 'مسجل حالياً' ? 'p-review' : '';
-              return `<div class="es-tree-item">
-                <div>
-                  <strong class="mono">${esc(item.code)}</strong> — <b>${esc(item.name)}</b>
-                  <div class="small">السنة ${item.year} · ${item.credits} ساعات معتمدة · المتطلب السابق: <span class="mono">${esc(item.prereq)}</span></div>
-                </div>
-                <div style="text-align:end">
-                  <span class="pill ${cls}">${esc(item.status)}</span>
-                  ${item.grade ? `<div style="font-weight:800;color:#0e6655;font-size:12px;margin-top:3px">العلامة: ${item.grade}%</div>` : ''}
-                </div>
-              </div>`;
-            }).join('')}
-          </div>
-          <div>
-            <h3 style="font-size:14px;margin:0 0 10px">محاكي المعدل التراكمي المتوقع (Interactive GPA Simulator)</h3>
-            <form id="es-gpa-form" class="form" style="background:rgba(14,102,85,.04);padding:14px;border-radius:12px;border:1px solid var(--line,#dce3dd)">
-              <div class="inline-form">
-                <label>المعدل التراكمي الحالي (%)<input id="gpa-cur" type="number" step="0.1" required></label>
-                <label>الساعات المنجزة<input id="gpa-hrs" type="number" required></label>
-              </div>
-              <div class="inline-form" style="margin-top:8px">
-                <label>علامة المقرر الأول (4 س)<input id="gpa-c1" type="number" min="0" max="100"></label>
-                <label>علامة المقرر الثاني (3 س)<input id="gpa-c2" type="number" min="0" max="100"></label>
-                <label>علامة المقرر الثالث (3 س)<input id="gpa-c3" type="number" min="0" max="100"></label>
-              </div>
-              <button class="btn pri" type="submit" style="margin-top:10px">حساب المعدل التراكمي المتوقع</button>
-            </form>
-            <div class="es-kpis" style="margin-top:14px">
-              <div class="es-kpi"><small>المعدل التراكمي المتوقع</small><strong>${gpa ? `${gpa.projectedGpa}%` : '—'}</strong></div>
-              <div class="es-kpi"><small>التقدير الجامعي</small><strong>${gpa ? esc(gpa.letter) : '—'}</strong></div>
-              <div class="es-kpi"><small>إجمالي الساعات بعد الفصل</small><strong>${gpa ? `${gpa.totalHours} ساعة` : '—'}</strong></div>
-              <div class="es-kpi"><small>مقدار التحسن</small><strong style="color:#1B7F4B">${gpa ? `${gpa.delta >= 0 ? '+' + gpa.delta : gpa.delta}%` : '—'}</strong></div>
-            </div>
-          </div>
+    return `<section class="es-card">
+      <h2><span>محاكي المعدل التراكمي المتوقع</span></h2>
+      <p class="sub">أدخل معدل الطالب الحالي وساعاته المنجزة والعلامات المتوقعة لمقررات الفصل، فيُحسب معدله التراكمي المتوقع نهاية الفصل.</p>
+      <form id="es-gpa-form" class="form" style="background:rgba(14,102,85,.04);padding:14px;border-radius:12px;border:1px solid var(--line,#dce3dd)">
+        <div class="inline-form">
+          <label>المعدل التراكمي الحالي (%)<input id="gpa-cur" type="number" step="0.1" required></label>
+          <label>الساعات المنجزة<input id="gpa-hrs" type="number" required></label>
         </div>
-      </section>
-    `;
+        <div class="inline-form" style="margin-top:8px">
+          <label>علامة المقرر الأول (4 س)<input id="gpa-c1" type="number" min="0" max="100"></label>
+          <label>علامة المقرر الثاني (3 س)<input id="gpa-c2" type="number" min="0" max="100"></label>
+          <label>علامة المقرر الثالث (3 س)<input id="gpa-c3" type="number" min="0" max="100"></label>
+        </div>
+        <button class="btn pri" type="submit" style="margin-top:10px">حساب المعدل التراكمي المتوقع</button>
+      </form>
+      <div class="es-kpis" style="margin-top:14px">
+        <div class="es-kpi"><small>المعدل التراكمي المتوقع</small><strong>${gpa ? `${gpa.projectedGpa}%` : '—'}</strong></div>
+        <div class="es-kpi"><small>التقدير الجامعي</small><strong>${gpa ? esc(gpa.letter) : '—'}</strong></div>
+        <div class="es-kpi"><small>إجمالي الساعات بعد الفصل</small><strong>${gpa ? `${gpa.totalHours} ساعة` : '—'}</strong></div>
+        <div class="es-kpi"><small>مقدار التحسن</small><strong style="color:#1B7F4B">${gpa ? `${gpa.delta >= 0 ? '+' + gpa.delta : gpa.delta}%` : '—'}</strong></div>
+      </div>
+    </section>`;
   }
 
   /* ---------- التسجيل بالشعب وفترة الحذف والإضافة ---------- */
@@ -285,117 +221,12 @@
       </table></div></article>`;
   };
 
-  /* ---------- التبويب 2: شؤون الطلاب والوثائق والبطاقة الذكية (4-6) ---------- */
-  function viewStudentPki(D) {
-    const enrolls = D.selfEnrollments || [];
-    const stName = S.me?.role === 'student' ? S.me.name : '—';
-    const stNo = S.me?.studentNo || '—';
-
-    return `
-      <div class="es-grid2">
-        <!-- 4. بوابة التحقق العلني من الوثائق والـ QR -->
-        <section class="es-card">
-          <h2><span>🛡️ بوابة التحقق العلني الفوري من الوثائق (PKI & QR Verifier)</span><span class="es-num">ميزة #4</span></h2>
-          <p class="sub">تحقق لحظي للجهات الخارجية من صحة الشهادات وكشوف العلامات وقسائم الرواتب عبر رمز الوثيقة أو مسح QR.</p>
-          <form id="es-verify-form" class="inline-form" style="margin-bottom:14px">
-            <label style="flex:1">رمز الوثيقة أو البصمة الرقمية
-              <input id="es-v-code" placeholder="PAY-… أو SC-…" dir="ltr" required>
-            </label>
-            <button class="btn pri" type="submit">تحقق رقمي فوري</button>
-            <button class="btn" type="button" data-act="view" data-v="verify">فتح شاشة التحقق العام</button>
-          </form>
-          ${E.verifyResult ? `
-            <div style="padding:14px;border-radius:12px;background:rgba(27,127,75,.1);border:1px solid #1B7F4B">
-              <strong style="color:#054239;display:block;margin-bottom:4px">✓ وثيقة رسمية صحيحة وموقعة رقمياً (PKI Verified)</strong>
-              <div class="small">الرمز: <span class="mono">${esc(E.verifyResult.code)}</span> · الجهة المصدرة: الجامعة السورية للعلوم الأمنية · الحالة: معتمدة وسارية</div>
-              <div class="small">نتيجة التحقق: <span class="mono">${esc(E.verifyResult.sig)}</span></div>
-            </div>
-          ` : `
-            <div style="padding:12px;border-radius:10px;background:rgba(14,102,85,.05);font-size:12.5px">
-              أدخل رمز قسيمة راتب أو رمز شهادة قيد للتحقق من وجوده في السجل.
-            </div>
-          `}
-        </section>
-
-        <!-- 6. البطاقة الجامعية الرقمية الذكية (NFC / Dynamic QR Pass) -->
-        <section class="es-card">
-          <h2><span>🪪 البطاقة الجامعية الرقمية الذكية (NFC / Dynamic QR Pass)</span><span class="es-num">ميزة #6</span></h2>
-          <p class="sub">بطاقة هوية جامعية مشفرة صالحة للبوابات الإلكترونية، القاعات الامتحانية، واستعارة المكتبة.</p>
-          <div class="es-idcard">
-            <div class="es-idcard-head">
-              <div>
-                <strong style="font-size:15px;display:block">الجامعة السورية للعلوم الأمنية</strong>
-                <small style="color:#D5B65D">بطاقة هوية جامعية ذكية — Smart NFC & QR ID</small>
-              </div>
-              <span class="es-badge">صالحة 2026/2027</span>
-            </div>
-            <div class="es-idcard-body">
-              <div>
-                <div style="font-size:18px;font-weight:800;margin-bottom:4px">${esc(stName)}</div>
-                <div style="font-size:13px;color:#A8D8BE">الرقم الجامعي: <b class="mono">${esc(stNo)}</b></div>
-                <div style="font-size:12.5px;color:#A8D8BE;margin-top:2px">الكلية: هندسة الأمن السيبراني · المستوى الثاني</div>
-                <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-                  <span style="background:rgba(255,255,255,.15);padding:3px 8px;border-radius:6px;font-size:11px">${D.cardBlock ? `البطاقة موقوفة: ${esc(D.cardBlock.reasonLabel)}` : 'البطاقة: فعّالة'}</span>
-                  <span style="background:rgba(213,182,93,.25);color:#E6CB84;padding:3px 8px;border-radius:6px;font-size:11px">براءة ذمة: مكتملة</span>
-                </div>
-              </div>
-              <div class="es-qrbox">
-                <svg viewBox="0 0 80 80" width="76" height="76" style="display:block;margin:0 auto 4px">
-                  <rect width="80" height="80" fill="#fff"/>
-                  <rect x="6" y="6" width="22" height="22" fill="#042f28"/><rect x="10" y="10" width="14" height="14" fill="#fff"/><rect x="13" y="13" width="8" height="8" fill="#042f28"/>
-                  <rect x="52" y="6" width="22" height="22" fill="#042f28"/><rect x="56" y="10" width="14" height="14" fill="#fff"/><rect x="59" y="13" width="8" height="8" fill="#042f28"/>
-                  <rect x="6" y="52" width="22" height="22" fill="#042f28"/><rect x="10" y="56" width="14" height="14" fill="#fff"/><rect x="13" y="59" width="8" height="8" fill="#042f28"/>
-                  <rect x="34" y="12" width="6" height="6" fill="#042f28"/><rect x="34" y="24" width="12" height="6" fill="#042f28"/>
-                  <rect x="12" y="34" width="18" height="6" fill="#042f28"/><rect x="36" y="36" width="14" height="14" fill="#D5B65D"/>
-                  <rect x="54" y="36" width="18" height="6" fill="#042f28"/><rect x="36" y="56" width="12" height="16" fill="#042f28"/><rect x="56" y="54" width="16" height="18" fill="#042f28"/>
-                </svg>
-                ${esc(stNo)}
-              </div>
-            </div>
-          </div>
-          ${S.me?.role === 'student' ? (D.cardBlock
-            ? `<p class="small" style="margin:10px 0 0;color:#9B2C2C"><b>البطاقة موقوفة.</b> راجع مكتب الوثائق لإصدار بديل أو رفع الإيقاف.</p>`
-            : `<div class="row-end" style="margin-top:10px;gap:8px"><button class="btn dan sm" type="button" data-act="escardlost" data-r="lost">الإبلاغ عن فقدان البطاقة</button><button class="btn sm" type="button" data-act="escardlost" data-r="stolen">الإبلاغ عن سرقتها</button></div>`) : ''}
-        </section>
-      </div>
-
-      <!-- 5. التسجيل الذاتي للفصول الدراسية -->
-      <section class="es-card">
-        <h2><span>📚 بوابة التسجيل الذاتي للمقررات الدراسية (Self-Enrollment)</span><span class="es-num">ميزة #5</span></h2>
-        <p class="sub">تسجيل مباشر للمقررات مع التحقق الآلي من الساعات المعتمدة والمتطلبات السابقة وبراءة الذمة المالية.</p>
-        ${enrollFormHtml(D)}
-        <div class="tbl-wrap">
-          <table>
-            <thead><tr><th>رمز المقرر</th><th>اسم المقرر</th><th>الساعات</th><th>الشعبة</th><th>الفصل الدراسي</th><th>الحالة</th><th>إجراء</th></tr></thead>
-            <tbody>
-              ${enrolls.map((e) => `<tr>
-                <td class="mono"><b>${esc(e.course_code)}</b></td>
-                <td>${esc(e.course_name)}</td>
-                <td>${e.credits}</td>
-                <td>${esc(sectionNameOf(D, e.section_id))}</td>
-                <td>${esc(e.semester)}</td>
-                <td><span class="pill ${e.dropped_at ? 'p-rejected' : 'p-approved'}">${esc(e.status)}</span></td>
-                <td>${canDrop(D, e) ? `<button class="btn sm" type="button" data-act="esdrop" data-id="${e.id}">حذف المقرر</button>` : '—'}</td>
-              </tr>`).join('')}
-            </tbody>
-          </table>
-        </div>
-      </section>
-      ${sectionsAdminHtml(D)}
-    `;
-  }
-
-  /* ---------- التبويب 3: الموارد البشرية والرواتب والمالية (7-9) ---------- */
-  function viewHrFinance(D) {
+  /* ---------- قسائم الرواتب الموقعة (في «شؤون الموظفين ← الرواتب») ---------- */
+  function payslipCard(D) {
     const payslips = D.signedPayslips || [];
-    const overloads = D.facultyOverloads || [];
-    const installments = D.feeInstallments || [];
-
     return `
-      <div class="es-grid2">
-        <!-- 7. توليد قسائم الرواتب -->
         <section class="es-card">
-          <h2><span>🧾 قسائم الرواتب الشهرية الموقعة رقمياً</span><span class="es-num">ميزة #7</span></h2>
+          <h2><span>🧾 قسائم الرواتب الشهرية الموقعة رقمياً</span></h2>
           <p class="sub">إصدار قسائم رواتب رسمية موقعة بشهادة PKI تتضمن الراتب الأساسي، الساعات الإضافية، التعويضات، والحسميات.</p>
           <form id="es-payslip-form" class="inline-form" style="margin-bottom:12px">
             <label>اسم الموظف / عضو الهيئة التدريسية<input id="es-ps-name" required></label>
@@ -404,6 +235,11 @@
             <label>علاوة العبء الإضافي<input id="es-ps-ov" type="number"></label>
             <button class="btn pri" type="submit">إصدار قسيمة راتب</button>
           </form>
+          <form id="es-verify-form" class="inline-form" style="margin-bottom:12px">
+            <label style="flex:1">التحقق من توقيع قسيمة<input id="es-v-code" placeholder="PAY-…" dir="ltr" required></label>
+            <button class="btn" type="submit">تحقق من التوقيع</button>
+          </form>
+          ${E.verifyResult ? `<p class="small" style="margin:0 0 12px;color:#1B7F4B"><b>✓ ${esc(E.verifyResult.code)}:</b> ${esc(E.verifyResult.sig)}</p>` : ''}
           <div class="tbl-wrap">
             <table>
               <thead><tr><th>رمز القسيمة</th><th>الموظف</th><th>الأساسي</th><th>العبء الإضافي</th><th>الصافي</th><th>التوقيع الرقمي</th></tr></thead>
@@ -419,11 +255,15 @@
               </tbody>
             </table>
           </div>
-        </section>
+        </section>`;
+  }
 
-        <!-- 8. الحساب الآلي للعبء التدريسي الإضافي -->
+  /* ---------- العبء التدريسي الإضافي (في «أعضاء هيئة التدريس») ---------- */
+  function overloadCard(D) {
+    const overloads = D.facultyOverloads || [];
+    return `
         <section class="es-card">
-          <h2><span>⚖️ الحساب الآلي للعبء التدريسي الإضافي (Faculty Overload)</span><span class="es-num">ميزة #8</span></h2>
+          <h2><span>⚖️ الحساب الآلي للعبء التدريسي الإضافي (Faculty Overload)</span></h2>
           <p class="sub">ربط النصاب التدريسي والاشراف العلمي بمسير الرواتب لحساب تعويض الساعات الإضافية تلقائياً.</p>
           <form id="es-overload-form" class="inline-form" style="margin-bottom:12px">
             <label>عضو الهيئة التدريسية<input id="es-ov-name" required></label>
@@ -448,12 +288,15 @@
               </tbody>
             </table>
           </div>
-        </section>
-      </div>
+        </section>`;
+  }
 
-      <!-- 9. بوابة الدفع الإلكتروني وتقسيط الرسوم -->
+  /* ---------- أقساط الرسوم والسداد (في «المالية ← محاسبة الرسوم والأقساط») ---------- */
+  function installmentsCard(D) {
+    const installments = D.feeInstallments || [];
+    return `
       <section class="es-card">
-        <h2><span>💳 بوابة الدفع الإلكتروني وتقسيط الرسوم الجامعية (E-Payment & Installments)</span><span class="es-num">ميزة #9</span></h2>
+        <h2><span>💳 بوابة الدفع الإلكتروني وتقسيط الرسوم الجامعية (E-Payment & Installments)</span></h2>
         <p class="sub">جدولة الأقساط الجامعية للطلاب مع السداد الإلكتروني الفوري وإصدار إيصالات القبض الرقمية.</p>
         <div class="tbl-wrap">
           <table>
@@ -482,16 +325,12 @@
     `;
   }
 
-  /* ---------- التبويب 4: الإشعارات، نافذة الأوامر، واللجان دون اتصال (10-12) ---------- */
-  function viewUxOffline(D) {
+  /* ---------- إرسال الإشعارات (في «الأخبار والشكاوى») ---------- */
+  function notifCard(D) {
     const notifs = D.notifications || [];
-    const batches = D.offlineBatches || [];
-
     return `
-      <div class="es-grid2">
-        <!-- 10. مركز الإشعارات الفورية متعدد القنوات -->
         <section class="es-card">
-          <h2><span>🔔 مركز الإشعارات الفورية متعدد القنوات (Multi-Channel Hub)</span><span class="es-num">ميزة #10</span></h2>
+          <h2><span>🔔 مركز الإشعارات الفورية متعدد القنوات (Multi-Channel Hub)</span></h2>
           <p class="sub">بث فوري للتنبيهات عبر المتصفح (Web Push)، البريد الرسمي، وقنوات Telegram / WhatsApp.</p>
           <form id="es-notif-form" class="form" style="margin-bottom:14px">
             <div class="inline-form">
@@ -520,11 +359,15 @@
               </tbody>
             </table>
           </div>
-        </section>
+        </section>`;
+  }
 
-        <!-- 12. وضع العمل دون اتصال للجان الامتحانية -->
+  /* ---------- رصد حضور اللجان الامتحانية (في «سجل القاعات») ---------- */
+  function committeeCard(D) {
+    const batches = D.offlineBatches || [];
+    return `
         <section class="es-card">
-          <h2><span>📋 رصد حضور اللجان الامتحانية</span><span class="es-num">ميزة #12</span></h2>
+          <h2><span>📋 رصد حضور اللجان الامتحانية</span></h2>
           <p class="sub">إدخال أرقام الطلاب الحاضرين؛ تُسجَّل في سجل القاعات مباشرة. يتطلب اتصالًا بالخادم.</p>
           <form id="es-offline-form" class="inline-form" style="margin-bottom:14px">
             <label>اللجنة الامتحانية<input id="es-of-comm" required></label>
@@ -547,18 +390,7 @@
               </tbody>
             </table>
           </div>
-        </section>
-      </div>
-
-      <!-- 11. البحث الشامل الفوري (Command Palette Ctrl+\`) -->
-      <section class="es-card">
-        <h2><span>⚡ نافذة الأوامر والبحث الشامل الفوري (Command Palette Ctrl+\`)</span><span class="es-num">ميزة #11</span></h2>
-        <p class="sub">ابحث فوراً في الطلاب، المقررات، قسائم الرواتب، أو انتقل لأي وحدة من وحدات الجامعة السبع عشرة بضغطة زر.</p>
-        <div class="actions" style="margin:0">
-          <button class="btn pri" type="button" data-act="esopencmd">فتح نافذة الأوامر والبحث الشامل (Ctrl+\`)</button>
-        </div>
-      </section>
-    `;
+        </section>`;
   }
 
   /* ---------- التبويب 5: مؤشرات الرئاسة (14) ---------- */
@@ -568,7 +400,7 @@
     return `
       <!-- 14. لوحة مؤشرات الأداء الاستراتيجية لرئاسة الجامعة -->
       <section class="es-card">
-        <h2><span>🏛️ لوحة مؤشرات الأداء الاستراتيجية لرئاسة الجامعة (Executive KPIs)</span><span class="es-num">ميزة #14</span></h2>
+        <h2><span>🏛️ لوحة مؤشرات الأداء الاستراتيجية لرئاسة الجامعة (Executive KPIs)</span></h2>
         <p class="sub">مقارنة بين الكليات محسوبة من العلامات المعتمدة والمستحقات والإيصالات والأبحاث المنشورة.</p>
         <div class="es-kpis" style="margin-bottom:16px">
           <div class="es-kpi"><small>متوسط النجاح العام بالجامعة</small><strong>${kpis.overallSuccessRate ?? 0}%</strong></div>
@@ -593,62 +425,28 @@
     `;
   }
 
-  function enterpriseView(mountEl, _me, defaultTab) {
+  // كل بطاقة تُعرض في القسم الذي يخصها؛ البيانات من /api/enterprise/overview وتُعاد الرسمة عند وصولها
+  const card = (fn, needsData = true) => () => {
     injectStyles();
     ensureEnterpriseDataLoaded();
-    if (defaultTab && E.context !== defaultTab) {
-      E.context = defaultTab;
-      E.tab = defaultTab;
-    }
-    const D = E.data || {};
-    let body = '';
-    if (E.tab === 'academics') body = viewAcademics(D);
-    else if (E.tab === 'student_pki') body = viewStudentPki(D);
-    else if (E.tab === 'hr_finance') body = viewHrFinance(D);
-    else if (E.tab === 'ux_offline') body = viewUxOffline(D);
-    else body = viewExecDevops(D);
-
-    const html = `
-      <div class="es-wrap">
-        <header class="es-banner">
-          <div>
-            <h1>✨ منظومة التطوير المؤسسي الشاملة — Enterprise Suite (15/15 ميزة مفعّلة)</h1>
-            <p>تطبيق عملي متكامل لكافة المقترحات التطويرية الخمسة عشر مع قواعد بياناتها ومحركاتها الحسابية الحية.</p>
-          </div>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <span class="es-badge">15 منظومة حديثة مدمجة</span>
-            <button class="btn sm" style="background:#D5B65D;color:#042f28;font-weight:800;border:0" data-act="esopencmd">⚡ نافذة الأوامر الشاملة (Ctrl+\`)</button>
-          </div>
-        </header>
-
-        <div class="es-tabs" role="tablist" aria-label="أقسام التطوير المؤسسي">
-          ${TABS.map((t) => `<button class="es-tab" role="tab" data-act="estab" data-t="${t[0]}" aria-selected="${E.tab === t[0]}">${esc(t[1])}</button>`).join('')}
-        </div>
-
-        ${body}
-      </div>
-    `;
-    if (mountEl && typeof mountEl === 'object' && 'innerHTML' in mountEl) {
-      mountEl.innerHTML = html;
-    }
-    return html;
-  }
-
-  UA.views.enterprise = enterpriseView;
-  UA.renderEnterpriseSection = function (defaultTab) {
-    return enterpriseView(null, null, defaultTab);
+    if (needsData && !E.data) return '<section class="card"><p class="hint">جارٍ التحميل…</p></section>';
+    return `<div class="es-wrap">${fn(E.data || {})}</div>`;
   };
+  UA.esCards = {
+    gpa: card(gpaCard, false),
+    payslips: card(payslipCard),
+    overload: card(overloadCard),
+    installments: card(installmentsCard),
+    notify: card(notifCard),
+    committee: card(committeeCard),
+  };
+
   // لوحة مؤشرات الرئاسة تُعرض في «الامتحانات والتقييم»؛ البيانات من /api/enterprise/overview (صلاحية stats:read)
   UA.renderExecKpis = function () {
     injectStyles();
     return `<div class="es-wrap">${viewExecDevops(E.data || UA.enterpriseData || {})}</div>`;
   };
-  UA.setEnterpriseTab = function (tab) {
-    if (tab) {
-      E.context = tab;
-      E.tab = tab;
-    }
-  };
+
 
   /* ---------- نافذة الأوامر والبحث الشامل الفوري (Command Palette Modal) ---------- */
   async function openCommandPalette() {
@@ -675,7 +473,6 @@
     }
     const r = E.cmdResults || { students: [], courses: [], payslips: [] };
     const quickViews = [
-      ['enterprise', '✨ منظومة التطوير المؤسسي الشاملة (15 ميزة جديدة)'],
       ['payroll', '👥 منظومة شؤون الموظفين والرواتب (10 شاشات)'],
       ['finance', '💰 المالية والمحاسبة القياسية'],
       ['procurement', '📦 المشتريات والمخازن والأصول'],
@@ -692,7 +489,7 @@
           ${r.students.length ? `<div class="small" style="font-weight:800;color:#0e6655;padding:8px 6px 2px">الطلاب المطابقون</div>` : ''}
           ${r.students.map((s) => `<button class="es-cmd-item" data-cmd-go="affairs"><span>👤 ${esc(s.display_name)} — <b class="mono">${esc(s.student_no)}</b></span><span class="small">${esc(s.program || '')}</span></button>`).join('')}
           ${r.payslips.length ? `<div class="small" style="font-weight:800;color:#0e6655;padding:8px 6px 2px">قسائم الرواتب</div>` : ''}
-          ${r.payslips.map((p) => `<button class="es-cmd-item" data-cmd-tab="hr_finance"><span>🧾 ${esc(p.employee_name)} (<span class="mono">${esc(p.payslip_code)}</span>)</span><span class="small">${nf(p.net_salary)} ل.س</span></button>`).join('')}
+          ${r.payslips.map((p) => `<button class="es-cmd-item" data-cmd-go="payroll"><span>🧾 ${esc(p.employee_name)} (<span class="mono">${esc(p.payslip_code)}</span>)</span><span class="small">${nf(p.net_salary)} ل.س</span></button>`).join('')}
         </div>
       </div>
     `;
@@ -716,12 +513,6 @@
         await UA.go(v);
         return;
       }
-      const tabBtn = ev.target.closest('[data-cmd-tab]');
-      if (tabBtn) {
-        E.tab = tabBtn.dataset.cmdTab;
-        closeCommandPalette();
-        await UA.go('enterprise');
-      }
     };
   }
 
@@ -744,20 +535,6 @@
       await api('PUT', `/api/enterprise/sections/${d.id}`, { active: d.on === '1' });
       await UA.loaders.enterprise();
       render();
-    },
-    escardlost: async (_el, d) => {
-      if (!confirm('ستتوقف البطاقة فوراً عند البوابات والقاعات، ولا يرفع الإيقاف إلا مكتب الوثائق. متابعة؟')) return;
-      await api('POST', `/api/students/${S.me.id}/card/block`, { reason: d.r });
-      await UA.loaders.enterprise();
-      render();
-      toast('✓ أُوقفت البطاقة');
-    },
-    estab: async (_el, d) => {
-      E.tab = d.t;
-      render();
-    },
-    esopencmd: async () => {
-      await openCommandPalette();
     },
     espayinst: async (_el, d) => {
       const r = await api('POST', `/api/enterprise/installments/${d.id}/pay`, { payment_method: 'بطاقة الدفع الإلكتروني الجامعية' });
@@ -893,9 +670,6 @@
     }
   });
 
-  UA.openEnterpriseSuite = async (tab) => {
-    if (tab) E.tab = tab;
-    await UA.go('enterprise');
-  };
+
   UA.openCommandPalette = openCommandPalette;
 })();
