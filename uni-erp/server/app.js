@@ -20,6 +20,7 @@ import { encryptLegacyAppealText } from './services/student_regulations.js';
 import { captureSnapshot } from './services/warehouse.js';
 import { escalateOverdueRequests } from './services/escalation.js';
 import { remindOverdueCouncilTasks } from './services/councils.js';
+import { platformTick } from './services/platform/automation.js';
 import { ensureForms } from './services/forms/index.js';
 import { ready as financeReady } from './services/finance/core.js';
 import { hashPassword } from './security.js';
@@ -128,6 +129,7 @@ export async function createApp(overrides = {}) {
     try { expireDisciplinaryHolds(db); } catch (e) { console.warn('disciplinary expiry:', e.message); }
     try { escalateOverdueRequests(db); } catch (e) { console.warn('request escalation:', e.message); }
     try { remindOverdueCouncilTasks(db); } catch (e) { console.warn('council tasks:', e.message); }
+    try { platformTick(db); } catch (e) { console.warn('platform tick:', e.message); }
   };
   const holdsFirst = scheduler ? setTimeout(expireHolds, 5_000) : null, holdsTimer = scheduler ? setInterval(expireHolds, 3600_000) : null;
   holdsFirst?.unref(); holdsTimer?.unref();

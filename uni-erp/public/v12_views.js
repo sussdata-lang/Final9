@@ -965,12 +965,16 @@
           });
         });
       } else if (activeTab === 'faculty') {
+        const canPromo = UA.S.me?.role === 'admin' || UA.can('faculty:manage') || UA.can('hr:manage');
         box.innerHTML = `
             <div class="v12-card">
-              <h3>ملفات الترقيات العلمية لأعضاء هيئة التدريس</h3>
+              <div class="spread" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+                <h3 style="margin:0">ملفات الترقيات العلمية لأعضاء هيئة التدريس</h3>
+                ${canPromo ? '<button class="btn pri" type="button" id="btn-add-promo">+ ملف ترقية جديد</button>' : ''}
+              </div>
               <div class="tbl-wrap">
                 <table class="grid-tbl">
-                  <thead><tr><th>العضو</th><th>الرتبة الحالية ← المستهدفة</th><th>نقاط الأبحاث</th><th>سنوات الخدمة</th><th>حالة لجنة الترقيات</th></tr></thead>
+                  <thead><tr><th>العضو</th><th>الرتبة الحالية ← المستهدفة</th><th>نقاط الأبحاث</th><th>سنوات الخدمة</th><th>حالة لجنة الترقيات</th><th>إجراءات</th></tr></thead>
                   <tbody>
                     ${d.promotions.map((p) => `
                       <tr>
@@ -978,14 +982,47 @@
                         <td>${esc(p.current_rank)} ← <b>${esc(p.target_rank)}</b></td>
                         <td class="mono"><b>${p.research_points}</b> / ${p.required_points}</td>
                         <td>${p.teaching_years} سنوات</td>
-                        <td><span class="pill ${p.committee_status === 'مستوفٍ للشروط' ? 'p-approved' : 'p-review'}">${esc(p.committee_status)}</span></td>
+                        <td><span class="pill ${/مستوفٍ للشروط|معتمدة/.test(p.committee_status) && !/غير/.test(p.committee_status) ? 'p-approved' : /مرفوضة|غير/.test(p.committee_status) ? 'p-rejected' : 'p-review'}">${esc(p.committee_status)}</span></td>
+                        <td>${canPromo && p.committee_status !== 'معتمدة بقرار مجلس الجامعة' ? `<button class="btn sm btn-edit-promo" type="button" data-id="${p.id}">تحديث</button>` : ''}</td>
                       </tr>
-                    `).join('')}
+                    `).join('') || '<tr><td colspan="6" class="empty">لا ملفات ترقية بعد.</td></tr>'}
                   </tbody>
                 </table>
               </div>
             </div>
         `;
+        // ملف الترقية: العضو من سجل الهيئة التدريسية (أو اسم يُكتب)، والرتب من «الدرجات العلمية» في الإعدادات
+        const promoFields = (o, p = {}) => {
+          const opt = (list, cur) => list.map((x) => `<option${x === cur ? ' selected' : ''}>${esc(x)}</option>`).join('');
+          return `${p.id ? `<p class="small hint" style="grid-column:1/-1">العضو: <b>${esc(p.faculty_name)}</b>. اعتماد الترقية بقرار المجلس يرفع رتبته في سجل الهيئة التدريسية تلقائياً.</p>` : `
+            <label>عضو الهيئة التدريسية <select name="member_id" data-no-other="1"><option value="">— غير مسجَّل: اكتب الاسم أدناه —</option>${o.members.map((m) => `<option value="${m.id}">${esc(m.name)} · ${esc(m.rank)}</option>`).join('')}</select></label>
+            <label>الاسم (لغير المسجَّل) <input name="faculty_name" maxlength="100" placeholder="د. اسم العضو"></label>`}
+            <label>التخصص <input name="specialty" maxlength="120" value="${esc(p.specialty || '')}" placeholder="يُؤخذ من سجل العضو إن تُرك فارغاً"></label>
+            <label>الرتبة الحالية <select name="current_rank" data-no-other="1"><option value="">${p.id ? '' : '— من سجل العضو —'}</option>${opt(o.ranks, p.current_rank)}</select></label>
+            <label>الرتبة المستهدفة <select name="target_rank" data-no-other="1" required>${opt(o.ranks, p.target_rank)}</select></label>
+            <label>نقاط الأبحاث <input name="research_points" type="number" min="0" max="1000" step="0.5" required value="${p.research_points ?? ''}" placeholder="0"></label>
+            <label>النقاط المطلوبة <input name="required_points" type="number" min="1" max="1000" step="0.5" required value="${p.required_points ?? 100}"></label>
+            <label>سنوات الخدمة <input name="teaching_years" type="number" min="0" max="60" step="1" required value="${p.teaching_years ?? ''}" placeholder="4"></label>
+            <label>حالة لجنة الترقيات <select name="committee_status" data-no-other="1">${opt(o.statuses, p.committee_status || o.statuses[0])}</select></label>`;
+        };
+        const done = (r, msg) => notify(r && r.rankUpdated ? `${msg}، ورُفعت رتبة العضو في سجل الهيئة التدريسية` : msg);
+        const addBtn = box.querySelector('#btn-add-promo');
+        if (addBtn) addBtn.onclick = async () => {
+          const o = await api('GET', '/api/expansions/promotions/options');
+          openModal('فتح ملف ترقية علمية', promoFields(o), async (data) => {
+            const r = await api('POST', '/api/expansions/promotions', { ...data, member_id: data.member_id ? Number(data.member_id) : null });
+            done(r, 'فُتح ملف الترقية'); render();
+          });
+        };
+        box.querySelectorAll('.btn-edit-promo').forEach((btn) => {
+          btn.onclick = async () => {
+            const o = await api('GET', '/api/expansions/promotions/options'), p = d.promotions.find((x) => String(x.id) === btn.dataset.id);
+            openModal('تحديث ملف الترقية', promoFields(o, p), async (data) => {
+              const r = await api('PUT', `/api/expansions/promotions/${p.id}`, data);
+              done(r, 'حُدّث ملف الترقية'); render();
+            });
+          };
+        });
       }
     }
     await render();
@@ -1526,7 +1563,7 @@
               <span class="v12-badge-gold">الذكاء الاصطناعي</span>
               <h1>الذكاء الاصطناعي الجامعي (AI-Powered University)</h1>
               <p>نظام الإنذار الأكاديمي المبكر لكشف التعثر الطلابي، المرشد الأكاديمي الذكي للخطط واللوائح، والمصنّف الآلي للمراسلات والشكاوى.</p>
-              ${d.aiEnabled ? '' : '<p class="small" style="margin-top:8px;font-weight:700">لا يوجد نموذج ذكاء اصطناعي مفعّل: الردود والتشخيصات هنا مولّدة بقواعد ثابتة.</p>'}
+              <p class="small" style="margin-top:8px;font-weight:700">الردود والتشخيصات هنا مولّدة محلياً بقواعد ثابتة، ولا تُرسل أي بيانات خارج النظام.</p>
             </div>
           </div>
           <div class="v12-kpis">

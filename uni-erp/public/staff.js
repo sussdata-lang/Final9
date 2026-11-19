@@ -4,7 +4,8 @@
   const DEF_LV = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة'];
   const getLV = () => ((S.limits && S.limits.levels) || DEF_LV);
   const lvl = (n) => 'السنة ' + ((getLV())[n - 1] || n);
-  const sem = (n) => (n === 1 ? 'الفصل الأول' : 'الفصل الثاني');
+  const SEMS = [[1, 'الأول'], [2, 'الثاني'], [3, 'الثالث']];   // السنة ثلاثة فصول (دليل الطالب)
+  const sem = (n) => ({ 1: 'الفصل الأول', 2: 'الفصل الثاني', 3: 'الفصل الثالث' })[n] || '';
   const defYear = () => { const d = new Date(), y = d.getMonth() >= 8 ? d.getFullYear() : d.getFullYear() - 1; return `${y}/${y + 1}`; };
 
   const A = { tab: 'courses', programs: [], courses: [], cf: null, gt: null, modal: null, news: [], cmps: [], cfilter: 'open', csel: null, nedit: null };
@@ -47,7 +48,7 @@
     return { rows, shown, pages, page };
   }
   function courseRows(v) {
-    return v.shown.map((c) => `<tr${c.active ? '' : ' class="off"'}><td class="nm">${esc(c.faculty || '—')}</td><td>${esc(c.program === c.faculty ? '—' : c.program || '—')}</td><td class="nowrap">${lvl(c.level)}</td><td class="nowrap">${c.semester === 1 ? 'الأول' : 'الثاني'}</td><td class="nm"><b>${esc(c.name)}</b></td><td class="mono">${esc(c.code || '—')}</td><td>${c.hours}</td><td>${esc(c.instructor || '—')}</td><td>${c.grades}</td>
+    return v.shown.map((c) => `<tr${c.active ? '' : ' class="off"'}><td class="nm">${esc(c.faculty || '—')}</td><td>${esc(c.program === c.faculty ? '—' : c.program || '—')}</td><td class="nowrap">${lvl(c.level)}</td><td class="nowrap">${({ 1: 'الأول', 2: 'الثاني', 3: 'الثالث' })[c.semester] || ''}</td><td class="nm"><b>${esc(c.name)}</b></td><td class="mono">${esc(c.code || '—')}</td><td>${c.hours}</td><td>${esc(c.instructor || '—')}</td><td>${c.grades}</td>
       <td>${pill(c.active, 'فعّال', 'معطَّل')}</td><td class="nowrap"><button class="btn sm" data-act="acedit" data-id="${c.id}">تعديل</button> <button class="btn sm" data-act="gcomp" data-id="${c.id}" data-name="${esc(c.name)}">مكونات العلامة</button> <button class="btn sm" data-act="actoggle" data-id="${c.id}" data-on="${c.active ? 0 : 1}">${c.active ? 'تعطيل' : 'تفعيل'}</button> <button class="btn sm bad" data-act="acdel" data-id="${c.id}">حذف</button></td></tr>`).join('')
       || '<tr><td colspan="12" class="empty">لا مقررات مطابقة. غيّر الفلاتر أو أضف مقرراً.</td></tr>';
   }
@@ -63,7 +64,7 @@
         <label>الكلية / المعهد<select data-cf="faculty">${opts(facs().map((x) => [x.id, x.name]), f.faculty, 'الكل')}</select></label>
         <label>البرنامج<select data-cf="program">${opts(progs.map((p) => [p.id, p.label || p.name]), f.program, 'الكل')}</select></label>
         <label>السنة<select data-cf="level">${opts(lvlList(), f.level, 'الكل')}</select></label>
-        <label>الفصل<select data-cf="semester">${opts([[1, 'الأول'], [2, 'الثاني']], f.semester, 'الكل')}</select></label>
+        <label>الفصل<select data-cf="semester">${opts(SEMS, f.semester, 'الكل')}</select></label>
         <label>الحالة<select data-cf="status">${opts([['on', 'فعّال'], ['off', 'معطَّل']], f.status, 'الكل')}</select></label>
         ${f.q || f.faculty || f.program || f.level || f.semester || f.status ? '<button class="btn sm" data-act="crclear">مسح الفلاتر</button>' : ''}</div>
       <div id="cr-table">${courseTable()}</div></section>`;
@@ -87,7 +88,7 @@
     return `<td class="nowrap"><span class="pill ${w[0]}">${w[1]}</span> ${btn}</td>`;
   }
   function gradeRows(d) {
-    return d.rows.map((x) => `<tr><td class="mono nowrap">${esc(x.studentNo)}</td><td class="nm"><button class="link" data-act="strecord" data-id="${x.studentId}" title="السجل الموحّد 360°"><b>${esc(x.studentName)}</b></button></td>${wfCell(x, d.workflow)}<td class="nm">${esc(x.faculty)}</td><td class="nm"><b>${esc(x.course)}</b>${x.code ? ` <span class="mono small">${esc(x.code)}</span>` : ''}</td><td class="nowrap">${x.level ? lvl(x.level) : '—'} / ${x.semester === 1 ? 'الأول' : x.semester === 2 ? 'الثاني' : '—'}</td><td class="mono">${esc(x.academicYear || '—')}</td>
+    return d.rows.map((x) => `<tr><td class="mono nowrap">${esc(x.studentNo)}</td><td class="nm"><button class="link" data-act="strecord" data-id="${x.studentId}" title="السجل الموحّد 360°"><b>${esc(x.studentName)}</b></button></td>${wfCell(x, d.workflow)}<td class="nm">${esc(x.faculty)}</td><td class="nm"><b>${esc(x.course)}</b>${x.code ? ` <span class="mono small">${esc(x.code)}</span>` : ''}</td><td class="nowrap">${x.level ? lvl(x.level) : '—'} / ${({ 1: 'الأول', 2: 'الثاني', 3: 'الثالث' })[x.semester] || '—'}</td><td class="mono">${esc(x.academicYear || '—')}</td>
       <td>${x.theory ?? '—'}</td><td>${x.practical ?? '—'}</td><td><b>${x.total}</b></td><td>${pill(x.passed, 'ناجح', 'راسب')}</td><td class="nowrap"><button class="btn sm" data-act="gtedit" data-id="${x.id}">تعديل</button> <button class="btn sm bad" data-act="gtdel" data-id="${x.id}">حذف</button></td></tr>`).join('')
       || '<tr><td colspan="11" class="empty">لا علامات مطابقة للبحث.</td></tr>';
   }
@@ -111,7 +112,7 @@
       <div class="filters no-print"><label class="grow">بحث<input data-gt="q" id="gt-q" value="${esc(g.q)}" placeholder="اسم الطالب، الرقم الجامعي، الكلية أو المعهد، المادة…" maxlength="80" autocomplete="off"></label>
         <label>الكلية / المعهد<select data-gt="faculty">${opts(o.faculties.map((x) => [x.id, x.name]), g.faculty, 'الكل')}</select></label>
         <label>السنة<select data-gt="level">${opts(lvlList(), g.level, 'الكل')}</select></label>
-        <label>الفصل<select data-gt="semester">${opts([[1, 'الأول'], [2, 'الثاني']], g.semester, 'الكل')}</select></label>
+        <label>الفصل<select data-gt="semester">${opts(SEMS, g.semester, 'الكل')}</select></label>
         <label>العام الدراسي<select data-gt="year">${opts(o.years.map((y) => [y, y]), g.year, 'الكل')}</select></label>
         <label>النتيجة<select data-gt="status">${opts([['pass', 'ناجح'], ['fail', 'راسب']], g.status, 'الكل')}</select></label>
         <label>الاعتماد<select data-gt="workflow">${opts([['draft', 'مدخلة'], ['reviewed', 'مراجَعة'], ['approved', 'معتمدة']], g.workflow, 'الكل')}</select></label>
@@ -128,7 +129,7 @@
     return `<h2 id="mttl">${ce ? 'تعديل مقرر' : 'إضافة مقرر'}</h2><form class="form" id="acadd" style="border:0;margin:0;padding:0">
       <div class="two"><label>الكلية / المعهد<select id="ac-nfac"${ce ? ' disabled' : ''} data-mc="fac">${opts(fl.map((x) => [x.id, x.name]), fid)}</select></label>
         <label>البرنامج<select id="ac-nprog"${ce ? ' disabled' : ''} data-mc="prog">${opts(plist.map((p) => [p.id, p.label || p.name]), pid)}</select></label></div>
-      <div class="two"><label>السنة الدراسية<select id="ac-nlvl">${opts(lvlList(yrs(pid)), ce ? ce.level : (dr.lvl || 1))}</select></label><label>الفصل<select id="ac-nsem">${opts([[1, 'الأول'], [2, 'الثاني']], ce ? ce.semester : (dr.sem || 1))}</select></label></div>
+      <div class="two"><label>السنة الدراسية<select id="ac-nlvl">${opts(lvlList(yrs(pid)), ce ? ce.level : (dr.lvl || 1))}</select></label><label>الفصل<select id="ac-nsem">${opts(SEMS, ce ? ce.semester : (dr.sem || 1))}</select></label></div>
       <label>اسم المقرر<input id="ac-nname" maxlength="100" required value="${ce ? esc(ce.name) : esc(dr.name || '')}"></label>
       <div class="two"><label>الساعات<input id="ac-nhours" type="number" min="0" max="${(UA.S.limits || {}).maxCourseHours || 12}" value="${ce ? ce.hours : (dr.hours || (UA.S.limits || {}).defaultCourseHours || 3)}"></label><label>الرمز (اختياري)<input id="ac-ncode" maxlength="20" dir="ltr" value="${ce ? esc(ce.code || '') : esc(dr.code || '')}"></label></div>
       <label>المدرّس (اختياري)<input id="ac-ninst" maxlength="80"${ce && ce.memberId ? ' readonly' : ''} value="${ce ? esc(ce.instructor || '') : esc(dr.inst || '')}"></label>

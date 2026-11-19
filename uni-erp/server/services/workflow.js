@@ -3,6 +3,7 @@
 import { tx } from '../db.js';
 import { audit } from '../audit.js';
 import { HttpError } from '../http.js';
+import { guardCourseYear } from './grading.js';    // استيراد دائري مع grading.js آمن: يُستعمل وقت التنفيذ لا وقت التحميل
 
 export const STAGES = ['draft', 'reviewed', 'approved'];
 const STAGE_LABEL = { draft: 'مدخلة', reviewed: 'مراجَعة', approved: 'معتمدة' };
@@ -88,6 +89,7 @@ export function transitionGrades({ db }, actor, b, ip) {
         }
       } else if (from === 'approved') {                    // إعادة فتح علامة معتمدة
         if (!canApprove(actor)) throw new HttpError(403, 'إعادة فتح علامة معتمدة تتطلب صلاحية الاعتماد.', 'forbidden');
+        if (g.course_id) guardCourseYear(db, g.course_id, g.academic_year);      // لا تُعاد فتحاً أثناء إعلان نتائج المقرر
         if (db.prepare('SELECT 1 FROM grade_locks WHERE course_id = ? AND academic_year = ?').get(g.course_id, g.academic_year) && !actor?.can?.('grade:unlock')) throw new HttpError(409, 'أُعلنت نتائج هذا المقرر وقُفلت؛ لا تُعاد علاماته للتدقيق إلا بالمسار الاستثنائي.', 'grades_locked');
         if (stage !== 'reviewed' && stage !== 'draft') { skipped.push({ id, reason: 'تُعاد المعتمدة إلى «مراجَعة» أو «مدخلة» فقط' }); continue; }
         needJustification(just, b?.decisionNo);
@@ -98,7 +100,7 @@ export function transitionGrades({ db }, actor, b, ip) {
       else db.prepare("UPDATE grades SET workflow_status = 'draft', reviewed_by = NULL, reviewed_at = NULL, approved_by = NULL, approved_at = NULL WHERE id = ?").run(id);
       logChange(db, actor, g, `${STAGE_LABEL[from]} ← ${STAGE_LABEL[stage]}`, { status: stage }, from === 'approved' || ownerOnly ? just : null);
       updated.push(id);
-      if (stage === 'approved') approvedNow.push({ studentId: g.student_id, course: g.course });
+      if (stage === 'approved') approvedNow.push({ studentId: g.student_id, course: g.course, courseId: Number(g.course_id), year: String(g.academic_year ?? '') });
     }
     if (updated.length) audit(db, actor, `نقل ${updated.length} علامة إلى «${STAGE_LABEL[stage]}»`, `grades:${updated.slice(0, 5).join(',')}${updated.length > 5 ? '…' : ''}`.slice(0, 100), ip);
   });

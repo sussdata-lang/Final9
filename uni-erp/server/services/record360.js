@@ -5,7 +5,7 @@ import { gradesFor, passMarkFor } from './academics.js';
 import { detectScheduleConflicts } from './schedule.js';
 import { decryptField } from '../lib/data_crypto.js';
 
-// المعدل التراكمي: متوسط أحدث محاولة معتمدة لكل مقرر موزونة بالساعات
+// المعدل التراكمي: متوسط المحاولة المحتسبة (الأعلى علامة، دليل الطالب) المعتمدة لكل مقرر موزونة بالساعات
 function gpaOf(db, studentId) {
   const g = gradesFor(db, studentId, null, { onlyApproved: true });
   const hrs = g.grades.reduce((s, x) => s + x.hours, 0);

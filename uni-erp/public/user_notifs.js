@@ -32,11 +32,17 @@
     if (state.unread && !bell.querySelector('.sx-dot')) bell.insertAdjacentHTML('beforeend', '<i class="sx-dot"></i>');
   }
 
+  // زر «النقاش» في أي شاشة: يفتح سجل النقاش والأنشطة في مركز العمل (platform.js يُحمَّل عند فتحه)
+  UA.actions = UA.actions || {};
+  UA.actions.recthread = (_el, d) => { UA.hubDeepLink = `?view=hub&rec=${d.m}:${d.id}`; return UA.go('hub'); };
+
   function openTarget(url) {
     const m = /[?&]view=lms&tab=assignments&id=(\d+)/.exec(url || '');
     if (m) { UA.lmsDeepLink = { id: Number(m[1]) }; return UA.go('lms'); }
     // تنبيهات مركز الأمان تفتح تبويبه في شاشة التدقيق
     if (/[?&]view=audit&tab=siem/.test(url || '')) { if (UA.S) UA.S.auditTab = 'siem'; return UA.go('audit'); }
+    // مركز العمل: طلب موافقة أو نقاش سجل أو أنشطتي
+    if (/[?&]view=hub/.test(url || '')) { UA.hubDeepLink = url; return UA.go('hub'); }
     return undefined;
   }
 

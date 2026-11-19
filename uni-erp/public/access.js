@@ -1347,6 +1347,7 @@
           payload.revokedPermissions = [...eb.revokedPerms];
           payload.allowedViews = [...eb.allowedViews];
           payload.hiddenTabs = [...(eb.hiddenTabs || [])];
+          payload.permissionsAreChecked = true;   // المحرّر يرسل المؤشَّر كله؛ الخادم يحفظ الفرق عن الدور فلا تلتصق صلاحيات دور سابق
         }
         await api('PUT', `/api/admin/users/${d.id}`, payload);
         X.edit = null;
@@ -1507,6 +1508,8 @@
           revokedPermissions: accessMode === 'role' ? [] : [...X.builder.revokedPerms],
           allowedViews: accessMode === 'role' ? [] : [...X.builder.allowedViews],
           hiddenTabs: accessMode === 'role' ? [] : [...(X.builder.hiddenTabs || [])],
+          // المربعات المؤشَّرة كلها لا الإضافات: الخادم يحفظ الفرق عن أساس الدور والوحدة
+          permissionsAreChecked: accessMode !== 'role',
         };
         const r = await api('POST', '/api/admin/users', payload);
         X.cred = { username, tempPassword };

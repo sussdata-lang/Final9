@@ -106,7 +106,8 @@ test('السجل 360: قسم المقررات حتى دون علامات، وز�
   await page.locator('[data-act=r360print]').click();
   // المستند يُبنى في طبقة A4 المستقلة بالترويسة الرسمية
   // الترويسة تُبنى بعد جلب بيانات الموقع، فننتظرها مع نص المستند
-  await page.waitForFunction(() => document.querySelector('#a4root .rec-print')?.textContent.includes('المقررات') && !!document.querySelector('#a4root .a4-head'));
+  // ووضع الطباعة يُفعَّل بعد تحميل الشعار والخط وقياس «ملاءمة صفحة واحدة»، فننتظره أيضاً
+  await page.waitForFunction(() => document.querySelector('#a4root .rec-print')?.textContent.includes('المقررات') && !!document.querySelector('#a4root .a4-head') && document.body.classList.contains('print-a4'), null, { timeout: 8000 });
   assert.ok(await page.evaluate(() => !!document.querySelector('#a4root .a4-head') && document.body.classList.contains('print-a4')));
 });
 

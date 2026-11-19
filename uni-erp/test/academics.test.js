@@ -79,6 +79,8 @@ test('العلامات: الإدخال بقيود، والنجاح/الرسوب�
   const r = await enter({ academicYear: '2025/2026', theory: 55, practical: 15 });             // محاولة ثانية: نجاح (70)
   assert.equal(r.status, 200, r.text);
 
+  // الطالب يرى العلامة المعتمدة بعد إعلان نتيجة مقررها لكل عام
+  for (const y of ['2024/2025', '2025/2026']) app.db.prepare('INSERT INTO grade_locks (course_id, academic_year, locked_by, locked_at) VALUES (?,?,NULL,?) ON CONFLICT DO NOTHING').run(courseId, y, Date.now());
   const g = await api('GET', '/api/me/grades', { cookie: stu });
   assert.equal(g.json.level, 2); assert.equal(g.json.grades.length, 1);
   const row = g.json.grades[0];
@@ -160,4 +162,40 @@ test('/api/me يعيد المستخدم عند وجود جلسة (إعادة ت�
   const c = await loginAs(r.json.credentials.username, r.json.credentials.tempPassword);
   const m2 = await api('GET', '/api/me', { cookie: c });
   assert.equal(m2.json.user.mustChange, true);
+});
+
+// دليل الطالب: «عند إعادة دراسة مقرر تُحتسب العلامة الأعلى»، والسنة ثلاثة فصول، وسلّم التقديرات (شرف/امتياز/جيد جداً/جيد/مقبول)
+test('دليل الطالب: المحاولة الأعلى تُحتسب وإن تلتها محاولة أدنى، والفصل الثالث، والتقدير في كشف العلامات', async () => {
+  // محاولة ثالثة أحدث لكنها أدنى (50) من المحاولة الناجحة (70)
+  const r = await api('POST', `/api/students/${stuId}/grades`, { cookie: staff, body: { courseId, academicYear: '2026/2027', theory: 40, practical: 10 } });
+  assert.equal(r.status, 200, r.text);
+  app.db.prepare('INSERT INTO grade_locks (course_id, academic_year, locked_by, locked_at) VALUES (?,?,NULL,?) ON CONFLICT DO NOTHING').run(courseId, '2026/2027', Date.now());
+  for (const [who, url] of [[stu, '/api/me/grades'], [staff, `/api/students/${stuId}/grades`]]) {
+    const g = (await api('GET', url, { cookie: who })).json, row = g.grades.find((x) => x.courseId === courseId);
+    assert.equal(row.total, 70, 'الأعلى (70) هي المحتسبة لا الأحدث (50)'); assert.equal(row.academicYear, '2025/2026');
+    assert.equal(row.rating, 'جيد');
+    assert.deepEqual(row.previous.map((p) => p.total), [50, 30], 'بقية المحاولات «علامات سابقة» (الأعلى أولاً)');
+    assert.equal(g.summary.average, 70); assert.equal(g.summary.failed, 0);
+  }
+
+  // كشف العلامات الرسمي: الأعلى غير «سابقة»، والمعدل بها، والتقدير بسلّم الدليل المحفوظ في الوثيقة
+  const pending = app.db.prepare("SELECT id FROM requests WHERE student_id = ? AND service_code = 'transcript' AND status = 'review' ORDER BY id DESC").get(stuId);
+  assert.ok(pending, 'طلب كشف العلامات من الاختبار السابق');
+  const ap = await api('POST', `/api/requests/${pending.id}/approve`, { cookie: staff });
+  assert.equal(ap.status, 200, ap.text);
+  const doc = (await api('GET', `/api/documents/${ap.json.request.document.code}`, { cookie: stu })).json.document;
+  const tr = doc.payload.transcript, tries = tr.grades.filter((g) => g.course === 'أمن الشبكات');
+  assert.deepEqual(tries.map((g) => [g.mark, g.previous]), [[70, false], [50, true], [30, true]]);
+  assert.equal(tr.average, 70);
+  assert.deepEqual(tr.ratingScale.tiers.map((t) => [t.label, t.min]), [['شرف', 95], ['امتياز', 85], ['جيد جداً', 75], ['جيد', 65]]);
+  assert.equal(doc.view.summary.rating, 'جيد');
+  const viewRows = doc.view.years.flatMap((y) => y.terms.flatMap((t) => t.rows)).filter((x) => x.course === 'أمن الشبكات');
+  assert.deepEqual(viewRows.map((x) => [x.mark, x.prev, x.rating]), [[70, false, 'جيد'], [50, true, 'راسب'], [30, true, 'راسب']]);
+
+  // الفصل الثالث مقبول للمقررات، والرابع مرفوض، وفلتر الفصل 3 يعمل
+  const add = (semester, name) => api('POST', '/api/courses', { cookie: staff, body: { programId: 2, level: 2, semester, name, hours: 2 } });
+  assert.equal((await add(3, 'مقرر الفصل الثالث')).status, 201);
+  assert.equal((await add(4, 'مقرر فصل رابع')).status, 400);
+  const s3 = await api('GET', '/api/courses?semester=3', { cookie: stu });
+  assert.deepEqual(s3.json.courses.map((c) => c.name), ['مقرر الفصل الثالث']);
 });

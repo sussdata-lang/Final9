@@ -240,7 +240,9 @@
     U.biometrics.devices = (d.biometrics || []).map((b) => ({ code: b.device_code, name: b.location, ip: b.ip_address, status: b.status, syncedAt: b.last_sync_at ? new Date(Number(b.last_sync_at)).toLocaleString('ar-SY') : '—', recordsToday: Number(b.logs_synced) || 0 }));
   }
 
+  // أجهزة البصمة وتقييم الأداء الشامل في hr_bio.js (الشاشتان القديمتان أدناه احتياط إن لم يُحمَّل)
   function renderBiometricsTab() {
+    if (UA.hrBio) return UA.hrBio.render();
     const devs = U.biometrics.devices.map((d) => `<tr>
       <td class="mono">${esc(d.code)}</td>
       <td><b>${esc(d.name)}</b></td>
@@ -269,6 +271,7 @@
   }
 
   function renderAppraisalsTab() {
+    if (UA.hrAppraisal) return UA.hrAppraisal.render();
     const depts = (S.limits && S.limits.dropdowns && S.limits.dropdowns.departments) || [];
     const rows = U.appraisals.map((a) => `<tr>
       <td><b>${esc(a.employee_name)}</b></td>
@@ -1321,7 +1324,10 @@
         curGpa: cur,
         hrs: hrs,
         expGpa: exp,
-        letter: exp >= 90 ? 'ممتاز (A+)' : exp >= 85 ? 'جيد جداً مرتفع (A)' : 'جيد جداً (B+)',
+        // سلّم دليل الطالب من الإعدادات (S.limits.ratingScale)، وإلا الحدود الافتراضية للدليل
+        letter: (() => { const sc = (S.limits && S.limits.ratingScale) || { totalMax: 100, passMark: 60, tiers: [{ label: 'شرف', min: 95 }, { label: 'امتياز', min: 85 }, { label: 'جيد جداً', min: 75 }, { label: 'جيد', min: 65 }] };
+          const v = Number(exp); if (v < sc.passMark) return 'إنذار أكاديمي'; const pct = v / (sc.totalMax || 100) * 100;
+          return (sc.tiers.find((t) => pct >= t.min) || { label: 'مقبول' }).label; })(),
         delta: (delta >= 0 ? '+' : '') + delta + '%'
       };
       toast(`تمت المحاكاة: المعدل المتوقع ${exp}%`);

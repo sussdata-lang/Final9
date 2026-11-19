@@ -12,6 +12,7 @@ import { detectMime } from './requests.js';
 import { notify } from './push.js';
 import { getSetting } from './settings.js';
 import { getCachedStaffUsersMap } from '../cache.js';
+import { templateApprovers } from './platform/approvals.js';
 
 const bad = (m, s = 400) => new HttpError(s, m, 'validation');
 const maxApprovers = (db) => getSetting(db, 'corr.max_approvers'), maxFiles = (db) => getSetting(db, 'corr.max_files');
@@ -115,10 +116,27 @@ export function listPeople({ db }, user) {
     .sort((a, b) => a.unit.localeCompare(b.unit) || a.name.localeCompare(b.name));
 }
 
+// الخطوات الثابتة التي يعرّفها المدير (نوع «المراسلات الداخلية» في أنواع الموافقات) تسبق معتمدي الكاتب.
+// من كان منهم في القائمة أصلاً يُنقل إلى موضع الخطوة الثابتة، ومن كان في النسخة يخرج منها لأنه صار معتمداً.
+function applyTemplate(db, user, d) {
+  const tpl = templateApprovers(db, 'corr_doc', user);
+  if (!tpl.length) return [];
+  const chosen = db.prepare('SELECT user_id FROM corr_approvers WHERE doc_id = ? ORDER BY seq').all(d.id).map((r) => Number(r.user_id));
+  const order = [...new Set([...tpl.map((t) => t.userId), ...chosen])];
+  if (order.length > chosen.length || order.some((u, i) => u !== chosen[i])) {
+    db.prepare('DELETE FROM corr_approvers WHERE doc_id = ?').run(d.id);
+    order.forEach((u, i) => db.prepare('INSERT INTO corr_approvers (doc_id, user_id, seq) VALUES (?,?,?)').run(d.id, u, i + 1));
+    for (const t of tpl) db.prepare('DELETE FROM corr_cc WHERE doc_id = ? AND user_id = ?').run(d.id, t.userId);
+  }
+  return tpl;
+}
+
 function send(deps, user, d) {
   const { db } = deps;
+  const tpl = applyTemplate(db, user, d);
   db.prepare("UPDATE corr_docs SET status = 'pending', sent_at = ? WHERE id = ?").run(Date.now(), d.id);
   ev(db, d.id, 'send', user, 'أُرسل المستند للاعتماد');
+  if (tpl.length) ev(db, d.id, 'send', null, `أُضيفت خطوات المسار المعتمد: ${tpl.map((t) => `${t.label} (${staffUser(db, t.userId)?.name ?? '—'})`).join('، ')}`);
   const fresh = db.prepare('SELECT * FROM corr_docs WHERE id = ?').get(d.id);
   note(deps, pendingApprovers(db, fresh).map((a) => a.user_id), fresh, `مستند جديد بانتظار اعتمادك: ${fresh.title}`);
   note(deps, ccIds(db, fresh.id), fresh, `نسخة للاطلاع: ${fresh.title}`);

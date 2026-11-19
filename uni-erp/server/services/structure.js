@@ -51,7 +51,7 @@ export const STRUCTURE = [
   { code: 'finance', name: 'المالية والحسابات', kind: 'department', parent: U, module: 'وحدة المالية', label: 'مسؤول المالية والحسابات',
     desc: 'الرسوم، التحصيل، الصرف، الميزانية، المحاسبة والقيود المحاسبية.', perms: ['holds:manage', 'student:read', 'finance:read', 'finance:entry', 'finance:post', 'finance:setup', 'finance:fees', 'procurement:read', ...INBOX] },
   { code: 'procure', name: 'المشتريات والمخازن', kind: 'department', parent: U, module: 'وحدة المشتريات والأصول', label: 'مسؤول المشتريات والمخازن',
-    desc: 'طلبات الشراء، العقود، الموردون، المخزون.', perms: [...INBOX, 'procurement:read', 'procurement:request', 'procurement:stock', 'procurement:assets', 'procurement:manage'] },
+    desc: 'طلبات الشراء، العقود، الموردون، المخزون.', perms: [...INBOX, 'procurement:read', 'procurement:request', 'procurement:stock', 'procurement:assets', 'procurement:manage', 'procurement:adjust'] },
   { code: 'admin_aff', name: 'الشؤون الإدارية', kind: 'department', parent: U, module: 'وحدة الشؤون الإدارية', label: 'مسؤول الشؤون الإدارية',
     desc: 'المراسلات، الأرشيف، المجالس واللجان، الصيانة والمرافق، النقل، الخدمات العامة.', perms: [...INBOX, 'news:manage'] },
   { code: 'it_sec', name: 'تقنية المعلومات والأمن السيبراني', kind: 'department', parent: U, module: 'وحدة الإدارة التقنية والأمن', label: 'مسؤول تقنية المعلومات والأمن السيبراني',
@@ -107,10 +107,10 @@ export const STRUCTURE = [
     'request:import',
     'corr:use',
     'staffatt:self',
-    ...(n.kind === 'department' ? ['procurement:request'] : []),
+    ...(n.kind === 'department' ? ['procurement:request', 'procurement:issue_approve'] : []),
     ...(DEPT_EXTRA[n.code] ?? []),
     ...(n.code === 'hr' ? ['staffatt:manage', 'hr:manage', 'hr_emp:view', 'hr_emp:write', 'hr_emp:edit', 'hr_payroll:approve', 'hr_emp:delete'] : []),
-    ...(n.code === 'procure' ? ['procurement:read', 'procurement:request', 'procurement:stock', 'procurement:assets', 'procurement:manage'] : []),
+    ...(n.code === 'procure' ? ['procurement:read', 'procurement:request', 'procurement:stock', 'procurement:assets', 'procurement:manage', 'procurement:adjust'] : []),
   ];
   for (const p of extras) if (!perms.includes(p)) perms.push(p);
   // من تصله طلبات وحدته (read_unit) يبتّ فيها، وإلا بقيت معلّقة في صندوق لا يقرّر أحد فيه

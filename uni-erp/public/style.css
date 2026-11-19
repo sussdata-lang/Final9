@@ -61,6 +61,8 @@ input,select,textarea{background:var(--surface);border:1px solid var(--line);bor
 .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media(max-width:420px){.two{grid-template-columns:1fr}}
 .btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 16px;cursor:pointer;font-weight:600}
+/* الزر المعطّل يبدو معطّلاً: كان بلون الزر الفعّال فيظن المستخدم أن النقر لا يعمل */
+.btn:disabled,.btn[aria-disabled="true"]{opacity:.45;cursor:not-allowed;filter:saturate(.4)}
 .btn:hover{border-color:var(--accent)}
 .btn.pri{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
 .btn.ok{background:var(--ok);color:#fff;border-color:var(--ok)}
@@ -2459,3 +2461,35 @@ tr.sx-row-click:hover>td{background:rgba(213,182,93,.08)}
 #a4root.a4-land .a4-title{font-size:13pt;padding:1.3mm 9mm}
 #a4root.a4-land .a4-meta{margin-bottom:3mm}
 #a4root.a4-land .a4-sign{margin-top:4mm}
+
+/* ===== المرحلة 5: مطبوعات أوضح — خط أكبر وخطوط جدول ظاهرة، والصغر يأتي من «ملاءمة صفحة واحدة» (print_doc.js) لا من خط ثابت صغير ===== */
+#a4root .a4-doc{font-size:11pt}
+#a4root .a4-body table{font-size:10.5pt;line-height:1.35}
+#a4root .a4-body th,#a4root .a4-body td{border:.75pt solid #6F8F86;padding:1.05mm 2mm}
+#a4root .a4-body thead th{font-weight:800;border-color:#054239!important}
+#a4root .a4-body td{color:#0B1A16;font-weight:500}
+#a4root .a4-body td.a4-num,#a4root .a4-body th.a4-num{font-variant-numeric:tabular-nums}
+#a4root.a4-land .a4-body table{font-size:9.6pt}
+#a4root.a4-land .a4-body th,#a4root.a4-land .a4-body td{padding:.9mm 1.5mm}
+#a4root .a4-body.a4-tight table{font-size:9.4pt}
+#a4root .a4-body.a4-tight th,#a4root .a4-body.a4-tight td{padding:1.1mm 1.3mm!important}
+#a4root .a4-body table.a4-dense,#a4root.a4-land .a4-body table.a4-dense{font-size:8.4pt}
+#a4root.a4-land .a4-body table.a4-dense th,#a4root.a4-land .a4-body table.a4-dense td{padding:.9mm 1mm!important}
+@media print{#a4root .a4-body tr{break-inside:avoid}#a4root .a4-body thead{display:table-header-group}}
+
+/* ===== المرحلة 5: تقييد الإدخال (input_guard.js) ===== */
+input.ig-bad,textarea.ig-bad{border-color:#B3261E!important;box-shadow:0 0 0 3px rgba(179,38,30,.14)!important;background:#FFF8F7}
+input.ig-blocked{animation:igShake .35s}
+@keyframes igShake{20%{transform:translateX(3px)}40%{transform:translateX(-3px)}60%{transform:translateX(2px)}80%{transform:translateX(-2px)}}
+@media (prefers-reduced-motion:reduce){input.ig-blocked{animation:none;outline:2px solid #B3261E}}
+input::placeholder,textarea::placeholder{color:#8A9893;opacity:1}
+
+/* ===== المرحلة 6: بنود نوافذ المشتريات صفوف حقيقية (الطلب والأمر والاستلام)، وعمود واحد على الشاشة الضيقة ===== */
+.pr-line,.po-line,.prc-line,.pr-head,.po-head{display:grid;gap:6px;align-items:center}
+.pr-line>*,.po-line>*,.prc-line>*{min-width:0}
+.pr-line .ua-combo,.po-line .ua-combo{min-width:0}
+@media (max-width:760px){
+  .pr-line,.po-line,.prc-line{grid-template-columns:1fr 1fr!important;border:1px solid var(--line,#D9E2DF);border-radius:8px;padding:6px}
+  .pr-line>.pr-item,.pr-line>.ua-combo,.po-line>.ua-combo,.pr-line>.pr-ldesc,.pr-line>.pr-specs,.po-line>.po-desc,.prc-line>span:first-child{grid-column:1/-1}
+  .pr-head,.po-head{display:none}
+}

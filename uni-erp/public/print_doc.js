@@ -112,6 +112,32 @@
 
   const parseSigners = (s) => String(s || '').split('|').map((x) => x.trim()).filter(Boolean).map((x) => { const i = x.indexOf(':'); return i < 0 ? [x, ''] : [x.slice(0, i).trim(), x.slice(i + 1).trim()]; });
 
+  /* «ملاءمة صفحة واحدة»: يُقاس المستند بعرض الورقة الفعلي، فإن زاد قليلاً عن صفحة واحدة يُصغَّر كله بالنسبة اللازمة
+     (ويُوسَّع عرضه بالمقابل كي يملأ الورقة). الحد الأدنى 70% كي يبقى الخط مقروءاً (10.5pt ← 7.4pt على الأقل)؛
+     المستند الأطول من ذلك يُطبع على عدة صفحات مع تكرار رأس الجدول. o.multiPage يعطّل الملاءمة. */
+  const MM = 96 / 25.4, MIN_ZOOM = 0.7;
+  function fitOnePage(root, o) {
+    const doc = root.querySelector('.a4-doc'), cell = doc && doc.parentElement;
+    if (!doc || o.multiPage) return;
+    const land = root.classList.contains('a4-land');
+    root.style.cssText = `display:block;position:absolute;visibility:hidden;left:-9999px;top:0;width:${land ? 297 : 210}mm`;
+    try {
+      // ارتفاع الورقة ناقص فراغي الرأس والذيل (a4-sp-t / a4-sp-b) وهامش أمان صغير
+      const avail = ((land ? 210 : 297) - (land ? 27 : 31) - 3) * MM;
+      const height = () => cell.getBoundingClientRect().height;
+      let h = height();
+      if (h <= avail) return;
+      let z = avail / h;
+      for (let i = 0; i < 4 && z >= MIN_ZOOM; i += 1) {
+        doc.style.zoom = String(z); doc.style.width = `${100 / z}%`;
+        h = height();
+        if (h <= avail) return;
+        z *= avail / h;
+      }
+      doc.style.zoom = ''; doc.style.width = '';
+    } finally { root.removeAttribute('style'); }
+  }
+
   /* الدالة العامة: تبني المستند وتطبعه */
   UA.printDoc = async function (o = {}) {
     const s = await site();
@@ -154,6 +180,7 @@
     // ننتظر الشعار والزخرفة وخط الترويسة كي لا تخرج الورقة دونها
     await Promise.all([...root.querySelectorAll('img')].map((im) => (im.complete ? null : new Promise((r) => { im.onload = im.onerror = r; setTimeout(r, 2500); }))));
     try { await Promise.race([document.fonts.load('16pt Mohanad', 'ج'), new Promise((r) => setTimeout(r, 2500))]); } catch { /* نطبع بالخط البديل */ }
+    fitOnePage(root, o);
     // اتجاه الورقة: قاعدة عامة تُضاف عند الطباعة لأن المتصفح لا يطبق الصفحة المسماة على الورقة الأولى. الهامش صفر ليظهر الإطار كاملاً، والفراغ في كل صفحة من رأس .a4-page وذيله
     const pg = document.getElementById('a4page') || document.head.appendChild(Object.assign(document.createElement('style'), { id: 'a4page' }));
     pg.textContent = root.classList.contains('a4-land') ? '@page{size:A4 landscape;margin:0}' : '@page{size:A4 portrait;margin:0}';
@@ -233,6 +260,13 @@
     root.innerHTML = '';
     [...sheet.children].filter((x) => !x.classList.contains('no-print')).forEach((x) => root.appendChild(x.cloneNode(true)));
     await Promise.all([...root.querySelectorAll('img')].map((im) => (im.complete ? null : new Promise((r) => { im.onload = im.onerror = r; setTimeout(r, 2500); }))));
+    // كشف يزيد قليلاً عن صفحة واحدة يُصغَّر ليتسع لها (حتى 80%)؛ الكشف الأطول يبقى متعدد الصفحات بخطه الكامل
+    root.style.cssText = 'display:block;position:absolute;visibility:hidden;left:-9999px;top:0;width:210mm';
+    try {
+      const kids = [...root.children], avail = 294 * MM, h = root.getBoundingClientRect().height;
+      const z = avail / h;
+      if (h > avail && z >= 0.8) kids.forEach((k) => { k.style.zoom = String(z); k.style.width = `${210 / z}mm`; k.style.maxWidth = 'none'; });
+    } finally { root.removeAttribute('style'); }
     document.body.classList.add('print-a4');
     const done = () => { document.body.classList.remove('print-a4'); root.innerHTML = ''; root.className = ''; };
     window.addEventListener('afterprint', done, { once: true });

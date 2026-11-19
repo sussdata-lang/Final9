@@ -64,12 +64,17 @@ test('Uni-ERP v12.9 Comprehensive Audit Report Fixes Verification (All 17 Bugs +
   // Valid approval by another actor
   decideRequest({ db }, approver, pr.id, 'approved', 'معتمد أصولاً', '127.0.0.1');
 
-  const { order: po } = createOrder({ db }, approver, {
+  // فصل المهام: من اعتمد الطلب لا يصدر أمره، فيصدره مسؤول مشتريات آخر
+  const buyerId = Number(db.prepare("INSERT INTO users (username, display_name, password_hash, role, created_at) VALUES ('buyer99', 'مسؤول مشتريات', 'x', 'admin', ?) RETURNING id").get(Date.now()).id);
+  const buyer = { ...approver, id: buyerId, display_name: 'مسؤول مشتريات', label: 'مسؤول مشتريات' };
+  assert.throws(() => createOrder({ db }, approver, { supplierId: sup.id, requestId: pr.id, lines: [{ itemId: item.id, description: 'حاسوب محمول', qty: 5, unitCost: 1000 }] }, '127.0.0.1'),
+    (err) => err.status === 403 && err.code === 'sod_violation', 'Approver must not issue the order');
+  const { order: po } = createOrder({ db }, buyer, {
     supplierId: sup.id,
     requestId: pr.id,
     lines: [{ itemId: item.id, description: 'حاسوب محمول', qty: 5, unitCost: 1000 }],
   }, '127.0.0.1');
-  orderAction({ db }, approver, po.id, 'order', '127.0.0.1');
+  orderAction({ db }, buyer, po.id, 'order', '127.0.0.1');
 
   // Bug #3: Over-receipt (qty 6 > ordered 5) must be rejected
   assert.throws(

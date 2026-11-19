@@ -191,3 +191,13 @@
 .b-ysw{margin:1.2em 2.2em}.b-ysw .trp-ys{margin:0}
 .ys-c{border-radius:.5em;overflow:hidden}
 @container (max-width:520px){.b-ysw{margin:1em .9em}.trp-ys{font-size:.85em}.trp-ys th:nth-child(5),.trp-ys td:nth-child(5){display:none}}
+
+/* ===== المرحلة 5: كشف علامات مطبوع أوضح — خط أكبر للجداول وحدود أغمق ===== */
+@media print{
+  .trp-pg{font-size:13.4px}
+  .trp{--ln:#9FB3AC}
+  .a-t,.b-t,.c-t,.d-t,.trp-ys{font-size:1em}
+  .a-t th,.c-t th,.b-t th,.trp-ys th{font-size:.9em;color:var(--gd)}
+  .a-t td,.c-t td,.b-t td,.trp-ys td{color:#0B1A16}
+  .a-t td,.a-t th{border-width:.08em}
+}

@@ -11,7 +11,6 @@ import { sections, validateProfile, duplicateCheck, registerStudent } from './st
 import { enterGrade } from './academics.js';
 import { courseComponents } from './grading.js';
 import { importLogRow } from './attendance.js';
-import { notify } from './push.js';
 
 export const MAX_BYTES = 10 * 1024 * 1024;
 
@@ -250,7 +249,7 @@ function importGrades(deps, actor, rows, commit, ip) {
     touched.add(st.id);
     return ex ? 'updated' : 'created';
   }));
-  if (commit && touched.size) notify(deps, [...touched], { title: 'علامات جديدة', body: 'رُصدت علامات جديدة في ملفك.', url: '/', tag: 'grades' });
+  // لا إشعار للطلاب هنا: العلامة تظهر لهم عند إعلان نتيجة مقررها، والإعلان يُبلغهم (والاستيراد لا يكتب في مقرر معلن)
   if (commit) audit(db, actor, `استيراد علامات: ${res.done - res.updated} جديدة / ${res.updated} محدَّثة`, '', ip);
   return { total: rows.length, valid: res.done, created: commit ? res.done - res.updated : 0, updated: commit ? res.updated : 0, preview: rows.slice(0, 8).map((r) => `${r.student_no} — ${r.course || r.course_code}`), errors, changes };
 }

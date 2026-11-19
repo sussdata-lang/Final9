@@ -15,6 +15,8 @@ import { linkedTargets } from './access.js';
 import { recordLeaveOnApprove } from './staffatt.js';
 import { submitRequestMovement, requestInChain } from './student_affairs_suite.js';
 import { getCachedServiceByCode, getCachedUnitById, getCachedUnitByCode, getCachedStaffUsersMap } from '../cache.js';
+import { publishedSql } from './grading.js';
+import { effective } from '../permissions.js';
 
 const ACADEMIC = new Set(['postponement', 'withdrawal', 'program_transfer', 'grade_appeal', 'violation_report']);
 const pad = (n, w) => String(n).padStart(w, '0');
@@ -31,7 +33,7 @@ function refOptions(db, studentId, ref) {
   const p = db.prepare('SELECT program_id, study_level FROM student_profiles WHERE user_id = ?').get(Number(studentId));
   if (ref === 'program') return db.prepare('SELECT id, faculty, name FROM programs WHERE active = 1 AND id != ? ORDER BY faculty, name').all(p?.program_id ?? -1).map((r) => ({ id: r.id, label: `${r.faculty} — ${r.name} [#${r.id}]` }));
   if (ref === 'my_course') return db.prepare('SELECT id, name, level FROM courses WHERE program_id = ? AND level <= ? ORDER BY level, name').all(p?.program_id ?? -1, p?.study_level ?? 0).map((r) => ({ id: r.id, label: `${r.name} (السنة ${r.level}) [#${r.id}]` }));
-  if (ref === 'my_grade') return db.prepare("SELECT id, course, academic_year ay, mark FROM grades WHERE student_id = ? AND workflow_status = 'approved' ORDER BY academic_year DESC, course").all(Number(studentId)).map((r) => ({ id: r.id, label: `${r.course} (${r.ay ?? r.term}) — ${r.mark} [#${r.id}]` }));
+  if (ref === 'my_grade') return db.prepare(`SELECT id, course, academic_year ay, mark FROM grades WHERE student_id = ? AND ${publishedSql('grades')} ORDER BY academic_year DESC, course`).all(Number(studentId)).map((r) => ({ id: r.id, label: `${r.course} (${r.ay ?? r.term}) — ${r.mark} [#${r.id}]` }));
   return [];
 }
 export const expandFields = (db, studentId, fieldsJson) => JSON.parse(fieldsJson).map((f) => (f.type === 'ref' ? { ...f, type: 'select', options: refOptions(db, studentId, f.ref).map((o) => o.label) } : f));
@@ -75,6 +77,8 @@ export const scopeOf = (user) => (user.can('request:read_all') ? 'all' : user.ca
 // «unit» يشمل وحدة المستخدم ووحداتها الفرعية (رئيس الوحدة يرى طلبات مكاتبه)، وطلبات صاحب الحساب نفسه دائماً
 export function visibleTo(user, r) {
   if (r.student_id === user.id) return true;
+  // أُحيل إليه بالاسم: يراه ولو لم تشمله صلاحيات وحدته
+  if (r.assigned_user_id != null && Number(r.assigned_user_id) === Number(user.id) && user.role !== 'student') return true;
   const s = scopeOf(user);
   if (s === 'all') return true;
   if (s === 'unit') return !!user.unit_id && r.assigned_unit_id != null && (user.unitIds ?? [user.unit_id]).includes(r.assigned_unit_id);
@@ -109,6 +113,7 @@ function requestView(db, r, { withStudent = false, ctx = null } = {}) {
     attachment: att ? { id: att.id, name: att.name, size: att.size } : null, attachments: atts,
     document: doc ? { code: doc.code, issuedAt: doc.issued_at } : null,
     unit: cachedUnit ? { id: cachedUnit.id, name: cachedUnit.name } : null,
+    assignee: r.assigned_user_id ? { id: Number(r.assigned_user_id), name: getCachedStaffUsersMap(db).get(Number(r.assigned_user_id))?.display_name ?? db.prepare('SELECT display_name FROM users WHERE id = ?').get(r.assigned_user_id)?.display_name ?? '' } : null,
     escalationLevel: Number(r.escalation_level ?? 0),
     events: ctx ? (ctx.events.get(Number(r.id)) ?? []).map((e) => ({ at: e.at, actor: e.actor, text: e.text })) : db.prepare('SELECT at, actor_label AS actor, text FROM request_events WHERE request_id = ? ORDER BY id').all(r.id),
   };
@@ -212,10 +217,10 @@ export function createRequest({ db, cfg }, user, input, ip, opts = {}) {
 export async function listRequests({ db }, user, query) {
   const scope = scopeOf(user), own = scope === 'own';
   const where = [], args = [];
-  if (scope === 'own') { where.push('student_id = ?'); args.push(user.id); }
+  if (scope === 'own') { where.push('(student_id = ? OR assigned_user_id = ?)'); args.push(user.id, user.role === 'student' ? -1 : user.id); }
   if (scope === 'unit') {
     const ids = (user.unitIds?.length ? user.unitIds : [user.unit_id ?? -1]);
-    where.push(`(assigned_unit_id IN (${ids.map(() => '?').join(',')}) OR student_id = ?)`); args.push(...ids, user.id);
+    where.push(`(assigned_unit_id IN (${ids.map(() => '?').join(',')}) OR student_id = ? OR assigned_user_id = ?)`); args.push(...ids, user.id, user.id);
   }
   if (['review', 'approved', 'rejected'].includes(query.status)) { where.push('status = ?'); args.push(query.status); }
   const rows = await db.prepare(`SELECT * FROM requests ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY created_at DESC LIMIT 200`).allAsync(...args);
@@ -278,11 +283,41 @@ export function decide({ db, cfg }, user, id, action, reason, ip) {
 }
 
 // إحالة طلب قيد المراجعة إلى وحدة مرتبطة بوحدة المستخدم (أو إلى أي وحدة لمن لا وحدة له، كالمدير)
+// من يُحال إليه الطلب بالاسم: موظف فعّال يملك الاطلاع على الطلبات أو البت فيها، من وحدة المحيل أو وحدة مرتبطة بها
+// (مدير النظام بلا قيد) — قاعدة الإحالة إلى الوحدات نفسها، فلا تصير الإحالة الشخصية طريقاً حولها
+const HANDLES = ['request:read_all', 'request:read_unit', 'request:decide'];
+function forwardablePeople(db, user) {
+  const free = !user.unit_id && user.role === 'admin' && !user.role_key;
+  if (!user.unit_id && !free) return [];
+  const units = free ? null : new Set([Number(user.unit_id), ...linkedTargets(db, user.unit_id).map((x) => Number(x.id))]);
+  return db.prepare("SELECT u.*, o.name AS unit_name FROM users u LEFT JOIN org_units o ON o.id = u.unit_id WHERE u.role != 'student' AND u.active = 1 AND u.id != ? ORDER BY u.display_name").all(user.id)
+    .filter((u) => (free || (u.unit_id && units.has(Number(u.unit_id)))) && effective(db, u).some((p) => HANDLES.includes(p)))
+    .map((u) => ({ id: Number(u.id), name: u.display_name, unit: u.unit_name ?? '', unitId: u.unit_id ? Number(u.unit_id) : null }));
+}
+export const forwardPeople = ({ db }, user) => ({ people: forwardablePeople(db, user) });
+
 export function forwardRequest({ db }, user, id, input, ip) {
   return tx(db, () => {
     const r = db.prepare('SELECT * FROM requests WHERE id = ?').get(Number(id));
     if (!r || !visibleTo(user, r)) throw new HttpError(404, 'الطلب غير موجود.', 'not_found');
     if (r.status !== 'review') throw new HttpError(409, 'لا تُحال إلا الطلبات قيد المراجعة.', 'conflict');
+    const note = String(input?.note ?? '').replace(/\s+/g, ' ').trim();
+    if (note.length > 300) throw new HttpError(400, 'الملاحظة لا تتجاوز 300 حرف.', 'validation');
+    // إحالة إلى موظف بعينه
+    if (input?.userId !== undefined && input?.userId !== null && input?.userId !== '') {
+      const p = forwardablePeople(db, user).find((x) => x.id === Number(input.userId));
+      if (!p) {
+        const u = db.prepare("SELECT display_name FROM users WHERE id = ? AND role != 'student'").get(Number(input.userId));
+        throw new HttpError(u ? 403 : 400, u ? `لا يمكن الإحالة إلى «${u.display_name}»: ليس من وحدتك أو وحدة مرتبطة بها، أو لا يملك صلاحية الاطلاع على الطلبات.` : 'الموظف غير موجود.', u ? 'forbidden' : 'validation');
+      }
+      if (Number(r.assigned_user_id) === p.id) throw new HttpError(409, `الطلب محال إلى «${p.name}» أصلاً.`, 'conflict');
+      db.prepare('UPDATE requests SET assigned_user_id = ?, assigned_unit_id = COALESCE(?, assigned_unit_id) WHERE id = ?').run(p.id, p.unitId, r.id);
+      addEvent(db, r.id, user.label, `إحالة الطلب إلى الموظف «${p.name}»${p.unit ? ` (${p.unit})` : ''}${note ? `: ${note}` : ''}`);
+      db.prepare("INSERT INTO user_notifications (user_id, kind, ref_id, text, url, at) VALUES (?, 'request_assigned', ?, ?, '', ?) ON CONFLICT DO NOTHING")
+        .run(p.id, r.id, `أُحيل إليك الطلب ${r.no}${note ? `: ${note}` : ''}.`, Date.now());
+      audit(db, user, `إحالة طلب إلى الموظف ${p.name}`, r.no, ip);
+      return requestView(db, db.prepare('SELECT * FROM requests WHERE id = ?').get(r.id), { withStudent: true });
+    }
     const t = db.prepare('SELECT id, name, active FROM org_units WHERE id = ?').get(Number(input?.unitId));
     if (!t || !t.active) throw new HttpError(400, 'الوحدة المطلوبة غير موجودة أو معطَّلة.', 'validation');
     if (r.assigned_unit_id === t.id) throw new HttpError(409, 'الطلب عند هذه الوحدة أصلاً.', 'conflict');
@@ -291,9 +326,8 @@ export function forwardRequest({ db }, user, id, input, ip) {
     } else if (user.role !== 'admin' || user.role_key) {
       throw new HttpError(403, 'حسابك غير مرتبط بوحدة إدارية، فلا يمكنه الإحالة.', 'forbidden');
     }
-    const note = String(input?.note ?? '').replace(/\s+/g, ' ').trim();
-    if (note.length > 300) throw new HttpError(400, 'الملاحظة لا تتجاوز 300 حرف.', 'validation');
-    db.prepare('UPDATE requests SET assigned_unit_id = ? WHERE id = ?').run(t.id, r.id);
+    // الإحالة لوحدة تلغي التكليف الشخصي السابق
+    db.prepare('UPDATE requests SET assigned_unit_id = ?, assigned_user_id = NULL WHERE id = ?').run(t.id, r.id);
     addEvent(db, r.id, user.label, `إحالة الطلب إلى «${t.name}»${note ? `: ${note}` : ''}`);
     audit(db, user, `إحالة طلب إلى ${t.name}`, r.no, ip);
     return requestView(db, db.prepare('SELECT * FROM requests WHERE id = ?').get(r.id), { withStudent: true });

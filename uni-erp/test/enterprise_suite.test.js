@@ -22,7 +22,7 @@ test('Pure Logic: GPA Simulator calculates weighted GPA and academic standing ac
   assert.equal(res.totalHours, 70);
   // (85*60 + 95*10) / 70 = (5100 + 950) / 70 = 6050 / 70 = 86.43
   assert.equal(res.projectedGpa, 86.43);
-  assert.equal(res.letter, 'جيد جداً (B+)');
+  assert.equal(res.letter, 'امتياز');   // 86.43: امتياز بحسب سلّم دليل الطالب (85 إلى أقل من 95)
   assert.equal(res.delta, 1.43);
 });
 
@@ -65,6 +65,8 @@ test('Database Integration: overview starts empty, and executive KPIs and the ad
     db.prepare('INSERT INTO sa_course_prerequisites (course_id, prereq_course_id, min_mark) VALUES (?, ?, 60)').run(c3, c1);
     const addGrade = (courseId, mark, status) => db.prepare("INSERT INTO grades (student_id, term, course, hours, mark, course_id, level, semester, academic_year, theory_mark, entered_at, workflow_status) VALUES (?, 't', 'c', 3, ?, ?, 1, 1, '2025/2026', ?, ?, ?)").run(stuId, mark, courseId, mark, now, status);
     addGrade(c1, 80, 'approved'); addGrade(c2, 40, 'approved'); addGrade(c4, 95, 'draft');
+    // النتائج تظهر بعد إعلانها فقط: نُعلن المقررات الثلاثة، فتبقى المسودة (K-4) مخفية رغم الإعلان
+    for (const c of [c1, c2, c4]) db.prepare('INSERT INTO grade_locks (course_id, academic_year, locked_by, locked_at) VALUES (?,?,NULL,?) ON CONFLICT DO NOTHING').run(c, '2025/2026', now);
     db.prepare("INSERT INTO research_projects (code, title, principal_investigator, faculty_name, domain, status, created_at) VALUES ('R-1', 'بحث', 'د', ?, 'م', 'published', ?)").run(faculty, now);
     const actor = { id: adminId, role: 'admin', display_name: 'adm' };
     const feeType = db.prepare("SELECT id FROM fin_fee_types WHERE kind = 'fee' AND active = 1 ORDER BY id LIMIT 1").get().id;

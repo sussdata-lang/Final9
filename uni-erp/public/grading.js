@@ -53,14 +53,14 @@
   async function resultsHtml() {
     const d = await UA.api('GET', `/api/grades/results${G.year ? `?year=${encodeURIComponent(G.year)}` : ''}`);
     G.year = d.year;
-    const can = UA.can('grade:approve');
+    const can = UA.can('grade:approve'), canUnlock = UA.can('grade:unlock');
     return `<section class="card"><h2>إعلان النتائج وقفلها</h2>
-      <p class="hint" style="margin-top:0">تُعلن نتيجة المقرر بعد اعتماد كل علاماته، فيُبلَّغ طلابه وتُقفل علاماته. التعديل بعدها لمن يملك صلاحية تعديل النتائج المقفلة وبتبرير يُسجَّل.</p>
+      <p class="hint" style="margin-top:0">تُعلن نتيجة المقرر بعد اعتماد كل علاماته، فتظهر لطلابه في «علاماتي» ووثائقهم ويُبلَّغون بها، وتُقفل علاماته. قبل الإعلان لا يرى الطالب علامته ولو كانت معتمدة. التعديل بعدها لمن يملك صلاحية تعديل النتائج المقفلة وبتبرير يُسجَّل.</p>
       <div class="inline-form"><label>العام الدراسي<input id="gl-year" value="${esc(d.year)}" dir="ltr" pattern="\\d{4}/\\d{4}"></label><button class="btn" type="button" data-act="glyear">عرض</button></div>
       <div class="tbl-wrap"><table><thead><tr><th>المقرر</th><th>العلامات</th><th>المعتمدة</th><th>الحالة</th><th></th></tr></thead><tbody>
       ${d.courses.map((c) => `<tr><td><b>${esc(c.name)}</b> <span class="mono small">${esc(c.code || '')}</span></td><td>${c.total}</td><td>${c.approved}</td>
         <td>${c.lockedAt ? `<span class="pill p-approved">أُعلنت</span> <span class="small">${esc(new Date(c.lockedAt).toISOString().slice(0, 10))} · ${esc(c.lockedBy || '')}</span>` : c.approved < c.total ? '<span class="pill p-review">بانتظار الاعتماد</span>' : '<span class="pill p-review">جاهزة للإعلان</span>'}</td>
-        <td>${!c.lockedAt && can ? `<button class="btn pri sm" type="button" data-act="gllock" data-id="${c.courseId}"${c.approved < c.total ? ' disabled' : ''}>إعلان وقفل</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="small">لا علامات في هذا العام.</td></tr>'}
+        <td>${!c.lockedAt && can ? `<button class="btn pri sm" type="button" data-act="gllock" data-id="${c.courseId}"${c.approved < c.total ? ` disabled title="بقيت ${c.total - c.approved} علامة غير معتمدة؛ يُعلن المقرر بعد اعتماد كل علاماته"` : ''}>إعلان وقفل</button>` : ''}${c.lockedAt && canUnlock ? `<button class="btn sm" type="button" data-act="glunlock" data-id="${c.courseId}" data-name="${esc(c.name)}">إلغاء الإعلان</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="small">لا علامات في هذا العام.</td></tr>'}
       </tbody></table></div></section>`;
   }
   async function mountResults() {
@@ -97,6 +97,15 @@
       if (!confirm(`إعلان نتيجة المقرر للعام ${G.year} وقفل علاماته؟ يُبلَّغ الطلاب، ولا تتغير العلامات بعدها إلا بالمسار الاستثنائي.`)) return;
       const r = await UA.api('POST', '/api/grades/results/lock', { courseId: Number(d.id), academicYear: G.year });
       toast(`أُعلنت النتيجة وقُفلت ${r.locked} علامة`); await mountResults();
+    },
+    glunlock: async (_el, d) => {
+      const v = await window.askForm({ title: `إلغاء إعلان نتيجة «${d.name || ''}» للعام ${G.year}`, submit: 'إلغاء الإعلان', fields: [
+        { name: 'justification', label: 'سبب الإلغاء', type: 'textarea', required: true, minLength: 5, placeholder: 'مثال: أُعلن المقرر قبل استكمال علامات الدورة التكميلية' },
+        { name: 'decisionNo', label: 'رقم القرار (اختياري)', placeholder: 'مثال: 125/ل.ا' },
+      ] });
+      if (!v) return;
+      await UA.api('POST', '/api/grades/results/unlock', { courseId: Number(d.id), academicYear: G.year, justification: v.justification, decisionNo: v.decisionNo });
+      toast('أُلغي الإعلان؛ عادت علامات المقرر قابلة للتعديل وبقيت معتمدة'); await mountResults();
     },
   });
 })();

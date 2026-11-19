@@ -1,0 +1,8286 @@
+{
+ "meta": {
+  "project": "uni-erp",
+  "version": "12.9.58",
+  "auditedCommit": "7747c3a",
+  "auditDate": "2026-11-04",
+  "basis": "static source review, local development database metadata, single-user local runtime checks",
+  "productionInspected": false,
+  "secretsIncluded": false
+ },
+ "languages": [
+  {
+   "name": "JavaScript (ES modules)",
+   "role": "server and browser",
+   "verified": true
+  },
+  {
+   "name": "SQL",
+   "role": "migrations, inline queries",
+   "verified": true
+  },
+  {
+   "name": "HTML/CSS",
+   "role": "frontend",
+   "verified": true
+  },
+  {
+   "name": "Shell",
+   "role": "container entrypoint",
+   "verified": true
+  },
+  {
+   "name": "Python",
+   "role": "one helper in tools/make-templates.py",
+   "verified": true
+  }
+ ],
+ "frameworks": [
+  {
+   "name": "none",
+   "note": "custom HTTP router on node:http and custom vanilla JS frontend"
+  }
+ ],
+ "runtime": {
+  "node": {
+   "engines": ">=22.5",
+   "dockerImage": "node:22-alpine"
+  }
+ },
+ "dependencies": {
+  "direct": [
+   {
+    "name": "pg",
+    "declared": "^8.23.1",
+    "locked": "8.23.1"
+   }
+  ],
+  "transitive": [
+   "pg-cloudflare@1.4.1",
+   "pg-connection-string@2.14.1",
+   "pg-int8@1.0.1",
+   "pg-pool@3.14.0",
+   "pg-protocol@1.16.1",
+   "pg-types@2.2.0",
+   "pgpass@1.0.5",
+   "postgres-array@2.0.0",
+   "postgres-bytea@1.0.1",
+   "postgres-date@1.0.7",
+   "postgres-interval@1.2.0",
+   "split2@4.2.0",
+   "xtend@4.0.2"
+  ],
+  "vulnerabilityScan": "NOT RUN (requires network access)"
+ },
+ "databaseTechnologies": [
+  {
+   "name": "PostgreSQL",
+   "localVersion": "PostgreSQL 17.11",
+   "productionVersion": "UNKNOWN",
+   "driver": "pg",
+   "orm": "none; custom SQLite-compatibility wrapper over raw SQL"
+  },
+  {
+   "name": "Redis",
+   "status": "optional via REDIS_URL, custom RESP client; production use UNKNOWN"
+  }
+ ],
+ "databaseSummary": {
+  "tables": 134,
+  "columns": 1306,
+  "foreignKeys": 142,
+  "indexes": 393,
+  "migrations": 52
+ },
+ "databaseTables": [
+  {
+   "name": "academic_request_details",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "تفاصيل الطلب الأكاديمي",
+   "columns": 9,
+   "primaryKey": [
+    "request_id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "request_id",
+     "references": "requests",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "target_course_id",
+     "references": "courses",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "target_program_id",
+     "references": "programs",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 2
+  },
+  {
+   "name": "ai_advisor_chats",
+   "group": "الأكاديمي والامتحانات والتعلم",
+   "purpose": "محادثات المرشد الذكي",
+   "columns": 6,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 1
+  },
+  {
+   "name": "ai_early_warnings",
+   "group": "الأكاديمي والامتحانات والتعلم",
+   "purpose": "الإنذار المبكر",
+   "columns": 12,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 1
+  },
+  {
+   "name": "ai_triage_logs",
+   "group": "الأكاديمي والامتحانات والتعلم",
+   "purpose": "الفرز الآلي للمراسلات",
+   "columns": 11,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 1
+  },
+  {
+   "name": "alumni_records",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "سجل الخريجين",
+   "columns": 14,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 2
+  },
+  {
+   "name": "attachments",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "مرفقات الطلبات",
+   "columns": 8,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "request_id",
+     "references": "requests",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 3
+  },
+  {
+   "name": "audit_log",
+   "group": "الهوية والصلاحيات والنظام",
+   "purpose": "سجل التدقيق بسلسلة بصمات",
+   "columns": 10,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 5
+  },
+  {
+   "name": "card_batches",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "دفعات طباعة البطاقات",
+   "columns": 5,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "created_by",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 1
+  },
+  {
+   "name": "card_handovers",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "استلام البطاقات",
+   "columns": 7,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "batch_id",
+     "references": "card_batches",
+     "onDelete": "CASCADE"
+    },
+    {
+     "column": "handed_by",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "student_id",
+     "references": "users",
+     "onDelete": "CASCADE"
+    }
+   ],
+   "indexes": 3
+  },
+  {
+   "name": "career_applications",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "طلبات التوظيف",
+   "columns": 8,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "job_id",
+     "references": "career_jobs",
+     "onDelete": "CASCADE"
+    }
+   ],
+   "indexes": 1
+  },
+  {
+   "name": "career_jobs",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "الوظائف",
+   "columns": 12,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 1
+  },
+  {
+   "name": "complaints",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "الشكاوى",
+   "columns": 10,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "responded_by",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "student_id",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 4
+  },
+  {
+   "name": "corr_approvers",
+   "group": "المراسلات",
+   "purpose": "معتمدو الكتاب",
+   "columns": 7,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "doc_id",
+     "references": "corr_docs",
+     "onDelete": "CASCADE"
+    },
+    {
+     "column": "user_id",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 5
+  },
+  {
+   "name": "corr_cc",
+   "group": "المراسلات",
+   "purpose": "نسخ الكتاب",
+   "columns": 2,
+   "primaryKey": [
+    "doc_id",
+    "user_id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "doc_id",
+     "references": "corr_docs",
+     "onDelete": "CASCADE"
+    },
+    {
+     "column": "user_id",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 3
+  },
+  {
+   "name": "corr_docs",
+   "group": "المراسلات",
+   "purpose": "الكتب الرسمية",
+   "columns": 14,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "creator_id",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "unit_id",
+     "references": "org_units",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 8
+  },
+  {
+   "name": "corr_events",
+   "group": "المراسلات",
+   "purpose": "أحداث الكتاب",
+   "columns": 7,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "doc_id",
+     "references": "corr_docs",
+     "onDelete": "CASCADE"
+    }
+   ],
+   "indexes": 3
+  },
+  {
+   "name": "corr_files",
+   "group": "المراسلات",
+   "purpose": "مرفقات الكتاب",
+   "columns": 7,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "doc_id",
+     "references": "corr_docs",
+     "onDelete": "CASCADE"
+    }
+   ],
+   "indexes": 2
+  },
+  {
+   "name": "corr_notifs",
+   "group": "المراسلات",
+   "purpose": "تنبيهات المراسلات",
+   "columns": 6,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "doc_id",
+     "references": "corr_docs",
+     "onDelete": "CASCADE"
+    },
+    {
+     "column": "user_id",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 5
+  },
+  {
+   "name": "corr_templates",
+   "group": "المراسلات",
+   "purpose": "قوالب المراسلات",
+   "columns": 10,
+   "primaryKey": [
+    "code"
+   ],
+   "foreignKeys": [],
+   "indexes": 1
+  },
+  {
+   "name": "course_schedules",
+   "group": "الأكاديمي والامتحانات والتعلم",
+   "purpose": "مواعيد المحاضرات",
+   "columns": 7,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "course_id",
+     "references": "courses",
+     "onDelete": "CASCADE"
+    }
+   ],
+   "indexes": 2
+  },
+  {
+   "name": "courses",
+   "group": "الأكاديمي والامتحانات والتعلم",
+   "purpose": "المقررات",
+   "columns": 10,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "member_id",
+     "references": "faculty_members",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "program_id",
+     "references": "programs",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 6
+  },
+  {
+   "name": "devops_incident_reports",
+   "group": "الهوية والصلاحيات والنظام",
+   "purpose": "بلاغات الأعطال",
+   "columns": 14,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 5
+  },
+  {
+   "name": "document_pdfs",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "نسخ PDF للوثائق",
+   "columns": 3,
+   "primaryKey": [
+    "pdf_sha256"
+   ],
+   "foreignKeys": [
+    {
+     "column": "code",
+     "references": "documents",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 1
+  },
+  {
+   "name": "documents",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "الوثائق الصادرة",
+   "columns": 8,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "issued_by",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "request_id",
+     "references": "requests",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 4
+  },
+  {
+   "name": "dorm_allocations",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "تسكين الطلاب",
+   "columns": 9,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "room_id",
+     "references": "dorm_rooms",
+     "onDelete": "CASCADE"
+    }
+   ],
+   "indexes": 1
+  },
+  {
+   "name": "dorm_rooms",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "غرف السكن",
+   "columns": 9,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 1
+  },
+  {
+   "name": "encrypted_snapshots",
+   "group": "الهوية والصلاحيات والنظام",
+   "purpose": "سجل لقطات مشفرة",
+   "columns": 10,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 2
+  },
+  {
+   "name": "exam_schedules",
+   "group": "الأكاديمي والامتحانات والتعلم",
+   "purpose": "جداول الامتحانات",
+   "columns": 15,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 2
+  },
+  {
+   "name": "faculties",
+   "group": "الأكاديمي والامتحانات والتعلم",
+   "purpose": "الكليات والمعاهد",
+   "columns": 6,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 3
+  },
+  {
+   "name": "faculty_members",
+   "group": "الأكاديمي والامتحانات والتعلم",
+   "purpose": "أعضاء الهيئة التدريسية",
+   "columns": 14,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "unit_id",
+     "references": "org_units",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "user_id",
+     "references": "users",
+     "onDelete": "SET NULL"
+    }
+   ],
+   "indexes": 3
+  },
+  {
+   "name": "faculty_overload_records",
+   "group": "الأكاديمي والامتحانات والتعلم",
+   "purpose": "العبء الزائد",
+   "columns": 13,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 1
+  },
+  {
+   "name": "faculty_promotions",
+   "group": "الأكاديمي والامتحانات والتعلم",
+   "purpose": "الترقيات العلمية",
+   "columns": 10,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 1
+  },
+  {
+   "name": "fin_accounts",
+   "group": "المالية",
+   "purpose": "شجرة الحسابات",
+   "columns": 10,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "parent_id",
+     "references": "fin_accounts",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 7
+  },
+  {
+   "name": "fin_charges",
+   "group": "المالية",
+   "purpose": "رسوم الطلاب",
+   "columns": 11,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "created_by",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "entry_id",
+     "references": "fin_entries",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "fee_type_id",
+     "references": "fin_fee_types",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "student_id",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 5
+  },
+  {
+   "name": "fin_cost_centers",
+   "group": "المالية",
+   "purpose": "مراكز الكلفة",
+   "columns": 5,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "unit_id",
+     "references": "org_units",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 4
+  },
+  {
+   "name": "fin_currencies",
+   "group": "المالية",
+   "purpose": "العملات",
+   "columns": 6,
+   "primaryKey": [
+    "code"
+   ],
+   "foreignKeys": [],
+   "indexes": 2
+  },
+  {
+   "name": "fin_entries",
+   "group": "المالية",
+   "purpose": "قيود اليومية",
+   "columns": 16,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "created_by",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "posted_by",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "reversal_of",
+     "references": "fin_entries",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "reversed_by",
+     "references": "fin_entries",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "year_id",
+     "references": "fin_years",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 10
+  },
+  {
+   "name": "fin_fee_structures",
+   "group": "المالية",
+   "purpose": "هياكل الرسوم",
+   "columns": 8,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 1
+  },
+  {
+   "name": "fin_fee_types",
+   "group": "المالية",
+   "purpose": "أنواع الرسوم",
+   "columns": 7,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "account_id",
+     "references": "fin_accounts",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 3
+  },
+  {
+   "name": "fin_lines",
+   "group": "المالية",
+   "purpose": "بنود القيود",
+   "columns": 13,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "account_id",
+     "references": "fin_accounts",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "cost_center_id",
+     "references": "fin_cost_centers",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "currency",
+     "references": "fin_currencies",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "entry_id",
+     "references": "fin_entries",
+     "onDelete": "CASCADE"
+    },
+    {
+     "column": "party_id",
+     "references": "fin_parties",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "student_id",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 11
+  },
+  {
+   "name": "fin_parties",
+   "group": "المالية",
+   "purpose": "الأطراف",
+   "columns": 9,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "account_id",
+     "references": "fin_accounts",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 3
+  },
+  {
+   "name": "fin_payments",
+   "group": "المالية",
+   "purpose": "دفعات الطلاب",
+   "columns": 12,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "account_id",
+     "references": "fin_accounts",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "created_by",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "entry_id",
+     "references": "fin_entries",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "student_id",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 6
+  },
+  {
+   "name": "fin_years",
+   "group": "المالية",
+   "purpose": "السنوات المالية",
+   "columns": 8,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "closed_by",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 3
+  },
+  {
+   "name": "grade_appeals",
+   "group": "الأكاديمي والامتحانات والتعلم",
+   "purpose": "تظلمات العلامات",
+   "columns": 13,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 2
+  },
+  {
+   "name": "grade_changes",
+   "group": "الأكاديمي والامتحانات والتعلم",
+   "purpose": "سجل تغييرات العلامات",
+   "columns": 16,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "actor_id",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 3
+  },
+  {
+   "name": "grades",
+   "group": "الأكاديمي والامتحانات والتعلم",
+   "purpose": "العلامات ومراحل اعتمادها",
+   "columns": 19,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "approved_by",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "course_id",
+     "references": "courses",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "entered_by",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "reviewed_by",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "student_id",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 9
+  },
+  {
+   "name": "hall_logs",
+   "group": "الأكاديمي والامتحانات والتعلم",
+   "purpose": "سجل دخول القاعات",
+   "columns": 11,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "course_id",
+     "references": "courses",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "recorded_by",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "student_id",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 6
+  },
+  {
+   "name": "hr_absences",
+   "group": "الموارد البشرية",
+   "purpose": "الغياب",
+   "columns": 10,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "employee_id",
+     "references": "hr_employees",
+     "onDelete": "CASCADE"
+    }
+   ],
+   "indexes": 3
+  },
+  {
+   "name": "hr_advances",
+   "group": "الموارد البشرية",
+   "purpose": "السلف",
+   "columns": 12,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "employee_id",
+     "references": "hr_employees",
+     "onDelete": "CASCADE"
+    }
+   ],
+   "indexes": 4
+  },
+  {
+   "name": "hr_alert_settings",
+   "group": "الموارد البشرية",
+   "purpose": "تنبيهات الموارد البشرية",
+   "columns": 6,
+   "primaryKey": [
+    "key"
+   ],
+   "foreignKeys": [],
+   "indexes": 1
+  },
+  {
+   "name": "hr_appraisals",
+   "group": "الموارد البشرية",
+   "purpose": "تقييم الأداء",
+   "columns": 11,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 1
+  },
+  {
+   "name": "hr_biometric_devices",
+   "group": "الموارد البشرية",
+   "purpose": "أجهزة البصمة",
+   "columns": 8,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 2
+  },
+  {
+   "name": "hr_contracts",
+   "group": "الموارد البشرية",
+   "purpose": "العقود",
+   "columns": 13,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "created_by",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "employee_id",
+     "references": "hr_employees",
+     "onDelete": "CASCADE"
+    }
+   ],
+   "indexes": 4
+  },
+  {
+   "name": "hr_employees",
+   "group": "الموارد البشرية",
+   "purpose": "ملفات الموظفين",
+   "columns": 22,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "unit_id",
+     "references": "org_units",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 6
+  },
+  {
+   "name": "hr_leaves",
+   "group": "الموارد البشرية",
+   "purpose": "الإجازات",
+   "columns": 16,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "created_by",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "employee_id",
+     "references": "hr_employees",
+     "onDelete": "CASCADE"
+    },
+    {
+     "column": "reviewed_by",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 5
+  },
+  {
+   "name": "hr_monthly_attendance",
+   "group": "الموارد البشرية",
+   "purpose": "الدوام الشهري",
+   "columns": 11,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "employee_id",
+     "references": "hr_employees",
+     "onDelete": "CASCADE"
+    }
+   ],
+   "indexes": 4
+  },
+  {
+   "name": "hr_salaries",
+   "group": "الموارد البشرية",
+   "purpose": "الرواتب الشهرية",
+   "columns": 7,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "created_by",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "employee_id",
+     "references": "hr_employees",
+     "onDelete": "CASCADE"
+    }
+   ],
+   "indexes": 4
+  },
+  {
+   "name": "hr_signed_payslips",
+   "group": "الموارد البشرية",
+   "purpose": "قسائم الراتب",
+   "columns": 13,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 2
+  },
+  {
+   "name": "hr_system_lookups",
+   "group": "الموارد البشرية",
+   "purpose": "قوائم الموارد البشرية",
+   "columns": 5,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 3
+  },
+  {
+   "name": "hr_trainings",
+   "group": "الموارد البشرية",
+   "purpose": "التدريب",
+   "columns": 8,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 1
+  },
+  {
+   "name": "idempotency_keys",
+   "group": "الهوية والصلاحيات والنظام",
+   "purpose": "مفاتيح منع التكرار",
+   "columns": 3,
+   "primaryKey": [
+    "key"
+   ],
+   "foreignKeys": [],
+   "indexes": 2
+  },
+  {
+   "name": "import_batches",
+   "group": "الهوية والصلاحيات والنظام",
+   "purpose": "دفعات الاستيراد",
+   "columns": 11,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "undone_by",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "user_id",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 2
+  },
+  {
+   "name": "import_changes",
+   "group": "الهوية والصلاحيات والنظام",
+   "purpose": "تغييرات الدفعة للتراجع",
+   "columns": 7,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "batch_id",
+     "references": "import_batches",
+     "onDelete": "CASCADE"
+    }
+   ],
+   "indexes": 2
+  },
+  {
+   "name": "import_staging",
+   "group": "الهوية والصلاحيات والنظام",
+   "purpose": "تجهيز الاستيراد",
+   "columns": 8,
+   "primaryKey": [
+    "token_hash"
+   ],
+   "foreignKeys": [
+    {
+     "column": "user_id",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 2
+  },
+  {
+   "name": "import_staging_chunks",
+   "group": "الهوية والصلاحيات والنظام",
+   "purpose": "أجزاء ملفات الاستيراد",
+   "columns": 3,
+   "primaryKey": [
+    "seq",
+    "token_hash"
+   ],
+   "foreignKeys": [
+    {
+     "column": "token_hash",
+     "references": "import_staging",
+     "onDelete": "CASCADE"
+    }
+   ],
+   "indexes": 1
+  },
+  {
+   "name": "infra_settings",
+   "group": "الهوية والصلاحيات والنظام",
+   "purpose": "إعدادات البنية المعروضة في الواجهة",
+   "columns": 3,
+   "primaryKey": [
+    "key"
+   ],
+   "foreignKeys": [],
+   "indexes": 1
+  },
+  {
+   "name": "leave_entitlements",
+   "group": "الموارد البشرية",
+   "purpose": "أرصدة الإجازات",
+   "columns": 3,
+   "primaryKey": [
+    "user_id",
+    "year"
+   ],
+   "foreignKeys": [
+    {
+     "column": "user_id",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 1
+  },
+  {
+   "name": "leave_records",
+   "group": "الموارد البشرية",
+   "purpose": "سجل إجازات ثانٍ (يتداخل مع hr_leaves)",
+   "columns": 9,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "request_id",
+     "references": "requests",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "user_id",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 3
+  },
+  {
+   "name": "library_books",
+   "group": "الأكاديمي والامتحانات والتعلم",
+   "purpose": "كتب المكتبة",
+   "columns": 11,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 1
+  },
+  {
+   "name": "library_loans",
+   "group": "الأكاديمي والامتحانات والتعلم",
+   "purpose": "الإعارة",
+   "columns": 9,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "book_id",
+     "references": "library_books",
+     "onDelete": "CASCADE"
+    }
+   ],
+   "indexes": 2
+  },
+  {
+   "name": "lms_lecture_files",
+   "group": "الأكاديمي والامتحانات والتعلم",
+   "purpose": "ملفات المحاضرات",
+   "columns": 9,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "lecture_id",
+     "references": "lms_lectures",
+     "onDelete": "CASCADE"
+    }
+   ],
+   "indexes": 2
+  },
+  {
+   "name": "lms_lectures",
+   "group": "الأكاديمي والامتحانات والتعلم",
+   "purpose": "المحاضرات",
+   "columns": 12,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 2
+  },
+  {
+   "name": "lms_quizzes",
+   "group": "الأكاديمي والامتحانات والتعلم",
+   "purpose": "بنك الاختبارات",
+   "columns": 11,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 1
+  },
+  {
+   "name": "multi_channel_notifications",
+   "group": "الهوية والصلاحيات والنظام",
+   "purpose": "سجل إشعارات متعددة القنوات",
+   "columns": 9,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 1
+  },
+  {
+   "name": "news",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "الأخبار",
+   "columns": 6,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "created_by",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 2
+  },
+  {
+   "name": "news_media",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "وسائط الأخبار",
+   "columns": 12,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "news_id",
+     "references": "news",
+     "onDelete": "CASCADE"
+    }
+   ],
+   "indexes": 2
+  },
+  {
+   "name": "office_hour_bookings",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "حجوزات الساعات المكتبية",
+   "columns": 9,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 1
+  },
+  {
+   "name": "offline_sync_batches",
+   "group": "الهوية والصلاحيات والنظام",
+   "purpose": "دفعات مزامنة دون اتصال",
+   "columns": 9,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 2
+  },
+  {
+   "name": "online_quiz_submissions",
+   "group": "الأكاديمي والامتحانات والتعلم",
+   "purpose": "إجابات الاختبارات",
+   "columns": 8,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 2
+  },
+  {
+   "name": "online_quizzes",
+   "group": "الأكاديمي والامتحانات والتعلم",
+   "purpose": "اختبارات إلكترونية (منظومة ثانية)",
+   "columns": 10,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 1
+  },
+  {
+   "name": "org_units",
+   "group": "الهوية والصلاحيات والنظام",
+   "purpose": "الوحدات التنظيمية وشجرتها",
+   "columns": 11,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "parent_id",
+     "references": "org_units",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 4
+  },
+  {
+   "name": "postgrad_theses",
+   "group": "الأكاديمي والامتحانات والتعلم",
+   "purpose": "رسائل الدراسات العليا",
+   "columns": 12,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 1
+  },
+  {
+   "name": "proc_asset_moves",
+   "group": "المشتريات والمخازن",
+   "purpose": "حركات الأصول",
+   "columns": 9,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "asset_id",
+     "references": "proc_assets",
+     "onDelete": "CASCADE"
+    },
+    {
+     "column": "from_wh",
+     "references": "proc_warehouses",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "moved_by",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "to_wh",
+     "references": "proc_warehouses",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 1
+  },
+  {
+   "name": "proc_assets",
+   "group": "المشتريات والمخازن",
+   "purpose": "الأصول",
+   "columns": 12,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "supplier_id",
+     "references": "proc_suppliers",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "warehouse_id",
+     "references": "proc_warehouses",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 5
+  },
+  {
+   "name": "proc_categories",
+   "group": "المشتريات والمخازن",
+   "purpose": "تصنيفات الأصناف",
+   "columns": 4,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 2
+  },
+  {
+   "name": "proc_issue_lines",
+   "group": "المشتريات والمخازن",
+   "purpose": "بنود الصرف",
+   "columns": 4,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "issue_id",
+     "references": "proc_issues",
+     "onDelete": "CASCADE"
+    },
+    {
+     "column": "item_id",
+     "references": "proc_items",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 1
+  },
+  {
+   "name": "proc_issues",
+   "group": "المشتريات والمخازن",
+   "purpose": "الصرف",
+   "columns": 10,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "created_by",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "warehouse_id",
+     "references": "proc_warehouses",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 3
+  },
+  {
+   "name": "proc_items",
+   "group": "المشتريات والمخازن",
+   "purpose": "الأصناف",
+   "columns": 13,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "category_id",
+     "references": "proc_categories",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "warehouse_id",
+     "references": "proc_warehouses",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 6
+  },
+  {
+   "name": "proc_order_lines",
+   "group": "المشتريات والمخازن",
+   "purpose": "بنود الأوامر",
+   "columns": 7,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "item_id",
+     "references": "proc_items",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "order_id",
+     "references": "proc_orders",
+     "onDelete": "CASCADE"
+    }
+   ],
+   "indexes": 2
+  },
+  {
+   "name": "proc_orders",
+   "group": "المشتريات والمخازن",
+   "purpose": "أوامر التوريد",
+   "columns": 11,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "created_by",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "request_id",
+     "references": "proc_requests",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "supplier_id",
+     "references": "proc_suppliers",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 5
+  },
+  {
+   "name": "proc_receipt_lines",
+   "group": "المشتريات والمخازن",
+   "purpose": "بنود الاستلام",
+   "columns": 5,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "item_id",
+     "references": "proc_items",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "receipt_id",
+     "references": "proc_receipts",
+     "onDelete": "CASCADE"
+    }
+   ],
+   "indexes": 1
+  },
+  {
+   "name": "proc_receipts",
+   "group": "المشتريات والمخازن",
+   "purpose": "الاستلام",
+   "columns": 9,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "created_by",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "order_id",
+     "references": "proc_orders",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 2
+  },
+  {
+   "name": "proc_request_lines",
+   "group": "المشتريات والمخازن",
+   "purpose": "بنود الطلبات",
+   "columns": 7,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "item_id",
+     "references": "proc_items",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "request_id",
+     "references": "proc_requests",
+     "onDelete": "CASCADE"
+    }
+   ],
+   "indexes": 2
+  },
+  {
+   "name": "proc_requests",
+   "group": "المشتريات والمخازن",
+   "purpose": "طلبات الشراء",
+   "columns": 12,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "decided_by",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "requester_id",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "warehouse_id",
+     "references": "proc_warehouses",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 5
+  },
+  {
+   "name": "proc_suppliers",
+   "group": "المشتريات والمخازن",
+   "purpose": "الموردون",
+   "columns": 9,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 2
+  },
+  {
+   "name": "proc_warehouses",
+   "group": "المشتريات والمخازن",
+   "purpose": "المستودعات",
+   "columns": 7,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "manager_id",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 2
+  },
+  {
+   "name": "programs",
+   "group": "الأكاديمي والامتحانات والتعلم",
+   "purpose": "البرامج الدراسية",
+   "columns": 7,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "faculty_id",
+     "references": "faculties",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 2
+  },
+  {
+   "name": "push_subscriptions",
+   "group": "الهوية والصلاحيات والنظام",
+   "purpose": "اشتراكات تنبيهات الجوال",
+   "columns": 7,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "user_id",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 3
+  },
+  {
+   "name": "qa_accreditations",
+   "group": "الأكاديمي والامتحانات والتعلم",
+   "purpose": "ملفات الاعتماد",
+   "columns": 9,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 1
+  },
+  {
+   "name": "qa_kpis",
+   "group": "الأكاديمي والامتحانات والتعلم",
+   "purpose": "مؤشرات الجودة",
+   "columns": 10,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 2
+  },
+  {
+   "name": "qa_surveys",
+   "group": "الأكاديمي والامتحانات والتعلم",
+   "purpose": "استبيانات الجودة",
+   "columns": 12,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 1
+  },
+  {
+   "name": "request_events",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "أحداث الطلب",
+   "columns": 5,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "request_id",
+     "references": "requests",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 3
+  },
+  {
+   "name": "requests",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "طلبات الطلاب والمعاملات",
+   "columns": 12,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "assigned_unit_id",
+     "references": "org_units",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "decided_by",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "service_code",
+     "references": "service_types",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "student_id",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 15
+  },
+  {
+   "name": "research_projects",
+   "group": "الأكاديمي والامتحانات والتعلم",
+   "purpose": "المشاريع البحثية",
+   "columns": 13,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 2
+  },
+  {
+   "name": "roles",
+   "group": "الهوية والصلاحيات والنظام",
+   "purpose": "الأدوار وصلاحياتها",
+   "columns": 6,
+   "primaryKey": [
+    "key"
+   ],
+   "foreignKeys": [],
+   "indexes": 2
+  },
+  {
+   "name": "rules",
+   "group": "الهوية والصلاحيات والنظام",
+   "purpose": "قواعد الفحص الآلي للطلبات",
+   "columns": 6,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "service_code",
+     "references": "service_types",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 1
+  },
+  {
+   "name": "sa_advising_warnings",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "الإرشاد والإنذارات",
+   "columns": 12,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 2
+  },
+  {
+   "name": "sa_applicants",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "المتقدمون والمفاضلة",
+   "columns": 17,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 4
+  },
+  {
+   "name": "sa_card_activity_logs",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "سجل نشاط البطاقة",
+   "columns": 13,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 3
+  },
+  {
+   "name": "sa_course_prerequisites",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "المتطلبات السابقة",
+   "columns": 4,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 3
+  },
+  {
+   "name": "sa_credit_equivalences",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "معادلة المقررات",
+   "columns": 12,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 2
+  },
+  {
+   "name": "sa_desk_appointments",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "طابور مكتب الخدمة",
+   "columns": 12,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 4
+  },
+  {
+   "name": "sa_disciplinary_details",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "تفاصيل القرارات الانضباطية",
+   "columns": 9,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 2
+  },
+  {
+   "name": "sa_lifecycle_movements",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "حركات القيد",
+   "columns": 17,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 3
+  },
+  {
+   "name": "sa_scholarships",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "المنح في منظومة شؤون الطلاب",
+   "columns": 13,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 3
+  },
+  {
+   "name": "schema_migrations",
+   "group": "الهوية والصلاحيات والنظام",
+   "purpose": "الترحيلات المطبقة",
+   "columns": 2,
+   "primaryKey": [
+    "name"
+   ],
+   "foreignKeys": [],
+   "indexes": 1
+  },
+  {
+   "name": "scholarships",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "سجل منح إداري ثانٍ (يتداخل مع sa_scholarships)",
+   "columns": 10,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 1
+  },
+  {
+   "name": "service_types",
+   "group": "الهوية والصلاحيات والنظام",
+   "purpose": "أنواع الخدمات ونماذجها",
+   "columns": 15,
+   "primaryKey": [
+    "code"
+   ],
+   "foreignKeys": [],
+   "indexes": 1
+  },
+  {
+   "name": "sessions",
+   "group": "الهوية والصلاحيات والنظام",
+   "purpose": "جلسات الدخول (بصمة الرمز)",
+   "columns": 7,
+   "primaryKey": [
+    "token_hash"
+   ],
+   "foreignKeys": [
+    {
+     "column": "user_id",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 5
+  },
+  {
+   "name": "site_settings",
+   "group": "الهوية والصلاحيات والنظام",
+   "purpose": "الإعدادات العامة",
+   "columns": 2,
+   "primaryKey": [
+    "key"
+   ],
+   "foreignKeys": [],
+   "indexes": 2
+  },
+  {
+   "name": "smart_schedule_slots",
+   "group": "الأكاديمي والامتحانات والتعلم",
+   "purpose": "جدول ذكي ثانٍ (يتداخل مع course_schedules)",
+   "columns": 13,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 1
+  },
+  {
+   "name": "staff_attendance",
+   "group": "الموارد البشرية",
+   "purpose": "حضور الموظفين الذاتي",
+   "columns": 4,
+   "primaryKey": [
+    "day",
+    "user_id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "user_id",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 2
+  },
+  {
+   "name": "student_activities",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "الأنشطة الطلابية",
+   "columns": 10,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 1
+  },
+  {
+   "name": "student_certs",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "شهادات التسجيل الموقعة",
+   "columns": 16,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "student_id",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 4
+  },
+  {
+   "name": "student_fee_installments",
+   "group": "المالية",
+   "purpose": "أقساط الرسوم (مسار موازٍ لدفتر المالية)",
+   "columns": 13,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 3
+  },
+  {
+   "name": "student_file_meta",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "بيانات تدقيق ملف الطالب",
+   "columns": 11,
+   "primaryKey": [
+    "student_id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "audited_by",
+     "references": "users",
+     "onDelete": "SET NULL"
+    },
+    {
+     "column": "student_id",
+     "references": "users",
+     "onDelete": "CASCADE"
+    },
+    {
+     "column": "updated_by",
+     "references": "users",
+     "onDelete": "SET NULL"
+    }
+   ],
+   "indexes": 1
+  },
+  {
+   "name": "student_files",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "مرفقات ملف الطالب",
+   "columns": 9,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "created_by",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "student_id",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 2
+  },
+  {
+   "name": "student_group_members",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "أعضاء الفئات",
+   "columns": 4,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "group_id",
+     "references": "student_groups",
+     "onDelete": "CASCADE"
+    },
+    {
+     "column": "student_id",
+     "references": "users",
+     "onDelete": "CASCADE"
+    }
+   ],
+   "indexes": 3
+  },
+  {
+   "name": "student_groups",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "فئات الطلاب",
+   "columns": 7,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "program_id",
+     "references": "programs",
+     "onDelete": "SET NULL"
+    }
+   ],
+   "indexes": 2
+  },
+  {
+   "name": "student_holds",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "موانع الطالب",
+   "columns": 8,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "created_by",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "student_id",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 4
+  },
+  {
+   "name": "student_profiles",
+   "group": "الطلاب والقبول والخدمات",
+   "purpose": "الملف الشخصي والأكاديمي للطالب",
+   "columns": 38,
+   "primaryKey": [
+    "user_id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "created_by",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "program_id",
+     "references": "programs",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "user_id",
+     "references": "users",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 11
+  },
+  {
+   "name": "student_self_enrollments",
+   "group": "الأكاديمي والامتحانات والتعلم",
+   "purpose": "التسجيل الذاتي للمقررات",
+   "columns": 10,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [],
+   "indexes": 2
+  },
+  {
+   "name": "unit_links",
+   "group": "الهوية والصلاحيات والنظام",
+   "purpose": "مسارات الإحالة بين الوحدات",
+   "columns": 5,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "from_unit",
+     "references": "org_units",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "to_unit",
+     "references": "org_units",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 4
+  },
+  {
+   "name": "users",
+   "group": "الهوية والصلاحيات والنظام",
+   "purpose": "حسابات الدخول لكل الموظفين والطلاب",
+   "columns": 23,
+   "primaryKey": [
+    "id"
+   ],
+   "foreignKeys": [
+    {
+     "column": "role_key",
+     "references": "roles",
+     "onDelete": "NO ACTION"
+    },
+    {
+     "column": "unit_id",
+     "references": "org_units",
+     "onDelete": "NO ACTION"
+    }
+   ],
+   "indexes": 9
+  }
+ ],
+ "apiEndpoints": [
+  {
+   "method": "GET",
+   "path": "/api/admin/access",
+   "module": "الحسابات والأدوار",
+   "file": "server/routes.js",
+   "line": 479,
+   "public": false,
+   "permissions": [
+    "user:manage",
+    "role:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/access/matrix.xlsx",
+   "module": "الحسابات والأدوار",
+   "file": "server/routes.js",
+   "line": 483,
+   "public": false,
+   "permissions": [
+    "user:manage",
+    "role:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/backups",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 171,
+   "public": false,
+   "permissions": [
+    "backup:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/backups",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 172,
+   "public": false,
+   "permissions": [
+    "backup:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/admin/backups/:name",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 181,
+   "public": false,
+   "permissions": [
+    "backup:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/backups/:name",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 173,
+   "public": false,
+   "permissions": [
+    "backup:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/backups/:name/verify",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 180,
+   "public": false,
+   "permissions": [
+    "backup:manage"
+   ],
+   "heavyWorker": true,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/faculties",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 301,
+   "public": false,
+   "permissions": [
+    "program:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/admin/faculties/:id",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 303,
+   "public": false,
+   "permissions": [
+    "program:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/admin/faculties/:id",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 302,
+   "public": false,
+   "permissions": [
+    "program:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/faculties/:id/toggle",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 304,
+   "public": false,
+   "permissions": [
+    "program:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/general",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 93,
+   "public": false,
+   "permissions": [
+    "settings:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/admin/general",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 94,
+   "public": false,
+   "permissions": [
+    "settings:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/general/reset",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 95,
+   "public": false,
+   "permissions": [
+    "settings:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/holds",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 495,
+   "public": false,
+   "permissions": [
+    "holds:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/holds",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 500,
+   "public": false,
+   "permissions": [
+    "holds:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/admin/holds/:id",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 511,
+   "public": false,
+   "permissions": [
+    "holds:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/admin/holds/:id",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 510,
+   "public": false,
+   "permissions": [
+    "holds:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/holds/:id/clear",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 512,
+   "public": false,
+   "permissions": [
+    "holds:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/hr/contracts",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 336,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/hr/contracts",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 337,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/admin/hr/employee/:id",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 326,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/hr/employee/:id",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 323,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/admin/hr/employee/:id",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 324,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/hr/employee/:id/toggle",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 325,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/hr/employees",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 321,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/hr/employees",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 322,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/hr/leave/:id",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 332,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/hr/leave/:id/approve",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 333,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/hr/leave/:id/cancel",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 335,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/hr/leave/:id/reject",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 334,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/hr/leaves",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 330,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/hr/leaves",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 331,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/hr/options",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 338,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/hr/salaries",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 327,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/hr/salaries",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 328,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/hr/salary/:employeeId/latest",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 329,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/links",
+   "module": "الحسابات والأدوار",
+   "file": "server/routes.js",
+   "line": 493,
+   "public": false,
+   "permissions": [
+    "role:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/admin/links/:id",
+   "module": "الحسابات والأدوار",
+   "file": "server/routes.js",
+   "line": 494,
+   "public": false,
+   "permissions": [
+    "role:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/logs",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 466,
+   "public": false,
+   "permissions": [
+    "audit:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/programs",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 305,
+   "public": false,
+   "permissions": [
+    "program:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/admin/programs/:id",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 307,
+   "public": false,
+   "permissions": [
+    "program:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/admin/programs/:id",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 306,
+   "public": false,
+   "permissions": [
+    "program:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/programs/:id/toggle",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 308,
+   "public": false,
+   "permissions": [
+    "program:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/roles",
+   "module": "الحسابات والأدوار",
+   "file": "server/routes.js",
+   "line": 487,
+   "public": false,
+   "permissions": [
+    "role:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/admin/roles/:key",
+   "module": "الحسابات والأدوار",
+   "file": "server/routes.js",
+   "line": 489,
+   "public": false,
+   "permissions": [
+    "role:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/admin/roles/:key",
+   "module": "الحسابات والأدوار",
+   "file": "server/routes.js",
+   "line": 488,
+   "public": false,
+   "permissions": [
+    "role:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/rules",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 521,
+   "public": false,
+   "permissions": [
+    "rules:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/rules",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 520,
+   "public": false,
+   "permissions": [
+    "rules:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/admin/rules/:id",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 539,
+   "public": false,
+   "permissions": [
+    "rules:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/admin/rules/:id",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 538,
+   "public": false,
+   "permissions": [
+    "rules:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/rules/:id/toggle",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 525,
+   "public": false,
+   "permissions": [
+    "rules:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/rules/kinds",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 519,
+   "public": false,
+   "permissions": [
+    "rules:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/services",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 533,
+   "public": false,
+   "permissions": [
+    "rules:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/services",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 534,
+   "public": false,
+   "permissions": [
+    "rules:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/admin/services/:code",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 535,
+   "public": false,
+   "permissions": [
+    "rules:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/settings",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 536,
+   "public": false,
+   "permissions": [
+    "rules:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/admin/settings",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 537,
+   "public": false,
+   "permissions": [
+    "rules:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/units",
+   "module": "الحسابات والأدوار",
+   "file": "server/routes.js",
+   "line": 490,
+   "public": false,
+   "permissions": [
+    "role:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/admin/units/:id",
+   "module": "الحسابات والأدوار",
+   "file": "server/routes.js",
+   "line": 492,
+   "public": false,
+   "permissions": [
+    "role:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/admin/units/:id",
+   "module": "الحسابات والأدوار",
+   "file": "server/routes.js",
+   "line": 491,
+   "public": false,
+   "permissions": [
+    "role:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/users",
+   "module": "الحسابات والأدوار",
+   "file": "server/routes.js",
+   "line": 470,
+   "public": false,
+   "permissions": [
+    "user:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/users",
+   "module": "الحسابات والأدوار",
+   "file": "server/routes.js",
+   "line": 472,
+   "public": false,
+   "permissions": [
+    "user:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/admin/users/:id",
+   "module": "الحسابات والأدوار",
+   "file": "server/routes.js",
+   "line": 474,
+   "public": false,
+   "permissions": [
+    "user:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/admin/users/:id",
+   "module": "الحسابات والأدوار",
+   "file": "server/routes.js",
+   "line": 473,
+   "public": false,
+   "permissions": [
+    "user:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/users/:id/access",
+   "module": "الحسابات والأدوار",
+   "file": "server/routes.js",
+   "line": 471,
+   "public": false,
+   "permissions": [
+    "user:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/users/:id/active",
+   "module": "الحسابات والأدوار",
+   "file": "server/routes.js",
+   "line": 475,
+   "public": false,
+   "permissions": [
+    "user:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/users/:id/reset-password",
+   "module": "الحسابات والأدوار",
+   "file": "server/routes.js",
+   "line": 476,
+   "public": false,
+   "permissions": [
+    "user:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/waf/stats",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 89,
+   "public": false,
+   "permissions": [
+    "settings:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/waf/test",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 91,
+   "public": false,
+   "permissions": [
+    "settings:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/waf/unban",
+   "module": "الإدارة والإعدادات",
+   "file": "server/routes.js",
+   "line": 90,
+   "public": false,
+   "permissions": [
+    "settings:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/ai/advisor/ask",
+   "module": "البحث والخريجون والجودة والذكاء الاصطناعي",
+   "file": "server/services/v12_modules.js",
+   "line": 1049,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/ai/early-warning/analyze",
+   "module": "البحث والخريجون والجودة والذكاء الاصطناعي",
+   "file": "server/services/v12_modules.js",
+   "line": 1014,
+   "public": false,
+   "permissions": [
+    "enterprise_ai:use",
+    "sa_advising:edit"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/ai/overview",
+   "module": "البحث والخريجون والجودة والذكاء الاصطناعي",
+   "file": "server/services/v12_modules.js",
+   "line": 991,
+   "public": false,
+   "permissions": [
+    "AI_READ"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/ai/triage/analyze",
+   "module": "البحث والخريجون والجودة والذكاء الاصطناعي",
+   "file": "server/services/v12_modules.js",
+   "line": 1083,
+   "public": false,
+   "permissions": [
+    "enterprise_ai:use",
+    "corr:use",
+    "complaint:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/alumni/applications",
+   "module": "البحث والخريجون والجودة والذكاء الاصطناعي",
+   "file": "server/services/v12_modules.js",
+   "line": 536,
+   "public": false,
+   "permissions": [
+    "ALUMNI_WRITE"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/alumni/jobs",
+   "module": "البحث والخريجون والجودة والذكاء الاصطناعي",
+   "file": "server/services/v12_modules.js",
+   "line": 513,
+   "public": false,
+   "permissions": [
+    "ALUMNI_WRITE"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/alumni/overview",
+   "module": "البحث والخريجون والجودة والذكاء الاصطناعي",
+   "file": "server/services/v12_modules.js",
+   "line": 460,
+   "public": false,
+   "permissions": [
+    "alumni_career:view",
+    "ALUMNI_WRITE"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/alumni/records",
+   "module": "البحث والخريجون والجودة والذكاء الاصطناعي",
+   "file": "server/services/v12_modules.js",
+   "line": 484,
+   "public": false,
+   "permissions": [
+    "ALUMNI_WRITE"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/analytics",
+   "module": "التحليلات والتدقيق",
+   "file": "server/routes.js",
+   "line": 387,
+   "public": false,
+   "permissions": [
+    "stats:read"
+   ],
+   "heavyWorker": true,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/analytics/export.docx",
+   "module": "التحليلات والتدقيق",
+   "file": "server/routes.js",
+   "line": 394,
+   "public": false,
+   "permissions": [
+    "stats:read"
+   ],
+   "heavyWorker": true,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/analytics/export.xlsx",
+   "module": "التحليلات والتدقيق",
+   "file": "server/routes.js",
+   "line": 389,
+   "public": false,
+   "permissions": [
+    "stats:read"
+   ],
+   "heavyWorker": true,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/attachments/:id",
+   "module": "الطلبات والوثائق",
+   "file": "server/routes.js",
+   "line": 382,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/attendance",
+   "module": "الأكاديمي",
+   "file": "server/routes.js",
+   "line": 162,
+   "public": false,
+   "permissions": [
+    "attendance:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/attendance",
+   "module": "الأكاديمي",
+   "file": "server/routes.js",
+   "line": 164,
+   "public": false,
+   "permissions": [
+    "attendance:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/attendance/:id",
+   "module": "الأكاديمي",
+   "file": "server/routes.js",
+   "line": 166,
+   "public": false,
+   "permissions": [
+    "attendance:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/attendance/:id",
+   "module": "الأكاديمي",
+   "file": "server/routes.js",
+   "line": 165,
+   "public": false,
+   "permissions": [
+    "attendance:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/attendance/open",
+   "module": "الأكاديمي",
+   "file": "server/routes.js",
+   "line": 163,
+   "public": false,
+   "permissions": [
+    "attendance:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/attendance/scan",
+   "module": "الأكاديمي",
+   "file": "server/routes.js",
+   "line": 161,
+   "public": false,
+   "permissions": [
+    "attendance:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/audit",
+   "module": "التحليلات والتدقيق",
+   "file": "server/routes.js",
+   "line": 461,
+   "public": false,
+   "permissions": [
+    "audit:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/audit/verify",
+   "module": "التحليلات والتدقيق",
+   "file": "server/routes.js",
+   "line": 467,
+   "public": false,
+   "permissions": [
+    "audit:read"
+   ],
+   "heavyWorker": true,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/change-password",
+   "module": "الهوية والجلسات",
+   "file": "server/routes.js",
+   "line": 82,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/login",
+   "module": "الهوية والجلسات",
+   "file": "server/routes.js",
+   "line": 64,
+   "public": true,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/logout",
+   "module": "الهوية والجلسات",
+   "file": "server/routes.js",
+   "line": 81,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/cards/batches",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 262,
+   "public": false,
+   "permissions": [
+    "student:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/cards/batches",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 263,
+   "public": false,
+   "permissions": [
+    "student:update"
+   ],
+   "heavyWorker": true,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/cards/batches/:id",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 264,
+   "public": false,
+   "permissions": [
+    "student:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/cards/batches/:id/export.xlsx",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 265,
+   "public": false,
+   "permissions": [
+    "student:read"
+   ],
+   "heavyWorker": true,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/cards/handovers/:id/receive",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 266,
+   "public": false,
+   "permissions": [
+    "student:update"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/cards/handovers/:id/undo",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 267,
+   "public": false,
+   "permissions": [
+    "student:update"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/cards/options",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 260,
+   "public": false,
+   "permissions": [
+    "student:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/cards/students",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 261,
+   "public": false,
+   "permissions": [
+    "student:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/complaints",
+   "module": "الأخبار والتواصل",
+   "file": "server/routes.js",
+   "line": 150,
+   "public": false,
+   "permissions": [
+    "complaint:create",
+    "complaint:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/complaints",
+   "module": "الأخبار والتواصل",
+   "file": "server/routes.js",
+   "line": 149,
+   "public": false,
+   "permissions": [
+    "complaint:create"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/complaints/:id",
+   "module": "الأخبار والتواصل",
+   "file": "server/routes.js",
+   "line": 154,
+   "public": false,
+   "permissions": [
+    "complaint:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/complaints/:id/respond",
+   "module": "الأخبار والتواصل",
+   "file": "server/routes.js",
+   "line": 155,
+   "public": false,
+   "permissions": [
+    "complaint:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/corr",
+   "module": "المراسلات",
+   "file": "server/routes.js",
+   "line": 290,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/corr",
+   "module": "المراسلات",
+   "file": "server/routes.js",
+   "line": 291,
+   "public": false,
+   "permissions": [
+    "corr:use"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/corr/:id",
+   "module": "المراسلات",
+   "file": "server/routes.js",
+   "line": 292,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/corr/:id",
+   "module": "المراسلات",
+   "file": "server/routes.js",
+   "line": 293,
+   "public": false,
+   "permissions": [
+    "corr:use"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/corr/:id/approve",
+   "module": "المراسلات",
+   "file": "server/routes.js",
+   "line": 296,
+   "public": false,
+   "permissions": [
+    "corr:use"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/corr/:id/cancel",
+   "module": "المراسلات",
+   "file": "server/routes.js",
+   "line": 299,
+   "public": false,
+   "permissions": [
+    "corr:use"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/corr/:id/comment",
+   "module": "المراسلات",
+   "file": "server/routes.js",
+   "line": 298,
+   "public": false,
+   "permissions": [
+    "corr:use"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/corr/:id/pdf",
+   "module": "المراسلات",
+   "file": "server/routes.js",
+   "line": 294,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/corr/:id/reject",
+   "module": "المراسلات",
+   "file": "server/routes.js",
+   "line": 297,
+   "public": false,
+   "permissions": [
+    "corr:use"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/corr/:id/send",
+   "module": "المراسلات",
+   "file": "server/routes.js",
+   "line": 295,
+   "public": false,
+   "permissions": [
+    "corr:use"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/corr/batch",
+   "module": "المراسلات",
+   "file": "server/routes.js",
+   "line": 595,
+   "public": false,
+   "permissions": [
+    "corr:use"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/corr/files/:id",
+   "module": "المراسلات",
+   "file": "server/routes.js",
+   "line": 289,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/corr/notifications",
+   "module": "المراسلات",
+   "file": "server/routes.js",
+   "line": 287,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/corr/notifications/read",
+   "module": "المراسلات",
+   "file": "server/routes.js",
+   "line": 288,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/corr/people",
+   "module": "المراسلات",
+   "file": "server/routes.js",
+   "line": 282,
+   "public": false,
+   "permissions": [
+    "corr:use"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/corr/templates",
+   "module": "المراسلات",
+   "file": "server/routes.js",
+   "line": 283,
+   "public": false,
+   "permissions": [
+    "corr:use"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/corr/templates",
+   "module": "المراسلات",
+   "file": "server/routes.js",
+   "line": 284,
+   "public": false,
+   "permissions": [
+    "corr:templates"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/corr/templates/:code",
+   "module": "المراسلات",
+   "file": "server/routes.js",
+   "line": 286,
+   "public": false,
+   "permissions": [
+    "corr:templates"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/corr/templates/:code",
+   "module": "المراسلات",
+   "file": "server/routes.js",
+   "line": 285,
+   "public": false,
+   "permissions": [
+    "corr:templates"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/courses",
+   "module": "الأكاديمي",
+   "file": "server/routes.js",
+   "line": 102,
+   "public": false,
+   "permissions": [
+    "course:read_own",
+    "course:manage",
+    "grade:manage",
+    "grade:approve",
+    "grade:approve_own"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/courses",
+   "module": "الأكاديمي",
+   "file": "server/routes.js",
+   "line": 106,
+   "public": false,
+   "permissions": [
+    "course:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/courses/:id",
+   "module": "الأكاديمي",
+   "file": "server/routes.js",
+   "line": 108,
+   "public": false,
+   "permissions": [
+    "course:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/courses/:id",
+   "module": "الأكاديمي",
+   "file": "server/routes.js",
+   "line": 107,
+   "public": false,
+   "permissions": [
+    "course:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/courses/:id/schedule",
+   "module": "الأكاديمي",
+   "file": "server/routes.js",
+   "line": 132,
+   "public": false,
+   "permissions": [
+    "course:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/courses/:id/schedule",
+   "module": "الأكاديمي",
+   "file": "server/routes.js",
+   "line": 133,
+   "public": false,
+   "permissions": [
+    "course:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/courses/:id/toggle",
+   "module": "الأكاديمي",
+   "file": "server/routes.js",
+   "line": 109,
+   "public": false,
+   "permissions": [
+    "course:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/devops/incidents",
+   "module": "التحليلات والتدقيق",
+   "file": "server/services/v12_modules.js",
+   "line": 890,
+   "public": false,
+   "permissions": [
+    "DEVOPS_ACCESS"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/devops/incidents",
+   "module": "التحليلات والتدقيق",
+   "file": "server/services/v12_modules.js",
+   "line": 896,
+   "public": false,
+   "permissions": [
+    "DEVOPS_ACCESS"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/devops/incidents/:id",
+   "module": "التحليلات والتدقيق",
+   "file": "server/services/v12_modules.js",
+   "line": 951,
+   "public": false,
+   "permissions": [
+    "devops:manage",
+    "settings:manage",
+    "backup:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/devops/incidents/:id/resolve",
+   "module": "التحليلات والتدقيق",
+   "file": "server/services/v12_modules.js",
+   "line": 934,
+   "public": false,
+   "permissions": [
+    "devops:manage",
+    "settings:manage",
+    "backup:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/devops/overview",
+   "module": "التحليلات والتدقيق",
+   "file": "server/services/v12_modules.js",
+   "line": 836,
+   "public": false,
+   "permissions": [
+    "DEVOPS_ACCESS"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/devops/postgres-ddl",
+   "module": "التحليلات والتدقيق",
+   "file": "server/services/v12_modules.js",
+   "line": 968,
+   "public": false,
+   "permissions": [
+    "DEVOPS_ACCESS"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "PUT",
+   "path": "/api/devops/settings/:key",
+   "module": "التحليلات والتدقيق",
+   "file": "server/services/v12_modules.js",
+   "line": 959,
+   "public": false,
+   "permissions": [
+    "devops:manage",
+    "settings:manage",
+    "backup:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/documents/:code",
+   "module": "الطلبات والوثائق",
+   "file": "server/routes.js",
+   "line": 412,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/documents/:code/pdf",
+   "module": "الطلبات والوثائق",
+   "file": "server/routes.js",
+   "line": 413,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/documents/:code/qr.svg",
+   "module": "الطلبات والوثائق",
+   "file": "server/routes.js",
+   "line": 418,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/enterprise/faculty-overload",
+   "module": "الحزمة المؤسسية",
+   "file": "server/services/enterprise_suite.js",
+   "line": 286,
+   "public": false,
+   "permissions": [
+    "hr:manage",
+    "hr_payroll:approve",
+    "faculty:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/enterprise/global-search",
+   "module": "الحزمة المؤسسية",
+   "file": "server/services/enterprise_suite.js",
+   "line": 401,
+   "public": false,
+   "permissions": [
+    "student:read",
+    "SEES_PAYROLL"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/enterprise/gpa-simulate",
+   "module": "الحزمة المؤسسية",
+   "file": "server/services/enterprise_suite.js",
+   "line": 207,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/enterprise/installments/:id/pay",
+   "module": "الحزمة المؤسسية",
+   "file": "server/services/enterprise_suite.js",
+   "line": 337,
+   "public": false,
+   "permissions": [
+    "finance:post",
+    "finance:fees"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/enterprise/notifications/broadcast",
+   "module": "الحزمة المؤسسية",
+   "file": "server/services/enterprise_suite.js",
+   "line": 358,
+   "public": false,
+   "permissions": [
+    "news:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/enterprise/offline-sync",
+   "module": "الحزمة المؤسسية",
+   "file": "server/services/enterprise_suite.js",
+   "line": 379,
+   "public": false,
+   "permissions": [
+    "grade:manage",
+    "attendance:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/enterprise/overview",
+   "module": "الحزمة المؤسسية",
+   "file": "server/services/enterprise_suite.js",
+   "line": 147,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/enterprise/payslips/issue",
+   "module": "الحزمة المؤسسية",
+   "file": "server/services/enterprise_suite.js",
+   "line": 311,
+   "public": false,
+   "permissions": [
+    "hr:manage",
+    "hr_payroll:approve"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/enterprise/quizzes/:id/submit",
+   "module": "الحزمة المؤسسية",
+   "file": "server/services/enterprise_suite.js",
+   "line": 183,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/enterprise/schedule",
+   "module": "الحزمة المؤسسية",
+   "file": "server/services/enterprise_suite.js",
+   "line": 152,
+   "public": false,
+   "permissions": [
+    "course:manage",
+    "attendance:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/enterprise/self-enroll",
+   "module": "الحزمة المؤسسية",
+   "file": "server/services/enterprise_suite.js",
+   "line": 214,
+   "public": false,
+   "permissions": [
+    "course:manage",
+    "student:register"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/expansions/appeals",
+   "module": "الامتحانات والتوسعات",
+   "file": "server/services/v12_modules.js",
+   "line": 702,
+   "public": false,
+   "permissions": [
+    "grade:manage",
+    "grade:approve",
+    "EXAMS_MANAGE"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/expansions/appeals/:id/decide",
+   "module": "الامتحانات والتوسعات",
+   "file": "server/services/v12_modules.js",
+   "line": 718,
+   "public": false,
+   "permissions": [
+    "grade:approve",
+    "exams_housing:approve"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/expansions/appraisals",
+   "module": "الامتحانات والتوسعات",
+   "file": "server/services/v12_modules.js",
+   "line": 802,
+   "public": false,
+   "permissions": [
+    "hr_emp:edit",
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/expansions/biometrics/sync",
+   "module": "الامتحانات والتوسعات",
+   "file": "server/services/v12_modules.js",
+   "line": 828,
+   "public": false,
+   "permissions": [
+    "hr:manage",
+    "staffatt:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/expansions/dorm-allocations",
+   "module": "الامتحانات والتوسعات",
+   "file": "server/services/v12_modules.js",
+   "line": 760,
+   "public": false,
+   "permissions": [
+    "sa_housing:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/expansions/exams",
+   "module": "الامتحانات والتوسعات",
+   "file": "server/services/v12_modules.js",
+   "line": 673,
+   "public": false,
+   "permissions": [
+    "course:manage",
+    "EXAMS_MANAGE"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/expansions/office-bookings",
+   "module": "الامتحانات والتوسعات",
+   "file": "server/services/v12_modules.js",
+   "line": 742,
+   "public": false,
+   "permissions": [
+    "sa_housing:manage",
+    "faculty:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/expansions/overview",
+   "module": "الامتحانات والتوسعات",
+   "file": "server/services/v12_modules.js",
+   "line": 628,
+   "public": false,
+   "permissions": [
+    "grade:manage",
+    "grade:approve",
+    "faculty:manage",
+    "EXAMS_READ",
+    "HR_READ"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/expansions/scholarships",
+   "module": "الامتحانات والتوسعات",
+   "file": "server/services/v12_modules.js",
+   "line": 783,
+   "public": false,
+   "permissions": [
+    "sa_scholarships:approve",
+    "finance:fees"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/export/file",
+   "module": "الاستيراد والتصدير",
+   "file": "server/routes.js",
+   "line": 404,
+   "public": false,
+   "permissions": [
+    "data:export"
+   ],
+   "heavyWorker": true,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/export/options",
+   "module": "الاستيراد والتصدير",
+   "file": "server/routes.js",
+   "line": 402,
+   "public": false,
+   "permissions": [
+    "data:export"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/export/preview",
+   "module": "الاستيراد والتصدير",
+   "file": "server/routes.js",
+   "line": 403,
+   "public": false,
+   "permissions": [
+    "data:export"
+   ],
+   "heavyWorker": true,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/faculties",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 300,
+   "public": false,
+   "permissions": [
+    "student:read",
+    "faculties:list"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/faculty",
+   "module": "الأكاديمي",
+   "file": "server/routes.js",
+   "line": 311,
+   "public": false,
+   "permissions": [
+    "faculty:manage",
+    "course:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/faculty",
+   "module": "الأكاديمي",
+   "file": "server/routes.js",
+   "line": 315,
+   "public": false,
+   "permissions": [
+    "faculty:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/faculty/:id",
+   "module": "الأكاديمي",
+   "file": "server/routes.js",
+   "line": 318,
+   "public": false,
+   "permissions": [
+    "faculty:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/faculty/:id",
+   "module": "الأكاديمي",
+   "file": "server/routes.js",
+   "line": 316,
+   "public": false,
+   "permissions": [
+    "faculty:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/faculty/:id/toggle",
+   "module": "الأكاديمي",
+   "file": "server/routes.js",
+   "line": 317,
+   "public": false,
+   "permissions": [
+    "faculty:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/faculty/my-grades",
+   "module": "الأكاديمي",
+   "file": "server/routes.js",
+   "line": 123,
+   "public": false,
+   "permissions": [
+    "grade:approve_own"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/accounts",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 35,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/accounts",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 36,
+   "public": false,
+   "permissions": [
+    "finance:setup"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/finance/accounts/:id",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 39,
+   "public": false,
+   "permissions": [
+    "finance:setup"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/finance/accounts/:id",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 37,
+   "public": false,
+   "permissions": [
+    "finance:setup"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/accounts/:id/toggle",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 38,
+   "public": false,
+   "permissions": [
+    "finance:setup"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/charges",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 265,
+   "public": false,
+   "permissions": [
+    "finance:fees"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/charges",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 266,
+   "public": false,
+   "permissions": [
+    "finance:fees"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/charges/:id/void",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 267,
+   "public": false,
+   "permissions": [
+    "finance:fees"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/cost-centers",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 168,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/cost-centers",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 171,
+   "public": false,
+   "permissions": [
+    "finance:setup"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "PUT",
+   "path": "/api/finance/cost-centers/:id",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 178,
+   "public": false,
+   "permissions": [
+    "finance:setup"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/cost-centers/:id/toggle",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 186,
+   "public": false,
+   "permissions": [
+    "finance:setup"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/currencies",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 191,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "PUT",
+   "path": "/api/finance/currencies/:code",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 194,
+   "public": false,
+   "permissions": [
+    "finance:setup"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/discounts",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 381,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/discounts",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 382,
+   "public": false,
+   "permissions": [
+    "finance:fees"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/entries",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 42,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/entries",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 44,
+   "public": false,
+   "permissions": [
+    "finance:entry"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/finance/entries/:id",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 46,
+   "public": false,
+   "permissions": [
+    "finance:entry"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/entries/:id",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 43,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/finance/entries/:id",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 45,
+   "public": false,
+   "permissions": [
+    "finance:entry"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/entries/:id/post",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 47,
+   "public": false,
+   "permissions": [
+    "finance:post"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/entries/:id/reverse",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 48,
+   "public": false,
+   "permissions": [
+    "finance:post"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/fee-structures",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 295,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/fee-structures",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 312,
+   "public": false,
+   "permissions": [
+    "finance:setup"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/fee-types",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 262,
+   "public": false,
+   "permissions": [
+    "finance:fees"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/fee-types",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 263,
+   "public": false,
+   "permissions": [
+    "finance:fees"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/fee-types/:id/toggle",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 264,
+   "public": false,
+   "permissions": [
+    "finance:fees"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/fees/overdue",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 383,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/fees/overview",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 278,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/fiscal-years",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 29,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/fiscal-years",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 31,
+   "public": false,
+   "permissions": [
+    "finance:setup"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/fiscal-years/:id/close",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 32,
+   "public": false,
+   "permissions": [
+    "finance:setup"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/invoices",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 98,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/invoices",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 118,
+   "public": false,
+   "permissions": [
+    "finance:entry"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/invoices/:id/cancel",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 136,
+   "public": false,
+   "permissions": [
+    "finance:entry"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/invoices/:id/issue",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 135,
+   "public": false,
+   "permissions": [
+    "finance:entry"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/journal",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 51,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/journal",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 53,
+   "public": false,
+   "permissions": [
+    "finance:entry"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/finance/journal/:id",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 55,
+   "public": false,
+   "permissions": [
+    "finance:entry"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/journal/:id",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 52,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/finance/journal/:id",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 54,
+   "public": false,
+   "permissions": [
+    "finance:entry"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/journal/:id/post",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 56,
+   "public": false,
+   "permissions": [
+    "finance:post"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/journal/:id/reverse",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 57,
+   "public": false,
+   "permissions": [
+    "finance:post"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/overview",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 24,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/parties",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 139,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/parties",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 147,
+   "public": false,
+   "permissions": [
+    "finance:setup"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "PUT",
+   "path": "/api/finance/parties/:id",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 155,
+   "public": false,
+   "permissions": [
+    "finance:setup"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/parties/:id/toggle",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 162,
+   "public": false,
+   "permissions": [
+    "finance:setup"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/payments",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 268,
+   "public": false,
+   "permissions": [
+    "finance:fees"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/payments",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 269,
+   "public": false,
+   "permissions": [
+    "finance:fees"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/payments/:id/void",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 270,
+   "public": false,
+   "permissions": [
+    "finance:fees"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/payroll-entry",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 274,
+   "public": false,
+   "permissions": [
+    "finance:post"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/payroll-months",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 272,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/payroll-preview",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 273,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/payroll/:id/post",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 399,
+   "public": false,
+   "permissions": [
+    "finance:post"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/reports/balance-sheet",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 217,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/reports/cash-book",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 218,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/reports/cost-centers",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 237,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/reports/income",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 205,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/reports/income-statement",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 206,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/reports/ledger",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 204,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/reports/party",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 238,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/reports/party-statement",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 239,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/reports/trial-balance",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 203,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/reports/trial-balance.xlsx",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 250,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/student-invoices",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 321,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/student-invoices",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 342,
+   "public": false,
+   "permissions": [
+    "finance:fees"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/student-invoices/:id",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 354,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/student-invoices/:id/pay",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 369,
+   "public": false,
+   "permissions": [
+    "finance:fees"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/student-statement/:id",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 271,
+   "public": false,
+   "permissions": [
+    "finance:fees"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/vouchers",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 60,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/vouchers",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 81,
+   "public": false,
+   "permissions": [
+    "finance:entry"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/finance/years",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 28,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/years",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 30,
+   "public": false,
+   "permissions": [
+    "finance:setup"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/finance/years/:id/close",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 275,
+   "public": false,
+   "permissions": [
+    "finance:setup"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/grades",
+   "module": "الأكاديمي",
+   "file": "server/routes.js",
+   "line": 110,
+   "public": false,
+   "permissions": [
+    "grade:manage",
+    "student:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/grades/:id/history",
+   "module": "الأكاديمي",
+   "file": "server/routes.js",
+   "line": 130,
+   "public": false,
+   "permissions": [
+    "grade:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/grades/workflow",
+   "module": "الأكاديمي",
+   "file": "server/routes.js",
+   "line": 124,
+   "public": false,
+   "permissions": [
+    "grade:approve_own",
+    "grade:manage"
+   ],
+   "heavyWorker": true,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/grades/workflow-setting",
+   "module": "الأكاديمي",
+   "file": "server/routes.js",
+   "line": 131,
+   "public": false,
+   "permissions": [
+    "grade:approve"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/health",
+   "module": "الهوية والجلسات",
+   "file": "server/routes.js",
+   "line": 84,
+   "public": true,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/hr-pro/absences",
+   "module": "الموارد البشرية",
+   "file": "server/services/hr_integrated.js",
+   "line": 822,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/hr-pro/absences/:id",
+   "module": "الموارد البشرية",
+   "file": "server/services/hr_integrated.js",
+   "line": 847,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/hr-pro/advances",
+   "module": "الموارد البشرية",
+   "file": "server/services/hr_integrated.js",
+   "line": 888,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/hr-pro/advances/:id/pay",
+   "module": "الموارد البشرية",
+   "file": "server/services/hr_integrated.js",
+   "line": 909,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/hr-pro/attendance",
+   "module": "الموارد البشرية",
+   "file": "server/services/hr_integrated.js",
+   "line": 785,
+   "public": false,
+   "permissions": [
+    "hr:manage",
+    "staffatt:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/hr-pro/contracts",
+   "module": "الموارد البشرية",
+   "file": "server/services/hr_integrated.js",
+   "line": 929,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/hr-pro/contracts/:id/renew",
+   "module": "الموارد البشرية",
+   "file": "server/services/hr_integrated.js",
+   "line": 953,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/hr-pro/employees",
+   "module": "الموارد البشرية",
+   "file": "server/services/hr_integrated.js",
+   "line": 656,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "PUT",
+   "path": "/api/hr-pro/employees/:id",
+   "module": "الموارد البشرية",
+   "file": "server/services/hr_integrated.js",
+   "line": 744,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/hr-pro/leaves",
+   "module": "الموارد البشرية",
+   "file": "server/services/hr_integrated.js",
+   "line": 854,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/hr-pro/lookups",
+   "module": "الموارد البشرية",
+   "file": "server/services/hr_integrated.js",
+   "line": 990,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/hr-pro/lookups/:id",
+   "module": "الموارد البشرية",
+   "file": "server/services/hr_integrated.js",
+   "line": 1004,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/hr-pro/overview",
+   "module": "الموارد البشرية",
+   "file": "server/services/hr_integrated.js",
+   "line": 642,
+   "public": false,
+   "permissions": [
+    "hr_emp:view",
+    "hr_emp:write",
+    "hr_emp:edit",
+    "hr_emp:delete",
+    "hr:manage",
+    "hr_payroll:approve",
+    "staffatt:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/hr-pro/settings",
+   "module": "الموارد البشرية",
+   "file": "server/services/hr_integrated.js",
+   "line": 977,
+   "public": false,
+   "permissions": [
+    "hr:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/hr/attendance",
+   "module": "الموارد البشرية",
+   "file": "server/routes.js",
+   "line": 277,
+   "public": false,
+   "permissions": [
+    "staffatt:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/hr/attendance/export.xlsx",
+   "module": "الموارد البشرية",
+   "file": "server/routes.js",
+   "line": 276,
+   "public": false,
+   "permissions": [
+    "staffatt:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/hr/attendance/me",
+   "module": "الموارد البشرية",
+   "file": "server/routes.js",
+   "line": 275,
+   "public": false,
+   "permissions": [
+    "staffatt:self"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/hr/attendance/punch",
+   "module": "الموارد البشرية",
+   "file": "server/routes.js",
+   "line": 272,
+   "public": false,
+   "permissions": [
+    "staffatt:self"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/hr/leave/entitlement",
+   "module": "الموارد البشرية",
+   "file": "server/routes.js",
+   "line": 279,
+   "public": false,
+   "permissions": [
+    "staffatt:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/hr/leaves",
+   "module": "الموارد البشرية",
+   "file": "server/routes.js",
+   "line": 278,
+   "public": false,
+   "permissions": [
+    "staffatt:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/hr/settings",
+   "module": "الموارد البشرية",
+   "file": "server/routes.js",
+   "line": 273,
+   "public": false,
+   "permissions": [
+    "staffatt:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/hr/settings",
+   "module": "الموارد البشرية",
+   "file": "server/routes.js",
+   "line": 274,
+   "public": false,
+   "permissions": [
+    "staffatt:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/import-engine/:kind/check",
+   "module": "الاستيراد والتصدير",
+   "file": "server/routes.js",
+   "line": 250,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": true,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/import-engine/:kind/commit",
+   "module": "الاستيراد والتصدير",
+   "file": "server/routes.js",
+   "line": 251,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": true,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/import-engine/:kind/template",
+   "module": "الاستيراد والتصدير",
+   "file": "server/routes.js",
+   "line": 252,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/import-engine/batches",
+   "module": "الاستيراد والتصدير",
+   "file": "server/routes.js",
+   "line": 247,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/import-engine/batches/:id/undo",
+   "module": "الاستيراد والتصدير",
+   "file": "server/routes.js",
+   "line": 248,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": true,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/import-engine/cancel",
+   "module": "الاستيراد والتصدير",
+   "file": "server/routes.js",
+   "line": 249,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/import-engine/catalog",
+   "module": "الاستيراد والتصدير",
+   "file": "server/routes.js",
+   "line": 246,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/import/:kind",
+   "module": "الاستيراد والتصدير",
+   "file": "server/routes.js",
+   "line": 257,
+   "public": false,
+   "permissions": [
+    "role:manage"
+   ],
+   "heavyWorker": true,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/lms/books",
+   "module": "التعلم الإلكتروني",
+   "file": "server/services/v12_modules.js",
+   "line": 313,
+   "public": false,
+   "permissions": [
+    "holds:manage",
+    "lms_lib:write",
+    "lms_lib:edit",
+    "course:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/lms/files/:id",
+   "module": "التعلم الإلكتروني",
+   "file": "server/services/v12_modules.js",
+   "line": 283,
+   "public": false,
+   "permissions": [
+    "course:manage",
+    "lms_lib:delete",
+    "lms_lib:edit"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/lms/files/:id",
+   "module": "التعلم الإلكتروني",
+   "file": "server/services/v12_modules.js",
+   "line": 280,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/lms/files/:id/media/:name",
+   "module": "التعلم الإلكتروني",
+   "file": "server/services/v12_modules.js",
+   "line": 282,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/lms/files/:id/slides",
+   "module": "التعلم الإلكتروني",
+   "file": "server/services/v12_modules.js",
+   "line": 281,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/lms/lectures",
+   "module": "التعلم الإلكتروني",
+   "file": "server/services/v12_modules.js",
+   "line": 243,
+   "public": false,
+   "permissions": [
+    "course:manage",
+    "lms_lib:write",
+    "lms_lib:edit"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/lms/lectures/:id",
+   "module": "التعلم الإلكتروني",
+   "file": "server/services/v12_modules.js",
+   "line": 266,
+   "public": false,
+   "permissions": [
+    "course:manage",
+    "lms_lib:delete",
+    "lms_lib:edit"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/lms/lectures/:id/files",
+   "module": "التعلم الإلكتروني",
+   "file": "server/services/v12_modules.js",
+   "line": 275,
+   "public": false,
+   "permissions": [
+    "course:manage",
+    "lms_lib:write",
+    "lms_lib:edit"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/lms/loans",
+   "module": "التعلم الإلكتروني",
+   "file": "server/services/v12_modules.js",
+   "line": 337,
+   "public": false,
+   "permissions": [
+    "holds:manage",
+    "lms_lib:write",
+    "lms_lib:edit",
+    "course:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/lms/loans/:id/return",
+   "module": "التعلم الإلكتروني",
+   "file": "server/services/v12_modules.js",
+   "line": 362,
+   "public": false,
+   "permissions": [
+    "holds:manage",
+    "lms_lib:write",
+    "lms_lib:edit",
+    "course:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/lms/overview",
+   "module": "التعلم الإلكتروني",
+   "file": "server/services/v12_modules.js",
+   "line": 209,
+   "public": false,
+   "permissions": [
+    "lms_lib:view",
+    "holds:manage",
+    "LMS_READ"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/lms/quizzes",
+   "module": "التعلم الإلكتروني",
+   "file": "server/services/v12_modules.js",
+   "line": 289,
+   "public": false,
+   "permissions": [
+    "course:manage",
+    "lms_lib:write",
+    "lms_lib:edit"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/local-accounts",
+   "module": "الهوية والجلسات",
+   "file": "server/routes.js",
+   "line": 73,
+   "public": true,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/local-switch",
+   "module": "الهوية والجلسات",
+   "file": "server/routes.js",
+   "line": 74,
+   "public": true,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/me",
+   "module": "الهوية والجلسات",
+   "file": "server/routes.js",
+   "line": 85,
+   "public": true,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/me/certificate",
+   "module": "أخرى",
+   "file": "server/routes.js",
+   "line": 454,
+   "public": false,
+   "permissions": [
+    "profile:read_own"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/me/certificate.pdf",
+   "module": "أخرى",
+   "file": "server/routes.js",
+   "line": 455,
+   "public": false,
+   "permissions": [
+    "profile:read_own"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/me/desk",
+   "module": "الطلبات والوثائق",
+   "file": "server/routes.js",
+   "line": 96,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/me/fees",
+   "module": "أخرى",
+   "file": "server/services/finance/routes.js",
+   "line": 408,
+   "public": false,
+   "permissions": [
+    "finance:fees"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/me/grades",
+   "module": "الأكاديمي",
+   "file": "server/routes.js",
+   "line": 114,
+   "public": false,
+   "permissions": [
+    "grade:read_own"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/me/groups",
+   "module": "الفئات والسكن",
+   "file": "server/services/student_groups.js",
+   "line": 115,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/me/profile",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 97,
+   "public": false,
+   "permissions": [
+    "profile:read_own"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/me/profile",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 99,
+   "public": false,
+   "permissions": [
+    "profile:update_own"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/me/timetable",
+   "module": "الأكاديمي",
+   "file": "server/routes.js",
+   "line": 134,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/media/:id",
+   "module": "الأخبار والتواصل",
+   "file": "server/routes.js",
+   "line": 148,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/news",
+   "module": "الأخبار والتواصل",
+   "file": "server/routes.js",
+   "line": 140,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/news",
+   "module": "الأخبار والتواصل",
+   "file": "server/routes.js",
+   "line": 141,
+   "public": false,
+   "permissions": [
+    "news:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/news/:id",
+   "module": "الأخبار والتواصل",
+   "file": "server/routes.js",
+   "line": 143,
+   "public": false,
+   "permissions": [
+    "news:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/news/:id",
+   "module": "الأخبار والتواصل",
+   "file": "server/routes.js",
+   "line": 142,
+   "public": false,
+   "permissions": [
+    "news:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/news/:id/links",
+   "module": "الأخبار والتواصل",
+   "file": "server/routes.js",
+   "line": 146,
+   "public": false,
+   "permissions": [
+    "news:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/news/:id/media",
+   "module": "الأخبار والتواصل",
+   "file": "server/routes.js",
+   "line": 145,
+   "public": false,
+   "permissions": [
+    "news:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/news/media/:id",
+   "module": "الأخبار والتواصل",
+   "file": "server/routes.js",
+   "line": 147,
+   "public": false,
+   "permissions": [
+    "news:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/payroll/runs",
+   "module": "المالية",
+   "file": "server/services/finance/routes.js",
+   "line": 385,
+   "public": false,
+   "permissions": [
+    "finance:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/procurement/assets",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 46,
+   "public": false,
+   "permissions": [
+    "procurement:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/procurement/assets",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 47,
+   "public": false,
+   "permissions": [
+    "procurement:assets"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/procurement/assets/:id",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 50,
+   "public": false,
+   "permissions": [
+    "procurement:assets"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/procurement/assets/:id",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 48,
+   "public": false,
+   "permissions": [
+    "procurement:assets"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/procurement/assets/:id/move",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 49,
+   "public": false,
+   "permissions": [
+    "procurement:assets"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/procurement/categories",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 22,
+   "public": false,
+   "permissions": [
+    "procurement:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/procurement/issues",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 44,
+   "public": false,
+   "permissions": [
+    "procurement:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/procurement/issues",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 45,
+   "public": false,
+   "permissions": [
+    "procurement:stock"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/procurement/items",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 23,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/procurement/items",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 24,
+   "public": false,
+   "permissions": [
+    "procurement:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/procurement/items.xlsx",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 52,
+   "public": false,
+   "permissions": [
+    "procurement:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/procurement/items/:id",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 28,
+   "public": false,
+   "permissions": [
+    "procurement:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/procurement/items/:id",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 25,
+   "public": false,
+   "permissions": [
+    "procurement:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/procurement/items/:id/adjust",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 26,
+   "public": false,
+   "permissions": [
+    "procurement:stock"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/procurement/items/:id/toggle",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 27,
+   "public": false,
+   "permissions": [
+    "procurement:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/procurement/orders",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 37,
+   "public": false,
+   "permissions": [
+    "procurement:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/procurement/orders",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 39,
+   "public": false,
+   "permissions": [
+    "procurement:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/procurement/orders/:id",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 38,
+   "public": false,
+   "permissions": [
+    "procurement:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/procurement/orders/:id/cancel",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 41,
+   "public": false,
+   "permissions": [
+    "procurement:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/procurement/orders/:id/order",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 40,
+   "public": false,
+   "permissions": [
+    "procurement:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/procurement/overview",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 11,
+   "public": false,
+   "permissions": [
+    "procurement:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/procurement/receipts",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 42,
+   "public": false,
+   "permissions": [
+    "procurement:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/procurement/receipts",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 43,
+   "public": false,
+   "permissions": [
+    "procurement:stock"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/procurement/requests",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 29,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/procurement/requests",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 31,
+   "public": false,
+   "permissions": [
+    "procurement:request"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/procurement/requests/:id",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 30,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/procurement/requests/:id",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 32,
+   "public": false,
+   "permissions": [
+    "procurement:request"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/procurement/requests/:id/approve",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 34,
+   "public": false,
+   "permissions": [
+    "procurement:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/procurement/requests/:id/cancel",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 36,
+   "public": false,
+   "permissions": [
+    "procurement:request"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/procurement/requests/:id/reject",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 35,
+   "public": false,
+   "permissions": [
+    "procurement:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/procurement/requests/:id/submit",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 33,
+   "public": false,
+   "permissions": [
+    "procurement:request"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/procurement/suppliers",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 17,
+   "public": false,
+   "permissions": [
+    "procurement:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/procurement/suppliers",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 18,
+   "public": false,
+   "permissions": [
+    "procurement:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/procurement/suppliers/:id",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 21,
+   "public": false,
+   "permissions": [
+    "procurement:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/procurement/suppliers/:id",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 19,
+   "public": false,
+   "permissions": [
+    "procurement:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/procurement/suppliers/:id/toggle",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 20,
+   "public": false,
+   "permissions": [
+    "procurement:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/procurement/warehouses",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 12,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/procurement/warehouses",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 13,
+   "public": false,
+   "permissions": [
+    "procurement:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/procurement/warehouses/:id",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 16,
+   "public": false,
+   "permissions": [
+    "procurement:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/procurement/warehouses/:id",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 14,
+   "public": false,
+   "permissions": [
+    "procurement:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/procurement/warehouses/:id/toggle",
+   "module": "المشتريات والمخازن",
+   "file": "server/services/procurement/routes.js",
+   "line": 15,
+   "public": false,
+   "permissions": [
+    "procurement:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/programs",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 205,
+   "public": false,
+   "permissions": [
+    "grade:approve_own",
+    "student:read",
+    "programs:list"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/push/key",
+   "module": "الأخبار والتواصل",
+   "file": "server/routes.js",
+   "line": 167,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/push/subscribe",
+   "module": "الأخبار والتواصل",
+   "file": "server/routes.js",
+   "line": 168,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/push/test",
+   "module": "الأخبار والتواصل",
+   "file": "server/routes.js",
+   "line": 170,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/push/unsubscribe",
+   "module": "الأخبار والتواصل",
+   "file": "server/routes.js",
+   "line": 169,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/qa/kpis",
+   "module": "البحث والخريجون والجودة والذكاء الاصطناعي",
+   "file": "server/services/v12_modules.js",
+   "line": 582,
+   "public": false,
+   "permissions": [
+    "QA_WRITE"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/qa/overview",
+   "module": "البحث والخريجون والجودة والذكاء الاصطناعي",
+   "file": "server/services/v12_modules.js",
+   "line": 560,
+   "public": false,
+   "permissions": [
+    "qa_inst:view",
+    "QA_WRITE"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/qa/surveys",
+   "module": "البحث والخريجون والجودة والذكاء الاصطناعي",
+   "file": "server/services/v12_modules.js",
+   "line": 599,
+   "public": false,
+   "permissions": [
+    "QA_WRITE"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/registration/options",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 158,
+   "public": false,
+   "permissions": [
+    "student:register",
+    "program:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/requests",
+   "module": "الطلبات والوثائق",
+   "file": "server/routes.js",
+   "line": 367,
+   "public": false,
+   "permissions": [
+    "request:read_own",
+    "request:read_all",
+    "request:read_unit",
+    "request:create_internal"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/requests",
+   "module": "الطلبات والوثائق",
+   "file": "server/routes.js",
+   "line": 366,
+   "public": false,
+   "permissions": [
+    "request:create",
+    "request:create_internal"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/requests/:id",
+   "module": "الطلبات والوثائق",
+   "file": "server/routes.js",
+   "line": 371,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/requests/:id/approve",
+   "module": "الطلبات والوثائق",
+   "file": "server/routes.js",
+   "line": 372,
+   "public": false,
+   "permissions": [
+    "request:decide"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/requests/:id/forward",
+   "module": "الطلبات والوثائق",
+   "file": "server/routes.js",
+   "line": 374,
+   "public": false,
+   "permissions": [
+    "request:forward"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/requests/:id/reject",
+   "module": "الطلبات والوثائق",
+   "file": "server/routes.js",
+   "line": 373,
+   "public": false,
+   "permissions": [
+    "request:decide"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/requests/export.xlsx",
+   "module": "الطلبات والوثائق",
+   "file": "server/routes.js",
+   "line": 269,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": true,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/research/overview",
+   "module": "البحث والخريجون والجودة والذكاء الاصطناعي",
+   "file": "server/services/v12_modules.js",
+   "line": 379,
+   "public": false,
+   "permissions": [
+    "research_grad:view",
+    "faculty:manage",
+    "RESEARCH_WRITE"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/research/projects",
+   "module": "البحث والخريجون والجودة والذكاء الاصطناعي",
+   "file": "server/services/v12_modules.js",
+   "line": 397,
+   "public": false,
+   "permissions": [
+    "RESEARCH_WRITE"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/research/theses",
+   "module": "البحث والخريجون والجودة والذكاء الاصطناعي",
+   "file": "server/services/v12_modules.js",
+   "line": 424,
+   "public": false,
+   "permissions": [
+    "RESEARCH_WRITE"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "PUT",
+   "path": "/api/research/theses/:id/stage",
+   "module": "البحث والخريجون والجودة والذكاء الاصطناعي",
+   "file": "server/services/v12_modules.js",
+   "line": 449,
+   "public": false,
+   "permissions": [
+    "research_grad:edit",
+    "research_grad:approve"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/services",
+   "module": "الطلبات والوثائق",
+   "file": "server/routes.js",
+   "line": 341,
+   "public": false,
+   "permissions": [
+    "request:import"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/services/:code/import",
+   "module": "الطلبات والوثائق",
+   "file": "server/routes.js",
+   "line": 270,
+   "public": false,
+   "permissions": [
+    "request:import"
+   ],
+   "heavyWorker": true,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/services/:code/template.xlsx",
+   "module": "الطلبات والوثائق",
+   "file": "server/routes.js",
+   "line": 268,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/stats",
+   "module": "التحليلات والتدقيق",
+   "file": "server/routes.js",
+   "line": 399,
+   "public": false,
+   "permissions": [
+    "stats:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/student-affairs-suite/admissions/applicant",
+   "module": "منظومة شؤون الطلاب",
+   "file": "server/services/student_affairs_suite.js",
+   "line": 1063,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/student-affairs-suite/admissions/enroll/:id",
+   "module": "منظومة شؤون الطلاب",
+   "file": "server/services/student_affairs_suite.js",
+   "line": 1071,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/student-affairs-suite/admissions/run-sort",
+   "module": "منظومة شؤون الطلاب",
+   "file": "server/services/student_affairs_suite.js",
+   "line": 1067,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": true,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/student-affairs-suite/advising",
+   "module": "منظومة شؤون الطلاب",
+   "file": "server/services/student_affairs_suite.js",
+   "line": 1082,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/student-affairs-suite/advising/:id/resolve",
+   "module": "منظومة شؤون الطلاب",
+   "file": "server/services/student_affairs_suite.js",
+   "line": 1086,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/student-affairs-suite/disciplinary",
+   "module": "منظومة شؤون الطلاب",
+   "file": "server/services/student_affairs_suite.js",
+   "line": 1094,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/student-affairs-suite/equivalence",
+   "module": "منظومة شؤون الطلاب",
+   "file": "server/services/student_affairs_suite.js",
+   "line": 1075,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/student-affairs-suite/lifecycle",
+   "module": "منظومة شؤون الطلاب",
+   "file": "server/services/student_affairs_suite.js",
+   "line": 1090,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/student-affairs-suite/overview",
+   "module": "منظومة شؤون الطلاب",
+   "file": "server/services/student_affairs_suite.js",
+   "line": 1058,
+   "public": false,
+   "permissions": [
+    "SUITE_READ"
+   ],
+   "heavyWorker": true,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/student-affairs-suite/prerequisites",
+   "module": "منظومة شؤون الطلاب",
+   "file": "server/services/student_affairs_suite.js",
+   "line": 1079,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/student-affairs-suite/prerequisites/:id",
+   "module": "منظومة شؤون الطلاب",
+   "file": "server/services/student_affairs_suite.js",
+   "line": 1080,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/student-affairs-suite/queue/:id/status",
+   "module": "منظومة شؤون الطلاب",
+   "file": "server/services/student_affairs_suite.js",
+   "line": 1106,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/student-affairs-suite/queue/book",
+   "module": "منظومة شؤون الطلاب",
+   "file": "server/services/student_affairs_suite.js",
+   "line": 1102,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/student-affairs-suite/scholarships",
+   "module": "منظومة شؤون الطلاب",
+   "file": "server/services/student_affairs_suite.js",
+   "line": 1098,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/student-files/:fid",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 189,
+   "public": false,
+   "permissions": [
+    "student:register",
+    "student:update"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/student-files/:fid",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 188,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/student-groups",
+   "module": "الفئات والسكن",
+   "file": "server/services/student_groups.js",
+   "line": 108,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/student-groups",
+   "module": "الفئات والسكن",
+   "file": "server/services/student_groups.js",
+   "line": 109,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/student-groups/:id",
+   "module": "الفئات والسكن",
+   "file": "server/services/student_groups.js",
+   "line": 113,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/student-groups/:id",
+   "module": "الفئات والسكن",
+   "file": "server/services/student_groups.js",
+   "line": 111,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/student-groups/:id",
+   "module": "الفئات والسكن",
+   "file": "server/services/student_groups.js",
+   "line": 112,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/student-groups/:id/members",
+   "module": "الفئات والسكن",
+   "file": "server/services/student_groups.js",
+   "line": 114,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/student-groups/split",
+   "module": "الفئات والسكن",
+   "file": "server/services/student_groups.js",
+   "line": 110,
+   "public": false,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/student-life/overview",
+   "module": "الفئات والسكن",
+   "file": "server/services/v12_modules.js",
+   "line": 656,
+   "public": false,
+   "permissions": [
+    "faculty:manage",
+    "student:read",
+    "sa_scholarships:view",
+    "sa_scholarships:write",
+    "sa_scholarships:approve",
+    "finance:read",
+    "finance:fees",
+    "HOUSING_READ"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/students",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 160,
+   "public": false,
+   "permissions": [
+    "student:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/students",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 159,
+   "public": false,
+   "permissions": [
+    "student:register"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/students-table",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 182,
+   "public": false,
+   "permissions": [
+    "student:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/students/:id",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 203,
+   "public": false,
+   "permissions": [
+    "student:delete"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/students/:id",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 193,
+   "public": false,
+   "permissions": [
+    "student:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/students/:id",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 202,
+   "public": false,
+   "permissions": [
+    "student:update"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/students/:id/card-activity",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 207,
+   "public": false,
+   "permissions": [
+    "student:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "POST",
+   "path": "/api/students/:id/card-activity",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 218,
+   "public": false,
+   "permissions": [
+    "attendance:manage",
+    "student:update"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/students/:id/certificate.pdf",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 456,
+   "public": false,
+   "permissions": [
+    "student:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/students/:id/files",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 183,
+   "public": false,
+   "permissions": [
+    "student:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/students/:id/files",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 184,
+   "public": false,
+   "permissions": [
+    "student:register",
+    "student:update"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/students/:id/grades",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 115,
+   "public": false,
+   "permissions": [
+    "student:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/students/:id/grades",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 116,
+   "public": false,
+   "permissions": [
+    "grade:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/students/:id/grades/:gid",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 121,
+   "public": false,
+   "permissions": [
+    "grade:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/students/:id/main-info",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 200,
+   "public": false,
+   "permissions": [
+    "student:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/students/:id/main-info",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 201,
+   "public": false,
+   "permissions": [
+    "student:update"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/students/:id/reset-password",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 204,
+   "public": false,
+   "permissions": [
+    "student:reset_password"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/students/:id/schedule-conflicts",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 135,
+   "public": false,
+   "permissions": [
+    "student:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/students/:id/unified-record",
+   "module": "الطلاب",
+   "file": "server/routes.js",
+   "line": 139,
+   "public": false,
+   "permissions": [
+    "student:read"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "PUT",
+   "path": "/api/transcript-template",
+   "module": "أخرى",
+   "file": "server/routes.js",
+   "line": 86,
+   "public": false,
+   "permissions": [
+    "program:manage",
+    "request:decide"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/units/targets",
+   "module": "الطلبات والوثائق",
+   "file": "server/routes.js",
+   "line": 376,
+   "public": false,
+   "permissions": [
+    "request:forward"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/v12/high-concurrency/benchmark",
+   "module": "أخرى",
+   "file": "server/routes.js",
+   "line": 585,
+   "public": false,
+   "permissions": [
+    "devops:manage",
+    "settings:manage"
+   ],
+   "heavyWorker": true,
+   "inlineSql": false
+  },
+  {
+   "method": "POST",
+   "path": "/api/v12/high-concurrency/cache/flush",
+   "module": "أخرى",
+   "file": "server/routes.js",
+   "line": 576,
+   "public": false,
+   "permissions": [
+    "devops:manage",
+    "settings:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": false
+  },
+  {
+   "method": "GET",
+   "path": "/api/v12/high-concurrency/telemetry",
+   "module": "أخرى",
+   "file": "server/routes.js",
+   "line": 555,
+   "public": false,
+   "permissions": [
+    "audit:read",
+    "devops:manage",
+    "settings:manage",
+    "backup:manage"
+   ],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/verify-hash/:sha",
+   "module": "الطلبات والوثائق",
+   "file": "server/routes.js",
+   "line": 430,
+   "public": true,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/verify/:code",
+   "module": "الطلبات والوثائق",
+   "file": "server/routes.js",
+   "line": 423,
+   "public": true,
+   "permissions": [],
+   "heavyWorker": false,
+   "inlineSql": false
+  }
+ ],
+ "applicationModules": [
+  {
+   "name": "الحسابات والأدوار",
+   "endpoints": 17
+  },
+  {
+   "name": "الإدارة والإعدادات",
+   "endpoints": 54
+  },
+  {
+   "name": "البحث والخريجون والجودة والذكاء الاصطناعي",
+   "endpoints": 15
+  },
+  {
+   "name": "التحليلات والتدقيق",
+   "endpoints": 13
+  },
+  {
+   "name": "الطلبات والوثائق",
+   "endpoints": 18
+  },
+  {
+   "name": "الأكاديمي",
+   "endpoints": 25
+  },
+  {
+   "name": "الهوية والجلسات",
+   "endpoints": 7
+  },
+  {
+   "name": "الطلاب",
+   "endpoints": 34
+  },
+  {
+   "name": "الأخبار والتواصل",
+   "endpoints": 16
+  },
+  {
+   "name": "المراسلات",
+   "endpoints": 19
+  },
+  {
+   "name": "الحزمة المؤسسية",
+   "endpoints": 11
+  },
+  {
+   "name": "الامتحانات والتوسعات",
+   "endpoints": 9
+  },
+  {
+   "name": "الاستيراد والتصدير",
+   "endpoints": 11
+  },
+  {
+   "name": "المالية",
+   "endpoints": 77
+  },
+  {
+   "name": "الموارد البشرية",
+   "endpoints": 22
+  },
+  {
+   "name": "التعلم الإلكتروني",
+   "endpoints": 12
+  },
+  {
+   "name": "أخرى",
+   "endpoints": 7
+  },
+  {
+   "name": "الفئات والسكن",
+   "endpoints": 9
+  },
+  {
+   "name": "المشتريات والمخازن",
+   "endpoints": 41
+  },
+  {
+   "name": "منظومة شؤون الطلاب",
+   "endpoints": 14
+  }
+ ],
+ "deploymentComponents": [
+  {
+   "name": "uni-erp/Dockerfile.railway",
+   "role": "image used by the current host"
+  },
+  {
+   "name": "uni-erp/Dockerfile",
+   "role": "generic image"
+  },
+  {
+   "name": "uni-erp/docker-entrypoint.sh",
+   "role": "fixes volume ownership, drops to node"
+  },
+  {
+   "name": "uni-erp/railway.json",
+   "role": "host config, /api/health health check"
+  },
+  {
+   "name": "uni-erp/scripts/start-cloud.js",
+   "role": "seed, structure, then server"
+  },
+  {
+   "name": "Railway",
+   "role": "current host per user statements; not inspected"
+  }
+ ],
+ "securityFindings": [
+  {
+   "id": "SEC-01",
+   "name": "Old shared password exposed in a public report and git history",
+   "severity": "Critical",
+   "status": "removed from current files; production state UNVERIFIED",
+   "location": "git history a6d4378, 8a3660e"
+  },
+  {
+   "id": "SEC-02",
+   "name": "Production database password exposed in screenshots and stored as plain variable",
+   "severity": "High",
+   "status": "rotation UNVERIFIED",
+   "location": "host configuration"
+  },
+  {
+   "id": "SEC-03",
+   "name": "DEMO_MODE resets every account and reactivates disabled accounts",
+   "severity": "High",
+   "status": "confirmed in code",
+   "location": "uni-erp/server/app.js:69"
+  },
+  {
+   "id": "SEC-04",
+   "name": "Late database reply can be read as the result of the next query after a timeout",
+   "severity": "High",
+   "status": "confirmed by reading code, not reproduced",
+   "location": "uni-erp/server/db.js:140-152"
+  },
+  {
+   "id": "SEC-05",
+   "name": "Backups contain data and signing key and are unencrypted unless a passphrase is set",
+   "severity": "High",
+   "status": "confirmed in code; production setting UNVERIFIED",
+   "location": "uni-erp/server/services/backup.js:59"
+  },
+  {
+   "id": "SEC-06",
+   "name": "student:update can grant financial scholarships",
+   "severity": "High",
+   "status": "confirmed in code",
+   "location": "uni-erp/server/services/student_affairs_suite.js:905"
+  },
+  {
+   "id": "SEC-07",
+   "name": "Admin separation of duties setting reads a table that does not exist",
+   "severity": "Medium",
+   "status": "confirmed",
+   "location": "uni-erp/server/permissions.js:982"
+  },
+  {
+   "id": "SEC-08",
+   "name": "data_scope setting is not enforced on student data",
+   "severity": "Medium",
+   "status": "confirmed by search",
+   "location": "uni-erp/server/services/useradmin.js, auth.js:36"
+  },
+  {
+   "id": "SEC-09",
+   "name": "Session token readable by JavaScript",
+   "severity": "Medium",
+   "status": "confirmed",
+   "location": "uni-erp/public/app.js:59, uni-erp/server/routes.js:66"
+  },
+  {
+   "id": "SEC-10",
+   "name": "No multi-factor authentication and weak configurable password floor",
+   "severity": "Medium",
+   "status": "confirmed",
+   "location": "uni-erp/server/security.js:28, services/settings.js:67"
+  },
+  {
+   "id": "SEC-11",
+   "name": "IP-based ban and rate limit can block a whole campus behind one address",
+   "severity": "Medium",
+   "status": "confirmed design risk",
+   "location": "uni-erp/server/waf.js:84, security.js:118"
+  },
+  {
+   "id": "SEC-12",
+   "name": "Records present simulated signatures, syncs and delivery counts as real",
+   "severity": "Medium",
+   "status": "confirmed",
+   "location": "uni-erp/server/services/enterprise_suite.js:327,371; routes.js:230; v12_modules.js:828"
+  },
+  {
+   "id": "SEC-13",
+   "name": "Online quiz accepts unlimited attempts without publication or time checks",
+   "severity": "Medium",
+   "status": "confirmed",
+   "location": "uni-erp/server/services/enterprise_suite.js:183-204"
+  },
+  {
+   "id": "SEC-14",
+   "name": "Frame ancestors allow unrelated domains",
+   "severity": "Medium",
+   "status": "confirmed",
+   "location": "uni-erp/server/http.js:28"
+  },
+  {
+   "id": "SEC-15",
+   "name": "Architecture maps are public without login",
+   "severity": "Low",
+   "status": "confirmed locally",
+   "location": "uni-erp/public/archify/"
+  },
+  {
+   "id": "SEC-16",
+   "name": "Audit chain hash has no secret key",
+   "severity": "Low",
+   "status": "confirmed",
+   "location": "uni-erp/server/audit.js:4"
+  },
+  {
+   "id": "SEC-17",
+   "name": "Database TLS certificate is not verified when TLS is used",
+   "severity": "Low",
+   "status": "confirmed",
+   "location": "uni-erp/server/db.js:526"
+  },
+  {
+   "id": "SEC-18",
+   "name": "Temporary passwords are printed to logs",
+   "severity": "Low",
+   "status": "confirmed",
+   "location": "uni-erp/server/app.js:33,41; scripts/accounts.js:13"
+  },
+  {
+   "id": "SEC-19",
+   "name": "Image build ignores the lockfile and may fall back to root",
+   "severity": "Low",
+   "status": "confirmed",
+   "location": "uni-erp/Dockerfile.railway; docker-entrypoint.sh"
+  },
+  {
+   "id": "SEC-20",
+   "name": "Security code that is never used gives false assurance",
+   "severity": "Informational",
+   "status": "confirmed",
+   "location": "uni-erp/server/security.js:73-113,150-159"
+  },
+  {
+   "id": "SEC-21",
+   "name": "Checks reference permissions that do not exist",
+   "severity": "Informational",
+   "status": "confirmed",
+   "location": "uni-erp/server/services/student_affairs_suite.js:822,873,905"
+  },
+  {
+   "id": "SEC-22",
+   "name": "Internal error text returned to the client on one route",
+   "severity": "Low",
+   "status": "confirmed",
+   "location": "uni-erp/server/routes.js:241"
+  }
+ ],
+ "performanceFindings": [
+  {
+   "id": "PERF-01",
+   "name": "Every query blocks the main thread",
+   "severity": "Critical",
+   "class": "confirmed design; contribution to production slowness UNVERIFIED",
+   "location": "uni-erp/server/db.js:149"
+  },
+  {
+   "id": "PERF-02",
+   "name": "Connection pool of 20 cannot run main-thread queries concurrently",
+   "severity": "High",
+   "class": "confirmed",
+   "location": "uni-erp/server/db.js:119"
+  },
+  {
+   "id": "PERF-03",
+   "name": "Backup runs memory and CPU work on the main thread",
+   "severity": "High",
+   "class": "strongly suspected cause of periodic freezes",
+   "location": "uni-erp/server/services/backup.js:72-92"
+  },
+  {
+   "id": "PERF-04",
+   "name": "Overview endpoints read whole tables on the main thread",
+   "severity": "High",
+   "class": "confirmed pattern; impact grows with data",
+   "location": "uni-erp/server/services/v12_modules.js:213-223; enterprise_suite.js:90-99"
+  },
+  {
+   "id": "PERF-05",
+   "name": "Each login clears the session cache of all users",
+   "severity": "Medium",
+   "class": "confirmed logic",
+   "location": "uni-erp/server/services/auth.js:53-56,138"
+  },
+  {
+   "id": "PERF-06",
+   "name": "Large results can reach 512 MB against a 512 MB heap",
+   "severity": "Medium",
+   "class": "confirmed limit mismatch",
+   "location": "uni-erp/server/db_worker.js:55; Dockerfile.railway"
+  },
+  {
+   "id": "PERF-07",
+   "name": "55 scripts load eagerly and revalidate on each load",
+   "severity": "Medium",
+   "class": "measured locally",
+   "location": "uni-erp/public/index.html; server/http.js:172"
+  },
+  {
+   "id": "PERF-08",
+   "name": "Service catalog of 95 to 118 KB loads for every user at start",
+   "severity": "Medium",
+   "class": "measured locally",
+   "location": "/api/services"
+  },
+  {
+   "id": "PERF-09",
+   "name": "Whole-document mutation observers and full innerHTML renders",
+   "severity": "Medium",
+   "class": "confirmed pattern; long tasks measured locally",
+   "location": "uni-erp/public/ux_restructure.js:662, tablefilter.js:146, ux_flow.js:329"
+  },
+  {
+   "id": "PERF-10",
+   "name": "JSON compression runs synchronously on the main thread",
+   "severity": "Medium",
+   "class": "confirmed",
+   "location": "uni-erp/server/http.js:122,128"
+  },
+  {
+   "id": "PERF-11",
+   "name": "Large uploads are buffered and limited by a 30 second request timeout",
+   "severity": "Medium",
+   "class": "confirmed",
+   "location": "uni-erp/server/http.js:98; app.js:93; v12_modules.js:278"
+  },
+  {
+   "id": "PERF-12",
+   "name": "65 foreign keys have no supporting index",
+   "severity": "Low",
+   "class": "confirmed on local schema; effect needs production statistics",
+   "location": "see 05-database-analysis.md"
+  },
+  {
+   "id": "PERF-13",
+   "name": "Audit log has no retention and verification loads all rows",
+   "severity": "Low",
+   "class": "confirmed",
+   "location": "uni-erp/server/audit.js:34"
+  },
+  {
+   "id": "PERF-14",
+   "name": "WAF runs many regular expressions over every JSON body",
+   "severity": "Low",
+   "class": "potential optimization",
+   "location": "uni-erp/server/waf.js:106-126"
+  }
+ ]
+}

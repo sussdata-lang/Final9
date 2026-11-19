@@ -38,7 +38,7 @@
       ${on.has('faculty') ? sel('faculty', 'الكلية / المعهد', o.faculties.map((f) => [f.id, f.name])) : ''}
       ${on.has('program') ? sel('program', 'البرنامج', progs.map((p) => [p.id, p.label])) : ''}
       ${on.has('level') ? sel('level', lvlLabel, LV.map((l, i) => [i + 1, 'السنة ' + l])) : ''}
-      ${on.has('semester') ? sel('semester', 'الفصل', [[1, 'الفصل الأول'], [2, 'الفصل الثاني']]) : ''}
+      ${on.has('semester') ? sel('semester', 'الفصل', [[1, 'الفصل الأول'], [2, 'الفصل الثاني'], [3, 'الفصل الثالث']]) : ''}
       ${on.has('academicYear') ? sel('academicYear', 'العام الدراسي', o.academicYears.map((y) => [y, y])) : ''}
       ${on.has('status') ? sel('status', 'حالة القيد', Object.entries(o.statuses)) : ''}
       ${on.has('enrollYear') ? sel('enrollYear', 'سنة القيد', o.enrollYears.map((y) => [y, y])) : ''}

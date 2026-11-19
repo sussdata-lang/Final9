@@ -8,9 +8,9 @@ import { createApp } from '../server/app.js';
 import { hashPassword } from '../server/security.js';
 
 const PW = 'Test#Pass12345';
-let app, base, adm, wh, item, sup;
-const api = async (m, u, body) => {
-  const r = await fetch(base + u, { method: m, headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), Cookie: adm }, body: body ? JSON.stringify(body) : undefined });
+let app, base, adm, adm2, wh, item, sup;
+const api = async (m, u, body, cookie) => {
+  const r = await fetch(base + u, { method: m, headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), Cookie: cookie || adm }, body: body ? JSON.stringify(body) : undefined });
   const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch { /* */ } return { s: r.status, j };
 };
 
@@ -22,19 +22,21 @@ test.before(async () => {
   app.db.prepare('INSERT INTO users (username, display_name, password_hash, role, created_at) VALUES (?,?,?,?,?)').run('admin', 'مدير', await hashPassword(PW, 1024), 'admin', Date.now());
   const r = await fetch(base + '/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'admin', password: PW }) });
   adm = r.headers.get('set-cookie').split(';')[0];
+  app.db.prepare('INSERT INTO users (username, display_name, password_hash, role, created_at) VALUES (?,?,?,?,?)').run('admin2', 'مدير ثانٍ', await hashPassword(PW, 1024), 'admin', Date.now());
+  adm2 = (await fetch(base + '/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'admin2', password: PW }) })).headers.get('set-cookie').split(';')[0];
   wh = (await api('POST', '/api/procurement/warehouses', { code: 'WH-T', name: 'المخزن الرئيسي', location: 'المبنى A' })).j.warehouse.id;
   item = (await api('POST', '/api/procurement/items', { code: 'IT-PRN', name: 'طابعة ليزر', unit: 'قطعة', warehouseId: wh })).j.item.id;
-  sup = (await api('POST', '/api/procurement/suppliers', { code: 'SUP-T', name: 'شركة الأمل للتوريدات', phone: '011', email: 's@example.com', address: 'دمشق', contactPerson: 'سامر الأحمد', fax: '012', mobile: '0944', specialty: 'أجهزة مكتبية' })).j.supplier.id;
+  sup = (await api('POST', '/api/procurement/suppliers', { code: 'SUP-T', name: 'شركة الأمل للتوريدات', phone: '0112123456', email: 's@example.com', address: 'دمشق', contactPerson: 'سامر الأحمد', fax: '0112123457', mobile: '0944123456', specialty: 'أجهزة مكتبية' })).j.supplier.id;
 });
 test.after(async () => { if (app) await app.close(); });
 
 test('المورّد: بيانات التواصل الإضافية تُحفظ وتُعرض', async () => {
   const s = (await api('GET', '/api/procurement/suppliers')).j.suppliers.find((x) => x.id === sup);
-  assert.equal(s.contactPerson, 'سامر الأحمد'); assert.equal(s.fax, '012'); assert.equal(s.mobile, '0944'); assert.equal(s.specialty, 'أجهزة مكتبية');
-  const u = await api('PUT', `/api/procurement/suppliers/${sup}`, { mobile: '0955' });
+  assert.equal(s.contactPerson, 'سامر الأحمد'); assert.equal(s.fax, '0112123457'); assert.equal(s.mobile, '0944123456'); assert.equal(s.specialty, 'أجهزة مكتبية');
+  const u = await api('PUT', `/api/procurement/suppliers/${sup}`, { mobile: '0955123456' });
   assert.equal(u.s, 200);
   const s2 = (await api('GET', '/api/procurement/suppliers')).j.suppliers.find((x) => x.id === sup);
-  assert.equal(s2.mobile, '0955'); assert.equal(s2.contactPerson, 'سامر الأحمد');
+  assert.equal(s2.mobile, '0955123456'); assert.equal(s2.contactPerson, 'سامر الأحمد');
 });
 
 let reqId;
@@ -67,7 +69,7 @@ test('طلب الشراء: تاريخ حاجة غير صالح يُرفض، وا
 let orderId;
 test('أمر الشراء: التوصيل والفوترة والضرائب والمجموع الكامل وبيانات المورّد', async () => {
   const r = await api('POST', '/api/procurement/orders', {
-    supplierId: sup, deliveryMethod: 'توصيل المورّد', deliveryDay: '2026-11-25', paymentTerms: 'نقدًا', currency: 'ليرة سورية',
+    supplierId: sup, directReason: 'أمر مباشر لاختبار نموذج الجامعة', deliveryMethod: 'توصيل المورّد', deliveryDay: '2026-11-25', paymentTerms: 'نقدًا', currency: 'ليرة سورية',
     deliveryContact: 'أمين المستودع', deliveryEmail: 'stores@example.com', deliveryAddress: 'المخزن الرئيسي', billingContact: 'المحاسب', billingEmail: 'fin@example.com',
     salesTax: 10000, deliveryTax: 50000, otherTax: 0,
     lines: [{ itemId: item, description: 'طابعة ليزر', qty: 2, unitCost: 1150000 }],
@@ -77,12 +79,12 @@ test('أمر الشراء: التوصيل والفوترة والضرائب وا
   assert.equal(o.totalAmount, 2300000); assert.equal(o.grandTotal, 2360000);
   assert.equal(o.deliveryMethod, 'توصيل المورّد'); assert.equal(o.deliveryDay, '2026-11-25'); assert.equal(o.billingContact, 'المحاسب');
   assert.equal(o.supplier.contactPerson, 'سامر الأحمد'); assert.equal(o.lines[0].unit, 'قطعة');
-  assert.equal((await api('POST', '/api/procurement/orders', { supplierId: sup, salesTax: -5, lines: [{ description: 'بند', qty: 1, unitCost: 1 }] })).s, 400, 'ضريبة سالبة مرفوضة');
+  assert.equal((await api('POST', '/api/procurement/orders', { supplierId: sup, directReason: 'أمر مباشر لاختبار الضريبة السالبة', salesTax: -5, lines: [{ description: 'بند', qty: 1, unitCost: 1 }] })).s, 400, 'ضريبة سالبة مرفوضة');
 });
 
 test('مذكرة فحص واستلام: بيان الشحنة والموقع والتوافق والكمية المتوقعة وفحص الجودة', async () => {
-  assert.equal((await api('POST', `/api/procurement/orders/${orderId}/order`)).s, 200);
-  const r = await api('POST', '/api/procurement/receipts', { orderId, deliveryNoteNo: 'DN-4471', location: 'المخزن الرئيسي', compliant: true, note: 'سليمة', lines: [{ itemId: item, qty: 2, quality: 'مطابق', comment: 'بلا ملاحظات' }] });
+  assert.equal((await api('POST', `/api/procurement/orders/${orderId}/order`, undefined, adm2)).s, 200, 'يرسله شخص غير منشئه');
+  const r = await api('POST', '/api/procurement/receipts', { orderId, deliveryNoteNo: 'DN-4471', location: 'المخزن الرئيسي', compliant: true, note: 'سليمة', lines: [{ itemId: item, qty: 2, quality: 'مطابق', comment: 'بلا ملاحظات' }] }, adm2);
   assert.equal(r.s, 201, JSON.stringify(r.j));
   const rc = (await api('GET', `/api/procurement/receipts?orderId=${orderId}`)).j.receipts[0];
   assert.equal(rc.deliveryNoteNo, 'DN-4471'); assert.equal(rc.location, 'المخزن الرئيسي'); assert.equal(rc.compliant, true);
@@ -106,6 +108,6 @@ test('محضر إخراج المواد: الكمية المطلوبة والمص
 test('التوافق: الطلب والأمر القديمان بلا الحقول الجديدة ما زالا يعملان', async () => {
   const r = await api('POST', '/api/procurement/requests', { title: 'طلب بسيط', lines: [{ description: 'بند عادي', qty: 1, estCost: 10 }] });
   assert.equal(r.s, 201); assert.equal(r.j.request.department, ''); assert.equal(r.j.request.lines[0].stockBalance, null);
-  const o = await api('POST', '/api/procurement/orders', { supplierId: sup, lines: [{ description: 'بند', qty: 1, unitCost: 5 }] });
+  const o = await api('POST', '/api/procurement/orders', { supplierId: sup, directReason: 'أمر مباشر لاختبار التوافق', lines: [{ description: 'بند', qty: 1, unitCost: 5 }] });
   assert.equal(o.s, 201); assert.equal(o.j.order.currency, 'ليرة سورية'); assert.equal(o.j.order.grandTotal, 5);
 });

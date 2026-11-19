@@ -53,7 +53,8 @@
   function item(it) {
     const def = it.type === 'list' ? `${it.default.length} عنصراً` : it.type === 'select' ? (it.options.find((o) => o.value === it.default) || {}).label : String(it.default);
     return `<div class="g-item${it.changed ? ' chg' : ''}"><div class="g-l"><label for="${fid(it.key)}"><b>${esc(it.label)}</b> ${it.type === 'list' ? '<span class="pill p-approved" style="font-size:10px">قائمة منسدلة قابلة للتعديل</span>' : ''}</label>${it.hint ? `<span class="small">${esc(it.hint)}</span>` : ''}
-      <span class="small g-def">الافتراضي: ${esc(def)}${it.unit ? ' ' + esc(it.unit) : ''}${it.changed ? ` · <button type="button" class="link" data-act="gres" data-k="${esc(it.key)}">إعادة إلى الافتراضي</button>` : ''}</span></div>
+      <span class="small g-def">الافتراضي: ${esc(def)}${it.unit ? ' ' + esc(it.unit) : ''}${it.customDefault ? ` <span class="pill p-review" style="font-size:10px">مخصص</span>` : ''}${it.changed ? ` · <button type="button" class="link" data-act="gres" data-k="${esc(it.key)}">إعادة إلى الافتراضي</button>` : ''}</span>
+      ${it.canSetDefault ? `<span class="small g-def"><button type="button" class="link" data-act="gmkdef" data-k="${esc(it.key)}" title="القيمة المكتوبة في الحقل تصبح الافتراضية، فتعود إليها «إعادة إلى الافتراضي»">★ جعل القيمة الحالية افتراضية</button>${it.customDefault ? ` · <button type="button" class="link" data-act="gfactory" data-k="${esc(it.key)}">استعادة قيمة المصنع كافتراضي (${esc(String(it.factoryDefault))}${it.unit ? ' ' + esc(it.unit) : ''})</button>` : ''}</span>` : ''}</div>
       <div class="g-c">${control(it)}</div></div>`;
   }
   function indexTab() {
@@ -140,6 +141,18 @@
       if (!next) return;
       cur[idx] = next.trim();
       await saveSingleList(d.k, cur);
+    },
+    // القيمة المكتوبة في الحقل (ولو لم تُحفظ بعد) تصبح القيمة الحالية والافتراضية معاً
+    gmkdef: async (el, d) => {
+      const inp = $id(fid(d.k)); if (!inp) return;
+      if (!confirm(`جعل «${inp.value}» القيمة الافتراضية لهذا الإعداد؟ ستعود إليها «إعادة إلى الافتراضي» بدل قيمة المصنع.`)) return;
+      try { const r = await api('POST', '/api/admin/general/make-default', { values: { [d.k]: inp.value } }); B.cfg = { tabs: r.tabs }; try { UA.S.limits = (await api('GET', '/api/me')).limits || {}; } catch { /* */ } toast('حُفظت القيمة وأصبحت الافتراضية'); UA.render(); }
+      catch (e) { if (!e.status) throw e; toast(e.message); }
+    },
+    gfactory: async (el, d) => {
+      if (!confirm('إعادة القيمة الافتراضية لهذا الإعداد إلى قيمة المصنع؟ القيمة الحالية لا تتغير.')) return;
+      try { const r = await api('POST', '/api/admin/general/factory-default', { keys: [d.k] }); B.cfg = { tabs: r.tabs }; toast('عاد الافتراضي إلى قيمة المصنع'); UA.render(); }
+      catch (e) { if (!e.status) throw e; toast(e.message); }
     },
     gres: async (el, d) => { if (!confirm('إعادة هذا الإعداد إلى قيمته الافتراضية؟')) return; try { const r = await api('POST', '/api/admin/general/reset', { keys: [d.k] }); B.cfg = { tabs: r.tabs }; toast('أُعيد إلى الافتراضي'); UA.render(); } catch (e) { if (!e.status) throw e; toast(e.message); } },
     gadmin: async (el, d) => { if (d.v === 'affairs') { UA.S.stTab = d.t; await UA.go('affairs'); return; } UA.S.adminTab = d.t; await UA.go('admin'); if (UA.adminCfg && UA.adminCfg.tabs.some((x) => x[0] === d.t)) { await UA.adminCfg.load(d.t); UA.render(); } },

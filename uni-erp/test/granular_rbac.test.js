@@ -61,9 +61,9 @@ test('2. Pure Logic: resolveModulePermissions & resolveEffectivePermissions hand
 
 test('3. Pure Logic: computeAllowedViews respects explicit allowedViews and derives views from permissions', () => {
   // التخصيص يُضيّق ما تتيحه الصلاحيات ولا يوسّعه: «المالية» بلا صلاحيتها لا تظهر
-  assert.deepEqual(computeAllowedViews(['student:read'], ['affairs', 'finance'], 'staff'), ['overview', 'guidelines', 'affairs', 'councils', 'facilities', 'admin']);
-  assert.deepEqual(computeAllowedViews(['student:read', 'finance:read'], ['affairs', 'finance'], 'staff'), ['overview', 'guidelines', 'affairs', 'councils', 'facilities', 'finance', 'admin']);   // desk→overview وverify→admin بعد إعادة تسمية العروض
-  assert.deepEqual(computeAllowedViews(['student:read', 'finance:read'], ['finance'], 'staff'), ['overview', 'guidelines', 'councils', 'facilities', 'finance', 'admin'], 'ولا تظهر شاشة يملكها ولم تُختر؛ والمجالس لكل موظف');
+  assert.deepEqual(computeAllowedViews(['student:read'], ['affairs', 'finance'], 'staff'), ['overview', 'guidelines', 'affairs', 'councils', 'facilities', 'hub', 'admin']);
+  assert.deepEqual(computeAllowedViews(['student:read', 'finance:read'], ['affairs', 'finance'], 'staff'), ['overview', 'guidelines', 'affairs', 'councils', 'facilities', 'hub', 'finance', 'admin']);   // desk→overview وverify→admin بعد إعادة تسمية العروض
+  assert.deepEqual(computeAllowedViews(['student:read', 'finance:read'], ['finance'], 'staff'), ['overview', 'guidelines', 'councils', 'facilities', 'hub', 'finance', 'admin'], 'ولا تظهر شاشة يملكها ولم تُختر؛ والمجالس لكل موظف');
 
   const derived = computeAllowedViews(['finance:read', 'hr_emp:view'], [], 'staff');
   assert.ok(derived.includes('finance'));

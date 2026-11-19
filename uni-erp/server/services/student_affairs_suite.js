@@ -422,8 +422,9 @@ export function getStudentAffairsSuiteOverview(deps, query = {}) {
   const atRiskAll = own ? [] : db
     .prepare(`
       SELECT u.id, u.display_name AS name, u.student_no AS studentNo, g.hrs, g.weighted, g.failed
-      FROM (SELECT student_id, SUM(COALESCE(hours, 3)) AS hrs, SUM(COALESCE(hours, 3) * mark) AS weighted, SUM(CASE WHEN mark < ${passSql(db, 'grades.student_id')} THEN 1 ELSE 0 END) AS failed
-            FROM grades WHERE workflow_status = 'approved' GROUP BY student_id) g
+      FROM (SELECT student_id, SUM(h) AS hrs, SUM(h * m) AS weighted, SUM(CASE WHEN m < ${passSql(db, 'b.student_id')} THEN 1 ELSE 0 END) AS failed
+            FROM (SELECT student_id, COALESCE(MAX(hours), 3) h, MAX(mark) m FROM grades WHERE workflow_status = 'approved'
+                  GROUP BY student_id, COALESCE(course_id, -id)) b GROUP BY student_id) g   -- المقرر المعاد بأعلى علامة (دليل الطالب)
       JOIN users u ON u.id = g.student_id
       JOIN student_profiles sp ON sp.user_id = u.id
       WHERE u.role = 'student'
@@ -1182,7 +1183,7 @@ export function decideMovementStep(deps, actor, id, body, ip) {
 }
 
 // ما ينتظر قرار هذا الحساب تحديداً
-function movementQueue(db, actor) {
+export function movementQueue(db, actor) {
   const rows = db.prepare(`SELECT m.id, m.movement_no, m.movement_type, m.student_id, m.reason, m.created_by, m.created_by_id, m.current_step, m.duration_semesters,
       s.step_key, s.label, u.display_name AS "studentName", u.student_no AS "studentNo", g.faculty,
       (SELECT COUNT(*) FROM sa_movement_steps x WHERE x.movement_id = m.id) AS total

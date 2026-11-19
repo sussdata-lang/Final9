@@ -37,7 +37,7 @@
   }
 
   function open() {
-    layer().innerHTML = `<div class="gg-bg" data-act="ggclose"><div class="gg-box" role="dialog" aria-label="الرصد السريع للعلامات" onclick="event.stopPropagation()"><h2 style="margin:0 0 10px">⚡ الرصد السريع للعلامات</h2><div id="gg-body">${html()}</div></div></div>`;
+    layer().innerHTML = `<div class="gg-bg" data-act="ggclose"><div class="gg-box" role="dialog" aria-label="الرصد السريع للعلامات"><h2 style="margin:0 0 10px">⚡ الرصد السريع للعلامات</h2><div id="gg-body">${html()}</div></div></div>`;
     recompute();
   }
   const redraw = () => { const b = document.getElementById('gg-body'); if (b) b.innerHTML = html(); recompute(); };
@@ -131,7 +131,8 @@
       const sel = document.getElementById('gg-course');
       if (sel && sel.value) await UA.actions.ggload();
     },
-    ggclose: async () => { layer().innerHTML = ''; G.sheet = null; },
+    // الخلفية تغلق النافذة، والنقر داخل الصندوق لا يغلقها إلا من زر «إغلاق» (بلا معالج مضمّن تمنعه CSP)
+    ggclose: async (el, _d, e) => { if (el.classList.contains('gg-bg') && e && e.target.closest('.gg-box')) return; layer().innerHTML = ''; G.sheet = null; },
     ggcourse: async () => { G.sheet = null; },
     ggload: async () => {
       const course = (document.getElementById('gg-course') || {}).value, year = (document.getElementById('gg-year') || {}).value || '';

@@ -6,6 +6,8 @@ import { universityDepartments } from './hr_integrated.js';
 import { tx } from '../db.js';
 import { audit } from '../audit.js';
 import { HttpError } from '../http.js';
+import { SEMESTER_LIST, LEGACY_SEMESTER_NAMES } from './semesters.js';
+import { scaleFrom, RATING_TIERS } from './grade_scale.js';
 
 const opt = (...p) => p.map(([value, label]) => ({ value, label }));
 
@@ -26,6 +28,11 @@ export const SCHEMA = [
     { key: 'grades.pass_mark', label: 'علامة النجاح (الكليات التطبيقية)', type: 'int', default: 60, min: 1, max: 1000, unit: 'علامة', hint: 'تُعتمد في العلامات والكشوف والإحصاءات والإنذار الأكاديمي والوثائق.' },
     { key: 'grades.pass_mark_other', label: 'علامة النجاح (الكليات غير التطبيقية)', type: 'int', default: 60, min: 1, max: 1000, unit: 'علامة', hint: 'تسري على الجهات المدرجة في القائمة التالية.' },
     { key: 'grades.non_applied_faculties', label: 'رموز الجهات غير التطبيقية', type: 'list', default: ['CSS', 'HISS', 'TISS', 'CSSR'], max: 100, itemMax: 20, hint: 'رمز كل جهة في سطر. الجهة غير المدرجة هنا تُعامل كتطبيقية.' },
+    // سلّم التقديرات (دليل الطالب): نسب مئوية من العلامة القصوى؛ «مقبول» من علامة النجاح حتى أقل من حد «جيد»، وما دون النجاح «راسب»
+    { key: 'grades.rating_honor', label: 'أدنى نسبة لتقدير «شرف»', type: 'int', default: 95, min: 1, max: 100, unit: '%', hint: 'سلّم التقديرات بحسب دليل الطالب: شرف 95–100٪.' },
+    { key: 'grades.rating_excellent', label: 'أدنى نسبة لتقدير «امتياز»', type: 'int', default: 85, min: 1, max: 100, unit: '%', hint: 'امتياز من هذه النسبة إلى أقل من حد «شرف».' },
+    { key: 'grades.rating_very_good', label: 'أدنى نسبة لتقدير «جيد جداً»', type: 'int', default: 75, min: 1, max: 100, unit: '%' },
+    { key: 'grades.rating_good', label: 'أدنى نسبة لتقدير «جيد»', type: 'int', default: 65, min: 1, max: 100, unit: '%', hint: 'ما بين علامة النجاح وهذا الحد تقديره «مقبول».' },
   ] },
   { key: 'academic', label: 'الأكاديمي', desc: 'حدود المقررات وتسميات السنوات الدراسية.', items: [
     { key: 'academic.cap_hours_default', label: 'الحد الفصلي للساعات (المعدل المتوسط أو الطالب الجديد)', type: 'int', default: 18, min: 1, max: 40, unit: 'ساعة' },
@@ -35,13 +42,14 @@ export const SCHEMA = [
     { key: 'academic.cap_hours_high', label: 'الحد الفصلي لمن بلغ ذلك المعدل', type: 'int', default: 21, min: 1, max: 40, unit: 'ساعة' },
     { key: 'academic.max_absence_percent', label: 'الحد الأقصى للغياب قبل الحرمان من المقرر', type: 'int', default: 15, min: 1, max: 100, unit: '%' },
     { key: 'academic.min_sessions_for_absence', label: 'أقل عدد محاضرات منعقدة قبل احتساب الغياب', type: 'int', default: 3, min: 1, max: 60, unit: 'محاضرة' },
+    { key: 'academic.course_roster', label: 'طلاب المقرر في كشف الحضور والغياب وجدول رصد العلامات', type: 'select', default: 'both', options: opt(['both', 'المسجلون ذاتياً مع طلاب البرنامج والسنة'], ['enrolled', 'المسجلون ذاتياً فقط (وإن لم يسجّل أحد: طلاب البرنامج والسنة)'], ['program', 'طلاب البرنامج والسنة فقط']), hint: 'الجمع يناسب الاعتماد الجزئي على التسجيل الذاتي؛ «المسجلون فقط» حين يسجّل كل الطلاب ذاتياً.' },
     { key: 'academic.registration_open', label: 'بداية التسجيل في المقررات', type: 'text', default: '', min: 0, max: 10, hint: 'بصيغة 2026-09-01. فارغ يعني بلا قيد.' },
     { key: 'academic.add_drop_close', label: 'نهاية فترة الحذف والإضافة', type: 'text', default: '', min: 0, max: 10, hint: 'بصيغة 2026-09-20. فارغ يعني بلا قيد.' },
     { key: 'academic.registration_requires_clearance', label: 'منع التسجيل عند وجود مستحقات حان موعدها', type: 'bool', default: true },
     { key: 'academic.registration_max_due', label: 'أقصى مبلغ مستحق يُسمح معه بالتسجيل', type: 'int', default: 0, min: 0, max: 1000000000, unit: 'ل.س' },
     { key: 'academic.auto_invoice_on_admission', label: 'إصدار فاتورة تلقائياً عند تثبيت القبول', type: 'bool', default: true },
     { key: 'academic.admission_invoice_days', label: 'مهلة سداد فاتورة القبول', type: 'int', default: 30, min: 0, max: 365, unit: 'يوم' },
-    { key: 'academic.current_semester', label: 'الفصل الدراسي الحالي (يُغيَّر عند بدء كل فصل)', type: 'select', default: 'الفصل الأول', options: opt(['الفصل الأول', 'الفصل الأول'], ['الفصل الثاني', 'الفصل الثاني'], ['الفصل الصيفي', 'الفصل الصيفي']) },
+    { key: 'academic.current_semester', label: 'الفصل الدراسي الحالي (يُغيَّر عند بدء كل فصل)', type: 'select', default: 'الفصل الأول', options: opt(...SEMESTER_LIST.map((s) => [s, s])), aliases: LEGACY_SEMESTER_NAMES, hint: 'السنة الدراسية ثلاثة فصول بحسب دليل الطالب.' },
     { key: 'academic.max_course_hours', label: 'أقصى ساعات للمقرر الواحد', type: 'int', default: 12, min: 1, max: 40, unit: 'ساعة' },
     { key: 'academic.default_course_hours', label: 'الساعات الافتراضية عند إضافة مقرر', type: 'int', default: 3, min: 0, max: 40, unit: 'ساعة' },
     { key: 'academic.levels', label: 'تسميات السنوات الدراسية (بالترتيب)', type: 'list', default: ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة'], max: 12, itemMax: 30, hint: 'سطر لكل سنة؛ تظهر بصيغة «السنة …».' },
@@ -158,6 +166,16 @@ export const SCHEMA = [
     { key: 'finance.separate_poster', label: 'فصل المهام: لا يرحّل القيد من أنشأه', type: 'bool', default: false, hint: 'عند تفعيله يُلزم بأن يرحّل شخص مختلف عن منشئ القيد.' },
     { key: 'procurement.min_quotes', label: 'أقل عدد عروض أسعار قبل الترسية دون تبرير', type: 'int', default: 3, min: 1, max: 10, unit: 'عرض' },
     { key: 'procurement.approval_finance_above', label: 'طلب الشراء فوق هذا المبلغ يحتاج اعتماداً مالياً', type: 'int', default: 1000000, min: 0, max: 100000000000, unit: 'ل.س', hint: 'صفر يلغي هذه المرحلة.' },
+    { key: 'procurement.issue_expense_account', label: 'حساب مصروف المواد المصروفة من المستودع (رمز الحساب)', type: 'text', default: '5201', max: 20, hint: 'مدين قيد الصرف، بمركز تكلفة القسم الطالب إن وُجد مركز بالاسم نفسه.' },
+    { key: 'procurement.adjust_loss_account', label: 'حساب عجز الجرد (رمز الحساب)', type: 'text', default: '5401', max: 20 },
+    { key: 'procurement.adjust_gain_account', label: 'حساب زيادة الجرد (رمز الحساب)', type: 'text', default: '4203', max: 20 },
+    { key: 'procurement.asset_account', label: 'حساب الأصول الثابتة المشتراة (رمز الحساب)', type: 'text', default: '1403', max: 20 },
+    { key: 'procurement.accumulated_dep_account', label: 'حساب مجمع الإهلاك (رمز الحساب)', type: 'text', default: '1404', max: 20 },
+    { key: 'procurement.depreciation_expense_account', label: 'حساب مصروف الإهلاك (رمز الحساب)', type: 'text', default: '5205', max: 20 },
+    { key: 'procurement.asset_disposal_loss_account', label: 'حساب خسارة إتلاف الأصول (رمز الحساب)', type: 'text', default: '5401', max: 20 },
+    { key: 'procurement.asset_default_life_months', label: 'العمر الإنتاجي الافتراضي للأصل المشترى (بالأشهر)', type: 'int', default: 60, min: 0, max: 600, unit: 'شهر', hint: 'صفر = بلا إهلاك تلقائي.' },
+    { key: 'procurement.sod_receive', label: 'فصل المهام: من أنشأ أمر التوريد لا يستلمه', type: 'bool', default: true },
+    { key: 'procurement.order_price_margin', label: 'هامش تجاوز سعر أمر التوريد عن تقدير الطلب المعتمد', type: 'int', default: 10, min: 0, max: 100, unit: '%', hint: 'ما يتجاوزه يحتاج طلب شراء جديداً يُعتمد.' },
     { key: 'procurement.approval_top_above', label: 'طلب الشراء فوق هذا المبلغ يحتاج اعتماد رئاسة الجامعة', type: 'int', default: 10000000, min: 0, max: 100000000000, unit: 'ل.س', hint: 'صفر يلغي هذه المرحلة.' },
     { key: 'finance.budget_control', label: 'الرقابة على الموازنة عند إرسال أمر التوريد', type: 'select', default: 'block', options: opt(['block', 'منع التجاوز'], ['warn', 'تحذير وتسجيل فقط'], ['off', 'بلا رقابة']) },
     { key: 'finance.po_requires_budget', label: 'إلزام كل أمر توريد ببند موازنة', type: 'bool', default: false },
@@ -194,6 +212,19 @@ function decode(it, raw) {
 }
 const encode = (it, v) => (it.legacy ? String(v) : JSON.stringify(v));
 
+// القيمة الافتراضية المخصصة (للأرقام والنصوص): يحفظها المدير من «جعله افتراضياً» فتعود إليها «إعادة إلى الافتراضي»
+// بدل قيمة المصنع. تُخزَّن منفصلة (default.<المفتاح>) فتبقى قيمة المصنع معروفة ويمكن استعادتها.
+const CUSTOM_DEFAULT_TYPES = new Set(['int', 'text']);
+const dkey = (it) => `default.${it.key}`;
+function defaultOf(db, it) {
+  if (!CUSTOM_DEFAULT_TYPES.has(it.type)) return it.default;
+  try {
+    const raw = getCachedSettingRaw(db, dkey(it));
+    if (raw !== undefined && raw !== null) return normalize(it, JSON.parse(raw));
+  } catch { /* تالف: قيمة المصنع */ }
+  return it.default;
+}
+
 import { cacheGetOrSet, getCachedSettingRaw } from '../cache.js';
 
 // القيمة الفعلية: المحفوظة إن وُجدت وصالحة، وإلا fallback (إن مُرّر)، وإلا الافتراضي. تتحمّل قاعدة وهمية (لا تنكسر).
@@ -208,7 +239,7 @@ export function getSetting(db, key, fallback) {
     v = undefined;
   }
   if (v !== undefined) { try { return normalize(it, v); } catch { /* قيمة تالفة: نعود للافتراضي */ } }
-  return fallback !== undefined ? fallback : it.default;
+  return fallback !== undefined ? fallback : defaultOf(db, it);
 }
 
 function normalize(it, v) {
@@ -228,6 +259,7 @@ function normalize(it, v) {
       return s;
     }
     case 'select': {
+      if (it.aliases && Object.hasOwn(it.aliases, v)) v = it.aliases[v];        // قيمة قديمة أُعيدت تسميتها (مثل «الفصل الصيفي»)
       if (!it.options.some((o) => o.value === v)) throw bad(`${label}: خيار غير صالح.`);
       return v;
     }
@@ -255,11 +287,25 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 // كل الإعدادات للواجهة: القيمة الحالية + الافتراضي + هل عُدِّلت
 export function listSettings(db) {
   return { tabs: SCHEMA.map((t) => ({ key: t.key, label: t.label, desc: t.desc, items: t.items.map((it) => {
-    const value = getSetting(db, it.key);
+    const value = getSetting(db, it.key), dflt = defaultOf(db, it);
     const { key, label, type, hint, min, max, unit, itemMax, options } = it;
-    return { key, label, type, hint: hint ?? '', min, max, unit: unit ?? '', itemMax, options, default: it.default, value, changed: !same(value, it.default) };
+    return { key, label, type, hint: hint ?? '', min, max, unit: unit ?? '', itemMax, options, default: dflt, factoryDefault: it.default, customDefault: !same(dflt, it.default),
+      canSetDefault: CUSTOM_DEFAULT_TYPES.has(it.type), value, changed: !same(value, dflt) };
   }) })) };
 }
+
+// اتساق القيم معاً قبل الحفظ: النجاح والعملي ضمن العلامة القصوى، وحدود سلّم التقديرات متناقصة.
+// (ما دون علامة النجاح «راسب» دائماً مهما كانت الحدود، فلا يُشترط أن يعلو حد «جيد» نسبة النجاح)
+function checkConsistency(db, next) {
+  const val = (k) => (k in next ? next[k] : getSetting(db, k));
+  if (val('grades.pass_mark') > val('grades.total_max') || val('grades.pass_mark_other') > val('grades.total_max')) throw bad('علامة النجاح لا تتجاوز العلامة الكلية القصوى.');
+  if (val('grades.practical_max') > val('grades.total_max')) throw bad('الحد الأعلى للعلامة العملية لا يتجاوز العلامة الكلية القصوى.');
+  const mins = RATING_TIERS.map((t) => val(t.setting));
+  for (let i = 1; i < mins.length; i++) if (!(mins[i] < mins[i - 1])) throw bad(`سلّم التقديرات: حد «${RATING_TIERS[i].label}» يجب أن يكون أقل من حد «${RATING_TIERS[i - 1].label}».`);
+}
+
+// سلّم التقديرات الحالي من الإعدادات؛ passMark علامة نجاح الطالب إن عُرفت (وإلا علامة النجاح العامة)
+export const ratingScale = (db, passMark) => scaleFrom((k) => getSetting(db, k), passMark);
 
 // حفظ دفعة قيم: تُتحقَّق كلها قبل أي كتابة (إما الكل أو لا شيء) مع تدقيق القديم والجديد
 export function saveSettings({ db }, actor, input, ip) {
@@ -271,10 +317,7 @@ export function saveSettings({ db }, actor, input, ip) {
     if (!it) throw bad(`إعداد غير معروف: ${k}`);
     next[k] = normalize(it, v);
   }
-  // اتساق: النجاح والعملي ضمن العلامة القصوى
-  const val = (k) => (k in next ? next[k] : getSetting(db, k));
-  if (val('grades.pass_mark') > val('grades.total_max') || val('grades.pass_mark_other') > val('grades.total_max')) throw bad('علامة النجاح لا تتجاوز العلامة الكلية القصوى.');
-  if (val('grades.practical_max') > val('grades.total_max')) throw bad('الحد الأعلى للعلامة العملية لا يتجاوز العلامة الكلية القصوى.');
+  checkConsistency(db, next);
   const changes = [];
   tx(db, () => {
     const up = db.prepare('INSERT INTO site_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value');
@@ -301,10 +344,52 @@ export function resetSettings({ db }, actor, input, ip) {
   return listSettings(db);
 }
 
+// «جعله افتراضياً»: القيمة المُرسلة (أو الحالية) تصبح الافتراضي المخصص، وتُطبَّق قيمةً حالية أيضاً
+export function makeDefaultSettings({ db }, actor, input, ip) {
+  const values = input?.values;
+  if (!values || typeof values !== 'object' || Array.isArray(values) || !Object.keys(values).length) throw bad('حدّد الإعداد وقيمته.');
+  const next = {};
+  for (const [k, v] of Object.entries(values)) {
+    const it = ITEMS[k];
+    if (!it) throw bad(`إعداد غير معروف: ${k}`);
+    if (!CUSTOM_DEFAULT_TYPES.has(it.type)) throw bad(`«${it.label}»: القيمة الافتراضية المخصصة للأرقام والنصوص فقط.`);
+    next[k] = normalize(it, v === undefined || v === null ? getSetting(db, k) : v);
+  }
+  checkConsistency(db, next);
+  tx(db, () => {
+    const up = db.prepare('INSERT INTO site_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value');
+    for (const [k, v] of Object.entries(next)) {
+      const it = ITEMS[k];
+      up.run(dkey(it), JSON.stringify(v));
+      db.prepare('DELETE FROM site_settings WHERE key = ?').run(skey(it));      // القيمة الحالية = الافتراضي الجديد
+    }
+    audit(db, actor, 'تعيين قيمة افتراضية مخصصة لإعدادات عامة', Object.entries(next).map(([k, v]) => `${k} = ${JSON.stringify(v).slice(0, 60)}`).join(' | ').slice(0, 900), ip);
+  });
+  return listSettings(db);
+}
+
+// إلغاء الافتراضي المخصص: يعود الافتراضي إلى قيمة المصنع (القيمة الحالية المحفوظة لا تتغير)
+export function factoryDefaultSettings({ db }, actor, input, ip) {
+  const keys = Array.isArray(input?.keys) ? input.keys : [];
+  if (!keys.length) throw bad('حدّد الإعدادات.');
+  for (const k of keys) if (!ITEMS[k]) throw bad(`إعداد غير معروف: ${k}`);
+  tx(db, () => {
+    for (const k of keys) {
+      const it = ITEMS[k], cur = getSetting(db, k);
+      db.prepare('DELETE FROM site_settings WHERE key = ?').run(dkey(it));
+      // كانت القيمة الحالية هي الافتراضي المخصص (غير محفوظة صراحة): نثبّتها كي لا تتغير بصمت
+      if (!same(cur, it.default) && !db.prepare('SELECT 1 FROM site_settings WHERE key = ?').get(skey(it))) db.prepare('INSERT INTO site_settings (key, value) VALUES (?, ?)').run(skey(it), encode(it, cur));
+    }
+    audit(db, actor, 'استعادة قيمة المصنع كافتراضي لإعدادات عامة', keys.join(',').slice(0, 300), ip);
+  });
+  return listSettings(db);
+}
+
 // القيم التي يحتاجها المتصفح (حدود الإدخال والقوائم المنسدلة الموحدة) — بلا مفاتيح حساسة (تُخزَّن مؤقتاً في الذاكرة)
 export function publicLimits(db) {
   return cacheGetOrSet(db, 'settings', 'public_limits', () => ({
     passMark: getSetting(db, 'grades.pass_mark'), totalMax: getSetting(db, 'grades.total_max'), practicalMax: getSetting(db, 'grades.practical_max'),
+    ratingScale: ratingScale(db), semesters: SEMESTER_LIST,
     maxCourseHours: getSetting(db, 'academic.max_course_hours'), defaultCourseHours: getSetting(db, 'academic.default_course_hours'),
     levels: getSetting(db, 'academic.levels'), maxAbsence: getSetting(db, 'academic.max_absence_percent'),
     passwordMin: getSetting(db, 'security.password_min'), defaultSla: getSetting(db, 'requests.default_sla_hours'),

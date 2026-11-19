@@ -67,7 +67,7 @@ export function sections(db) {
       F('admission_type', 'نوع القبول', 'select', { required: true, options: opts(ADMISSIONS(db)) }),
       F('ministerial_no', 'الرقم الوزاري', 'text', { max: 20, hint: 'رقم القبول الوزاري إن وُجد' }),
       F('enroll_year', 'سنة القيد', 'int', { required: true, min: 1980, max: year + 1, default: year }),
-      F('enroll_term', 'فصل القيد', 'select', { required: true, options: opts(['الفصل الأول', 'الفصل الثاني', 'الفصل الصيفي']), default: 'الفصل الأول' }),
+      F('enroll_term', 'فصل القيد', 'select', { required: true, options: opts(['الفصل الأول', 'الفصل الثاني', 'الفصل الثالث']), default: 'الفصل الأول' }),
       F('study_level', 'السنة الدراسية الحالية', 'select', { required: true, options: opts([1, 2, 3, 4].map((n) => ({ v: n, l: levelLabel(n, db) }))), default: 1 }),
       F('status', 'حالة القيد', 'select', { required: true, editOnly: true, default: 'active', options: opts(Object.entries(STATUS_LABEL).map(([v, l]) => ({ v, l }))) }),
     ] },

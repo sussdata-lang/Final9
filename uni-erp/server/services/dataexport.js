@@ -8,12 +8,13 @@ import { passMarkResolver } from './academics.js';
 import { logsForExport, KINDS as HALL_KINDS } from './attendance.js';
 import { sections, STATUS_LABEL, levelLabel, programLabel } from './students.js';
 import { decryptField } from '../lib/data_crypto.js';
+import { isSemester, SEMESTER_NAMES } from './semesters.js';
 
 const MAX_ROWS = 100_000;
 const REQ_LABEL = { review: 'قيد المراجعة', approved: 'معتمد', rejected: 'مرفوض' };
 const CMP_LABEL = { open: 'قيد المعالجة', answered: 'تم الرد', closed: 'مغلقة' };
 const HOLD_LABEL = { financial: 'مالية', disciplinary: 'تأديبية', library: 'مكتبة' };
-const semLabel = (n) => (n === 1 ? 'الفصل الأول' : n === 2 ? 'الفصل الثاني' : '');
+const semLabel = (n) => SEMESTER_NAMES[n] || '';
 const day = (ms) => (ms ? new Date(ms).toISOString().slice(0, 10) : '');
 
 const DATASETS = [
@@ -34,7 +35,7 @@ const FORMATS = ['xlsx', 'csv', 'json', 'docx'];
 
 const int = (v) => { const n = Number(v); return Number.isInteger(n) && n > 0 ? n : null; };
 function parseFilters(q = {}) {
-  const f = { faculty: int(q.faculty), program: int(q.program), level: int(q.level), semester: [1, 2].includes(Number(q.semester)) ? Number(q.semester) : null,
+  const f = { faculty: int(q.faculty), program: int(q.program), level: int(q.level), semester: isSemester(q.semester) ? Number(q.semester) : null,
     academicYear: /^\d{4}\/\d{4}$/.test(String(q.academicYear ?? '')) ? String(q.academicYear) : null, status: STATUS_LABEL[q.status] ? q.status : null, enrollYear: int(q.enrollYear),
     akind: HALL_KINDS[q.akind] ? q.akind : null, ahall: q.ahall ? String(q.ahall).slice(0, 60) : null, acourse: int(q.acourse), astate: ['open', 'closed'].includes(q.astate) ? q.astate : null,
     afrom: /^\d{4}-\d{2}-\d{2}$/.test(String(q.afrom ?? '')) ? q.afrom : null, ato: /^\d{4}-\d{2}-\d{2}$/.test(String(q.ato ?? '')) ? q.ato : null, tz: Number.isFinite(Number(q.tz)) ? Number(q.tz) : -180 };

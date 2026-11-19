@@ -60,7 +60,7 @@
         ${(b.mine || m) && ['pending', 'approved'].includes(b.status) ? ` <button class="btn sm" type="button" data-act="fcdec" data-id="${b.id}" data-d="cancel">إلغاء</button>` : ''}</td></tr>`).join('');
     const orders = d.orders.map((o) => `<tr><td class="mono">${esc(o.no)}</td><td><b>${esc(o.location)}</b><div class="small">${esc(o.category)} · ${esc(o.description)}</div></td>
       <td>${pill(o.priority === 'normal' ? 'p-review' : 'p-rejected', o.priorityLabel)}</td><td>${pill(MST[o.status][0], MST[o.status][1])}${o.doneNote ? `<div class="small">${esc(o.doneNote)}</div>` : ''}</td><td>${esc(o.assignee)}</td>
-      <td>${m && ['open', 'assigned'].includes(o.status) ? `${sel(`fc-tech-${o.id}`, d.staff.map((u) => [u.id, u.name]))} <button class="btn sm" type="button" data-act="fcact" data-id="${o.id}" data-a="assign">إسناد</button>` : ''}
+      <td><button type="button" class="btn sm" data-act="recthread" data-m="maintenance" data-id="${o.id}">النقاش</button> ${m && ['open', 'assigned'].includes(o.status) ? `${sel(`fc-tech-${o.id}`, d.staff.map((u) => [u.id, u.name]))} <button class="btn sm" type="button" data-act="fcact" data-id="${o.id}" data-a="assign">إسناد</button>` : ''}
         ${(o.assignedToMe || m) && o.status === 'assigned' ? ` <button class="btn pri sm" type="button" data-act="fcact" data-id="${o.id}" data-a="done">تم التنفيذ</button>` : ''}
         ${(o.mine || m) && o.status === 'done' ? ` <button class="btn pri sm" type="button" data-act="fcact" data-id="${o.id}" data-a="close">تأكيد الإغلاق</button> <button class="btn sm" type="button" data-act="fcact" data-id="${o.id}" data-a="reopen">لم يُعالج</button>` : ''}
         ${(o.mine || m) && o.status === 'open' ? ` <button class="btn sm" type="button" data-act="fcact" data-id="${o.id}" data-a="cancel">إلغاء</button>` : ''}</td></tr>`).join('');
@@ -84,12 +84,13 @@
     const rfqs = d.rfqs.map((r) => {
       const cheapest = r.quotes[0];
       const quotes = table(['المورّد', 'الإجمالي', 'مدة التوريد', 'ملاحظات', ''], r.quotes.map((q) => `<tr${r.awardedQuoteId === q.id ? ' style="background:#EAF3F0"' : ''}><td><b>${esc(q.supplier)}</b>${cheapest && q.id === cheapest.id ? ' <span class="pill p-approved">الأرخص</span>' : ''}</td><td>${money(q.total)}</td><td>${q.deliveryDays} يوم</td><td>${esc(q.notes)}</td>
-        <td>${manage && r.status === 'open' ? `<button class="btn pri sm" type="button" data-act="qtaward" data-id="${r.id}" data-q="${q.id}">ترسية</button>` : r.awardedQuoteId === q.id ? 'رُسّي عليه' : ''}</td></tr>`).join(''), 'لا عروض بعد.');
-      const addQuote = manage && r.status === 'open' ? `<div class="inline-form" style="margin-top:8px"><label>المورّد${sel(`qt-sup-${r.id}`, d.suppliers.map((s) => [s.id, `${s.name}${s.score ? ` (${s.score}/5)` : ''}`]))}</label>
+        <td>${manage && r.status === 'open' ? `<button class="btn pri sm" type="button" data-act="qtaward" data-id="${r.id}" data-q="${q.id}">ترسية</button> <button class="btn sm" type="button" data-act="qtwithdraw" data-id="${r.id}" data-q="${q.id}">سحب</button>` : r.awardedQuoteId === q.id ? 'رُسّي عليه' : ''}</td></tr>`).join(''), 'لا عروض بعد.');
+      const addQuote = manage && r.status === 'open' && !r.closed ? `<div class="inline-form" style="margin-top:8px"><label>المورّد${sel(`qt-sup-${r.id}`, d.suppliers.map((s) => [s.id, `${s.name}${s.score ? ` (${s.score}/5)` : ''}`]))}</label>
         ${r.lines.map((l) => `<label>${esc(l.description)} × ${l.qty}<input class="qt-price-${r.id}" data-line="${l.id}" type="number" min="0" placeholder="سعر الوحدة"></label>`).join('')}
         <label>التوريد (يوم)<input id="qt-days-${r.id}" type="number" min="0" value="7"></label><button class="btn sm" type="button" data-act="qtquote" data-id="${r.id}">تسجيل العرض</button></div>` : '';
       return `<article class="card"><h3 style="margin:0">${esc(r.title)} <span class="mono small">${esc(r.no)}</span></h3>
-        <p class="small">طلب الشراء ${esc(r.requestNo)} · آخر موعد ${esc(r.closesOn)} · ${r.status === 'open' ? 'مفتوح' : r.status === 'awarded' ? 'رُسّي' : 'ملغى'}${r.awardNote ? ` · ${esc(r.awardNote)}` : ''}</p>${quotes}${addQuote}</article>`;
+        <p class="small">طلب الشراء ${esc(r.requestNo)} · آخر موعد ${esc(r.closesOn)} · ${r.status === 'open' ? (r.closed ? 'انتهى موعد العروض — جاهز للترسية' : 'مفتوح لتلقي العروض') : r.status === 'awarded' ? 'رُسّي' : 'ملغى'}${r.awardNote ? ` · ${esc(r.awardNote)}` : ''}${r.cancelReason ? ` · سبب الإلغاء: ${esc(r.cancelReason)}` : ''}</p>${quotes}${addQuote}
+        ${manage && r.status === 'open' ? `<div class="row-end" style="margin-top:6px"><button class="btn sm dan" type="button" data-act="qtcancel" data-id="${r.id}">إلغاء طلب العروض</button></div>` : ''}</article>`;
     }).join('');
     return `<section class="card"><h2>طلبات عروض الأسعار</h2><p class="hint" style="margin-top:0">الحد الأدنى ${d.minQuotes} عروض. الترسية على غير الأرخص أو بعروض أقل تحتاج تبريراً مكتوباً، وتنشئ أمر التوريد بأسعار العرض.</p>
       ${manage && d.requests.length ? `<div class="inline-form"><label style="flex:2">طلب شراء معتمد${sel('qt-req', d.requests.map((r) => [r.id, `${r.no} · ${r.title}`]))}</label><label>آخر موعد<input id="qt-close" type="date"></label><button class="btn pri" type="button" data-act="qtnew">طلب عروض</button></div>` : ''}</section>
@@ -136,6 +137,8 @@
       try { r = await send(''); } catch (e) { if (e.code !== 'justification_required' && !/تبرير/.test(e.message || '')) throw e; const note = prompt(`${e.message}\nالتبرير:`); if (!note) return; r = await send(note); }
       await reload('quotations', `رُسّي وأُنشئ أمر التوريد ${r.orderNo}`);
     },
+    qtcancel: async (_el, d) => { const reason = prompt('سبب إلغاء طلب العروض:'); if (!reason) return; await UA.api('POST', `/api/procurement/rfqs/${d.id}/cancel`, { reason }); await reload('quotations', 'أُلغي طلب العروض؛ يمكن طلب عروض جديد للطلب نفسه'); },
+    qtwithdraw: async (_el, d) => { const reason = prompt('سبب سحب العرض (يبقى في السجل):'); if (!reason) return; await UA.api('POST', `/api/procurement/rfqs/${d.id}/quotes/${d.q}/withdraw`, { reason }); await reload('quotations', 'سُحب العرض'); },
     qtrate: async () => { await UA.api('POST', '/api/procurement/supplier-ratings', { orderId: Number(val('qt-ro')), quality: Number(val('qt-r-quality')), timeliness: Number(val('qt-r-timeliness')), price: Number(val('qt-r-price')) }); await reload('quotations', 'حُفظ التقييم'); },
   });
 })();

@@ -11,16 +11,19 @@ import crypto from 'node:crypto';
 import { HttpError } from '../http.js';
 import { audit } from '../audit.js';
 import { passMarkFor, passSql } from './academics.js';
-import { getSetting } from './settings.js';
+import { getSetting, ratingScale } from './settings.js';
+import { rateMark, FAIL_LABEL, DEFAULT_SCALE } from './grade_scale.js';
 import { STATUS_LABEL } from './students.js';
 import { overdueDues } from './finance/fees.js';
 import { creditCap, currentTerm, registrationWindow, assertRegistrationOpen, listSections, activeSectionsOf, createSection, updateSection, dropEnrollment } from './sections.js';
 import { activeCardBlock } from './card_blocks.js';
+import { publishedSql } from './grading.js';
 
 /**
  * دوال منطقية نقية وقابلة للاختبار المباشر (Pure Functions for Unit Testing)
  */
-export function calculateSimulatedGpa(currentGpa, completedHours, upcomingCourses = []) {
+// scale: سلّم التقديرات (grade_scale.js) — الافتراضي سلّم دليل الطالب؛ المسار يمرّر سلّم الإعدادات وعلامة نجاح الطالب
+export function calculateSimulatedGpa(currentGpa, completedHours, upcomingCourses = [], scale = DEFAULT_SCALE) {
   const curGpa = Math.max(0, Math.min(100, Number(currentGpa) || 0));
   const curHours = Math.max(0, Number(completedHours) || 0);
   let totalWeighted = curGpa * curHours;
@@ -35,7 +38,7 @@ export function calculateSimulatedGpa(currentGpa, completedHours, upcomingCourse
     }
   }
   const projectedGpa = totalHours > 0 ? Math.round((totalWeighted / totalHours) * 100) / 100 : 0;
-  const letter = projectedGpa >= 90 ? 'ممتاز (A+)' : projectedGpa >= 80 ? 'جيد جداً (B+)' : projectedGpa >= 70 ? 'جيد (C+)' : projectedGpa >= 60 ? 'مقبول (D)' : 'إنذار أكاديمي (F)';
+  const rated = rateMark(projectedGpa, scale), letter = rated === FAIL_LABEL ? 'إنذار أكاديمي' : rated;
   return { projectedGpa, totalHours, letter, delta: Math.round((projectedGpa - curGpa) * 100) / 100 };
 }
 
@@ -54,7 +57,7 @@ function advisingPlanFor(db, userId) {
   const profile = db.prepare('SELECT program_id FROM student_profiles WHERE user_id = ?').get(userId);
   if (!profile) return [];
   const pm = passMarkFor(db, userId);
-  const marks = new Map(db.prepare("SELECT course_id, mark FROM grades WHERE student_id = ? AND workflow_status = 'approved' ORDER BY academic_year, id").all(userId).map((g) => [g.course_id, Number(g.mark)]));
+  const marks = new Map(db.prepare(`SELECT course_id, mark FROM grades WHERE student_id = ? AND ${publishedSql('grades')} ORDER BY academic_year, id`).all(userId).map((g) => [g.course_id, Number(g.mark)]));
   const enrolled = new Set(db.prepare('SELECT e.course_code FROM student_self_enrollments e JOIN users u ON u.student_no = e.student_no WHERE u.id = ? AND e.semester = ? AND e.dropped_at IS NULL').all(userId, currentTerm(db)).map((e) => e.course_code));
   const prereqs = new Map();
   for (const p of db.prepare('SELECT p.course_id, c.code FROM sa_course_prerequisites p JOIN courses c ON c.id = p.prereq_course_id').all()) prereqs.set(p.course_id, [...(prereqs.get(p.course_id) ?? []), p.code]);
@@ -162,7 +165,7 @@ export function registerEnterpriseSuiteRoutes(r, deps) {
   // 3. محاكي المعدل التراكمي (GPA Simulator)
   r.add('POST', '/api/enterprise/gpa-simulate', (c) => {
     const b = c.body || {};
-    const res = calculateSimulatedGpa(b.currentGpa ?? 0, b.completedHours ?? 0, b.upcomingCourses || []);
+    const res = calculateSimulatedGpa(b.currentGpa ?? 0, b.completedHours ?? 0, b.upcomingCourses || [], ratingScale(db, c.user ? passMarkFor(db, c.user.id) : undefined));
     c.json(200, res);
   });
 

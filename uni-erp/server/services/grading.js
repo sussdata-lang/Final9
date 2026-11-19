@@ -8,6 +8,7 @@ import { needJustification } from './workflow.js';
 import { academicYear } from '../lib/doc_no.js';
 import { writeXlsx } from '../lib/xlsx.js';
 import { sendRaw } from '../http.js';
+import { notify } from './push.js';
 
 export const COMPONENT_KINDS = { theory: 'نظري', practical: 'عملي' };
 const bad = (msg, status = 400, code = 'validation') => new HttpError(status, msg, code);
@@ -68,6 +69,16 @@ export function saveComponentMarks(db, gradeId, marks) {
 
 export const isLocked = (db, courseId, year) => !!db.prepare('SELECT 1 FROM grade_locks WHERE course_id = ? AND academic_year = ?').get(Number(courseId), String(year));
 
+// ما يراه الطالب وتحمله وثائقه: العلامة المعتمدة في مقرر أُعلنت نتيجته لذلك العام. تُستثنى علامات بلا مقرر أو بلا عام دراسي
+// اعتيادي (معادلات النقل وما شابهها) فتظهر عند اعتمادها، إذ لا إعلان لها. المنطق الأكاديمي الداخلي (المتطلبات، العبء،
+// الإحصاءات، شاشات الموظفين) يبقى على «المعتمدة» وحدها.
+export const publishedSql = (a = 'g') => `${a}.workflow_status = 'approved' AND (${a}.course_id IS NULL OR ${a}.academic_year IS NULL OR NOT (${a}.academic_year ~ '^[0-9]{4}/[0-9]{4}$')
+  OR EXISTS (SELECT 1 FROM grade_locks gl WHERE gl.course_id = ${a}.course_id AND gl.academic_year = ${a}.academic_year))`;
+
+// قفل باسم «مقرر/عام» حتى نهاية المعاملة الجارية: يسلسل إعلان النتائج مع كتابة علامات المقرر نفسه عبر عمليات الخادم،
+// فلا تُكتب علامة بين فحص الإعلان وقفله، ولا يُعلن المقرر مرتين. يُستدعى داخل tx فقط.
+export const guardCourseYear = (db, courseId, year) => { db.prepare('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))').get(`grades:${Number(courseId)}:${String(year)}`); };
+
 // يعيد التبرير إن كان المقرر مقفلاً ويملك المستخدم المسار الاستثنائي، ويرفض غير ذلك
 export function assertEditable(db, actor, courseId, year, justification, decisionNo) {
   if (!courseId || !isLocked(db, courseId, year)) return null;
@@ -90,15 +101,40 @@ export function lockResults({ db }, actor, b, ip) {
   const year = String(b?.academicYear ?? '');
   const m = YEAR_RE.exec(year);
   if (!m || Number(m[2]) !== Number(m[1]) + 1) throw bad('العام الدراسي بصيغة 2025/2026.');
-  if (isLocked(db, course.id, year)) throw bad('أُعلنت نتائج هذا المقرر مسبقاً.', 409, 'conflict');
-  const s = db.prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN workflow_status = 'approved' THEN 0 ELSE 1 END) AS open FROM grades WHERE course_id = ? AND academic_year = ?").get(course.id, year);
-  if (!Number(s.total)) throw bad('لا علامات مرصودة لهذا المقرر في هذا العام.', 409, 'conflict');
-  if (Number(s.open)) throw bad(`بقيت ${s.open} علامة غير معتمدة؛ تُعلن النتائج بعد اعتمادها كلها.`, 409, 'not_approved');
-  db.prepare('INSERT INTO grade_locks (course_id, academic_year, locked_by, locked_at) VALUES (?,?,?,?)').run(course.id, year, actor.id ?? null, Date.now());
-  const ins = db.prepare("INSERT INTO user_notifications (user_id, kind, ref_id, text, url, at) VALUES (?, 'results_published', ?, ?, '', ?) ON CONFLICT DO NOTHING");
-  for (const st of db.prepare('SELECT DISTINCT student_id FROM grades WHERE course_id = ? AND academic_year = ?').all(course.id, year)) ins.run(st.student_id, course.id, `أُعلنت نتيجة مقرر ${course.name} للعام ${year}.`, Date.now());
-  audit(db, actor, 'إعلان نتائج مقرر وقفل علاماته', `${course.code ?? course.name} ${year}: ${s.total} علامة`, ip);
-  return { locked: Number(s.total) };
+  // الفحص والقفل والإشعارات عملية واحدة تحت قفل المقرر/العام: نقرتان متزامنتان أو علامة تُعدَّل أثناء الإعلان لا تُنتج حالة ناقصة
+  return tx(db, () => {
+    guardCourseYear(db, course.id, year);
+    if (isLocked(db, course.id, year)) throw bad('أُعلنت نتائج هذا المقرر مسبقاً.', 409, 'conflict');
+    const s = db.prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN workflow_status = 'approved' THEN 0 ELSE 1 END) AS open FROM grades WHERE course_id = ? AND academic_year = ?").get(course.id, year);
+    if (!Number(s.total)) throw bad('لا علامات مرصودة لهذا المقرر في هذا العام.', 409, 'conflict');
+    if (Number(s.open)) throw bad(`بقيت ${s.open} علامة غير معتمدة؛ تُعلن النتائج بعد اعتمادها كلها.`, 409, 'not_approved');
+    const now = Date.now();
+    db.prepare('INSERT INTO grade_locks (course_id, academic_year, locked_by, locked_at) VALUES (?,?,?,?)').run(course.id, year, actor.id ?? null, now);
+    const ins = db.prepare("INSERT INTO user_notifications (user_id, kind, ref_id, text, url, at) VALUES (?, 'results_published', ?, ?, '', ?) ON CONFLICT DO NOTHING");
+    const students = db.prepare('SELECT DISTINCT student_id FROM grades WHERE course_id = ? AND academic_year = ?').all(course.id, year).map((x) => Number(x.student_id));
+    for (const sid of students) ins.run(sid, course.id, `أُعلنت نتيجة مقرر ${course.name} للعام ${year}.`, now);
+    audit(db, actor, 'إعلان نتائج مقرر وقفل علاماته', `${course.code ?? course.name} ${year}: ${s.total} علامة`, ip);
+    return { locked: Number(s.total), students, courseName: course.name };
+  });
+}
+
+// إلغاء إعلان أُجري بالخطأ: لمن يملك تعديل النتائج المقفلة، وبتبرير يُسجَّل. تعود العلامات قابلة للتعديل بالمسار العادي
+// وتبقى معتمدة كما هي؛ وإعادة الإعلان بعدها تمر بالفحوص نفسها.
+export function unlockResults({ db }, actor, b, ip) {
+  if (!actor?.can?.('grade:unlock')) throw bad('إلغاء إعلان النتائج يتطلب صلاحية تعديل النتائج المقفلة.', 403, 'forbidden');
+  const course = db.prepare('SELECT * FROM courses WHERE id = ?').get(Number(b?.courseId));
+  if (!course) throw bad('المقرر غير موجود.', 404, 'not_found');
+  const year = String(b?.academicYear ?? '');
+  if (!YEAR_RE.test(year)) throw bad('العام الدراسي بصيغة 2025/2026.');
+  const just = needJustification(b?.justification, b?.decisionNo);
+  return tx(db, () => {
+    guardCourseYear(db, course.id, year);
+    const l = db.prepare('SELECT * FROM grade_locks WHERE course_id = ? AND academic_year = ?').get(course.id, year);
+    if (!l) throw bad('نتائج هذا المقرر غير معلنة في هذا العام.', 409, 'conflict');
+    db.prepare('DELETE FROM grade_locks WHERE course_id = ? AND academic_year = ?').run(course.id, year);
+    audit(db, actor, 'إلغاء إعلان نتائج مقرر وفك قفل علاماته', `${course.code ?? course.name} ${year}: ${just}`.slice(0, 300), ip);
+    return { unlocked: true };
+  });
 }
 
 // قالب Excel لمقرر: عمود لكل مكوّن باسمه، ليُملأ ويُستورد دون ضبط يدوي للأعمدة
@@ -121,5 +157,11 @@ export function registerGradingRoutes(r, deps) {
   r.add('GET', '/api/courses/:id/grades-template.xlsx', (c) => { any(c, 'grade:manage', 'course:manage'); sendRaw(c.res, 200, { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': `attachment; filename="grades-course-${Number(c.params.id)}.xlsx"` }, gradesTemplate(deps, c.params.id)); });
   r.add('PUT', '/api/courses/:id/components', (c) => c.json(200, saveComponents(deps, any(c, 'course:manage'), c.params.id, c.body, c.ip)));
   r.add('GET', '/api/grades/results', (c) => { any(c, 'grade:approve', 'grade:manage'); c.json(200, resultsSummary(deps, c.query ?? {})); });
-  r.add('POST', '/api/grades/results/lock', (c) => c.json(200, lockResults(deps, any(c, 'grade:approve'), c.body, c.ip)));
+  r.add('POST', '/api/grades/results/lock', (c) => {
+    const { students, courseName, ...out } = lockResults(deps, any(c, 'grade:approve'), c.body, c.ip);
+    // العلامات تظهر للطلاب الآن فقط (لا عند اعتمادها): الإشعار الفوري يُرسل عند الإعلان
+    if (students.length) notify(deps, students, { title: 'إعلان نتيجة', body: `أُعلنت نتيجة مقرر «${courseName}»؛ علامتك في «علاماتي».`, url: '/', tag: 'grades' });
+    c.json(200, out);
+  });
+  r.add('POST', '/api/grades/results/unlock', (c) => c.json(200, unlockResults(deps, any(c, 'grade:unlock'), c.body, c.ip)));
 }

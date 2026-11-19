@@ -6,7 +6,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { createApp } from '../server/app.js';
 import { hashPassword } from '../server/security.js';
-import { callGeminiAI } from '../server/services/v12_modules.js';
 
 const PW = 'Str0ng-Test-Pass!';
 let app, base, hash, adm;
@@ -112,23 +111,22 @@ test('قسم الخريجين للخريج فقط، وكشف الرسوم متا
   assert.equal(fees.json.balance, 0);
 });
 
-test('الذكاء الاصطناعي: مع المفتاح يستدعي Gemini، وعند الفشل يعمل البديل الداخلي', async () => {
-  const saved = { key: process.env.GEMINI_API_KEY, ctx: process.env.NODE_TEST_CONTEXT, fetch: globalThis.fetch };
-  process.env.GEMINI_API_KEY = 'test-key'; delete process.env.NODE_TEST_CONTEXT;
+test('الذكاء الاصطناعي محلي فقط: لا اتصال خارجي، وأرقام المرشد من الإعدادات', async () => {
+  const realFetch = globalThis.fetch, outside = [];
+  globalThis.fetch = (url, init) => { if (!String(url).startsWith(base)) outside.push(String(url)); return realFetch(url, init); };
   try {
-    let seen;
-    globalThis.fetch = async (url, init) => { seen = { url, init }; return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: 'جواب' }] } }] }) }; };
-    const good = await callGeminiAI('نظام', 'سؤال', () => 'بديل');
-    assert.equal(good.text, 'جواب');
-    assert.match(seen.url, /generativelanguage\.googleapis\.com/);
-    assert.equal(seen.init.headers['x-goog-api-key'], 'test-key');
-    assert.ok(!seen.url.includes('test-key'), 'المفتاح لا يوضع في الرابط');
-    globalThis.fetch = async () => ({ ok: false, status: 500 });
-    assert.equal((await callGeminiAI('نظام', 'سؤال', () => 'بديل')).text, 'بديل');
+    const ask = await call('POST', '/api/ai/advisor/ask', { cookie: adm, body: { question: 'ما حد الغياب المسموح؟' } });
+    assert.equal(ask.status, 201);
+    assert.equal(ask.json.model, 'rule-based');
+    const maxAbsence = Number(app.db.prepare("SELECT value FROM site_settings WHERE key = 'cfg.academic.max_absence_percent'").get()?.value ?? NaN);
+    if (Number.isFinite(maxAbsence)) assert.match(ask.json.answer, new RegExp(`${maxAbsence}%`));
+    const triage = await call('POST', '/api/ai/triage/analyze', { cookie: adm, body: { subject: 'رسوم الفصل', body_text: 'استفسار عن قسط الرسوم' } });
+    assert.equal(triage.status, 201);
+    assert.equal(triage.json.ai_category, 'الشؤون المالية والرسوم');
+    assert.equal((await call('GET', '/api/ai/overview', { cookie: adm })).json.aiEnabled, undefined);
+    assert.deepEqual(outside, [], 'لا طلب يخرج من الخادم');
   } finally {
-    globalThis.fetch = saved.fetch;
-    if (saved.key === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = saved.key;
-    if (saved.ctx !== undefined) process.env.NODE_TEST_CONTEXT = saved.ctx;
+    globalThis.fetch = realFetch;
   }
 });
 

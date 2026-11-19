@@ -167,6 +167,30 @@ export function staffDetail(db, id) {
   return view(db, u);
 }
 
+/* محرّر الصلاحيات يرسل «المربعات المؤشَّرة» كلها في customPermissions (صلاحيات الدور + الإضافات). حفظها كما هي يجعل صلاحيات
+   الدور القديم إضافات دائمة: يُنقل الموظف إلى دور آخر فيبقى معه ما كان لدوره السابق، ويتجمّد حساب مدير النظام على صلاحيات اليوم.
+   لذا نحفظ الفرق عن أساس الدور والوحدة فقط: الإضافات في custom، والمحجوب من الأساس في revoked. (النمط المخصص custom يبقى قائمة كاملة.)
+   يُطبَّق حين يعلن المرسل permissionsAreChecked: true (المحرّر)؛ عميل الواجهة البرمجية يرسل الإضافات والسحب صراحة كما كان. */
+const baseOf = (db, row) => new Set(effective(db, { ...row, access_mode: 'role', custom_permissions_json: '[]', revoked_permissions_json: '[]' }));
+function normalizeGrants(db, { accessMode, checked, revokedInput, next, prev }) {
+  if (accessMode === 'custom') return { custom: checked, revoked: revokedInput };
+  const nb = baseOf(db, next), on = new Set(checked);
+  // الدور والوحدة كما هما: المؤشَّر هو الحالة المطلوبة كاملة
+  if (!prev || ((prev.role_key ?? prev.role) === (next.role_key ?? next.role) && (prev.unit_id ?? null) === (next.unit_id ?? null))) {
+    return { custom: checked.filter((p) => !nb.has(p)), revoked: [...nb].filter((p) => ASSIGNABLE.has(p) && !on.has(p)) };
+  }
+  // تغيّر الدور أو الوحدة: المؤشَّر محسوب على الأساس القديم، فلا نبقي منه إلا ما أضافه المدير يدوياً فوق الأساسين
+  const ob = baseOf(db, prev);
+  return { custom: checked.filter((p) => !ob.has(p) && !nb.has(p)), revoked: revokedInput.filter((p) => nb.has(p)) };
+}
+// منح صلاحية لشاشة لم تكن متاحة يُظهرها: قائمة الشاشات المحفوظة تضيّق ما تتيحه الصلاحيات، فلولا هذا لبقيت الصلاحية الجديدة بلا شاشة
+function withGainedViews(views, beforePerms, afterPerms, role) {
+  if (!Array.isArray(views) || !views.length) return views;
+  const before = new Set(computeAllowedViews(beforePerms, [], role));
+  const gained = computeAllowedViews(afterPerms, [], role).filter((k) => !before.has(k) && !views.includes(k));
+  return gained.length ? [...views, ...gained] : views;
+}
+
 const KINDS = ['admin', 'faculty'];
 const kindOf = (v, dflt = 'admin') => { if (v === undefined || v === null || v === '') return dflt; if (!KINDS.includes(v)) throw bad('نوع العضو: هيئة إدارية أو تدريسية.'); return v; };
 const titleOf = (v, dflt = '') => { if (v === undefined) return dflt; const s = String(v ?? '').replace(/\s+/g, ' ').trim(); if (s.length > 80) throw bad('المسمى الوظيفي حتى 80 حرفاً.'); return s; };
@@ -190,10 +214,14 @@ export async function createUser({ db, cfg }, actor, input, ip) {
   const accessMode = modeOf(input?.accessMode, 'role');
   const dataScope = scopeOf(input?.dataScope, unit ? 'unit' : 'all');
   const moduleAccess = sanitizeModuleAccess(actor, input?.moduleAccess);
-  const customPerms = sanitizePermissionList(actor, input?.customPermissions);
-  const revokedPerms = Array.isArray(input?.revokedPermissions)
+  const rawCustom = sanitizePermissionList(actor, input?.customPermissions);
+  const rawRevoked = Array.isArray(input?.revokedPermissions)
     ? [...new Set(input.revokedPermissions.map(String).filter((p) => ASSIGNABLE.has(p)))]
     : [];
+  // المحرّر يرسل المؤشَّر كله: نحفظ الفرق عن أساس الدور والوحدة (انظر normalizeGrants)
+  const { custom: customPerms, revoked: revokedPerms } = input?.permissionsAreChecked === true && Array.isArray(input?.customPermissions)
+    ? normalizeGrants(db, { accessMode, checked: rawCustom, revokedInput: rawRevoked, next: { role: rk.role, role_key: rk.role_key, unit_id: unit, module_access_json: JSON.stringify(moduleAccess) }, prev: null })
+    : { custom: rawCustom, revoked: rawRevoked };
   const allowedViews = sanitizeAllowedViews(input?.allowedViews);
   const hiddenTabs = sanitizeHiddenTabs(input?.hiddenTabs);
 
@@ -265,15 +293,22 @@ export function updateUser({ db }, actor, id, input, ip) {
   const moduleAccess = input?.moduleAccess !== undefined
     ? sanitizeModuleAccess(actor, input.moduleAccess)
     : safeJsonParse(u.module_access_json, {});
-  const customPerms = input?.customPermissions !== undefined
+  const rawCustom = input?.customPermissions !== undefined
     ? sanitizePermissionList(actor, input.customPermissions)
     : safeJsonParse(u.custom_permissions_json, []);
-  const revokedPerms = input?.revokedPermissions !== undefined
+  const rawRevoked = input?.revokedPermissions !== undefined
     ? (Array.isArray(input.revokedPermissions) ? [...new Set(input.revokedPermissions.map(String).filter((p) => ASSIGNABLE.has(p)))] : [])
     : safeJsonParse(u.revoked_permissions_json, []);
-  const allowedViews = input?.allowedViews !== undefined
-    ? sanitizeAllowedViews(input.allowedViews)
-    : safeJsonParse(u.allowed_views_json, []);
+  const nextRow = { role: rk.role, role_key: rk.role_key, unit_id: unit, module_access_json: JSON.stringify(moduleAccess) };
+  const { custom: customPerms, revoked: revokedPerms } = input?.permissionsAreChecked === true && Array.isArray(input?.customPermissions)
+    ? normalizeGrants(db, { accessMode, checked: rawCustom, revokedInput: rawRevoked, next: nextRow, prev: u })
+    : { custom: rawCustom, revoked: rawRevoked };
+  const allowedViews = withGainedViews(
+    input?.allowedViews !== undefined ? sanitizeAllowedViews(input.allowedViews) : safeJsonParse(u.allowed_views_json, []),
+    effective(db, u),
+    effective(db, { ...u, ...nextRow, access_mode: accessMode, custom_permissions_json: JSON.stringify(customPerms), revoked_permissions_json: JSON.stringify(revokedPerms) }),
+    rk.role,
+  );
   // قائمة جديدة تُختم بالشاشات الموجودة الآن، وبقاؤها كما هي يبقي ختمها القديم
   const knownViews = input?.allowedViews !== undefined ? knownViewsFor(allowedViews) : safeJsonParse(u.views_known_json, null);
   const hiddenTabs = input?.hiddenTabs !== undefined ? sanitizeHiddenTabs(input.hiddenTabs) : safeJsonParse(u.hidden_tabs_json, []);

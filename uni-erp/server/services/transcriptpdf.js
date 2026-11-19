@@ -2,6 +2,7 @@
 // يدعم عدة صفحات، وشعاراً شفافاً في خلفية كل صفحة. الخط المضمَّن في PDF هو DejaVu (لا يحوي Cairo)، أما التخطيط والألوان فمن هوية الجامعة.
 import { textWidth } from '../lib/pdf.js';
 import { PASS } from './transcriptmodel.js';
+import { rateMark } from './grade_scale.js';
 
 const W = 595.28, H = 841.89, R = 545, L = 50, TOP = 800, BOT = 48;
 const C = { g: '#054239', gd: '#032E28', gm: '#0A5A4D', au: '#C9A24B', au2: '#E6CB84', ink: '#8A6A1B', ln: '#D9E2DF', mu: '#5B6B66', tx: '#10211D', ok: '#0B7A4B', bad: '#B3261E', soft: '#EEF3F1', cream: '#F3EAD2', white: '#FFFFFF' };
@@ -9,7 +10,8 @@ const f1 = (n) => (n === null || n === undefined ? '—' : String(Math.round(n *
 const utc = (ms) => new Date(ms).toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
 const fit = (str, font, size, maxW) => { let s = String(str ?? ''); if (textWidth(s, font, size) <= maxW) return s; while (s.length > 1 && textWidth(`${s}…`, font, size) > maxW) s = s.slice(0, -1); return `${s}…`; };
 const markColor = (r) => (r.pending ? C.mu : r.mark >= PASS ? C.ok : C.bad);
-const ratingOf = (r) => (r.pending ? 'لم تُرصد' : r.mark >= 90 ? 'ممتاز' : r.mark >= 80 ? 'جيد جداً' : r.mark >= 70 ? 'جيد' : r.mark >= PASS ? 'مقبول' : 'راسب');
+// التقدير محسوب في نموذج العرض (transcriptmodel.js) من سلّم دليل الطالب؛ احتياطاً لصفوف بلا تقدير يُحسب بالسلّم الافتراضي
+const ratingOf = (r) => (r.pending ? 'لم تُرصد' : r.rating || rateMark(r.mark) || '—');
 const ctr = (d, str, cx, y, o = {}) => d.text(str, { x: cx, y, align: 'center', ...o });
 
 // أعمدة جدول المقررات: عرض ثابت لكل عمود (من اليمين)، والمقرر يأخذ الباقي

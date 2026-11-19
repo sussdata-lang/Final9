@@ -66,7 +66,7 @@ test('طلب الشراء: مقدّمه يرى طلباته فقط ولا يرى
   add('req_a', ['procurement:request']); add('req_b', ['procurement:request']); add('keeper', ['procurement:read', 'procurement:request']);
   const login = async (username) => (await call('POST', '/api/auth/login', { body: { username, password: PW } })).cookie;
   const [a, b, keeper] = [await login('req_a'), await login('req_b'), await login('keeper')];
-  const made = await call('POST', '/api/procurement/requests', { cookie: a, body: { title: 'طلب أقلام', lines: [{ description: 'أقلام', qty: 2 }] } });
+  const made = await call('POST', '/api/procurement/requests', { cookie: a, body: { title: 'طلب أقلام', lines: [{ description: 'أقلام', qty: 2, estCost: 1500 }] } });
   assert.equal(made.status, 201, JSON.stringify(made.json));
   const id = made.json.id ?? made.json.request?.id;
   assert.equal((await call('GET', '/api/procurement/requests', { cookie: a })).json.requests.length, 1);

@@ -5,42 +5,20 @@ import { punch } from './staffatt.js';
 import { listQuizzes, withoutAnswers, submitQuiz, startQuiz, createQuiz, updateQuiz, deleteQuiz, requestQuizApproval, decideQuiz, listSubmissions, gradeSubmission } from './quizzes.js';
 import { groupsOfStudent, listGroups, groupSize } from './student_groups.js';
 import { HttpError } from '../http.js';
-import { log } from '../lib/logger.js';
 import { audit } from '../audit.js';
 import { tx } from '../db.js';
 import { appealGrade, applyAppealMark } from './academics.js';
 import { notify } from './push.js';
+import { getSetting, ratingScale } from './settings.js';
 import { addLectureFile, filesFor, streamLectureFile, lectureSlides, streamSlideMedia, deleteLectureFile, removeLectureFiles } from './lms_files.js';
 import { SECURITY_HEADERS } from '../http.js';
 
 const clean = (v, max = 300) => String(v ?? '').trim().slice(0, max);
 const need = (v, label, max = 300) => { const s = clean(v, max); if (!s) throw new HttpError(400, `«${label}» مطلوب.`, 'validation'); return s; };
 
-// استدعاء Gemini AI من الخادم (مع بديل ذكي فوري في حال عدم توفر المفتاح أو انتهاء المهلة في بيئة الاختبار)
+// المساعد الأكاديمي والإداري يعمل محلياً بقواعد ثابتة فقط: النظام داخلي ولا يرسل أي بيانات إلى خدمة خارجية.
 const RULE_BASED_MODEL = 'rule-based';
-const aiModelEnabled = () => Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'MY_GEMINI_API_KEY');
-export async function callGeminiAI(systemPrompt, userPrompt, fallbackFn) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (apiKey && apiKey !== 'MY_GEMINI_API_KEY' && !process.env.NODE_TEST_CONTEXT) {
-    try {
-      // واجهة Gemini مباشرة، بلا مكتبة إضافية
-      const model = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-        body: JSON.stringify({ systemInstruction: { parts: [{ text: systemPrompt }] }, contents: [{ role: 'user', parts: [{ text: userPrompt }] }], generationConfig: { temperature: 0.4 } }),
-        signal: AbortSignal.timeout(15000),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const text = ((await res.json()).candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? '').join('');
-      if (text) return { text, model };
-    } catch (err) {
-      // في حال تعذر الاتصال، ننتقل للتحليل المحلي المدمج دون تعطيل النظام، ويبقى السبب في السجل
-      log.warn('gemini: ' + err.message);
-    }
-  }
-  return { text: fallbackFn(), model: RULE_BASED_MODEL };
-}
+const ruleBased = (text) => ({ text, model: RULE_BASED_MODEL });
 
 // ==================== تحليلات وإحصائيات DevOps المتقدمة ====================
 export function buildDevopsAnalytics(db) {
@@ -639,7 +617,7 @@ export async function registerV12Modules(r, deps) {
   // 5.5 جداول الامتحانات والتظلمات + 5.6 الساعات المكتبية والترقيات + 5.7 السكن والمنح والأنشطة + 5.8 التقييم والتدريب والبصمة
   r.add('GET', '/api/expansions/overview', (c) => {
     // موارد الموظفين تقرأ من هنا التقييم والبصمة
-    if (!isStudent(c)) requireV12Perm(c, ...EXAMS_READ, ...HR_READ, 'grade:manage', 'grade:approve', 'course:manage');
+    if (!isStudent(c)) requireV12Perm(c, ...EXAMS_READ, ...HR_READ, 'grade:manage', 'grade:approve', 'course:manage', 'faculty:manage');
     const own = (rows) => rows.filter((x) => x.student_no === c.user.student_no);
     // لكل قسم جمهوره: الطالب يرى ما يخصه، والموظف ما تغطيه صلاحياته
     const section = (rows, perms) => (isStudent(c) ? own(rows) : hasV12Perm(c, perms) ? rows : []);
@@ -821,6 +799,75 @@ export async function registerV12Modules(r, deps) {
       Date.now()
     );
     c.json(201, { id: Number(res.lastInsertRowid) });
+  });
+
+  /* ---------- 5.6 ملفات الترقيات العلمية: إضافة وتحديث، والاعتماد يرفع رتبة العضو في سجل الهيئة التدريسية ---------- */
+  const PROMO_STATUS = ['قيد التحكيم العلمي', 'مستوفٍ للشروط', 'غير مستوفٍ للشروط', 'معتمدة بقرار مجلس الجامعة', 'مرفوضة'];
+  const PROMO_DONE = 'معتمدة بقرار مجلس الجامعة';
+  const promoPerm = (c) => requireV12Perm(c, 'faculty:manage', 'hr:manage');
+  const ranks = () => { const r = getSetting(db, 'faculty.ranks'); return Array.isArray(r) && r.length ? r : ['أستاذ', 'أستاذ مشارك', 'أستاذ مساعد', 'محاضر', 'مساعد', 'معيد']; };
+  const num = (v, label, min, max) => { const n = Number(v); if (v === '' || v === null || v === undefined || !Number.isFinite(n) || n < min || n > max) throw new HttpError(400, `«${label}» رقم من ${min} إلى ${max}.`, 'validation'); return n; };
+  const rankIn = (v, label) => { const x = need(v, label, 40); if (!ranks().includes(x)) throw new HttpError(400, `«${label}» من الدرجات العلمية المعتمدة: ${ranks().join('، ')}.`, 'validation'); return x; };
+  function promoValues(b, cur = {}) {
+    const pick = (k) => (b[k] !== undefined ? b[k] : cur[k]);
+    const v = {
+      current_rank: rankIn(pick('current_rank'), 'الرتبة الحالية'),
+      target_rank: rankIn(pick('target_rank'), 'الرتبة المستهدفة'),
+      specialty: need(pick('specialty'), 'التخصص', 120),
+      research_points: num(pick('research_points'), 'نقاط الأبحاث', 0, 1000),
+      required_points: num(pick('required_points') ?? 100, 'النقاط المطلوبة', 1, 1000),
+      teaching_years: Math.trunc(num(pick('teaching_years'), 'سنوات الخدمة', 0, 60)),
+      committee_status: clean(pick('committee_status') || PROMO_STATUS[0], 60),
+    };
+    if (v.current_rank === v.target_rank) throw new HttpError(400, 'الرتبة المستهدفة يجب أن تختلف عن الحالية.', 'validation');
+    if (!PROMO_STATUS.includes(v.committee_status)) throw new HttpError(400, `حالة لجنة الترقيات: ${PROMO_STATUS.join('، ')}.`, 'validation');
+    return v;
+  }
+  // اعتماد الترقية بقرار المجلس: تصبح رتبة العضو المربوط هي المستهدفة
+  function applyRank(p, actor, ip) {
+    if (p.committee_status !== PROMO_DONE || !p.member_id) return false;
+    const m = db.prepare('SELECT id, name, rank FROM faculty_members WHERE id = ?').get(Number(p.member_id));
+    if (!m || m.rank === p.target_rank) return false;
+    db.prepare('UPDATE faculty_members SET rank = ? WHERE id = ?').run(p.target_rank, m.id);
+    audit(db, actor, 'ترقية علمية لعضو هيئة تدريس', `${m.name}: ${m.rank} ← ${p.target_rank}`.slice(0, 200), ip);
+    return true;
+  }
+  r.add('GET', '/api/expansions/promotions/options', (c) => {
+    promoPerm(c);
+    c.json(200, { ranks: ranks(), statuses: PROMO_STATUS, members: db.prepare("SELECT id, name, rank, specialty FROM faculty_members WHERE status != 'inactive' ORDER BY name").all().map((m) => ({ id: Number(m.id), name: m.name, rank: m.rank, specialty: m.specialty ?? '' })) });
+  });
+  r.add('POST', '/api/expansions/promotions', (c) => {
+    promoPerm(c);
+    const b = c.body ?? {};
+    // العضو من سجل الهيئة التدريسية (يُملأ الاسم والرتبة والتخصص منه)، أو اسم مكتوب لمن لم يُسجَّل بعد
+    const m = b.member_id ? db.prepare('SELECT * FROM faculty_members WHERE id = ?').get(Number(b.member_id)) : null;
+    if (b.member_id && !m) throw new HttpError(404, 'عضو الهيئة التدريسية غير موجود.', 'not_found');
+    const name = m ? m.name : need(b.faculty_name, 'اسم العضو', 100);
+    const v = promoValues({ ...b, current_rank: b.current_rank || m?.rank, specialty: b.specialty || m?.specialty });
+    if (db.prepare(`SELECT 1 FROM faculty_promotions WHERE (member_id = ? OR (member_id IS NULL AND faculty_name = ?)) AND target_rank = ? AND committee_status NOT IN ('مرفوضة', ?)`).get(m ? m.id : -1, name, v.target_rank, PROMO_DONE)) {
+      throw new HttpError(409, `يوجد ملف ترقية مفتوح لـ«${name}» إلى «${v.target_rank}».`, 'conflict');
+    }
+    const out = tx(db, () => {
+      const id = Number(db.prepare(`INSERT INTO faculty_promotions (faculty_name, specialty, current_rank, target_rank, research_points, required_points, teaching_years, committee_status, submitted_at, member_id)
+        VALUES (?,?,?,?,?,?,?,?,?,?) RETURNING id`).get(name, v.specialty, v.current_rank, v.target_rank, v.research_points, v.required_points, v.teaching_years, v.committee_status, Date.now(), m ? m.id : null).id);
+      audit(db, c.user, 'فتح ملف ترقية علمية', `${name}: ${v.current_rank} ← ${v.target_rank}`.slice(0, 200), c.ip);
+      return { id, rankUpdated: applyRank({ ...v, member_id: m?.id }, c.user, c.ip) };
+    });
+    c.json(201, out);
+  });
+  r.add('PUT', '/api/expansions/promotions/:id', (c) => {
+    promoPerm(c);
+    const p = db.prepare('SELECT * FROM faculty_promotions WHERE id = ?').get(Number(c.params.id));
+    if (!p) throw new HttpError(404, 'ملف الترقية غير موجود.', 'not_found');
+    if (p.committee_status === PROMO_DONE) throw new HttpError(409, 'اعتُمدت هذه الترقية بقرار المجلس؛ لا يُعدَّل ملفها.', 'conflict');
+    const v = promoValues(c.body ?? {}, p);
+    const out = tx(db, () => {
+      db.prepare(`UPDATE faculty_promotions SET specialty = ?, current_rank = ?, target_rank = ?, research_points = ?, required_points = ?, teaching_years = ?, committee_status = ? WHERE id = ?`)
+        .run(v.specialty, v.current_rank, v.target_rank, v.research_points, v.required_points, v.teaching_years, v.committee_status, p.id);
+      audit(db, c.user, 'تحديث ملف ترقية علمية', `${p.faculty_name}: ${v.committee_status}`.slice(0, 200), c.ip);
+      return { ok: true, rankUpdated: applyRank({ ...v, member_id: p.member_id }, c.user, c.ip) };
+    });
+    c.json(200, out);
   });
 
   r.add('POST', '/api/expansions/appraisals', (c) => {
@@ -1026,7 +1073,7 @@ export async function registerV12Modules(r, deps) {
     const chats = student
       ? db.prepare('SELECT * FROM ai_advisor_chats WHERE user_label = ? ORDER BY id DESC LIMIT 20').all(clean(c.user.display_name, 80))
       : db.prepare('SELECT * FROM ai_advisor_chats ORDER BY id DESC LIMIT 20').all();
-    c.json(200, { aiEnabled: aiModelEnabled(),
+    c.json(200, {
       warnings,
       triageLogs,
       chats,
@@ -1052,10 +1099,8 @@ export async function registerV12Modules(r, deps) {
     const failed = Number(b.failed_courses) || 0;
     const riskLevel = gpa < 65 || attendance < 70 || failed >= 2 ? 'حرج' : gpa < 75 || attendance < 80 || failed === 1 ? 'متوسط' : 'آمن';
 
-    const aiOut = await callGeminiAI(
-      'أنت خبير إرشاد أكاديمي جامعي. حلل بيانات الطالب وقدم تشخيصاً مختصراً وخطة تدخل عملية من 3 نقاط باللغة العربية.',
-      `الطالب: ${studentName} (${studentNo})، التخصص: ${programName}، المعدل: ${gpa}%، نسبة الحضور: ${attendance}%، المواد المتعثرة: ${failed}.`,
-      () => riskLevel === 'حرج'
+    const aiOut = ruleBased(
+      riskLevel === 'حرج'
         ? `تشخيص مبكر: خطر أكاديمي مرتفع بسبب تراجع المعدل (${gpa}%) وانخفاض الحضور (${attendance}%).\nخطة التدخل: 1) استدعاء إرشادي عاجل وتحديد سقف الساعات بـ 12 ساعة. 2) جدولة دروس تقوية عملية. 3) متابعة أسبوعية لسجل الحضور.`
         : riskLevel === 'متوسط'
         ? `تشخيص مبكر: أداء متوسط يحتاج دعم في المقررات التخصصية (المعدل ${gpa}%).\nخطة التدخل: 1) حضور الساعات المكتبية مع مدرس المقرر. 2) مراجعة خطة توزيع المقررات للفصل القادم.`
@@ -1080,26 +1125,20 @@ export async function registerV12Modules(r, deps) {
     const question = clean(c.body?.question, 500);
     if (!question) throw new HttpError(400, 'يرجى كتابة السؤال الأكاديمي.');
 
-    const coursesCount = db.prepare('SELECT COUNT(*) AS n FROM courses').get().n;
     const programs = db.prepare('SELECT name FROM programs WHERE active = 1').all().map((p) => p.name).join('، ');
+    // أرقام اللوائح من الإعدادات (علامة النجاح، حد الغياب) فلا تنحرف إجابات المرشد عن المعتمد
+    const sc = ratingScale(db), pct = (m) => Math.round((m / sc.totalMax) * 1000) / 10;
+    const maxAbsence = Number(getSetting(db, 'academic.max_absence_percent'));
 
-    const aiOut = await callGeminiAI(
-      `أنت المرشد الأكاديمي الذكي في الجامعة السورية للعلوم الأمنية (منظومة Uni-ERP v12).
-أجب بدقة ووضوح باللغة العربية وفق اللوائح الجامعية.
-البرامج المتاحة في الجامعة: ${programs || 'هندسة الأمن السيبراني، الحقوق والعلوم الشرطية'}.
-إجمالي المقررات المسجلة: ${coursesCount}.
-قواعد الجامعة: الحد الأدنى للنجاح 60%، الإنذار الأكاديمي تحت 65%، مرتبة الشرف فوق 90%، والحد الأقصى للغياب المسموح 15%.`,
-      question,
-      () => {
-        if (question.includes('تخرج') || question.includes('ساعات')) {
-          return 'وفق اللائحة الأكاديمية للجامعة، يتطلب التخرج إتمام كافة الساعات المعتمدة في الخطة الدراسية للبرنامج بمعدل تراكمي لا يقل عن 60%، وإنجاز مشروع التخرج والتدريب العملي بنجاح مع براءة ذمة من المكتبة الرقمية والشؤون المالية.';
-        }
-        if (question.includes('غياب') || question.includes('حرمان')) {
-          return 'تنص لائحة الدوام الجامعي على أن نسبة الحضور الإلزامية هي 85% كحد أدنى في كل مقرر. عند تجاوز نسبة الغياب 15% بدون عذر طبي أو رسمي معتمد من شؤون الطلاب، يُصدر النظام إنذاراً آلياً ثم حرماناً من التقدم للامتحان النهائي.';
-        }
-        return `بناءً على أنظمة الجامعة والبرامج المعتمدة (${programs || 'الأمن السيبراني والحقوق'})، يُنصح الطالب بتسجيل المقررات التأسيسية أولاً ومراعاة المتطلبات السابقة، مع الاستفادة من الساعات المكتبية لأعضاء هيئة التدريس والمحاضرات الرقمية في وحدة التعلم الإلكتروني (5.12).`;
+    const aiOut = ruleBased((() => {
+      if (question.includes('تخرج') || question.includes('ساعات')) {
+        return `وفق اللائحة الأكاديمية للجامعة، يتطلب التخرج إتمام كافة الساعات المعتمدة في الخطة الدراسية للبرنامج بمعدل تراكمي لا يقل عن ${pct(sc.passMark)}%، وإنجاز مشروع التخرج والتدريب العملي بنجاح مع براءة ذمة من المكتبة الرقمية والشؤون المالية.`;
       }
-    );
+      if (question.includes('غياب') || question.includes('حرمان')) {
+        return `تنص لائحة الدوام الجامعي على أن نسبة الحضور الإلزامية هي ${100 - maxAbsence}% كحد أدنى في كل مقرر. عند تجاوز نسبة الغياب ${maxAbsence}% بدون عذر طبي أو رسمي معتمد من شؤون الطلاب، يُصدر النظام إنذاراً آلياً ثم حرماناً من التقدم للامتحان النهائي.`;
+      }
+      return `بناءً على أنظمة الجامعة والبرامج المعتمدة (${programs || 'الأمن السيبراني والحقوق'})، يُنصح الطالب بتسجيل المقررات التأسيسية أولاً ومراعاة المتطلبات السابقة، مع الاستفادة من الساعات المكتبية لأعضاء هيئة التدريس والمحاضرات الرقمية في وحدة التعلم الإلكتروني (5.12).`;
+    })());
 
     const res = db.prepare(`
       INSERT INTO ai_advisor_chats (user_label, question, answer, model_used, created_at)
@@ -1126,10 +1165,8 @@ export async function registerV12Modules(r, deps) {
     const priority = /عاجل|تعارض|حرمان|فوري|خطأ/.test(textCombined) ? 'عاجل جداً' : 'مرتفع';
     const targetUnit = isExam ? 'قسم الامتحانات وشؤون الطلاب' : isFinance ? 'مديرية الشؤون المالية والمحاسبة' : isTech ? 'مديرية تقانة المعلومات والأمن السيبراني' : 'رئاسة الديوان والشؤون الإدارية';
 
-    const aiOut = await callGeminiAI(
-      'أنت مساعد إداري ذكي في رئاسة الجامعة. لخص الشكوى أو المذكرة في جملة واحدة، ثم اكتب مسودة رد رسمي رصين ومهذب باللغة العربية.',
-      `الموضوع: ${subject}\nالنص: ${bodyText}\nالتصنيف: ${category}\nالجهة المختصة: ${targetUnit}`,
-      () => `الملخص: طلب متعلق بـ «${subject}» موجه إلى ${targetUnit} للمعالجة.\nالرد المقترح: تهديكم إدارة الجامعة أطيب التحيات. إشارةً إلى كتابكم/طلبكم حول «${subject}»، نفيدكم بأنه تمت إحالة الموضوع إلى ${targetUnit} للدراسة واتخاذ الإجراء النظامي اللازم وفق اللوائح المعتمدة.`
+    const aiOut = ruleBased(
+      `الملخص: طلب متعلق بـ «${subject}» موجه إلى ${targetUnit} للمعالجة.\nالرد المقترح: تهديكم إدارة الجامعة أطيب التحيات. إشارةً إلى كتابكم/طلبكم حول «${subject}»، نفيدكم بأنه تمت إحالة الموضوع إلى ${targetUnit} للدراسة واتخاذ الإجراء النظامي اللازم وفق اللوائح المعتمدة.`
     );
 
     const lines = aiOut.text.split('\n').filter(Boolean);

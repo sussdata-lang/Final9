@@ -5,7 +5,7 @@
    3) اختصارات: Alt+N إنشاء جديد في القسم الحالي، Alt+S حفظ النموذج المفتوح، Esc إغلاق النافذة أو إلغاء التحديد أو العودة للقائمة،
       ? دليل الاختصارات. (Ctrl+K للبحث الشامل في shell.js)
    4) تحديد متعدد في كل الجداول: مربع لكل صف داخل الخلية الأولى (فلا تتغير فهارس الأعمدة على فلتر الأعمدة)، «تحديد الكل» في الترويسة
-      يشمل الصفوف الظاهرة بعد الفلترة، Shift لتحديد نطاق، Ctrl+A داخل الجدول، وشريط عائم (عدد، تحديد الكل، عكس، إلغاء، نسخ، تصدير CSV).
+      يشمل الصفوف الظاهرة بعد الفلترة، Shift لتحديد نطاق، Ctrl+A داخل الجدول، وشريط عائم (عدد، تحديد الكل، عكس، إلغاء، نسخ، تصدير Excel).
       الوحدات تقرأ التحديد بـ UA.selection.rows(table) وتستمع للحدث ps:selection.
    استثناء جدول: data-sel="off" (التحديد) أو data-psm="off" (المؤشرات). */
 (function () {
@@ -212,7 +212,7 @@
     bar.hidden = true;
     bar.innerHTML = `<span class="ps-n" aria-live="polite"></span>
       <button type="button" class="btn sm" data-ps="all">تحديد الكل</button><button type="button" class="btn sm" data-ps="invert">عكس التحديد</button><button type="button" class="btn sm" data-ps="none">إلغاء التحديد <kbd>Esc</kbd></button>
-      <span class="ps-sep" aria-hidden="true"></span><button type="button" class="btn sm" data-ps="copy">نسخ</button><button type="button" class="btn sm pri" data-ps="csv">تصدير CSV</button>`;
+      <span class="ps-sep" aria-hidden="true"></span><button type="button" class="btn sm" data-ps="copy">نسخ</button><button type="button" class="btn sm pri" data-ps="xlsx">تصدير Excel</button>`;
     bar.addEventListener('click', (e) => {
       const x = e.target.closest('[data-psx]');
       if (x) { e.stopPropagation(); const g = bar._groups && bar._groups[Number(x.dataset.psx)]; if (g) runBulk(g); return; }
@@ -224,7 +224,7 @@
       else if (a === 'none') clearSel(t);
       else if (a === 'invert') { const set = store.get(t._ps.key); for (const r of dataRows(t, headCells(t).length)) if (!r.hidden) { if (set.has(r._psk)) set.delete(r._psk); else set.add(r._psk); } sync(t); }
       else if (a === 'copy') copySel(t);
-      else if (a === 'csv') csvSel(t);
+      else if (a === 'xlsx') xlsxSel(t);
     });
     document.body.appendChild(bar);
     return bar;
@@ -316,16 +316,23 @@
   }
   async function copySel(t) {
     const tsv = grid(t).map((r) => r.join('\t')).join('\n');
-    try { await navigator.clipboard.writeText(tsv); toast(`نُسخ ${selRows(t).length} صف — الصقها في Excel مباشرة`); } catch { toast('تعذّر النسخ؛ استخدم تصدير CSV'); }
+    try { await navigator.clipboard.writeText(tsv); toast(`نُسخ ${selRows(t).length} صف — الصقها في Excel مباشرة`); } catch { toast('تعذّر النسخ؛ استخدم تصدير Excel'); }
   }
-  function csvSel(t) {
-    const q = (v) => (/[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
-    const csv = '﻿' + grid(t).map((r) => r.map(q).join(',')).join('\r\n');
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-    a.download = `selection-${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+  // عنوان الورقة: عنوان البطاقة التي فيها الجدول (مثل «سجل الطلاب»)
+  const titleOf = (t) => txt((t.closest('.card, section, .v12-card') || document).querySelector('h2, h3')).replace(/\(\d+\)/g, '').trim();
+  // ملف Excel حقيقي بتنسيق الجامعة يكتبه الخادم من الصفوف المحددة
+  async function xlsxSel(t) {
+    const [head, ...rows] = grid(t);
+    try {
+      const r = await fetch('/api/export/selection.xlsx', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: titleOf(t), head, rows }) });
+      if (!r.ok) { let m = 'تعذّر التصدير.'; try { m = (await r.json()).message || m; } catch { /* */ } toast(m); return; }
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(await r.blob());
+      a.download = `${(titleOf(t) || 'selection').replace(/[\\/:*?"<>|]/g, ' ')}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+      toast(`صُدّر ${rows.length} صف إلى Excel`);
+    } catch { toast('تعذّر الاتصال بالخادم للتصدير.'); }
   }
   UA.selection = { rows: selRows, keys: (t) => (t && t._ps ? [...store.get(t._ps.key)] : []), clear: clearSel, selectAll, active: () => active };
 

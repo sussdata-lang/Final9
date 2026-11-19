@@ -100,13 +100,13 @@
     const m = F.list.find((x) => x.id === F.assign.id); if (!m) return '';
     const mine = (F.courses || []).filter((c) => c.memberId === m.id);
     const free = (F.courses || []).filter((c) => c.active && c.memberId === null);
-    const row = (c) => `<tr><td class="nm"><b>${esc(c.name)}</b>${c.code ? ` <span class="mono small">${esc(c.code)}</span>` : ''}</td><td class="nowrap">${c.hours} ساعة</td><td class="nowrap">${LV[c.level - 1] || c.level} / ${c.semester === 1 ? 'الأول' : 'الثاني'}</td>
+    const row = (c) => `<tr><td class="nm"><b>${esc(c.name)}</b>${c.code ? ` <span class="mono small">${esc(c.code)}</span>` : ''}</td><td class="nowrap">${c.hours} ساعة</td><td class="nowrap">${LV[c.level - 1] || c.level} / ${({ 1: 'الأول', 2: 'الثاني', 3: 'الثالث' })[c.semester] || ''}</td>
       <td class="nm">${esc(c.program || '—')}</td><td><button class="btn sm bad" data-act="fmassignrm" data-c="${c.id}">فك الإسناد</button></td></tr>`;
     return `<h2 id="fmttl">العبء التدريسي: ${esc(m.name)}</h2>
       <p class="small" style="margin-top:0">${esc(m.rank)}${m.unit ? ' · ' + esc(m.unit) : ''} · إجمالي ${m.hours} ساعة من ${m.courses} مقرر. إسناد مقرر يجعل اسم العضو هو «المدرّس» فيه.</p>
       <div class="tbl-wrap"><table class="grid-tbl"><thead><tr><th>المقرر المسند</th><th>الساعات</th><th>المستوى / الفصل</th><th>البرنامج</th><th></th></tr></thead><tbody>
         ${mine.map(row).join('') || '<tr><td colspan="5" class="empty">لا مقررات مسندة بعد.</td></tr>'}</tbody></table></div>
-      <div class="inline-form" style="margin-top:10px"><label class="grow">إسناد مقرر نشط<select id="fm-assign-sel">${opts(free.map((c) => [c.id, `${c.faculty || ''} · ${LV[c.level - 1] || c.level}/${c.semester === 1 ? 'أ' : 'ث'} — ${c.name} (${c.hours} ساعة)`]), '', '— اختر مقرراً غير مسنَد —')}</select></label>
+      <div class="inline-form" style="margin-top:10px"><label class="grow">إسناد مقرر نشط<select id="fm-assign-sel">${opts(free.map((c) => [c.id, `${c.faculty || ''} · ${LV[c.level - 1] || c.level}/${({ 1: 'أ', 2: 'ث', 3: 'ث٣' })[c.semester] || c.semester} — ${c.name} (${c.hours} ساعة)`]), '', '— اختر مقرراً غير مسنَد —')}</select></label>
         <button class="btn pri" data-act="fmassigngo"${free.length ? '' : ' disabled'}>إسناد</button></div>
       <div class="actions"><button class="btn" type="button" data-act="fmclose">إغلاق</button></div>`;
   }

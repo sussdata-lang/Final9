@@ -25,12 +25,14 @@ const budget = async (accountId, amount) => {
 };
 const budgetOf = async (id) => (await api('GET', '/api/finance/budgets')).j.budgets.find((b) => b.id === id);
 async function order(lines, budgetId) {
-  const r = await api('POST', '/api/procurement/orders', { body: { supplierId: sup, budgetId, lines: lines.map(([itemId, qty, unitCost]) => ({ itemId, description: `بند ${++seq}`, qty, unitCost })) } });
+  const r = await api('POST', '/api/procurement/orders', { body: { supplierId: sup, budgetId, directReason: 'أمر مباشر لاختبار الموازنة والمطابقة', lines: lines.map(([itemId, qty, unitCost]) => ({ itemId, description: `بند ${++seq}`, qty, unitCost })) } });
   assert.ok(r.s < 300, JSON.stringify(r.j));
   return r.j.order;
 }
-const send = (o) => api('POST', `/api/procurement/orders/${o.id}/order`);
-const receive = (o, itemId, qty) => api('POST', '/api/procurement/receipts', { body: { orderId: o.id, lines: [{ itemId, qty }] } });
+// الأمر المباشر يعتمده ويرسله شخص غير منشئه (فصل المهام)
+const send = (o) => api('POST', `/api/procurement/orders/${o.id}/order`, { cookie: chief });
+// يستلم غير منشئ الأمر (فصل المهام)
+const receive = (o, itemId, qty) => api('POST', '/api/procurement/receipts', { cookie: chief, body: { orderId: o.id, lines: [{ itemId, qty }] } });
 const lineIds = (o) => app.db.prepare('SELECT id FROM proc_order_lines WHERE order_id = ? ORDER BY id').all(o.id).map((x) => Number(x.id));
 const invoice = (o, lines, cookie = adm) => api('POST', '/api/finance/invoices', { cookie, body: { kind: 'purchase', orderId: o.id, supplierRef: 'S-1', lines: lines.map(([orderLineId, qty, unitPrice]) => ({ orderLineId, qty, unitPrice })) } });
 const row = (id) => app.db.prepare('SELECT * FROM fin_invoices WHERE id = ?').get(id);

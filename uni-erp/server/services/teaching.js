@@ -5,6 +5,7 @@ import { HttpError } from '../http.js';
 import { getSetting } from './settings.js';
 import { currentTerm } from './sections.js';
 import { academicYear } from '../lib/doc_no.js';
+import { tx } from '../db.js';
 
 export const CALENDAR_KINDS = { term: 'بداية الفصل ونهايته', registration: 'التسجيل', add_drop: 'الحذف والإضافة', exams: 'الامتحانات', holiday: 'عطلة', event: 'حدث أكاديمي' };
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/, TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -30,12 +31,16 @@ const needCourse = (db, actor, courseId, ...perms) => {
   throw bad('هذا الإجراء لمدرّس المقرر أو لمن يملك صلاحية إدارة المقررات.', 403, 'forbidden');
 };
 
-// طلاب المقرر في الفصل الجاري: المسجلون فيه، وإلا طلاب برنامجه وسنته الفعّالون
+// طلاب المقرر في الفصل الجاري حسب إعداد academic.course_roster:
+//   both (الافتراضي): المسجلون ذاتياً مع طلاب برنامجه وسنته الفعّالين، فلا يُسقط تسجيلُ بعضهم ذاتياً بقيةَ الدفعة
+//   enrolled: المسجلون ذاتياً، وإن لم يسجّل أحد فطلاب البرنامج والسنة · program: طلاب البرنامج والسنة فقط
 export function courseStudents(db, course) {
-  const enrolled = db.prepare(`SELECT DISTINCT u.id FROM student_self_enrollments e JOIN users u ON u.student_no = e.student_no
+  const mode = String(getSetting(db, 'academic.course_roster') ?? 'both');
+  const enrolled = mode === 'program' ? [] : db.prepare(`SELECT DISTINCT u.id FROM student_self_enrollments e JOIN users u ON u.student_no = e.student_no
     WHERE (e.course_id = ? OR e.course_code = ?) AND e.semester = ? AND e.dropped_at IS NULL`).all(course.id, course.code ?? '', currentTerm(db)).map((x) => Number(x.id));
-  if (enrolled.length) return enrolled;
-  return db.prepare("SELECT p.user_id AS id FROM student_profiles p WHERE p.program_id = ? AND p.study_level = ? AND p.status = 'active'").all(course.program_id, course.level).map((x) => Number(x.id));
+  if (mode === 'enrolled' && enrolled.length) return enrolled;
+  const cohort = db.prepare("SELECT p.user_id AS id FROM student_profiles p WHERE p.program_id = ? AND p.study_level = ? AND p.status = 'active'").all(course.program_id, course.level).map((x) => Number(x.id));
+  return [...new Set([...enrolled, ...cohort])];
 }
 
 /* ===== التقويم ===== */
@@ -128,12 +133,101 @@ export function addLectureChange({ db }, actor, b, ip) {
   return { id, notified: sent };
 }
 
+/* ===== كشف حضور المحاضرة ===== */
+// أيام انعقاد المقرر: كل يوم فيه سجل قاعة للمقرر، وكل محاضرة سُجّل لها كشف حضور (ولو لم يحضر أحد)
+export function heldDays(db, courseId) {
+  const days = new Set(db.prepare(`SELECT DISTINCT ${DAMASCUS_DAY} AS d FROM hall_logs l WHERE l.course_id = ? AND l.kind = 'course'`).all(Number(courseId)).map((x) => x.d));
+  for (const r of db.prepare('SELECT day FROM lecture_sessions WHERE course_id = ?').all(Number(courseId))) days.add(r.day);
+  return days;
+}
+const ROLL_NOTE = 'كشف حضور المحاضرة';
+const rollAt = (day) => Date.parse(`${day}T10:00:00+03:00`);          // العاشرة صباحاً بتوقيت دمشق: يقع في اليوم نفسه
+const rollDay = (v) => {
+  const d = v === undefined || v === null || v === '' ? today() : String(v);
+  if (!DAY_RE.test(d) || Number.isNaN(Date.parse(d))) throw bad('تاريخ المحاضرة بصيغة 2026-10-15.');
+  if (d > today()) throw bad('لا يُسجَّل حضور محاضرة لم تنعقد بعد.');
+  return d;
+};
+function dayLogs(db, courseId, day) {
+  const by = new Map();
+  for (const l of db.prepare(`SELECT l.id, l.student_id, l.method, l.note FROM hall_logs l WHERE l.course_id = ? AND l.kind = 'course' AND ${DAMASCUS_DAY} = ?`).all(Number(courseId), day)) {
+    const id = Number(l.student_id);
+    if (!by.has(id)) by.set(id, { roll: [], card: false });
+    if (l.method === 'manual' && l.note === ROLL_NOTE) by.get(id).roll.push(Number(l.id)); else by.get(id).card = true;
+  }
+  return by;
+}
+
+export function rollCall({ db }, actor, courseId, dayInput) {
+  const course = loadCourse(db, courseId);
+  needCourse(db, actor, course.id, 'course:manage', 'attendance:manage');
+  const day = rollDay(dayInput), logs = dayLogs(db, course.id, day), term = currentTerm(db);
+  const ids = [...new Set([...courseStudents(db, course), ...logs.keys()])];
+  const deprived = new Set(db.prepare("SELECT student_id FROM course_deprivations WHERE course_id = ? AND term = ? AND status = 'active'").all(course.id, term).map((x) => Number(x.student_id)));
+  const s = db.prepare('SELECT s.*, u.display_name AS taker FROM lecture_sessions s LEFT JOIN users u ON u.id = s.taken_by WHERE s.course_id = ? AND s.day = ?').get(course.id, day);
+  const students = ids.map((id) => {
+    const u = db.prepare('SELECT display_name, student_no FROM users WHERE id = ?').get(id) ?? {}, l = logs.get(id);
+    // بلا كشف محفوظ: الكل حاضر افتراضياً فيؤشّر المدرّس الغائبين فقط؛ ومع الكشف: حالته المحفوظة
+    return { studentId: id, name: u.display_name, studentNo: u.student_no, present: s ? !!l : true, byCard: !!l?.card, deprived: deprived.has(id) };
+  }).sort((a, b) => String(a.name ?? '').localeCompare(String(b.name ?? ''), 'ar'));
+  return {
+    course: { id: Number(course.id), name: course.name, code: course.code }, day, saved: !!s,
+    session: s ? { hall: s.hall ?? '', takenAt: Number(s.taken_at), takenBy: s.taker ?? '', present: Number(s.present_count), absent: Number(s.absent_count) } : null,
+    students,
+  };
+}
+
+export function saveRollCall({ db }, actor, courseId, b, ip) {
+  const course = loadCourse(db, courseId);
+  needCourse(db, actor, course.id, 'course:manage', 'attendance:manage');
+  const day = rollDay(b?.day), hall = clean(b?.hall, 60) || 'قاعة المحاضرة';
+  const roster = new Set([...courseStudents(db, course), ...dayLogs(db, course.id, day).keys()]);
+  const want = new Set((Array.isArray(b?.present) ? b.present : []).map(Number));
+  if ([...want].some((id) => !roster.has(id))) throw bad('في الكشف طلاب ليسوا من طلاب المقرر؛ أعد فتح الكشف.', 409, 'conflict');
+  const at = rollAt(day), now = Date.now();
+  let present = 0, absent = 0;
+  tx(db, () => {
+    const logs = dayLogs(db, course.id, day);
+    const ins = db.prepare("INSERT INTO hall_logs (student_id, kind, course_id, subject, hall, entered_at, exited_at, method, recorded_by, note) VALUES (?, 'course', ?, ?, ?, ?, ?, 'manual', ?, ?)");
+    for (const id of roster) {
+      const l = logs.get(id) ?? { roll: [], card: false };
+      // من مسح بطاقته حاضر دائماً: الكشف لا يحذف سجلات القاعة الفعلية
+      if (want.has(id) || l.card) {
+        present++;
+        if (!l.card && !l.roll.length) ins.run(id, course.id, course.name, hall, at, at + 90 * 60000, actor.id ?? null, ROLL_NOTE);
+      } else {
+        absent++;
+        for (const lid of l.roll) db.prepare('DELETE FROM hall_logs WHERE id = ?').run(lid);
+      }
+    }
+    db.prepare(`INSERT INTO lecture_sessions (course_id, day, hall, taken_by, taken_at, present_count, absent_count) VALUES (?,?,?,?,?,?,?)
+      ON CONFLICT (course_id, day) DO UPDATE SET hall = excluded.hall, taken_by = excluded.taken_by, taken_at = excluded.taken_at, present_count = excluded.present_count, absent_count = excluded.absent_count`)
+      .run(course.id, day, hall, actor.id ?? null, now, present, absent);
+    audit(db, actor, 'تسجيل حضور محاضرة', `${course.code ?? course.name} ${day}: حاضر ${present} · غائب ${absent}`, ip);
+  });
+  return rollCall({ db }, actor, course.id, day);
+}
+
+// محاضرة سُجّلت بالخطأ (لم تنعقد): يُحذف الكشف وحضوره اليدوي، وتبقى سجلات مسح البطاقات
+export function cancelRollCall({ db }, actor, courseId, dayInput, ip) {
+  const course = loadCourse(db, courseId);
+  needCourse(db, actor, course.id, 'course:manage', 'attendance:manage');
+  const day = rollDay(dayInput);
+  if (!db.prepare('SELECT 1 FROM lecture_sessions WHERE course_id = ? AND day = ?').get(course.id, day)) throw bad('لا كشف حضور محفوظ لهذا اليوم.', 404, 'not_found');
+  tx(db, () => {
+    for (const l of dayLogs(db, course.id, day).values()) for (const lid of l.roll) db.prepare('DELETE FROM hall_logs WHERE id = ?').run(lid);
+    db.prepare('DELETE FROM lecture_sessions WHERE course_id = ? AND day = ?').run(course.id, day);
+    audit(db, actor, 'إلغاء كشف حضور محاضرة', `${course.code ?? course.name} ${day}`, ip);
+  });
+  return rollCall({ db }, actor, course.id, day);
+}
+
 /* ===== الغياب والحرمان ===== */
 export function absenceReport({ db }, actor, courseId) {
   const course = loadCourse(db, courseId);
   needCourse(db, actor, course.id, 'course:manage', 'attendance:manage');
   const w = termWindow(db), term = currentTerm(db), max = Number(getSetting(db, 'academic.max_absence_percent')), minSessions = Number(getSetting(db, 'academic.min_sessions_for_absence'));
-  const days = db.prepare(`SELECT DISTINCT ${DAMASCUS_DAY} AS d FROM hall_logs l WHERE l.course_id = ? AND l.kind = 'course'`).all(course.id).map((x) => x.d).filter((d) => d >= w.from && d <= w.to);
+  const days = [...heldDays(db, course.id)].filter((d) => d >= w.from && d <= w.to);
   const held = days.length, daySet = new Set(days);
   const presence = new Map();
   for (const r of db.prepare(`SELECT l.student_id, ${DAMASCUS_DAY} AS d FROM hall_logs l WHERE l.course_id = ? AND l.kind = 'course'`).all(course.id)) {
@@ -237,20 +331,22 @@ export function assertNotDeprived(db, studentId, courseId, year) {
 
 export function myTeaching({ db }, actor) {
   const p = db.prepare('SELECT program_id, study_level FROM student_profiles WHERE user_id = ?').get(actor.id);
-  const term = currentTerm(db), max = Number(getSetting(db, 'academic.max_absence_percent'));
+  const term = currentTerm(db), max = Number(getSetting(db, 'academic.max_absence_percent')), minSessions = Number(getSetting(db, 'academic.min_sessions_for_absence'));
   const own = db.prepare('SELECT course_id, course_code FROM student_self_enrollments WHERE student_no = ? AND semester = ? AND dropped_at IS NULL').all(actor.student_no ?? '', term);
   const courses = own.length
     ? own.map((o) => db.prepare('SELECT * FROM courses WHERE id = ? OR code = ? ORDER BY id LIMIT 1').get(o.course_id ?? 0, o.course_code)).filter(Boolean)
     : (p ? db.prepare('SELECT * FROM courses WHERE program_id = ? AND level = ? AND active = 1').all(p.program_id, p.study_level) : []);
   const w = termWindow(db);
   const absence = courses.map((c) => {
-    const days = new Set(db.prepare(`SELECT DISTINCT ${DAMASCUS_DAY} AS d FROM hall_logs l WHERE l.course_id = ? AND l.kind = 'course'`).all(c.id).map((x) => x.d).filter((d) => d >= w.from && d <= w.to));
+    const days = new Set([...heldDays(db, c.id)].filter((d) => d >= w.from && d <= w.to));
     const mine = new Set(db.prepare(`SELECT DISTINCT ${DAMASCUS_DAY} AS d FROM hall_logs l WHERE l.course_id = ? AND l.kind = 'course' AND l.student_id = ?`).all(c.id, actor.id).map((x) => x.d).filter((d) => days.has(d)));
     const pct = days.size ? Math.round(((days.size - mine.size) / days.size) * 1000) / 10 : 0;
     const dep = db.prepare("SELECT 1 FROM course_deprivations WHERE student_id = ? AND course_id = ? AND term = ? AND status = 'active'").get(actor.id, c.id, term);
-    return { course: c.name, held: days.size, present: mine.size, percent: pct, deprived: !!dep };
+    // الحالة بقاعدة شاشة الموظفين نفسها: لا «تجاوز» ولا «تنبيه» قبل انعقاد الحد الأدنى من المحاضرات
+    const counted = days.size >= minSessions;
+    return { course: c.name, held: days.size, present: mine.size, percent: pct, deprived: !!dep, overLimit: counted && pct > max, warn: counted && pct >= max / 2 && pct <= max };
   });
-  return { term, maxPercent: max, calendar: listCalendar({ db }).events.filter((e) => !e.past), changes: listLectureChanges({ db }, actor).changes, absence };
+  return { term, maxPercent: max, minSessions, calendar: listCalendar({ db }).events.filter((e) => !e.past), changes: listLectureChanges({ db }, actor).changes, absence };
 }
 
 export function registerTeachingRoutes(r, deps) {
@@ -266,6 +362,9 @@ export function registerTeachingRoutes(r, deps) {
   r.add('POST', '/api/teaching/absence-overview/warn', (c) => c.json(200, warnAbsenceAll(deps, staff(c))));
   r.add('POST', '/api/teaching/absence-overview/deprive', (c) => c.json(200, depriveAll(deps, staff(c), c.body, c.ip)));
   r.add('GET', '/api/teaching/absence/:courseId',(c) => c.json(200, absenceReport(deps, staff(c), c.params.courseId)));
+  r.add('GET', '/api/teaching/rollcall/:courseId', (c) => c.json(200, rollCall(deps, staff(c), c.params.courseId, c.query?.day)));
+  r.add('POST', '/api/teaching/rollcall/:courseId', (c) => c.json(200, saveRollCall(deps, staff(c), c.params.courseId, c.body, c.ip)));
+  r.add('DELETE', '/api/teaching/rollcall/:courseId', (c) => c.json(200, cancelRollCall(deps, staff(c), c.params.courseId, c.query?.day, c.ip)));
   r.add('POST', '/api/teaching/absence/:courseId/warn', (c) => c.json(200, warnAbsence(deps, staff(c), c.params.courseId)));
   r.add('POST', '/api/teaching/absence/:courseId/deprive', (c) => c.json(200, depriveStudents(deps, staff(c), c.params.courseId, c.body, c.ip)));
   r.add('POST', '/api/teaching/deprivations/:id/lift', (c) => c.json(200, liftDeprivation(deps, perm(c, 'course:manage'), c.params.id, c.body, c.ip)));

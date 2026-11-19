@@ -49,6 +49,9 @@ test.after(async () => { await app.close(); });
 
 let c1, c2, c3, gid;
 const addCourse = async (o) => (await api('POST', '/api/courses', { cookie: staff, body: { programId: 2, level: 2, semester: 1, hours: 3, ...o } })).json.course.id;
+// الطالب يرى العلامة المعتمدة بعد إعلان نتيجة مقررها: نعلنها مباشرة عند فحص ما يراه، ونسحب الإعلان لنكمل فحص مسار الاعتماد العادي
+const announce = (cid, y = '2025/2026') => app.db.prepare('INSERT INTO grade_locks (course_id, academic_year, locked_by, locked_at) VALUES (?,?,NULL,?) ON CONFLICT DO NOTHING').run(cid, y, Date.now());
+const unannounce = (cid, y = '2025/2026') => app.db.prepare('DELETE FROM grade_locks WHERE course_id = ? AND academic_year = ?').run(cid, y);
 const enter = (o = {}, id = stuId) => api('POST', `/api/students/${id}/grades`, { cookie: staff, body: { courseId: c1, academicYear: '2025/2026', theory: 50, practical: 20, ...o } });
 
 test('مراحل الاعتماد: الطالب لا يرى المسودة، والاعتماد بصلاحيته فقط، وتعديل المعتمد بتبرير', async () => {
@@ -65,8 +68,11 @@ test('مراحل الاعتماد: الطالب لا يرى المسودة، و�
   assert.equal((await wf(staff, 'approved')).status, 403);
   assert.equal((await wf(stu, 'reviewed')).status, 403);
   assert.equal((await wf(admin, 'approved')).json.updated, 1);
+  assert.equal((await api('GET', '/api/me/grades', { cookie: stu })).json.grades.length, 0, 'معتمدة غير معلنة: مخفية');
+  announce(c1);
   const g = await api('GET', '/api/me/grades', { cookie: stu });
   assert.equal(g.json.grades.length, 1); assert.equal(g.json.grades[0].total, 70);
+  unannounce(c1);
   // كشف العلامات يتضمن المعتمدة فقط
   const rq = await api('POST', '/api/requests', { cookie: stu, body: { service: 'transcript', details: { lang: 'العربية' } } });
   assert.equal(rq.status, 201, rq.text);
@@ -75,7 +81,9 @@ test('مراحل الاعتماد: الطالب لا يرى المسودة، و�
   assert.equal((await api('POST', `/api/students/${stuId}/grades`, { cookie: admin, body: { courseId: c1, academicYear: '2025/2026', theory: 60, practical: 20 } })).status, 400, 'تبرير مطلوب');
   const ok = await api('POST', `/api/students/${stuId}/grades`, { cookie: admin, body: { courseId: c1, academicYear: '2025/2026', theory: 60, practical: 20, justification: 'تصحيح خطأ رصد' } });
   assert.equal(ok.status, 200, ok.text);
+  announce(c1);
   assert.equal((await api('GET', '/api/me/grades', { cookie: stu })).json.grades[0].total, 80);
+  unannounce(c1);
   const h = (await api('GET', `/api/grades/${gid}/history`, { cookie: staff })).json.history;
   assert.ok(h.some((x) => x.justification === 'تصحيح خطأ رصد' && x.oldTotal === 70 && x.newTotal === 80));
   // إعادة فتح معتمدة تتطلب تبريراً وصلاحية
@@ -92,6 +100,7 @@ test('إيقاف مراحل الاعتماد: العلامات الجديدة م
   assert.equal((await api('POST', '/api/grades/workflow-setting', { cookie: staff, body: { enabled: false } })).status, 403);
   assert.equal((await api('POST', '/api/grades/workflow-setting', { cookie: admin, body: { enabled: false } })).status, 200);
   assert.equal((await enter({ courseId: c2 })).status, 200);
+  announce(c2);   // معتمدة فوراً، وتظهر للطالب عند إعلان نتيجة المقرر (يبقى معلناً لاختبار قوائم الطلبات)
   assert.equal((await api('GET', '/api/me/grades', { cookie: stu })).json.grades.length, 1);
   await api('POST', '/api/grades/workflow-setting', { cookie: admin, body: { enabled: true } });
 });

@@ -2,28 +2,32 @@
 // قواعد العرض:
 //  - تُدرج كل السنوات من الأولى حتى سنة الطالب الحالية (أو أعلى سنة فيها علامات) فلا تغيب سنة سابقة؛
 //  - المقررات المنهجية التي لم تُرصد علامتها بعد تظهر بحالة «لم تُرصد» ولا تدخل في المعدل؛
-//  - وثائق قديمة بلا سنة/فصل: تُستنتج السنة من العام الدراسي، وإلا تُجمع بالعام الدراسي نفسه.
+//  - وثائق قديمة بلا سنة/فصل: تُستنتج السنة من العام الدراسي، وإلا تُجمع بالعام الدراسي نفسه؛
+//  - التقدير من سلّم دليل الطالب (grade_scale.js) بالحدود المحفوظة في الوثيقة وقت إصدارها، أو الافتراضية للوثائق القديمة.
+import { rateMark, normScale, DEFAULT_SCALE } from './grade_scale.js';
+import { SEMESTER_NAMES } from './semesters.js';
 export const PASS = 60;
 const LV = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة'];
 const levelName = (n) => `السنة ${LV[n - 1] || n}`;
-const SEMESTER = { 1: 'الفصل الأول', 2: 'الفصل الثاني' };
+const SEMESTER = SEMESTER_NAMES;
 export const STATUS = { active: 'مقيَّد', suspended: 'موقوف القيد', withdrawn: 'منسحب', transferred: 'محوَّل', graduated: 'متخرج' };
-export const ratingOf = (m) => (m === null || m === undefined ? null : m >= 90 ? 'ممتاز' : m >= 80 ? 'جيد جداً' : m >= 70 ? 'جيد' : m >= PASS ? 'مقبول' : 'راسب');
+export const ratingOf = (m, scale = DEFAULT_SCALE) => rateMark(m, scale);
 const r1 = (n) => Math.round(n * 10) / 10;
 const wavg = (rows) => { const g = rows.filter((r) => r.mark !== null && !r.prev); const h = g.reduce((s, r) => s + r.hours, 0); return h ? r1(g.reduce((s, r) => s + r.hours * r.mark, 0) / h) : null; };
 const ayStart = (ay) => { const m = /^(\d{4})/.exec(ay || ''); return m ? Number(m[1]) : null; };
 
 export function buildView(payload) {
-  const st = payload.student || {}, tr = payload.transcript || { grades: [] };
+  const st = payload.student || {}, tr = payload.transcript || { grades: [] }, scale = normScale(tr.ratingScale);
   const rows = (tr.grades || []).map((g) => ({
     course: g.course, code: g.code || '', hours: Number(g.hours) || 0, theory: g.theory ?? null, practical: g.practical ?? null,
     mark: g.pending || g.mark === null || g.mark === undefined ? null : Number(g.mark), pending: !!g.pending, prev: !!g.previous,
+    rating: g.pending || g.mark === null || g.mark === undefined ? null : ratingOf(Number(g.mark), scale),
     level: g.level || 0, semester: g.semester || 0, ay: g.academicYear || (/^(\d{4}\/\d{4})/.exec(g.term || '') || [])[1] || '',
   }));
   // وثائق قديمة: السنة من العام الدراسي بالنسبة لسنة القيد (إن أمكن)
   const known = rows.some((r) => r.level);
   if (!known) for (const r of rows) { const s = ayStart(r.ay); if (s && st.enrollYear) { const lv = s - st.enrollYear + 1; if (lv >= 1 && lv <= (st.years || 7)) r.level = lv; } }
-  const sem = (r) => r.semester || Number((/-([12])$/.exec(r.term || '') || [])[1]) || 0;
+  const sem = (r) => r.semester || Number((/-([123])$/.exec(r.term || '') || [])[1]) || 0;
   const maxLvl = Math.max(0, ...rows.map((r) => r.level));
   const upTo = Math.min(st.years || 7, Math.max(st.level || 0, maxLvl));
   const groups = new Map();
@@ -48,5 +52,5 @@ export function buildView(payload) {
     .filter((x) => x[1] !== '' && x[1] !== null && x[1] !== undefined);
   return { university: payload.university, name: st.name, studentNo: st.studentNo, faculty: st.faculty || '', program: prog || '', info, years,
     summary: { courses: cur.length, passed: cur.filter((r) => r.mark >= PASS).length, failed: cur.filter((r) => r.mark < PASS).length, pending: rows.filter((r) => r.pending).length,
-      hours: cur.reduce((s, r) => s + r.hours, 0), earned: cur.filter((r) => r.mark >= PASS).reduce((s, r) => s + r.hours, 0), avg, rating: ratingOf(avg) || '—' } };
+      hours: cur.reduce((s, r) => s + r.hours, 0), earned: cur.filter((r) => r.mark >= PASS).reduce((s, r) => s + r.hours, 0), avg, rating: ratingOf(avg, scale) || '—' } };
 }

@@ -6,6 +6,9 @@ import { HttpError } from '../http.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { buildView } from './transcriptmodel.js';
+import { publishedSql } from './grading.js';
+import { attemptOrder } from './grade_scale.js';
+import { ratingScale } from './settings.js';
 
 const r1 = (n) => Math.round(n * 10) / 10;
 // شعار الكلية الاختياري يوضع في public/brand/faculties/<الرمز>.svg أو .png؛ وإلا يُستعمل شعار الجامعة
@@ -23,15 +26,17 @@ export function canonical(v) {
 }
 const sign = (cfg, hash, code) => hmac(cfg.signingKey, `${hash}|${code}`);
 
-// بيانات كشف العلامات: كل محاولة بسنتها وفصلها وعلاماتها؛ أحدث محاولة لكل مقرر تُحتسب في المعدل وما قبلها يُعلَّم «سابقة»
-// (نفس منطق شاشة «علاماتي»). تبقى الحقول القديمة (term, course, hours, mark, average) كما هي لتوافق الوثائق السابقة.
+// بيانات كشف العلامات: كل محاولة بسنتها وفصلها وعلاماتها؛ المحاولة الأعلى علامة لكل مقرر تُحتسب في المعدل (دليل الطالب:
+// «عند إعادة دراسة مقرر تُحتسب العلامة الأعلى») وبقية المحاولات تُعلَّم «سابقة» (نفس منطق شاشة «علاماتي»).
+// يُحفظ سلّم التقديرات النافذ وقت الإصدار في الوثيقة (ratingScale) فيبقى تقديرها ثابتاً وإن تغيّرت الإعدادات لاحقاً. تبقى الحقول القديمة (term, course, hours, mark, average) كما هي لتوافق الوثائق السابقة.
 function transcriptData(db, studentId) {
   const rows = db.prepare(`SELECT g.id, g.term, g.course, g.hours, g.mark, g.course_id, g.level, g.semester, g.academic_year, g.theory_mark, g.practical_mark, c.code ccode
-    FROM grades g LEFT JOIN courses c ON c.id = g.course_id WHERE g.student_id = ? AND g.workflow_status = 'approved'
+    FROM grades g LEFT JOIN courses c ON c.id = g.course_id WHERE g.student_id = ? AND ${publishedSql('g')}
     ORDER BY COALESCE(g.level, 99), COALESCE(g.semester, 9), g.course, g.academic_year DESC, g.id DESC`).all(studentId);
-  const seen = new Set();
+  const counted = new Map();
+  for (const g of rows) { const key = g.course_id ?? `x${g.id}`, best = counted.get(key); if (!best || attemptOrder(g, best) < 0) counted.set(key, g); }
   const grades = rows.map((g) => {
-    const key = g.course_id ?? `x${g.id}`, previous = seen.has(key); seen.add(key);
+    const previous = counted.get(g.course_id ?? `x${g.id}`) !== g;
     return { term: g.term, course: g.course, hours: g.hours, mark: g.mark, code: g.ccode ?? null, level: g.level ?? null, semester: g.semester ?? null,
       academicYear: g.academic_year ?? null, theory: g.theory_mark ?? null, practical: g.practical_mark ?? null, previous };
   }).sort((a, b) => (a.level ?? 99) - (b.level ?? 99) || (a.semester ?? 9) - (b.semester ?? 9) || a.course.localeCompare(b.course, 'ar') || Number(a.previous) - Number(b.previous));
@@ -46,7 +51,7 @@ function transcriptData(db, studentId) {
     for (const c of db.prepare('SELECT id, name, code, hours, level, semester FROM courses WHERE program_id = ? AND active = 1 AND level <= ? ORDER BY level, semester, name').all(prof.program_id, prof.study_level))
       if (!done.has(c.id)) grades.push({ term: '', course: c.name, hours: c.hours, mark: null, code: c.code ?? null, level: c.level, semester: c.semester, academicYear: null, theory: null, practical: null, previous: false, pending: true });
   }
-  return { grades, average, summary };
+  return { grades, average, summary, ratingScale: ratingScale(db, PASS) };
 }
 
 // إصدار وثيقة: لقطة ثابتة من بيانات الطالب والطلب وقت الاعتماد.

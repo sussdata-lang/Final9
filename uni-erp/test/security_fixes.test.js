@@ -300,9 +300,6 @@ test('البطاقة ورصد اللجان والتسجيل الذاتي تعت�
   assert.equal(en.course_name, 'مقرر فعلي');
   assert.equal(Number(en.credits), 4);
 
-  // الذكاء الاصطناعي: الواجهة تعرف أن الرد بالقواعد عند غياب المفتاح
-  const aiOv = (await c.call('GET', '/api/ai/overview', { cookie: adm })).json;
-  assert.equal(aiOv.aiEnabled, Boolean(process.env.GEMINI_API_KEY));
   assert.equal((await c.call('GET', '/api/finance/entries', { cookie: adm })).status, 404);
   assert.equal((await c.call('GET', '/api/finance/years', { cookie: adm })).status, 404);
   assert.equal((await c.call('GET', '/api/finance/fiscal-years', { cookie: adm })).status, 200);

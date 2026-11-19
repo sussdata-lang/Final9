@@ -66,6 +66,8 @@ test('قبول التظلم يعدّل العلامة الفعلية، ويُس�
   assert.match(log.justification, /إعادة جمع/);
   const after = appealOf(filed.json.id);
   assert.deepEqual([after.status, Number(after.old_mark), Number(after.new_mark)], ['مقبول وتعديل العلامة', 70, 78]);
+  // يرى الطالب علامته بعد إعلان نتيجة المقرر (قرار التظلم على مقرر معلن له اختبار مستقل في grading.test.js)
+  app.db.prepare("INSERT INTO grade_locks (course_id, academic_year, locked_by, locked_at) SELECT course_id, academic_year, NULL, ? FROM grades WHERE id = ? ON CONFLICT DO NOTHING").run(Date.now(), gid);
   assert.equal(await myMark('APL-1'), 78);
   assert.equal((await decide(filed.json.id, { approve: false, committee_note: 'x' }, adm)).status, 409);
   assert.equal(Number(gradeOf(gid).mark), 78);

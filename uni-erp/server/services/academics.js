@@ -4,9 +4,11 @@ import { audit } from '../audit.js';
 import { HttpError } from '../http.js';
 import { tx } from '../db.js';
 import { nextNumber } from './numbering.js';
-import { getSetting } from './settings.js';
+import { getSetting, ratingScale } from './settings.js';
+import { attemptOrder, rateMark } from './grade_scale.js';
+import { SEMESTER_COUNT, SEMESTER_NAMES, isSemester } from './semesters.js';
 import { assertNotDeprived, courseStudents } from './teaching.js';
-import { componentMarks, saveComponentMarks, assertEditable, courseComponents, isLocked } from './grading.js';
+import { componentMarks, saveComponentMarks, assertEditable, courseComponents, isLocked, guardCourseYear, publishedSql } from './grading.js';
 import { academicYear } from '../lib/doc_no.js';
 
 export const passMark = (db) => getSetting(db, 'grades.pass_mark');
@@ -44,7 +46,7 @@ export function listCourses({ db }, user, q) {
   if (user.role === 'student') {
     const p = db.prepare('SELECT program_id, study_level FROM student_profiles WHERE user_id = ?').get(user.id);
     if (!p) return { courses: [], level: null, programId: null };
-    const level = Number(q.level) || p.study_level, sem = q.semester === '1' || q.semester === '2' ? ' AND semester = ' + Number(q.semester) : '';
+    const level = Number(q.level) || p.study_level, sem = isSemester(q.semester) ? ' AND semester = ' + Number(q.semester) : '';
     const rows = db.prepare(`SELECT * FROM courses WHERE program_id = ? AND active = 1 AND level = ?${sem} ORDER BY level, semester, name LIMIT 500`).all(p.program_id, level);
     return { courses: rows.map(courseView), level };
   }
@@ -53,7 +55,7 @@ export function listCourses({ db }, user, q) {
   if (q.program) { where.push('c.program_id = ?'); args.push(Number(q.program) || 0); }
   if (!user.can('course:manage')) where.push('c.active = 1');
   if (q.level) { where.push('c.level = ?'); args.push(Number(q.level) || 0); }
-  if (q.semester === '1' || q.semester === '2') { where.push('c.semester = ?'); args.push(Number(q.semester)); }
+  if (isSemester(q.semester)) { where.push('c.semester = ?'); args.push(Number(q.semester)); }
   const rows = db.prepare(`SELECT c.*, g.name pname, g.faculty fname, g.faculty_id fid, g.years pyears, f.code fcode, (SELECT COUNT(*) FROM grades x WHERE x.course_id = c.id) gcount
     FROM courses c JOIN programs g ON g.id = c.program_id LEFT JOIN faculties f ON f.id = g.faculty_id ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY g.faculty_id, c.level, c.semester, c.name LIMIT 5000`).all(...args);
   return { courses: rows.map((r) => ({ ...courseView(r), program: r.pname, faculty: r.fname, facultyId: r.fid, facultyCode: r.fcode ?? null, years: r.pyears, grades: r.gcount })), level: q.level ? Number(q.level) : null };
@@ -62,7 +64,7 @@ export function listCourses({ db }, user, q) {
 export function createCourse({ db }, actor, b, ip) {
   const prog = db.prepare('SELECT id, years FROM programs WHERE id = ?').get(Number(b?.programId));
   if (!prog) throw new HttpError(400, 'البرنامج غير موجود.', 'validation');
-  const level = intIn(b.level, 1, prog.years, 'السنة الدراسية'), semester = intIn(b.semester, 1, 2, 'الفصل');
+  const level = intIn(b.level, 1, prog.years, 'السنة الدراسية'), semester = intIn(b.semester, 1, SEMESTER_COUNT, 'الفصل');
   const name = text(b.name, 2, 100, 'اسم المقرر'), hours = intIn(b.hours ?? getSetting(db, 'academic.default_course_hours'), 0, getSetting(db, 'academic.max_course_hours'), 'الساعات');
   const code = b.code ? text(b.code, 1, 20, 'رمز المقرر') : null, instructor = b.instructor ? text(b.instructor, 2, 80, 'المدرّس') : null;
   if (db.prepare('SELECT 1 FROM courses WHERE program_id = ? AND level = ? AND semester = ? AND name = ?').get(prog.id, level, semester, name)) throw new HttpError(409, 'المقرر موجود مسبقاً في هذه السنة والفصل.', 'conflict');
@@ -81,14 +83,16 @@ export function toggleCourse({ db }, actor, id, active, ip) {
 const gview = (g, pm) => ({ id: g.id, course: g.course, courseId: g.course_id, level: g.level, semester: g.semester, academicYear: g.academic_year,
   hours: g.hours, theory: g.theory_mark, practical: g.practical_mark, total: g.mark, passed: g.mark >= pm, instructor: g.instructor ?? null, workflowStatus: g.workflow_status });
 
-// العلامات مجمّعة بالمقرر: أحدث محاولة تظهر، وما قبلها «علامات سابقة»
-export function gradesFor(db, studentId, level, { onlyApproved = false } = {}) {
-  const pm = passMarkFor(db, studentId);
+// العلامات مجمّعة بالمقرر: المحاولة الأعلى علامة تظهر وتُحتسب في المعدل (دليل الطالب: «عند إعادة دراسة مقرر تُحتسب العلامة الأعلى»)،
+// وبقية المحاولات «علامات سابقة» (الأعلى ثم الأحدث). عند تساوي العلامة تُحتسب الأحدث.
+// onlyApproved: المعتمدة (شاشات الموظفين والمعدل الداخلي). onlyPublished: المعتمدة في مقرر أُعلنت نتيجته (ما يراه الطالب)
+export function gradesFor(db, studentId, level, { onlyApproved = false, onlyPublished = false } = {}) {
+  const pm = passMarkFor(db, studentId), scale = ratingScale(db, pm);
   const rows = db.prepare(`SELECT g.*, c.instructor FROM grades g LEFT JOIN courses c ON c.id = g.course_id
-    WHERE g.student_id = ? ${onlyApproved ? "AND g.workflow_status = 'approved'" : ''} ${level ? 'AND g.level = ?' : ''} ORDER BY g.semester, g.course, g.academic_year DESC`).all(...(level ? [studentId, Number(level)] : [studentId]));
+    WHERE g.student_id = ? ${onlyPublished ? `AND ${publishedSql('g')}` : onlyApproved ? "AND g.workflow_status = 'approved'" : ''} ${level ? 'AND g.level = ?' : ''} ORDER BY g.semester, g.course, g.academic_year DESC, g.id DESC`).all(...(level ? [studentId, Number(level)] : [studentId]));
   const byCourse = new Map();
-  for (const g of rows) { const k = g.course_id ?? `x${g.id}`; if (!byCourse.has(k)) byCourse.set(k, { ...gview(g, pm), previous: [] }); else byCourse.get(k).previous.push(gview(g, pm)); }
-  const list = [...byCourse.values()];
+  for (const g of rows) { const k = g.course_id ?? `x${g.id}`; if (!byCourse.has(k)) byCourse.set(k, []); byCourse.get(k).push(g); }
+  const list = [...byCourse.values()].map((tries) => { const [best, ...rest] = [...tries].sort(attemptOrder); return { ...gview(best, pm), rating: rateMark(best.mark, scale), previous: rest.map((g) => gview(g, pm)) }; });
   const hrs = list.reduce((s, g) => s + g.hours, 0);
   return { grades: list, summary: { count: list.length, passed: list.filter((g) => g.passed).length, failed: list.filter((g) => !g.passed).length,
     average: hrs ? Math.round(list.reduce((s, g) => s + g.hours * g.total, 0) / hrs * 10) / 10 : null }, passMark: pm };
@@ -98,7 +102,7 @@ export function myGrades({ db }, user, q) {
   const p = db.prepare('SELECT study_level FROM student_profiles WHERE user_id = ?').get(user.id);
   if (!p) return { grades: [], summary: { count: 0, passed: 0, failed: 0, average: null }, passMark: passMarkFor(db, user.id), level: null };
   const level = Number(q.level) || p.study_level;
-  return { ...gradesFor(db, user.id, level, { onlyApproved: true }), level };
+  return { ...gradesFor(db, user.id, level, { onlyPublished: true }), level };
 }
 
 export function enterGrade({ db }, actor, studentId, b, ip) {
@@ -110,8 +114,8 @@ export function enterGrade({ db }, actor, studentId, b, ip) {
   const m = /^(\d{4})\/(\d{4})$/.exec(ay);
   if (!m || Number(m[2]) !== Number(m[1]) + 1) throw new HttpError(400, 'العام الدراسي بصيغة 2025/2026.', 'validation');
   assertNotDeprived(db, studentId, c.id, ay);
-  // بعد إعلان النتائج: مسار استثنائي بصلاحيته وتبرير، وتبقى العلامة معتمدة
-  const lockJust = assertEditable(db, actor, c.id, ay, b?.justification, b?.decisionNo);
+  // بعد إعلان النتائج: مسار استثنائي بصلاحيته وتبرير، وتبقى العلامة معتمدة (يُفحص هنا مبكراً، ويُعاد داخل المعاملة تحت قفل المقرر)
+  const lockJust0 = assertEditable(db, actor, c.id, ay, b?.justification, b?.decisionNo);
   const totalMax = getSetting(db, 'grades.total_max'), practicalMax = getSetting(db, 'grades.practical_max');
   // المقرر ذو المكونات تُرصد علامته مكوناً مكوناً، ويُحسب النظري والعملي منها
   const comp = componentMarks(db, c.id, b?.components);
@@ -119,8 +123,11 @@ export function enterGrade({ db }, actor, studentId, b, ip) {
   const practical = comp ? comp.practical : (b.practical === '' || b.practical === null || b.practical === undefined ? null : intIn(b.practical, 0, practicalMax, 'العلامة العملية'));
   const total = comp ? comp.total : theory + (practical ?? 0);
   if (total > totalMax) throw new HttpError(400, `مجموع العلامتين لا يتجاوز ${totalMax}.`, 'validation');
-  const term = `${ay}-${c.semester === 1 ? 'الفصل الأول' : 'الفصل الثاني'}`, now = Date.now();
+  const term = `${ay}-${SEMESTER_NAMES[c.semester] || SEMESTER_NAMES[1]}`, now = Date.now();
   return tx(db, () => {
+    // إعلان نتائج المقرر قد يكون اكتمل بعد الفحص المبكر: نعيده تحت القفل نفسه الذي يأخذه الإعلان
+    guardCourseYear(db, c.id, ay);
+    const lockJust = lockJust0 ?? assertEditable(db, actor, c.id, ay, b?.justification, b?.decisionNo);
     const ex = db.prepare('SELECT * FROM grades WHERE student_id = ? AND course_id = ? AND academic_year = ?').get(Number(studentId), c.id, ay);
     if (ex) {
       const locked = ex.workflow_status === 'approved' && workflowOn(db);
@@ -138,9 +145,10 @@ export function enterGrade({ db }, actor, studentId, b, ip) {
         .run(theory, practical, total, actor.id, now, status, status, status, status, status, ex.id);
       audit(db, actor, locked ? (resetWf ? 'تعديل علامة معتمدة وإعادة ضبط الاعتماد' : 'تعديل علامة معتمدة') : 'تعديل علامة', `${st.student_no} / ${c.name}`.slice(0, 100), ip);
     } else {
-      const status = initialStatus(db);
-      const gid = Number(db.prepare(`INSERT INTO grades (student_id, term, course, hours, mark, course_id, level, semester, academic_year, theory_mark, practical_mark, entered_by, entered_at, workflow_status)
-                  VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(Number(studentId), term, c.name, c.hours, total, c.id, c.level, c.semester, ay, theory, practical, actor.id, now, status).lastInsertRowid);
+      // علامة تُضاف بالمسار الاستثنائي بعد الإعلان تُرصد معتمدة كبقية علامات المقرر المعلن (لا تبقى مسودة مخفية عن الطالب)
+      const status = lockJust ? 'approved' : initialStatus(db);
+      const gid = Number(db.prepare(`INSERT INTO grades (student_id, term, course, hours, mark, course_id, level, semester, academic_year, theory_mark, practical_mark, entered_by, entered_at, workflow_status, approved_by, approved_at)
+                  VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(Number(studentId), term, c.name, c.hours, total, c.id, c.level, c.semester, ay, theory, practical, actor.id, now, status, lockJust ? actor.id : null, lockJust ? now : null).lastInsertRowid);
       if (comp) saveComponentMarks(db, gid, comp.marks);
       logChange(db, actor, { id: gid, student_id: Number(studentId), course: c.name }, lockJust ? 'إدخال علامة بعد إعلان النتائج' : 'إدخال علامة', { mark: total, theory, practical, status }, lockJust);
       audit(db, actor, 'إدخال علامة', `${st.student_no} / ${c.name}`.slice(0, 100), ip);
@@ -199,8 +207,13 @@ export function applyAppealMark(db, actor, g, newMark, justification) {
   const just = needJustification(justification);
   const practical = g.practical_mark === null || g.practical_mark === undefined ? null : Math.min(Number(g.practical_mark), total);
   const theory = total - (practical ?? 0);
-  const status = g.workflow_status === 'approved' && workflowOn(db) && !canApprove(actor) ? 'draft' : g.workflow_status;
-  logChange(db, actor, g, 'تعديل علامة بقرار تظلم', { mark: total, theory, practical, status }, just);
+  // مقرر أُعلنت نتائجه: قرار التظلم مسار استثنائي كتعديل العلامة المقفلة، لمن يملك صلاحيته، وتبقى العلامة معتمدة
+  // (لا تعود مسودة فتختفي من ملف الطالب داخل مقرر مقفل)
+  if (g.course_id) guardCourseYear(db, g.course_id, g.academic_year);
+  const locked = !!g.course_id && isLocked(db, g.course_id, g.academic_year);
+  if (locked && !actor?.can?.('grade:unlock')) throw new HttpError(409, 'أُعلنت نتائج هذا المقرر وقُفلت؛ تطبيق قرار التظلم على علامته يتطلب صلاحية تعديل النتائج المقفلة. اطلبها من مدير النظام أو أحِل القرار لمن يملكها.', 'grades_locked');
+  const status = locked ? g.workflow_status : g.workflow_status === 'approved' && workflowOn(db) && !canApprove(actor) ? 'draft' : g.workflow_status;
+  logChange(db, actor, g, locked ? 'تعديل علامة بقرار تظلم بعد إعلان النتائج' : 'تعديل علامة بقرار تظلم', { mark: total, theory, practical, status }, just);
   db.prepare(`UPDATE grades SET theory_mark = ?, practical_mark = ?, mark = ?, entered_by = ?, entered_at = ?, workflow_status = ?,
     reviewed_by = CASE WHEN ? = 'draft' THEN NULL ELSE reviewed_by END, reviewed_at = CASE WHEN ? = 'draft' THEN NULL ELSE reviewed_at END,
     approved_by = CASE WHEN ? = 'draft' THEN NULL ELSE approved_by END, approved_at = CASE WHEN ? = 'draft' THEN NULL ELSE approved_at END WHERE id = ?`)
@@ -270,7 +283,7 @@ export function updateCourse({ db }, actor, id, b, ip) {
   const c = db.prepare('SELECT * FROM courses WHERE id = ?').get(Number(id));
   if (!c) throw new HttpError(404, 'المقرر غير موجود.', 'not_found');
   const prog = db.prepare('SELECT years FROM programs WHERE id = ?').get(c.program_id);
-  const level = intIn(b?.level ?? c.level, 1, prog.years, 'السنة الدراسية'), semester = intIn(b?.semester ?? c.semester, 1, 2, 'الفصل');
+  const level = intIn(b?.level ?? c.level, 1, prog.years, 'السنة الدراسية'), semester = intIn(b?.semester ?? c.semester, 1, SEMESTER_COUNT, 'الفصل');
   const name = text(b?.name ?? c.name, 2, 100, 'اسم المقرر'), hours = intIn(b?.hours ?? c.hours, 0, getSetting(db, 'academic.max_course_hours'), 'الساعات');
   const code = b?.code ? text(b.code, 1, 20, 'رمز المقرر') : null;
   // الإسناد إلى عضو هيئة التدريس (وحدة 5.6): memberId غائباً = بلا تغيير، null = فك الإسناد
@@ -305,7 +318,7 @@ export function deleteGrade({ db }, actor, studentId, gradeId, ip, justification
   assertEditable(db, actor, g.course_id, g.academic_year, justification);
   let just = null;
   if (g.workflow_status === 'approved' && workflowOn(db)) { if (!canApprove(actor)) throw new HttpError(403, 'العلامة معتمدة؛ حذفها يتطلب صلاحية اعتماد العلامات.', 'forbidden'); just = needJustification(justification); }
-  tx(db, () => { logChange(db, actor, g, 'حذف علامة', { status: 'deleted' }, just); db.prepare('DELETE FROM grades WHERE id = ?').run(g.id); audit(db, actor, 'حذف علامة', `${g.student_no} / ${g.course}`.slice(0, 100), ip); });
+  tx(db, () => { guardCourseYear(db, g.course_id, g.academic_year); assertEditable(db, actor, g.course_id, g.academic_year, justification); logChange(db, actor, g, 'حذف علامة', { status: 'deleted' }, just); db.prepare('DELETE FROM grades WHERE id = ?').run(g.id); audit(db, actor, 'حذف علامة', `${g.student_no} / ${g.course}`.slice(0, 100), ip); });
   return gradesFor(db, Number(studentId), null);
 }
 
@@ -343,7 +356,7 @@ export function listGradesTable({ db }, q) {
   if (Number(q.program) > 0) { where.push('g.id = ?'); args.push(Number(q.program)); }
   if (Number(q.course) > 0) { where.push('gr.course_id = ?'); args.push(Number(q.course)); }
   if (Number(q.level) > 0) { where.push('gr.level = ?'); args.push(Number(q.level)); }
-  if (q.semester === '1' || q.semester === '2') { where.push('gr.semester = ?'); args.push(Number(q.semester)); }
+  if (isSemester(q.semester)) { where.push('gr.semester = ?'); args.push(Number(q.semester)); }
   if (/^\d{4}\/\d{4}$/.test(String(q.year ?? ''))) { where.push('gr.academic_year = ?'); args.push(q.year); }
   if (['draft', 'reviewed', 'approved'].includes(q.workflow)) { where.push('gr.workflow_status = ?'); args.push(q.workflow); }
   const PASS_SQL = passSql(db, 'gr.student_id'), passOf = passMarkResolver(db);

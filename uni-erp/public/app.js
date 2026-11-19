@@ -167,6 +167,7 @@ Object.assign(window.UA, {
     }
     v.push(['councils', tr('المجالس واللجان')]);
     v.push(['facilities', tr('الخدمات الإدارية')]);
+    v.push(['hub', tr('مركز العمل')]);
     // 5) التقارير والبيانات والذكاء الاصطناعي
     if (['stats:read', 'hr_emp:view', 'hr_emp:write', 'hr_emp:edit', 'hr_emp:delete', 'hr:manage', 'hr_payroll:approve', 'staffatt:manage', 'audit:read', 'devops:manage', 'settings:manage', 'backup:manage'].some(can)) v.push(['dashboard', tr('الإحصاءات والتقارير')]);
     if (can('student:register') || can('course:manage') || can('grade:manage') || can('data:export') || can('request:import') || ['import:academic', 'import:procurement', 'import:finance', 'import:hr', 'import:student_fin', 'import:misc'].some(can)) v.push(['exchange', tr('الاستيراد والتصدير')]);
@@ -298,13 +299,24 @@ Object.assign(window.UA, {
     const fl = [['all', 'الكل'], ['review', 'قيد المراجعة'], ['approved', 'معتمدة'], ['rejected', 'مرفوضة']];
     const list = S.requests.filter((r) => S.filter === 'all' || r.status === S.filter);
     const sel = S.requests.find((r) => r.id === S.sel);
-    const rows = list.map((r) => `<tr class="row" tabindex="0" data-act="sel" data-id="${r.id}" aria-selected="${S.sel === r.id}"><td>${esc(r.service.label)}${r.escalationLevel ? ` <span class="pill p-rejected">مصعّد ${r.escalationLevel}</span>` : ''}${r.unit ? `<div class="small">عند: ${esc(r.unit.name)}</div>` : ''}</td><td>${esc(r.student.name)}</td><td>${pill(r)}${UA.flow && UA.flow.isPending(r.id) ? ' <span class="small ux-pending-tag">بانتظار مهلة التراجع</span>' : ''}</td><td class="hint" style="white-space:nowrap">${fmt(r.createdAt)}</td><td>${UA.slaCell ? UA.slaCell(r) : ''}</td></tr>`).join('');
+    const rows = list.map((r) => `<tr class="row" tabindex="0" data-act="sel" data-id="${r.id}" aria-selected="${S.sel === r.id}"><td>${esc(r.service.label)}${r.escalationLevel ? ` <span class="pill p-rejected">مصعّد ${r.escalationLevel}</span>` : ''}${r.unit || r.assignee ? `<div class="small">عند: ${esc([r.unit && r.unit.name, r.assignee && r.assignee.name].filter(Boolean).join(' · '))}</div>` : ''}</td><td>${esc(r.student.name)}</td><td>${pill(r)}${UA.flow && UA.flow.isPending(r.id) ? ' <span class="small ux-pending-tag">بانتظار مهلة التراجع</span>' : ''}</td><td class="hint" style="white-space:nowrap">${fmt(r.createdAt)}</td><td>${UA.slaCell ? UA.slaCell(r) : ''}</td></tr>`).join('');
     const fresh = sel && S.drawerFor !== sel.id;
     S.drawerFor = sel ? sel.id : null;
     return `<div><section class="card"><h2>سجل الطلبات</h2><p class="hint" style="margin-top:0">اختر طلباً لعرض تفاصيله وإجراءاته في اللوحة الجانبية.</p><div class="chips">${fl.map((f) => `<button class="chip" data-act="flt" data-f="${f[0]}" aria-pressed="${S.filter === f[0]}">${f[1]}</button>`).join('')}</div>
       <div class="tbl-wrap"><table><thead><tr><th>الخدمة</th><th>الطالب</th><th>الحالة</th><th>التاريخ</th><th>مؤشر المهلة (SLA)</th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="empty">لا طلبات في هذا التصنيف.</td></tr>'}</tbody></table></div></section>
-      ${sel ? `<aside class="ux-drawer no-print" aria-label="تفاصيل الطلب"${fresh ? ' data-fresh="1"' : ''}><header><h2 tabindex="-1">تفاصيل الطلب</h2><span style="display:flex;gap:6px"><button type="button" class="btn sm" data-act="reqprint" data-id="${sel.id}">طباعة النموذج</button><button type="button" class="btn sm" data-act="reqclose" aria-label="إغلاق تفاصيل الطلب">إغلاق</button></span></header><div class="ux-drawer-body">${staffDetail(sel, canDecide)}</div></aside>` : ''}</div>`;
+      ${sel ? `<aside class="ux-drawer no-print" aria-label="تفاصيل الطلب"${fresh ? ' data-fresh="1"' : ''}><header><h2 tabindex="-1">تفاصيل الطلب</h2><span style="display:flex;gap:6px"><button type="button" class="btn sm" data-act="reqprint" data-id="${sel.id}">طباعة النموذج</button><button type="button" class="btn sm" data-act="recthread" data-m="request" data-id="${sel.id}">النقاش</button><button type="button" class="btn sm" data-act="reqclose" aria-label="إغلاق تفاصيل الطلب">إغلاق</button></span></header><div class="ux-drawer-body">${staffDetail(sel, canDecide)}</div></aside>` : ''}</div>`;
   }
+  // الموظفون الذين تجوز الإحالة إليهم (يُحمَّلون عند اختيار «موظف محدد بالاسم» أول مرة)
+  function loadFwPeople() {
+    S.fwLoading = true;
+    api('GET', '/api/requests/forward-people').then((r) => { S.fwPeople = r.people || []; }, () => { S.fwPeople = []; }).finally(() => { S.fwLoading = false; render(); });
+  }
+  document.addEventListener('change', (e) => {
+    if (!e.target || e.target.id !== 'fw-unit') return;
+    S.fwMode = e.target.value === 'person' ? 'person' : null;
+    const w = document.getElementById('fw-person-wrap'); if (w) w.hidden = S.fwMode !== 'person';
+    if (S.fwMode === 'person') { if (!S.fwPeople && !S.fwLoading) loadFwPeople(); setTimeout(() => { const i = document.getElementById('fw-person'); if (i) i.focus(); }, 0); }
+  });
   function staffDetail(r, canDecide) {
     const auto = r.rejectedBy === 'auto';
     let act = '';
@@ -314,14 +326,18 @@ Object.assign(window.UA, {
       act = `<div class="actions"><button class="btn ok" data-act="approve" data-id="${r.id}">اعتماد وإصدار الوثيقة</button><button class="btn bad" data-act="rejform" data-id="${r.id}">رفض</button></div>` +
         (S.rej === r.id ? `<div class="form" style="margin-top:12px"><label>سبب الرفض (يظهر للطالب)<textarea id="rej-text" rows="2" maxlength="300"></textarea></label><div class="actions" style="margin:0"><button class="btn bad" data-act="reject" data-id="${r.id}">تأكيد الرفض</button></div></div>` : '');
     } else if (r.document) act = `<div class="actions"><button class="btn pri" data-act="doc" data-c="${esc(r.document.code)}">عرض الوثيقة</button><span class="hint" style="align-self:center">رمز التحقق: <span class="mono">${esc(r.document.code)}</span></span></div>`;
-    if (r.status === 'review' && can('request:forward') && (S.targets || []).length) {
-      const opts = S.targets.filter((t) => !r.unit || t.id !== r.unit.id);
-      if (opts.length) act += `<div class="form fwd-box" style="margin-top:12px"><b>إحالة الطلب إلى وحدة مرتبطة</b><label>الوحدة<select id="fw-unit">${opts.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></label>
+    if (r.status === 'review' && can('request:forward')) {
+      // إلى وحدة مرتبطة، أو إلى موظف بعينه بالاسم (من وحدتك أو وحدة مرتبطة)؛ القائمة بلا «أخرى» العامة لأن «موظف بالاسم» يقوم مقامها
+      const opts = (S.targets || []).filter((t) => !r.unit || t.id !== r.unit.id), person = S.fwMode === 'person' || !opts.length;
+      const label = (p) => `${p.name}${p.unit ? ' — ' + p.unit : ''}`;
+      act += `<div class="form fwd-box" style="margin-top:12px"><b>إحالة الطلب إلى وحدة مرتبطة أو موظف</b><label>الجهة<select id="fw-unit" data-no-other="1">${opts.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}<option value="person"${person ? ' selected' : ''}>موظف محدد بالاسم…</option></select></label>
+        <label id="fw-person-wrap"${person ? '' : ' hidden'}>اسم الموظف<input id="fw-person" list="fw-people" maxlength="120" autocomplete="off" placeholder="اكتب اسم الموظف واختره من القائمة"><datalist id="fw-people">${(S.fwPeople || []).map((p) => `<option value="${esc(label(p))}"></option>`).join('')}</datalist></label>
         <label>ملاحظة للجهة المستلمة (اختياري)<input id="fw-note" maxlength="300"></label><div class="actions" style="margin:0"><button class="btn" data-act="fwd" data-id="${r.id}">إحالة</button></div></div>`;
+      if (person && !S.fwPeople && !S.fwLoading) loadFwPeople();
     }
     else if (r.status === 'rejected') act = `<div class="reason" style="margin-top:8px">سبب الرفض: ${esc(r.rejectReason)}</div>`;
     const att = r.attachment ? `<dt>المرفق</dt><dd><a href="/api/attachments/${r.attachment.id}">${esc(r.attachment.name)}</a> <span class="small">(${Math.round(r.attachment.size / 1024)} ك.ب)</span></dd>` : '';
-    return `<dl class="kv"><dt>الطلب</dt><dd>${esc(r.service.label)} <span class="no">${esc(r.no)}</span></dd><dt>الطالب</dt><dd>${esc(r.student.name)} · ${esc(r.student.studentNo)}${can('student:read') && r.student.id ? ` <button class="link" data-act="openstud" data-id="${r.student.id}">فتح ملف الطالب</button>` : ''}</dd><dt>التفاصيل</dt><dd>${esc(detailsText(r))}</dd><dt>الحالة</dt><dd>${pill(r)}</dd><dt>الجهة الحالية</dt><dd>${r.unit ? esc(r.unit.name) : '<span class="hint">غير محال</span>'}</dd>${r.decidedAt ? `<dt>زمن المعالجة</dt><dd>${dur(r.decidedAt - r.createdAt)}</dd>` : ''}${att}</dl>
+    return `<dl class="kv"><dt>الطلب</dt><dd>${esc(r.service.label)} <span class="no">${esc(r.no)}</span></dd><dt>الطالب</dt><dd>${esc(r.student.name)} · ${esc(r.student.studentNo)}${can('student:read') && r.student.id ? ` <button class="link" data-act="openstud" data-id="${r.student.id}">فتح ملف الطالب</button>` : ''}</dd><dt>التفاصيل</dt><dd>${esc(detailsText(r))}</dd><dt>الحالة</dt><dd>${pill(r)}</dd><dt>الجهة الحالية</dt><dd>${r.unit ? esc(r.unit.name) : '<span class="hint">غير محال</span>'}${r.assignee ? ` · الموظف: <b>${esc(r.assignee.name)}</b>` : ''}</dd>${r.decidedAt ? `<dt>زمن المعالجة</dt><dd>${dur(r.decidedAt - r.createdAt)}</dd>` : ''}${att}</dl>
       <b style="display:block;margin-top:12px;font-size:14px">مراحل الطلب</b>${(UA.steps || steps)(r)}
       <b style="display:block;margin-top:12px;font-size:14px">الفحص الآلي</b><ul class="checks"><li class="${auto ? 'x' : ''}">${auto ? esc(r.rejectReason) : 'اجتاز كل القواعد المفعَّلة'}</li></ul>${act}<div style="margin-top:12px">${events(r)}</div>`;
   }
@@ -639,7 +655,7 @@ Object.assign(window.UA, {
     restoreScrollAndFocus(snap);
   }
   /* ---------- ملفات الأقسام الكبيرة تُحمَّل عند فتحها ---------- */
-  const LAZY = { exchange: ['import.js', 'export.js'], import: ['import.js'], export: ['export.js'], finance: ['finance.js'], procurement: ['procurement.js'], access: ['access.js'], guidelines: ['guidelines.js'], lms: ['v12_views.js', 'quiz_builder.js', 'lms_assignments.js', 'lms_assignments_student.js'], research: ['v12_views.js'], alumni: ['v12_views.js'], qa: ['v12_views.js'], expansions: ['v12_views.js'], student_life: ['v12_views.js', 'housing.js'], labtools: ['v12_views.js', 'quiz_builder.js', 'housing.js'], ai: ['v12_views.js'], audit: ['v12_views.js'] };
+  const LAZY = { hub: ['platform.js'], exchange: ['import.js', 'export.js'], import: ['import.js'], export: ['export.js'], finance: ['finance.js'], procurement: ['procurement.js'], access: ['access.js'], guidelines: ['guidelines.js'], lms: ['v12_views.js', 'quiz_builder.js', 'lms_assignments.js', 'lms_assignments_student.js'], research: ['v12_views.js'], alumni: ['v12_views.js'], qa: ['v12_views.js'], expansions: ['v12_views.js'], student_life: ['v12_views.js', 'housing.js'], labtools: ['v12_views.js', 'quiz_builder.js', 'housing.js'], ai: ['v12_views.js'], audit: ['v12_views.js'] };
   const ASSET_V = (document.currentScript && document.currentScript.src.split('?')[1]) || '';
   const scripts = new Map();
   function loadScript(file) {
@@ -912,7 +928,16 @@ Object.assign(window.UA, {
       else if (a === 'crednew') { S.cred = null; S.newVals = {}; S.newExtra = []; render(); }
       else if (a === 'addfac') { const r = await api('POST', '/api/admin/faculties', { name: val('fc-name'), nameEn: val('fc-en'), code: val('fc-code'), kind: val('fc-kind') }); S.reg = null; await loadFor('admin'); render(); toast('أُضيفت الجهة، رمزها ' + r.code); }
       else if (a === 'factoggle') { await api('POST', `/api/admin/faculties/${d.id}/toggle`, { enabled: d.on === '1' }); S.reg = null; await loadFor('admin'); render(); }
-      else if (a === 'fwd') { await api('POST', `/api/requests/${d.id}/forward`, { unitId: Number(val('fw-unit')), note: val('fw-note') }); await loadFor('affairs'); render(); toast('أُحيل الطلب'); }
+      else if (a === 'fwd') {
+        if (val('fw-unit') === 'person' || !val('fw-unit')) {
+          // الاسم المكتوب يُطابق موظفاً واحداً من القائمة المقترحة (الاسم مع وحدته، أو الاسم وحده إن لم يتكرر)
+          const name = val('fw-person').replace(/\s+/g, ' ').trim(), list = S.fwPeople || [];
+          const p = list.find((x) => `${x.name}${x.unit ? ' — ' + x.unit : ''}` === name) || (list.filter((x) => x.name === name).length === 1 ? list.find((x) => x.name === name) : null);
+          if (!p) { toast(name ? 'اختر الموظف من القائمة المقترحة (لا يُحال إلا لموظف من وحدتك أو وحدة مرتبطة يملك الاطلاع على الطلبات).' : 'اكتب اسم الموظف أولاً.'); return; }
+          await api('POST', `/api/requests/${d.id}/forward`, { userId: p.id, note: val('fw-note') });
+          S.fwMode = null; await loadFor('affairs'); render(); toast(`أُحيل الطلب إلى ${p.name}`);
+        } else { await api('POST', `/api/requests/${d.id}/forward`, { unitId: Number(val('fw-unit')), note: val('fw-note') }); await loadFor('affairs'); render(); toast('أُحيل الطلب'); }
+      }
       else if (a === 'addprog') { await api('POST', '/api/admin/programs', { facultyId: Number(val('pg-fac')), name: val('pg-name'), degree: val('pg-deg'), years: Number(val('pg-years')) }); S.reg = null; await loadFor('admin'); render(); toast('أُضيف البرنامج'); }
       else if (a === 'progtoggle') { await api('POST', `/api/admin/programs/${d.id}/toggle`, { enabled: d.on === '1' }); S.reg = null; await loadFor('admin'); render(); }
       else if (a === 'reqopen') { S.stTab = 'requests'; S.sel = Number(d.id); S.rej = null; render(); window.scrollTo(0, 0); }

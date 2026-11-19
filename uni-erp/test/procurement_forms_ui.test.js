@@ -32,12 +32,15 @@ test.before(async () => {
   adm = (await fetch(base + '/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'admin', password: PW }) })).headers.get('set-cookie').split(';')[0];
   const wh = (await api('POST', '/api/procurement/warehouses', { code: 'WH-U', name: 'المخزن الرئيسي', location: 'المبنى A' })).j.warehouse.id;
   const item = (await api('POST', '/api/procurement/items', { code: 'IT-U', name: 'طابعة ليزر', unit: 'قطعة', warehouseId: wh })).j.item.id;
-  const sup = (await api('POST', '/api/procurement/suppliers', { code: 'SUP-U', name: 'شركة الأمل', contactPerson: 'سامر الأحمد', mobile: '0944' })).j.supplier.id;
+  const sup = (await api('POST', '/api/procurement/suppliers', { code: 'SUP-U', name: 'شركة الأمل', contactPerson: 'سامر الأحمد', mobile: '0944123456' })).j.supplier.id;
   ids.req = (await api('POST', '/api/procurement/requests', { title: 'طابعات', description: 'حاجة المكتبة', department: 'المكتبة', jobTitle: 'سكرتير', directManager: 'رئيس القسم', purchaseThreshold: 'شراء مباشر', amountWords: 'مليونان', lines: [{ itemId: item, description: 'طابعة ليزر', qty: 2, estCost: 1000, budgetCode: 'B-1', specs: 'A4' }] })).j.request.id;
-  const o = (await api('POST', '/api/procurement/orders', { supplierId: sup, deliveryMethod: 'توصيل المورّد', paymentTerms: 'نقدًا', deliveryTax: 50, lines: [{ itemId: item, description: 'طابعة ليزر', qty: 2, unitCost: 1000 }] })).j.order;
+  const o = (await api('POST', '/api/procurement/orders', { supplierId: sup, directReason: 'أمر مباشر لاختبار واجهة النماذج', deliveryMethod: 'توصيل المورّد', paymentTerms: 'نقدًا', deliveryTax: 50, lines: [{ itemId: item, description: 'طابعة ليزر', qty: 2, unitCost: 1000 }] })).j.order;
   ids.order = o.id;
-  await api('POST', `/api/procurement/orders/${o.id}/order`);
-  await api('POST', '/api/procurement/receipts', { orderId: o.id, deliveryNoteNo: 'DN-9', location: 'المخزن', compliant: true, lines: [{ itemId: item, qty: 2, quality: 'مطابق' }] });
+  // الأمر المباشر يرسله شخص غير منشئه
+  app.db.prepare('INSERT INTO users (username, display_name, password_hash, role, created_at) VALUES (?,?,?,?,?)').run('admin2', 'مدير ثانٍ', await hashPassword(PW, 1024), 'admin', Date.now());
+  const adm2 = (await fetch(base + '/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'admin2', password: PW }) })).headers.get('set-cookie').split(';')[0];
+  await fetch(`${base}/api/procurement/orders/${o.id}/order`, { method: 'POST', headers: { Cookie: adm2 } });
+  await fetch(`${base}/api/procurement/receipts`, { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: adm2 }, body: JSON.stringify({ orderId: o.id, deliveryNoteNo: 'DN-9', location: 'المخزن', compliant: true, lines: [{ itemId: item, qty: 2, quality: 'مطابق' }] }) });
   await api('POST', '/api/procurement/issues', { warehouseId: wh, department: 'المكتبة', receiverName: 'زياد', requestRef: 'SR-1', lines: [{ itemId: item, qty: 1, requestedQty: 1, itemCondition: 'جديدة' }] });
   try { browser = await pw.chromium.launch(); } catch { pw = null; return; }
   page = await browser.newPage({ viewport: { width: 1366, height: 900 } });

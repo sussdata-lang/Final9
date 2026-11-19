@@ -7,6 +7,7 @@ import { createApp } from '../server/app.js';
 import { hashPassword } from '../server/security.js';
 import { academicYear } from '../server/lib/doc_no.js';
 import { creditCap } from '../server/services/sections.js';
+import { applyAppealMark } from '../server/services/academics.js';
 
 const PW = 'Test#Pass12345';
 let app, base, ck = {}, id = {}, prog, course, plain;
@@ -90,4 +91,57 @@ test('إعلان النتائج يقفل العلامات، والتعديل ب�
   const g = app.db.prepare('SELECT * FROM grades WHERE id = ?').get(gid);
   assert.equal(g.workflow_status, 'approved', 'تبقى معتمدة');
   assert.ok(app.db.prepare("SELECT 1 FROM grade_changes WHERE grade_id = ? AND action = 'تعديل علامة بعد إعلان النتائج' AND justification LIKE '%لجنة%'").get(gid));
+});
+
+test('الإعلان عملية واحدة: نقرتان متزامنتان تعطيان نجاحاً وتعارضاً لا خطأ خادم', async () => {
+  const yr = '2019/2020';
+  for (const s of ['s1', 's2']) app.db.prepare("INSERT INTO grades (student_id, term, course, hours, mark, course_id, level, semester, academic_year, theory_mark, entered_at, workflow_status) VALUES (?, 't', 'برمجة', 3, 70, ?, 1, 1, ?, 70, ?, 'approved')").run(id[s], plain, yr, Date.now());
+  const both = await Promise.all([1, 2].map(() => api('POST', '/api/grades/results/lock', 'ex', { courseId: plain, academicYear: yr })));
+  assert.deepEqual(both.map((r) => r.s).sort(), [200, 409], JSON.stringify(both.map((r) => r.j)));
+  assert.equal(Number(app.db.prepare('SELECT COUNT(*) AS n FROM grade_locks WHERE course_id = ? AND academic_year = ?').get(plain, yr).n), 1);
+
+  // علامة تُضاف بالمسار الاستثنائي بعد الإعلان تبقى معتمدة كبقية علامات المقرر، فيراها الطالب
+  const add = await api('POST', `/api/students/${id.s3}/grades`, 'adm', { courseId: plain, academicYear: yr, theory: 66, justification: 'علامة طالب غاب عن الكشف بقرار لجنة الامتحانات' });
+  assert.ok(add.s < 300, JSON.stringify(add.j));
+  const g3 = app.db.prepare('SELECT * FROM grades WHERE student_id = ? AND course_id = ? AND academic_year = ?').get(id.s3, plain, yr);
+  assert.equal(g3.workflow_status, 'approved');
+  assert.ok(g3.approved_by && g3.approved_at);
+});
+
+test('إلغاء الإعلان: لمن يملك تعديل النتائج المقفلة وبتبرير، ثم يُعاد الإعلان بالفحوص نفسها', async () => {
+  const yr = '2019/2020', unlock = (who, extra = {}) => api('POST', '/api/grades/results/unlock', who, { courseId: plain, academicYear: yr, ...extra });
+  assert.equal((await unlock('ex', { justification: 'إعلان قبل الدورة التكميلية' })).s, 403, 'الاعتماد وحده لا يكفي');
+  assert.equal((await unlock('adm')).s, 400, 'التبرير مطلوب');
+  const ok = await unlock('adm', { justification: 'أُعلن قبل استكمال الدورة التكميلية', decisionNo: '12/ل' });
+  assert.equal(ok.s, 200, JSON.stringify(ok.j));
+  assert.ok(!app.db.prepare('SELECT 1 FROM grade_locks WHERE course_id = ? AND academic_year = ?').get(plain, yr));
+  assert.equal((await unlock('adm', { justification: 'مرة ثانية للتجربة' })).s, 409, 'غير معلن');
+  assert.ok(app.db.prepare("SELECT 1 FROM audit_log WHERE action = 'إلغاء إعلان نتائج مقرر وفك قفل علاماته'").get());
+  assert.equal(Number(app.db.prepare("SELECT COUNT(*) AS n FROM grades WHERE course_id = ? AND academic_year = ? AND workflow_status = 'approved'").get(plain, yr).n), 3, 'تبقى معتمدة');
+  assert.equal((await api('POST', '/api/grades/results/lock', 'ex', { courseId: plain, academicYear: yr })).s, 200, 'إعادة الإعلان');
+});
+
+test('قرار التظلم على مقرر معلن: يتطلب صلاحية تعديل النتائج المقفلة، وتبقى العلامة معتمدة', () => {
+  const g = app.db.prepare('SELECT * FROM grades WHERE student_id = ? AND course_id = ? AND academic_year = ?').get(id.s1, plain, '2019/2020');
+  const actor = (perms) => ({ id: id.ex, can: (p) => perms.includes(p) });
+  assert.throws(() => applyAppealMark(app.db, actor(['grade:approve']), g, 75, 'قبول التظلم بقرار اللجنة'), (e) => e.status === 409 && e.code === 'grades_locked');
+  assert.equal(Number(app.db.prepare('SELECT mark FROM grades WHERE id = ?').get(g.id).mark), 70, 'لم تتغير');
+  // من لا يملك الاعتماد كان يعيدها مسودة فتختفي من ملف الطالب داخل مقرر مقفل
+  const r = applyAppealMark(app.db, actor(['grade:unlock']), g, 75, 'قبول التظلم بقرار اللجنة');
+  assert.equal(r.status, 'approved');
+  const after = app.db.prepare('SELECT * FROM grades WHERE id = ?').get(g.id);
+  assert.equal(Number(after.mark), 75); assert.equal(after.workflow_status, 'approved');
+  assert.ok(app.db.prepare("SELECT 1 FROM grade_changes WHERE grade_id = ? AND action = 'تعديل علامة بقرار تظلم بعد إعلان النتائج'").get(g.id));
+});
+
+test('الطالب يرى العلامة المعتمدة بعد إعلان نتيجة مقررها فقط، وعلامة المعادلة عند اعتمادها', async () => {
+  const yr = '2018/2019', mine = async () => (await api('GET', '/api/me/grades?level=1', 's2')).j.grades;
+  const has = (list, y) => list.some((g) => g.academicYear === y || (g.previous || []).some((p) => p.academicYear === y));
+  app.db.prepare("INSERT INTO grades (student_id, term, course, hours, mark, course_id, level, semester, academic_year, theory_mark, entered_at, workflow_status) VALUES (?, 't', 'برمجة', 3, 81, ?, 1, 1, ?, 81, ?, 'approved')").run(id.s2, plain, yr, Date.now());
+  assert.ok(!has(await mine(), yr), 'معتمدة غير معلنة: مخفية');
+  assert.equal((await api('POST', '/api/grades/results/lock', 'ex', { courseId: plain, academicYear: yr })).s, 200);
+  assert.ok(has(await mine(), yr), 'بعد الإعلان تظهر');
+  // معادلة نقل: لا عام دراسي اعتيادي ولا إعلان لها
+  app.db.prepare("INSERT INTO grades (student_id, term, course, hours, mark, course_id, level, semester, academic_year, theory_mark, entered_at, workflow_status) VALUES (?, 'الفصل الأول', 'تشفير', 3, 77, ?, 1, 1, 'معادلة نقل', 77, ?, 'approved')").run(id.s3, course, Date.now());
+  assert.ok((await api('GET', '/api/me/grades?level=1', 's3')).j.grades.some((g) => Number(g.total) === 77));
 });

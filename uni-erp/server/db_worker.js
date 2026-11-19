@@ -40,20 +40,29 @@ function reply(sa, status, length, seq) {
 
 // المعاملات: pool.query يوزّع كل استعلام على اتصال مختلف فلا يعمل BEGIN/COMMIT/ROLLBACK كوحدة واحدة.
 // نثبّت اتصالاً واحداً من BEGIN حتى COMMIT/ROLLBACK. الرئيس متزامن (Atomics.wait) والمعاملة تُنفَّذ كلها دون تداخل
-// مع طلبات أخرى، لذا يكفي اتصال مثبَّت واحد. BEGIN المتداخل يُعدّ بعمق ولا يُرسل (SQLite كان يرفضه، هنا نتساهل).
+// مع طلبات أخرى، لذا يكفي اتصال مثبَّت واحد. BEGIN المتداخل يصير نقطة حفظ (SAVEPOINT): فشل المعاملة الداخلية يتراجع عن
+// عملها وحده وتبقى الخارجية قائمة. كان ROLLBACK الداخلي ينهي المعاملة كلها فتُنفَّذ الاستعلامات التالية خارج أي معاملة وتُثبَّت
+// فوراً (فمعاينة استيراد العلامات كانت تكتب الصفوف التالية لصف مرفوض، والحفظ يفقد ما قبله).
 let txClient = null;
 let txDepth = 0;
+const EMPTY = { rows: [], rowCount: 0 };
 
 async function runQuery(sql, values) {
   const verb = String(sql).trim().replace(/;+\s*$/, '').toUpperCase();
   if (verb === 'BEGIN' || verb === 'BEGIN TRANSACTION') {
-    if (txClient) { txDepth++; return { rows: [], rowCount: 0 }; }
+    if (txClient) { txDepth++; await txClient.query(`SAVEPOINT sp_${txDepth}`); return EMPTY; }
     txClient = await pool.connect();
     try { await txClient.query('BEGIN'); } catch (e) { txClient.release(); txClient = null; throw e; }
-    return { rows: [], rowCount: 0 };
+    return EMPTY;
   }
   if (txClient && (verb === 'COMMIT' || verb === 'END' || verb === 'ROLLBACK')) {
-    if (verb !== 'ROLLBACK' && txDepth > 0) { txDepth--; return { rows: [], rowCount: 0 }; }
+    if (txDepth > 0) {
+      const sp = `sp_${txDepth}`;
+      txDepth--;
+      if (verb === 'ROLLBACK') await txClient.query(`ROLLBACK TO SAVEPOINT ${sp}`);
+      await txClient.query(`RELEASE SAVEPOINT ${sp}`);
+      return EMPTY;
+    }
     const c = txClient; txClient = null; txDepth = 0;
     try { return await c.query(verb === 'END' ? 'COMMIT' : verb); } finally { c.release(); }
   }

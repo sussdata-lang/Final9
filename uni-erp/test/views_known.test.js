@@ -44,7 +44,7 @@ test('المنطق: الشاشة المضافة بعد الحفظ تظهر، و�
   const noPerm = computeAllowedViews(['finance:read'], chosen, 'staff', null, known);
   assert.ok(!noPerm.includes('recruitment') && !noPerm.includes('quotations'), 'الختم لا يتجاوز الصلاحيات');
   assert.deepEqual(computeAllowedViews(perms, chosen, 'staff', null, staffViewKeys()), strict, 'قائمة حُفظت الآن تعمل كما كانت');
-  assert.deepEqual(new Set(editableViewList(chosen, known)), new Set(['overview', 'finance', 'councils', 'facilities', 'recruitment', 'quotations']));
+  assert.deepEqual(new Set(editableViewList(chosen, known)), new Set(['overview', 'finance', 'councils', 'facilities', 'hub', 'recruitment', 'quotations']));
   assert.deepEqual(editableViewList(chosen, null), chosen);
 });
 

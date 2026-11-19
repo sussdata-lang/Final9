@@ -10,7 +10,7 @@ export const YN = (label, required = false) => S(label, ['نعم', 'لا'], requ
 export const PHONE = T('رقم هاتف للتواصل', true, 'مثال: 0944123456');
 export const URGENCY = S('درجة الاستعجال', ['عادي', 'مستعجل', 'طارئ'], true);
 export const NOTES = L('ملاحظات إضافية');
-export const TERM = S('الفصل الدراسي', ['الفصل الأول', 'الفصل الثاني', 'الفصل الصيفي'], true);
+export const TERM = S('الفصل الدراسي', ['الفصل الأول', 'الفصل الثاني', 'الفصل الثالث'], true);   // السنة ثلاثة فصول (دليل الطالب)
 export const YEAR = T('العام الدراسي', true, 'مثال: 2026-2027');
 
 // form(code, label, unit, audience, category, desc, { sla, ins, att:[[label, required]], doc, fields })

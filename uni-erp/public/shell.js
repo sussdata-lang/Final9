@@ -56,7 +56,7 @@
   const ico = (n, s = 20) => FILL[n]
     ? `<svg class="fi" width="${s}" height="${s}" viewBox="0 0 24 24" aria-hidden="true">${FILL[n]}</svg>`
     : `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[n] || ''}</svg>`;
-  const NAV_ICON = { councils: 'users', facilities: 'home', recruitment: 'briefcase', quotations: 'file', desk: 'home', overview: 'home', enterprise: 'layers', home: 'home', guide: 'guide', grades: 'bars', fees: 'wallet', tx: 'file', affairs: 'users', student_life: 'housing', labtools: 'library', dashboard: 'bars', academics: 'book', comms: 'news', exchange: 'exchange', internal: 'file', corr: 'mail', hr: 'briefcase', payroll: 'briefcase', procurement: 'box', finance: 'wallet', settings: 'settings', units: 'layers', import: 'upload', export: 'download', attendance: 'hall', admin: 'settings', access: 'key', audit: 'audit', verify: 'check', lms: 'lms', research: 'research', alumni: 'graduation', qa: 'quality', expansions: 'clipboard', devops: 'settings', ai: 'spark', guidelines: 'compass' };
+  const NAV_ICON = { hub: 'clipboard', councils: 'users', facilities: 'home', recruitment: 'briefcase', quotations: 'file', desk: 'home', overview: 'home', enterprise: 'layers', home: 'home', guide: 'guide', grades: 'bars', fees: 'wallet', tx: 'file', affairs: 'users', student_life: 'housing', labtools: 'library', dashboard: 'bars', academics: 'book', comms: 'news', exchange: 'exchange', internal: 'file', corr: 'mail', hr: 'briefcase', payroll: 'briefcase', procurement: 'box', finance: 'wallet', settings: 'settings', units: 'layers', import: 'upload', export: 'download', attendance: 'hall', admin: 'settings', access: 'key', audit: 'audit', verify: 'check', lms: 'lms', research: 'research', alumni: 'graduation', qa: 'quality', expansions: 'clipboard', devops: 'settings', ai: 'spark', guidelines: 'compass' };
   /* أيقونات التبويبات الفرعية في القائمة الجانبية: بمفتاح التبويب أولاً، ثم بكلمات عنوانه، وإلا أيقونة ملف.
      تُزال الرموز التعبيرية من أول العنوان كي تتوحد التبويبات كلها على أيقونات الهوية. */
   const SUB_ICON = {
@@ -92,7 +92,7 @@
   const PARENT = { site: 'admin', services: 'admin' };
   /* مجموعات القائمة الجانبية وترتيبها */
   const NAV_GROUP = {
-    overview: 'الرئيسية', desk: 'الرئيسية',
+    overview: 'الرئيسية', desk: 'الرئيسية', hub: 'الرئيسية',
     affairs: 'الشؤون الطلابية', student_life: 'الشؤون الطلابية',
     academics: 'الشؤون الأكاديمية', attendance: 'الشؤون الأكاديمية', expansions: 'الشؤون الأكاديمية', lms: 'الشؤون الأكاديمية', research: 'الشؤون الأكاديمية', alumni: 'الشؤون الأكاديمية', qa: 'الشؤون الأكاديمية',
     payroll: 'الإدارة والموارد', hr: 'الإدارة والموارد', corr: 'الإدارة والموارد', councils: 'الإدارة والموارد', facilities: 'الإدارة والموارد', recruitment: 'الإدارة والموارد', quotations: 'الإدارة والموارد', internal: 'الإدارة والموارد', finance: 'الإدارة والموارد', procurement: 'الإدارة والموارد',
@@ -100,7 +100,7 @@
     admin: 'الإدارة والحوكمة', access: 'الإدارة والحوكمة', audit: 'الإدارة والحوكمة', units: 'الإدارة والحوكمة', verify: 'الإدارة والحوكمة', guidelines: 'الإدارة والحوكمة',
     labtools: 'أدوات تجريبية',
   };
-  const NAV_ORDER = ['overview', 'desk', 'affairs', 'student_life', 'academics', 'attendance', 'expansions', 'lms', 'research', 'alumni', 'qa', 'payroll', 'hr', 'recruitment', 'corr', 'councils', 'facilities', 'internal', 'finance', 'procurement', 'quotations', 'dashboard', 'exchange', 'ai', 'comms', 'admin', 'access', 'audit', 'units', 'verify', 'guidelines', 'labtools'];
+  const NAV_ORDER = ['overview', 'desk', 'hub', 'affairs', 'student_life', 'academics', 'attendance', 'expansions', 'lms', 'research', 'alumni', 'qa', 'payroll', 'hr', 'recruitment', 'corr', 'councils', 'facilities', 'internal', 'finance', 'procurement', 'quotations', 'dashboard', 'exchange', 'ai', 'comms', 'admin', 'access', 'audit', 'units', 'verify', 'guidelines', 'labtools'];
   const SIDE_LABEL = { corr: 'الديوان والمراسلات', guidelines: 'دليل الإرشادات التفاعلي' };
   const EXTRA_LABEL = { site: 'إعدادات الموقع', services: 'الخدمات' };
 

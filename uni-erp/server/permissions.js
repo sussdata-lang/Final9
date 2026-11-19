@@ -65,6 +65,14 @@ export const PERMISSION_CATALOG = [
     ],
   },
   {
+    group: 'مركز العمل (الموافقات والأتمتة)',
+    items: [
+      { key: 'approvals:manage', label: 'تعريف أنواع الموافقات وخطواتها، والاطلاع على كل طلبات الموافقة', op: 'approve', module: 'governance_system' },
+      { key: 'approvals:read_all', label: 'الاطلاع على كل طلبات الموافقة دون البت فيها', op: 'view', module: 'governance_system' },
+      { key: 'automation:manage', label: 'تعريف قواعد الأتمتة والتذكيرات الدورية وتشغيلها', op: 'edit', module: 'governance_system' },
+    ],
+  },
+  {
     group: 'المجالس واللجان',
     items: [
       { key: 'council:manage', label: 'تشكيل المجالس واللجان وتعيين أعضائها وإدارة كل اجتماعاتها', op: 'edit', module: 'correspondence' },
@@ -107,7 +115,9 @@ export const PERMISSION_CATALOG = [
     items: [
       { key: 'procurement:read', label: 'عرض المخازن والأصناف وطلبات الشراء والأصول الثابتة', op: 'view', module: 'procurement_assets' },
       { key: 'procurement:request', label: 'كتابة وإنشاء طلبات الشراء وإرسالها للاعتماد', op: 'write', module: 'procurement_assets' },
-      { key: 'procurement:stock', label: 'استلام التوريد وصرف المخزون وتعديل الحركة المخزنية', op: 'edit', module: 'procurement_assets' },
+      { key: 'procurement:stock', label: 'استلام التوريد وصرف المخزون', op: 'edit', module: 'procurement_assets' },
+      { key: 'procurement:issue_approve', label: 'اعتماد طلبات صرف المواد من المستودع لموظفي وحدته', op: 'approve', module: 'procurement_assets' },
+      { key: 'procurement:adjust', label: 'تسوية الجرد وتعديل الرصيد الدفتري (منفصلة عن الاستلام والصرف)', op: 'approve', module: 'procurement_assets' },
       { key: 'procurement:assets', label: 'إدارة وتعديل الأصول الثابتة وحركاتها (نقل، صيانة، إتلاف)', op: 'delete', module: 'procurement_assets' },
       { key: 'procurement:manage', label: 'اعتماد طلبات الشراء وإنشاء أوامر التوريد وإدارة الموردين', op: 'approve', module: 'procurement_assets' },
       { key: 'procurement:approve_finance', label: 'الاعتماد المالي لطلبات الشراء التي تتجاوز حدها في الإعدادات', op: 'approve', module: 'procurement_assets' },
@@ -296,7 +306,7 @@ const RAW_PLATFORM_MODULES = [
       view: { label: 'عرض المخازن والأصول والطلبات', perms: ['procurement:read'] },
       write: { label: 'تقديم طلبات شراء وتوريد', perms: ['procurement:request'] },
       edit: { label: 'استلام وصرف وتعديل المخزون', perms: ['procurement:stock'] },
-      approve: { label: 'اعتماد الشراء وأوامر التوريد', perms: ['procurement:manage'] },
+      approve: { label: 'اعتماد الشراء وأوامر التوريد وتسوية الجرد', perms: ['procurement:manage', 'procurement:adjust'] },
       delete: { label: 'إدارة الأصول وإتلاف العهد', perms: ['procurement:assets'] },
     },
   },
@@ -519,7 +529,7 @@ export const DEPARTMENT_ROLE_PRESETS = [
     dataScope: 'all',
     allowedViews: ['desk', 'overview', 'procurement', 'internal', 'corr'],
     permissions: [
-      'procurement:read', 'procurement:request', 'procurement:stock', 'procurement:assets', 'procurement:manage',
+      'procurement:read', 'procurement:request', 'procurement:stock', 'procurement:assets', 'procurement:manage', 'procurement:adjust',
       'request:create_internal', 'corr:use', 'staffatt:self',
     ],
   },
@@ -600,6 +610,7 @@ export const ALL_STAFF_VIEWS = [
   { key: 'corr', label: 'الديوان والمراسلات والطلبات الداخلية', group: 'الموارد البشرية والديوان' },
   { key: 'councils', label: 'المجالس واللجان والقرارات', group: 'الموارد البشرية والديوان' },
   { key: 'facilities', label: 'الخدمات الإدارية (الصيانة وحجز القاعات)', group: 'الموارد البشرية والديوان' },
+  { key: 'hub', label: 'مركز العمل (الأنشطة والموافقات والتقارير المحورية والأتمتة)', group: 'الرئيسية' },
   { key: 'recruitment', label: 'التوظيف (الشواغر والمتقدمون والمقابلات)', group: 'الموارد البشرية والديوان' },
   { key: 'quotations', label: 'عروض الأسعار وتقييم المورّدين', group: 'المالية والمشتريات' },
   { key: 'finance', label: 'المالية والمحاسبة والرسوم', group: 'المالية والمشتريات' },
@@ -643,7 +654,7 @@ export const PERMISSIONS = {
     'academic:read', 'course:manage', 'grade:manage', 'attendance:manage', 'faculty:manage',
     'comms:read', 'news:manage', 'complaint:manage', 'data:export', 'alumni_career:view', 'sa_discipline:view',
   ],
-  auditor: ['request:read_all', 'corr:read_all', 'document:read_all', 'audit:read', 'stats:read', 'student:read', 'academic:read', 'comms:read', 'finance:read', 'procurement:read', 'qa_inst:view', 'alumni_career:view', 'sa_discipline:view', 'sa_housing:view'],
+  auditor: ['request:read_all', 'corr:read_all', 'document:read_all', 'audit:read', 'stats:read', 'student:read', 'academic:read', 'comms:read', 'finance:read', 'procurement:read', 'qa_inst:view', 'alumni_career:view', 'sa_discipline:view', 'sa_housing:view', 'approvals:read_all'],
   admin: [...ASSIGNABLE],
 };
 
@@ -839,7 +850,8 @@ export function computeAllowedViews(effectivePerms = [], explicitAllowedViews = 
   if (has('request:read_all', 'request:read_unit', 'student:read', 'student:register', 'sa_admissions:view', 'sa_advising:view', 'sa_scholarships:view')) out.push('affairs');
   if (has('academic:read', 'course:manage', 'grade:manage', 'grade:approve', 'grade:approve_own', 'faculty:manage')) out.push('academics');
   if (has('attendance:manage')) out.push('attendance');
-  if (has('exams_housing:view', 'exams_housing:write', 'exams_housing:edit', 'exams_housing:approve', 'academic:read', 'grade:manage', 'grade:approve', 'course:manage')) out.push('expansions');
+  // تبويب «الترقيات العلمية» في هذه الواجهة لشؤون الهيئة التدريسية والموارد البشرية: بدونها لا يصلون إلى ملفات الترقية
+  if (has('exams_housing:view', 'exams_housing:write', 'exams_housing:edit', 'exams_housing:approve', 'academic:read', 'grade:manage', 'grade:approve', 'course:manage', 'faculty:manage', 'hr_emp:view', 'hr_emp:write', 'hr_emp:edit', 'hr:manage', 'staffatt:manage')) out.push('expansions');
   if (has('sa_housing:view', 'sa_housing:manage')) out.push('student_life');
   if (has('sa_admissions:view', 'sa_admissions:write', 'sa_admissions:approve', 'student:register', 'sa_housing:view', 'sa_housing:manage', 'faculty:manage', 'lms_lib:view', 'lms_lib:write', 'lms_lib:edit', 'lms_lib:approve', 'academic:read', 'course:manage')) out.push('labtools');
   if (has('lms_lib:view', 'lms_lib:write', 'lms_lib:edit', 'lms_lib:approve', 'academic:read', 'course:manage', 'sa_quiz:write', 'sa_quiz:approve')) out.push('lms');
@@ -849,7 +861,8 @@ export function computeAllowedViews(effectivePerms = [], explicitAllowedViews = 
   if (has('hr_emp:view', 'hr_emp:write', 'hr_emp:edit', 'hr_payroll:approve', 'staffatt:self', 'staffatt:manage')) out.push('payroll');
   if (has('corr:use', 'corr:read_all', 'corr:templates', 'request:create_internal')) out.push('corr');
   // كل موظف قد يكون عضواً في مجلس أو مكلفاً بتنفيذ قرار، فيرى مجالسه ومهامه
-  out.push('councils', 'facilities');
+  // مركز العمل لكل موظف: أنشطته وموافقاته ونقاش السجلات
+  out.push('councils', 'facilities', 'hub');
   if (role === 'admin' || has('hr:manage')) out.push('recruitment');
   if (has('procurement:read')) out.push('quotations');
   if (has('stats:read', 'hr_emp:view', 'hr_emp:write', 'hr_emp:edit', 'hr_emp:delete', 'hr:manage', 'hr_payroll:approve', 'staffatt:manage', 'audit:read', 'devops:manage', 'settings:manage', 'backup:manage')) out.push('dashboard');
@@ -865,7 +878,7 @@ export function computeAllowedViews(effectivePerms = [], explicitAllowedViews = 
   // ويحجب فقط ما كان موجوداً عند حفظه (knownViews)؛ بلا هذه القائمة يبقى السلوك القديم: كل ما لم يُختر محجوب
   if (Array.isArray(explicitAllowedViews) && explicitAllowedViews.length > 0) {
     const legacy = { desk: 'overview', hr: 'payroll', internal: 'corr', devops: 'audit', units: 'admin', verify: 'admin' };
-    const chosen = new Set(['overview', 'guidelines', 'admin', 'councils', 'facilities', ...explicitAllowedViews.map((k) => legacy[k] ?? k)]);
+    const chosen = new Set(['overview', 'guidelines', 'admin', 'councils', 'facilities', 'hub', ...explicitAllowedViews.map((k) => legacy[k] ?? k)]);
     const known = Array.isArray(knownViews) && knownViews.length ? new Set(knownViews.map((k) => legacy[k] ?? k)) : null;
     return staffViewKeys().filter((k) => out.includes(k) && (chosen.has(k) || (known !== null && !known.has(k))));
   }

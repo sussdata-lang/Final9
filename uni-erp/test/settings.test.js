@@ -159,3 +159,36 @@ test('الحضور والإجازات: الرصيد والعطلة ونوع ال
   const hrs = (await api('GET', '/api/hr/settings', { cookie: adm })).json.settings;
   assert.equal(hrs.leaveDefaultDays, 21);                       // الواجهتان تقرآن المصدر نفسه
 });
+
+// دليل الطالب: حدود سلّم التقديرات قابلة للضبط ومتسقة، و«الفصل الصيفي» المحفوظ قبل التوحيد يُقرأ «الفصل الثالث»
+test('سلّم التقديرات والفصول الثلاثة من الإعدادات', async () => {
+  const adm = await loginAs('admin');
+  const { getSetting, ratingScale } = await import('../server/services/settings.js');
+  const items = (await api('GET', '/api/admin/general', { cookie: adm })).json.tabs.find((t) => t.key === 'grades').items;
+  assert.deepEqual(['grades.rating_honor', 'grades.rating_excellent', 'grades.rating_very_good', 'grades.rating_good'].map((k) => items.find((i) => i.key === k).value), [95, 85, 75, 65]);
+  assert.deepEqual(ratingScale(app.db).tiers.map((t) => t.label), ['شرف', 'امتياز', 'جيد جداً', 'جيد']);
+
+  // الحدود يجب أن تتناقص تماماً
+  assert.equal((await put({ 'grades.rating_excellent': 96 }, adm)).status, 400);
+  assert.equal((await put({ 'grades.rating_very_good': 85 }, adm)).status, 400);
+  assert.equal((await put({ 'grades.rating_good': 80 }, adm)).status, 400);
+  assert.equal((await put({ 'grades.rating_honor': 101 }, adm)).status, 400);
+  assert.equal((await put({ 'grades.rating_honor': 90 }, adm)).status, 200);
+  try {
+    assert.equal(ratingScale(app.db).tiers[0].min, 90);
+    const lim = (await api('GET', '/api/me', { cookie: adm })).json.limits;
+    assert.equal(lim.ratingScale.tiers[0].min, 90); assert.deepEqual(lim.semesters, ['الفصل الأول', 'الفصل الثاني', 'الفصل الثالث']);
+  } finally { await api('POST', '/api/admin/general/reset', { cookie: adm, body: { keys: ['grades.rating_honor'] } }); }
+
+  // الفصل الحالي: ثلاثة خيارات، والقيمة القديمة المحفوظة تُقرأ وتُحفظ «الفصل الثالث»
+  const sem = (await api('GET', '/api/admin/general', { cookie: adm })).json.tabs.flatMap((t) => t.items).find((i) => i.key === 'academic.current_semester');
+  assert.deepEqual(sem.options.map((o) => o.value), ['الفصل الأول', 'الفصل الثاني', 'الفصل الثالث']);
+  app.db.prepare("INSERT INTO site_settings (key, value) VALUES ('cfg.academic.current_semester', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(JSON.stringify('الفصل الصيفي'));
+  try {
+    (await import('../server/cache.js')).flushAllCaches(app.db);       // كتابة مباشرة في الجدول (محاكاة بيانات قديمة)
+    assert.equal(getSetting(app.db, 'academic.current_semester'), 'الفصل الثالث');
+    assert.equal((await put({ 'academic.current_semester': 'الفصل الصيفي' }, adm)).status, 200);
+    assert.equal(getSetting(app.db, 'academic.current_semester'), 'الفصل الثالث');
+    assert.equal((await put({ 'academic.current_semester': 'الفصل الرابع' }, adm)).status, 400);
+  } finally { await api('POST', '/api/admin/general/reset', { cookie: adm, body: { keys: ['academic.current_semester'] } }); }
+});

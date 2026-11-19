@@ -4,7 +4,7 @@
   const LV = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة'];
   const GOV_DEFAULT = ['دمشق'];
   const govs = () => (UA.S.limits && UA.S.limits.governorates) || GOV_DEFAULT;
-  const SEM_LABEL = { 1: 'الفصل الأول', 2: 'الفصل الثاني' };
+  const SEM_LABEL = { 1: 'الفصل الأول', 2: 'الفصل الثاني', 3: 'الفصل الثالث' };
   const day = (t) => { try { return new Date(t).toLocaleDateString('ar-EG-u-nu-latn', { dateStyle: 'medium' }); } catch { return ''; } };
 
   const T = { all: null, profile: null, news: null, courses: null, grades: null, reqs: null, cmps: null, loading: {},
@@ -93,7 +93,7 @@
         const prev = open ? g.previous.map((p) => `<tr class="sx-prev"><td colspan="7"><span class="sx-muted">${esc(p.academicYear || '')}</span> · نظري <b>${dash(p.theory)}</b> · عملي <b>${dash(p.practical)}</b> · المجموع <b>${dash(p.total)}</b></td></tr>`).join('') : '';
         return `<tr><td><strong>${esc(g.course)}</strong>${g.instructor ? `<div class="sx-sub rtl">${esc(g.instructor)}</div>` : ''}</td><td data-l="الفصل">${SEM_LABEL[g.semester] || ''}</td><td data-l="النظري">${dash(g.theory)}</td><td data-l="العملي">${dash(g.practical)}</td><td data-l="المجموع"><b>${dash(g.total)}</b></td><td data-l="النتيجة">${badge}</td><td>${prevBtn}</td></tr>${prev}`;
       }).join('');
-      body = list.length ? `<table class="sx-table rsp"><thead><tr><th>المقرر</th><th>الفصل</th><th>النظري</th><th>العملي</th><th>المجموع</th><th>النتيجة</th><th></th></tr></thead><tbody>${rows}</tbody></table>` : sxEmpty('لا توجد علامات لهذه السنة بعد', 'تظهر العلامات هنا فور اعتمادها من شؤون الطلاب.');
+      body = list.length ? `<table class="sx-table rsp"><thead><tr><th>المقرر</th><th>الفصل</th><th>النظري</th><th>العملي</th><th>المجموع</th><th>النتيجة</th><th></th></tr></thead><tbody>${rows}</tbody></table>` : sxEmpty('لا توجد علامات لهذه السنة بعد', 'تظهر علامة كل مقرر هنا عند إعلان نتيجته، ويصلك إشعار بذلك.');
     }
     return sxHead('علاماتي', 'نتائجك في كل مقرر، مع المحاولات السابقة إن وُجدت.') + cards + `<article class="sx-panel"><div class="sx-bar">${sxTabs('grlvl', lv)}${sxSem('grsem', T.gr.sem)}</div><div class="sx-tscroll">${body}</div></article>`;
   }

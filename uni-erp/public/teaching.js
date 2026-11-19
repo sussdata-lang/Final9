@@ -57,7 +57,22 @@
         <td><b>${esc(x.name)}</b> <span class="mono small">${esc(x.studentNo)}</span></td><td>${x.present}</td><td>${x.absent}</td>
         <td><b style="color:${x.overLimit ? '#B3261E' : x.warn ? '#8A6A1B' : '#1B7F4B'}">${x.percent}%</b></td>
         <td>${x.deprivationId ? `<span class="pill p-rejected">محروم</span>${UA.can('course:manage') ? ` <button class="btn sm" type="button" data-act="talift" data-id="${x.deprivationId}">رفع الحرمان</button>` : ''}` : x.overLimit ? '<span class="pill p-rejected">تجاوز الحد</span>' : x.warn ? '<span class="pill p-review">تنبيه</span>' : '—'}</td></tr>`).join('');
-      return `${wizard}<section class="card"><h2>الغياب والحرمان</h2>${pick}
+      // كشف حضور المحاضرة: يُفتح ليوم (اليوم افتراضياً)، الكل حاضر حتى يؤشّر المدرّس الغائبين، ومن مسح بطاقته حاضر دائماً
+      const rc = T.roll && String(T.roll.course.id) === String(T.absenceCourse) ? T.roll : null;
+      const rollRows = rc ? rc.students.map((x) => `<tr>
+        <td><input type="checkbox" class="ta-roll" value="${x.studentId}"${x.present ? ' checked' : ''}${x.byCard ? ' disabled title="مسح بطاقته عند دخول القاعة"' : ''} aria-label="حاضر"></td>
+        <td><b>${esc(x.name)}</b> <span class="mono small">${esc(x.studentNo)}</span></td>
+        <td>${x.byCard ? '<span class="pill p-approved">حاضر بالبطاقة</span>' : ''}${x.deprived ? ' <span class="pill p-rejected">محروم</span>' : ''}</td></tr>`).join('') : '';
+      const roll = `<section class="card"><h2>كشف حضور المحاضرة</h2>
+        <p class="hint" style="margin-top:0">اختر يوم المحاضرة وافتح الكشف: الطلاب حاضرون افتراضياً، أزل التأشير عن الغائبين ثم احفظ. تُحتسب المحاضرة منعقدة ولو غاب الجميع، ومن مسح بطاقته عند الدخول يبقى حاضراً.</p>
+        <div class="inline-form"><label>يوم المحاضرة<input id="ta-roll-day" type="date" value="${esc(T.rollDay || new Date().toISOString().slice(0, 10))}" max="${new Date().toISOString().slice(0, 10)}"></label>
+          <label>القاعة (اختياري)<input id="ta-roll-hall" maxlength="60" placeholder="مثال: المدرج الثاني" value="${esc(rc && rc.session ? rc.session.hall : '')}"></label>
+          <button class="btn" type="button" data-act="tarollopen">فتح الكشف</button></div>
+        ${rc ? `<p class="small">${rc.saved ? `محفوظ ${esc(new Date(rc.session.takenAt).toLocaleString('ar-SY'))}${rc.session.takenBy ? ` · ${esc(rc.session.takenBy)}` : ''} · حاضر ${rc.session.present} · غائب ${rc.session.absent}` : 'كشف جديد لم يُحفظ بعد'} · <span id="ta-roll-count"></span></p>
+          ${table(['حاضر', 'الطالب', ''], rollRows, 'لا طلاب في هذا المقرر.')}
+          <div class="actions"><button class="btn" type="button" data-act="tarollall" data-on="1">الكل حاضر</button><button class="btn" type="button" data-act="tarollall" data-on="0">الكل غائب</button>
+            <button class="btn pri" type="button" data-act="tarollsave">حفظ الكشف</button>${rc.saved ? '<button class="btn dan" type="button" data-act="tarollcancel">لم تنعقد المحاضرة (حذف الكشف)</button>' : ''}</div>` : ''}</section>`;
+      return `${wizard}${roll}<section class="card"><h2>الغياب والحرمان</h2>${pick}
         <p class="hint">${esc(r.term)} · الفترة ${esc(r.window.from)} إلى ${esc(r.window.to)}${r.window.fromCalendar ? '' : ' (لم تُحدد في التقويم؛ آخر 120 يوماً)'} · انعقد المقرر ${r.held} يوماً · الحد ${r.maxPercent}% ويُحسب بعد ${r.minSessions} محاضرات.</p>
         ${table(['', 'الطالب', 'حضر', 'غاب', 'نسبة الغياب', 'الحالة'], rows, 'لا طلاب.')}
         <div class="actions"><button class="btn" type="button" data-act="tawarn">تنبيه من بلغ نصف الحد</button><button class="btn dan" type="button" data-act="tadeprive">حرمان المحددين</button></div></section>`;
@@ -79,7 +94,7 @@
         try {
           const d = await UA.api('GET', '/api/teaching/me');
           el.innerHTML = `<article class="sx-panel" style="margin-top:16px"><div class="sx-ph"><div><h2>الغياب وتغييرات المحاضرات</h2><p>${esc(d.term)} · الحد المسموح للغياب ${d.maxPercent}%</p></div></div>
-            ${table(['المقرر', 'انعقد', 'حضرت', 'نسبة الغياب', ''], d.absence.map((a) => `<tr><td><b>${esc(a.course)}</b></td><td>${a.held}</td><td>${a.present}</td><td>${a.percent}%</td><td>${a.deprived ? '<span class="pill p-rejected">محروم</span>' : a.percent > d.maxPercent ? '<span class="pill p-rejected">تجاوز الحد</span>' : a.percent >= d.maxPercent / 2 ? '<span class="pill p-review">انتبه</span>' : ''}</td></tr>`).join(''), 'لا مقررات.')}
+            ${table(['المقرر', 'انعقد', 'حضرت', 'نسبة الغياب', ''], d.absence.map((a) => `<tr><td><b>${esc(a.course)}</b></td><td>${a.held}</td><td>${a.present}</td><td>${a.percent}%</td><td>${a.deprived ? '<span class="pill p-rejected">محروم</span>' : a.overLimit ? '<span class="pill p-rejected">تجاوز الحد</span>' : a.warn ? '<span class="pill p-review">انتبه</span>' : a.held && a.held < d.minSessions ? `<span class="small">يُحتسب بعد ${d.minSessions} محاضرات</span>` : ''}</td></tr>`).join(''), 'لا مقررات.')}
             ${d.changes.length ? `<h3>تغييرات المحاضرات</h3>${table(['المقرر', 'الإجراء', 'الموعد', 'التعويض', 'السبب'], d.changes.map((x) => `<tr><td>${esc(x.course)}</td><td>${esc(KIND[x.kind])}</td><td>${esc(x.lectureDay)} ${esc(x.start)}</td><td>${x.makeupDay ? `${esc(x.makeupDay)} ${esc(x.makeupStart)}-${esc(x.makeupEnd)} ${esc(x.makeupHall)}` : '—'}</td><td>${esc(x.reason)}</td></tr>`).join(''), '')}` : ''}
             ${d.calendar.length ? `<h3>التقويم الأكاديمي القادم</h3>${table(['الحدث', 'من', 'إلى'], d.calendar.map((e) => `<tr><td><b>${esc(e.title)}</b></td><td>${esc(e.startDay)}</td><td>${esc(e.endDay)}</td></tr>`).join(''), '')}` : ''}</article>`;
         } catch { /* غير متاح: لا نعرض اللوحة */ }
@@ -88,7 +103,13 @@
     },
   };
 
-  const again = () => mount(UA.teaching.tab);
+  // عدّاد حي لكشف الحضور أثناء التأشير
+  const rollCount = () => {
+    const all = [...document.querySelectorAll('.ta-roll')], on = all.filter((x) => x.checked).length, el = document.getElementById('ta-roll-count');
+    if (el) el.textContent = `المؤشَّر الآن: حاضر ${on} · غائب ${all.length - on}`;
+  };
+  document.addEventListener('change', (e) => { if (e.target && e.target.classList && e.target.classList.contains('ta-roll')) rollCount(); });
+  const again = () => mount(UA.teaching.tab).then(rollCount);
   Object.assign(UA.actions, {
     tcadd: async () => { await UA.api('POST', '/api/teaching/calendar', { kind: val('tc-kind'), title: val('tc-title'), startDay: val('tc-start'), endDay: val('tc-end') }); toast('أُضيف الحدث'); await again(); },
     tccancel: async (_el, d) => { if (!confirm('إلغاء هذا الحدث من التقويم؟')) return; await UA.api('POST', `/api/teaching/calendar/${d.id}/cancel`, {}); await again(); },
@@ -104,7 +125,23 @@
       if (!confirm(`حرمان ${studentIds.length} طالباً من كل مقرر تجاوزوا فيه الحد؟ يُبلَّغ كل منهم.`)) return;
       const r = await UA.api('POST', '/api/teaching/absence-overview/deprive', { studentIds }); toast(`صدر ${r.deprived} قرار حرمان في ${r.courses} مقرر`); await again();
     },
-    tashow: async () => { T.absenceCourse = val('ta-course'); await again(); },
+    tashow: async () => { T.absenceCourse = val('ta-course'); T.roll = null; await again(); },
+    tarollopen: async () => {
+      T.rollDay = val('ta-roll-day');
+      T.roll = await UA.api('GET', `/api/teaching/rollcall/${T.absenceCourse}?day=${encodeURIComponent(T.rollDay)}`);
+      await again();
+    },
+    tarollall: async (_el, d) => { document.querySelectorAll('.ta-roll:not(:disabled)').forEach((x) => { x.checked = d.on === '1'; }); rollCount(); },
+    tarollsave: async () => {
+      const present = [...document.querySelectorAll('.ta-roll:checked')].map((x) => Number(x.value));
+      T.roll = await UA.api('POST', `/api/teaching/rollcall/${T.absenceCourse}`, { day: T.roll.day, hall: val('ta-roll-hall'), present });
+      toast(`حُفظ كشف ${T.roll.day}: حاضر ${T.roll.session.present} · غائب ${T.roll.session.absent}`); await again();
+    },
+    tarollcancel: async () => {
+      if (!confirm(`حذف كشف حضور ${T.roll.day}؟ لن تُحتسب المحاضرة منعقدة (تبقى سجلات مسح البطاقات).`)) return;
+      T.roll = await UA.api('DELETE', `/api/teaching/rollcall/${T.absenceCourse}?day=${encodeURIComponent(T.roll.day)}`);
+      toast('حُذف كشف المحاضرة'); await again();
+    },
     tawarn: async () => { const r = await UA.api('POST', `/api/teaching/absence/${T.absenceCourse}/warn`, {}); toast(`أُرسل التنبيه إلى ${r.warned} طالباً`); },
     tadeprive: async () => {
       const studentIds = [...document.querySelectorAll('.ta-pick:checked')].map((x) => Number(x.value));

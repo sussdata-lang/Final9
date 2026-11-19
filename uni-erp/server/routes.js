@@ -39,6 +39,8 @@ const ROUTE_LOCKS = {
   'POST /api/student-affairs-suite/lifecycle': (c) => `lifecycle:${c.body?.studentId}`,
   'POST /api/student-affairs-suite/lifecycle/:id/decide': byId('movement'),
   'POST /api/procurement/receipts': () => 'stock', 'POST /api/procurement/issues': () => 'stock', 'POST /api/procurement/items/:id/adjust': () => 'stock',
+  'POST /api/procurement/returns': () => 'stock',
+  'POST /api/procurement/transfers': () => 'stock', 'POST /api/procurement/transfers/:id/receive': () => 'stock', 'POST /api/procurement/transfers/:id/cancel': () => 'stock',
 };
 // الرد يُرسل بعد إنهاء المعاملة، فلا يقرأ العميل بيانات لم تُحفظ بعد
 function lockedHandler(db, keyOf, handler) {
@@ -69,7 +71,8 @@ import { registerCouncilRoutes } from './services/councils.js';
 import { registerTeachingRoutes } from './services/teaching.js';
 import { registerRecruitmentRoutes } from './services/recruitment.js';
 import { registerFacilitiesRoutes } from './services/facilities.js';
-import { registerGradingRoutes } from './services/grading.js';
+import { registerPlatformRoutes } from './services/platform/routes.js';
+import { registerGradingRoutes, isLocked } from './services/grading.js';
 import { globalSearch } from './services/global_search.js';
 import { registerSecurityCenterRoutes } from './services/security_center.js';
 import { registerConsentRoutes } from './services/consent.js';
@@ -78,6 +81,9 @@ import { registerContainmentRoutes } from './services/security_containment.js';
 import { registerWalletRoutes } from './services/wallet.js';
 import { DATA_CLASSIFICATION, SENSITIVITY } from './lib/data_classification.js';
 import { registerQuotationRoutes } from './services/procurement/quotations.js';
+import { registerIssueFlowRoutes } from './services/procurement/issue_flow.js';
+import { registerAssetRoutes } from './services/procurement/assets.js';
+import { registerProcReportRoutes } from './services/procurement/reports.js';
 import { login, logout, publicUser, changePassword, getSessionCacheStats, invalidateSessionCache } from './services/auth.js';
 import { listStaff, listStaffLight, staffDetail, createUser, updateUser, setUserActive, resetUserPassword, deleteUser } from './services/useradmin.js';
 import { getTranscriptTemplate, setTranscriptTemplate, getSite, saveSite, universityName } from './services/site.js';
@@ -89,7 +95,7 @@ import { createDoc, updateDoc, sendDoc, getDoc, listDocs, decideDoc, commentDoc,
 import { corrPdf } from './services/corrpdf.js';
 import { listTemplates, createTemplate, updateTemplate, deleteTemplate } from './services/corrTemplates.js';
 import { deskSummary } from './services/desk.js';
-import { listSettings, saveSettings, resetSettings, publicLimits } from './services/settings.js';
+import { listSettings, saveSettings, resetSettings, makeDefaultSettings, factoryDefaultSettings, publicLimits } from './services/settings.js';
 import { punch, myAttendance, dayReport, exportMonth, listBalances, setEntitlement, getHrSettings, saveHrSettings } from './services/staffatt.js';
 import { IMPORT_PERM } from './services/importer.js';
 import { cardOptions, cardStudents, listCardBatches, createCardBatch, cardBatchDetail, cardBatchXlsx, markCardReceived, undoCardReceived, cardCertificates } from './services/cards.js';
@@ -115,13 +121,16 @@ import { qrSvg } from './qr.js';
 import { overview, createRole, updateRole, deleteRole, createUnit, updateUnit, deleteUnit, createLink, deleteLink, linkedTargets, matrixXlsx } from './services/access.js';
 import { registrationOptions, registerStudent, listStudents, listStudentsTable, getStudent, updateStudent, resetStudentPassword, myProfile, updateOwnContact, listPrograms, addProgram, toggleProgram, listFaculties, addFaculty, toggleFaculty, updateFaculty, deleteFaculty, updateProgram, deleteProgram, deleteStudent, assertStudentInScope } from './services/students.js';
 import { listCourses, listGradesTable, createCourse, toggleCourse, updateCourse, deleteCourse, myGrades, gradesFor, enterGrade, gradeSheet, saveGradeSheet, deleteGrade, listNews, createNews, updateNews, deleteNews, createComplaint, listComplaints, respondComplaint, deleteComplaint } from './services/academics.js';
-import { transitionGrades, gradeHistory, workflowOn, setWorkflow, myCourseGrades } from './services/workflow.js';
+import { transitionGrades, gradeHistory, setWorkflow, myCourseGrades } from './services/workflow.js';
 import { getSlots, setSlots, addSlot, detectScheduleConflicts, studentTimetable, DAYS } from './services/schedule.js';
 import { getUnifiedStudentRecord } from './services/record360.js';
-import { expandFields, requesterKind, createRequest, listRequests, getRequest, decide, forwardRequest, stats, readAttachment } from './services/requests.js';
+import { expandFields, requesterKind, createRequest, listRequests, getRequest, decide, forwardRequest, forwardPeople, stats, readAttachment } from './services/requests.js';
 import { getDocument, verifyPublic } from './services/documents.js';
 import { exportOptions, preview as exportPreview, renderExport } from './services/dataexport.js';
 import { audit, verifyAuditChain } from './audit.js';
+import { writeXlsx } from './lib/xlsx.js';
+import { registerBiometricRoutes } from './services/biometric.js';
+import { registerAppraisalRoutes } from './services/appraisals.js';
 import { encryptField, decryptField } from './lib/data_crypto.js';
 import { recentLogs } from './lib/logger.js';
 
@@ -176,6 +185,8 @@ export async function buildRouter(deps) {
   r.add('GET', '/api/admin/general', (c) => { need(c, 'settings:manage'); c.json(200, listSettings(db)); });
   r.add('PUT', '/api/admin/general', (c) => { need(c, 'settings:manage'); c.json(200, saveSettings(deps, c.user, c.body, c.ip)); });
   r.add('POST', '/api/admin/general/reset', (c) => { need(c, 'settings:manage'); c.json(200, resetSettings(deps, c.user, c.body, c.ip)); });
+  r.add('POST', '/api/admin/general/make-default', (c) => { need(c, 'settings:manage'); c.json(200, makeDefaultSettings(deps, c.user, c.body, c.ip)); });
+  r.add('POST', '/api/admin/general/factory-default', (c) => { need(c, 'settings:manage'); c.json(200, factoryDefaultSettings(deps, c.user, c.body, c.ip)); });
   r.add('GET', '/api/me/desk', async (c) => { if (c.user.role === 'student') throw new HttpError(403, 'خاص بالعاملين.', 'forbidden'); c.json(200, { desk: await deskSummary(deps, c.user) }); });
   r.add('GET', '/api/me/profile', (c) => { need(c, 'profile:read_own'); c.json(200, { profile: myProfile(deps, c.user) }); });
 
@@ -198,14 +209,15 @@ export async function buildRouter(deps) {
   r.add('GET', '/api/students/:id/grades', (c) => { need(c, 'student:read'); getStudent(deps, c.params.id); c.json(200, gradesFor(db, Number(c.params.id), null)); });
   r.add('POST', '/api/students/:id/grades', (c) => {
     need(c, 'grade:manage'); const out = enterGrade(deps, c.user, c.params.id, c.body, c.ip);
-    if (!workflowOn(db)) notifyGrade(deps, Number(c.params.id), db.prepare('SELECT name FROM courses WHERE id = ?').get(Number(c.body?.courseId))?.name);
+    // الطالب يرى العلامة بعد إعلان نتيجة مقررها: لا نُبلغه بعلامة لا يراها (الإعلان يُبلغ الجميع)، إلا تعديلاً بعد الإعلان
+    if (isLocked(db, Number(c.body?.courseId), String(c.body?.academicYear ?? ''))) notifyGrade(deps, Number(c.params.id), db.prepare('SELECT name FROM courses WHERE id = ?').get(Number(c.body?.courseId))?.name);
     c.json(200, out);
   });
   r.add('GET', '/api/search', async (c) => { if (!c.user || c.user.role === 'student') throw new HttpError(403, 'البحث الشامل للموظفين.', 'forbidden'); c.json(200, await globalSearch(deps, c.user, c.query?.q)); });
   r.add('GET', '/api/courses/:id/grade-sheet', (c) => { need(c, 'grade:manage'); c.json(200, gradeSheet(deps, c.params.id, c.query?.year)); });
   r.add('POST', '/api/courses/:id/grade-sheet', (c) => {
     need(c, 'grade:manage'); const out = saveGradeSheet(deps, c.user, c.params.id, c.body, c.ip);
-    if (!workflowOn(db)) { const name = db.prepare('SELECT name FROM courses WHERE id = ?').get(Number(c.params.id))?.name; for (const id of out.savedIds) notifyGrade(deps, id, name); }
+    if (isLocked(db, Number(c.params.id), String(c.body?.year ?? ''))) { const name = db.prepare('SELECT name FROM courses WHERE id = ?').get(Number(c.params.id))?.name; for (const id of out.savedIds) notifyGrade(deps, id, name); }
     c.json(200, { saved: out.saved, errors: out.errors });
   });
   r.add('DELETE', '/api/students/:id/grades/:gid',(c) => { need(c, 'grade:manage'); c.json(200, deleteGrade(deps, c.user, c.params.id, c.params.gid, c.ip, c.query.justification)); });
@@ -214,7 +226,7 @@ export async function buildRouter(deps) {
   r.add('POST', '/api/grades/workflow', async (c) => {
     if (!c.user.can('grade:approve_own') && !c.user.can('grade:approve')) need(c, 'grade:manage');   // صلاحية المقرر نفسه تُفحص داخل transitionGrades
     const out = await deps.heavy.run('gradeWorkflow', c, [c.body, c.ip], { writes: true });
-    for (const a of out.approvedNow) notifyGrade(deps, a.studentId, a.course);
+    for (const a of out.approvedNow) if (isLocked(db, a.courseId, a.year)) notifyGrade(deps, a.studentId, a.course);
     c.json(200, { updated: out.updated, skipped: out.skipped, stage: out.stage });
   });
   r.add('GET', '/api/grades/:id/history', (c) => { need(c, 'grade:manage'); c.json(200, { history: gradeHistory(db, c.params.id) }); });
@@ -364,6 +376,22 @@ export async function buildRouter(deps) {
   r.add('GET', '/api/cards/batches/:id/export.xlsx', async (c) => { need(c, 'student:read'); const file = await deps.heavy.run('cardBatchXlsx', c, [c.params.id]); sendRaw(c.res, 200, { 'Content-Type': XL, 'Content-Disposition': 'attachment; filename="card-handover.xlsx"' }, file); });
   r.add('POST', '/api/cards/handovers/:id/receive', (c) => { need(c, 'student:update'); c.json(200, markCardReceived(deps, c.user, c.params.id, c.body, c.ip)); });
   r.add('POST', '/api/cards/handovers/:id/undo', (c) => { need(c, 'student:update'); c.json(200, undoCardReceived(deps, c.user, c.params.id, c.ip)); });
+  // الصفوف المحددة في أي جدول (شريط التحديد في الواجهة) ملفَّ Excel: يرسل المتصفح ما يراه المستخدم أصلاً، والخادم يكتبه
+  // بتنسيق الجامعة. الأرقام تبقى أرقاماً إلا ما يبدأ بصفر (هاتف، رقم وطني) فيبقى نصاً. يُسجَّل التصدير في سجل التدقيق.
+  r.add('POST', '/api/export/selection.xlsx', (c) => {
+    if (!c.user) throw new HttpError(401, 'سجّل الدخول أولاً.', 'unauthorized');
+    if (c.user.role === 'student') throw new HttpError(403, 'تصدير الجداول للموظفين.', 'forbidden');   // مسارات الكتابة ترفض الطالب
+    const b = c.body ?? {};
+    const cell = (v) => { const t = String(v ?? '').slice(0, 2000); return /^-?(0|[1-9]\d{0,14})(\.\d+)?$/.test(t) ? Number(t) : t; };
+    const head = (Array.isArray(b.head) ? b.head : []).slice(0, 80).map((v) => String(v ?? '').slice(0, 200));
+    const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 20000).map((r) => (Array.isArray(r) ? r.slice(0, head.length || 80).map(cell) : []));
+    if (!head.length || !rows.length) throw new HttpError(400, 'لا صفوف محددة للتصدير.', 'validation');
+    const name = String(b.title ?? '').replace(/[[\]:*?/\\]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 31) || 'الصفوف المحددة';
+    const widths = head.map((h, i) => Math.min(60, Math.max(10, ...[h, ...rows.slice(0, 300).map((r) => r[i])].map((v) => String(v ?? '').length + 2))));
+    const file = writeXlsx([{ name, rows: [head, ...rows], widths, rtl: true }], { title: name });
+    audit(db, c.user, 'تصدير صفوف محددة إلى Excel', `${name}: ${rows.length} صف`.slice(0, 120), c.ip);
+    sendRaw(c.res, 200, { 'Content-Type': XL, 'Content-Disposition': `attachment; filename="selection-${new Date().toISOString().slice(0, 10)}.xlsx"` }, file);
+  });
   r.add('GET', '/api/services/:code/template.xlsx', (c) => { sendRaw(c.res, 200, { 'Content-Type': XL, 'Content-Disposition': `attachment; filename="form-${String(c.params.code).replace(/[^a-z0-9_]/gi, '')}.xlsx"` }, buildTemplate(db, c.params.code)); });
   r.add('GET', '/api/requests/export.xlsx', async (c) => { const file = await deps.heavy.run('exportRequests', c, [{ ...c.query, ip: c.ip }]); sendRaw(c.res, 200, { 'Content-Type': XL, 'Content-Disposition': 'attachment; filename="requests.xlsx"' }, file); });
   r.add('POST', '/api/services/:code/import', async (c) => { need(c, 'request:import'); c.json(200, await deps.heavy.run('stagedRequestsImport', c, [c.params.code, c.body ?? {}, c.ip], { writes: true })); }, { maxBody: 8 * 1024 * 1024 });
@@ -449,10 +477,16 @@ export async function buildRouter(deps) {
     if (!c.user.can('request:read_own') && !c.user.can('request:read_all') && !c.user.can('request:read_unit') && !c.user.can('request:create_internal')) throw new HttpError(403, 'لا تملك صلاحية هذا الإجراء.', 'forbidden');
     c.json(200, { requests: await listRequests(deps, c.user, c.query) });
   });
+  r.add('GET', '/api/requests/forward-people', (c) => { need(c, 'request:forward'); c.json(200, forwardPeople(deps, c.user)); });
   r.add('GET', '/api/requests/:id', (c) => c.json(200, { request: getRequest(deps, c.user, c.params.id) }));
   r.add('POST', '/api/requests/:id/approve', (c) => { need(c, 'request:decide'); const out = decide(deps, c.user, c.params.id, 'approve', null, c.ip); notifyRequest(deps, c.params.id); c.json(200, { request: out }); });
   r.add('POST', '/api/requests/:id/reject', (c) => { need(c, 'request:decide'); const out = decide(deps, c.user, c.params.id, 'reject', c.body.reason, c.ip); notifyRequest(deps, c.params.id); c.json(200, { request: out }); });
-  r.add('POST', '/api/requests/:id/forward', (c) => { need(c, 'request:forward'); c.json(200, { request: forwardRequest(deps, c.user, c.params.id, c.body, c.ip) }); });
+  r.add('POST', '/api/requests/:id/forward', (c) => {
+    need(c, 'request:forward');
+    const request = forwardRequest(deps, c.user, c.params.id, c.body, c.ip);
+    if (request.assignee && c.body?.userId) notify(deps, [request.assignee.id], { title: 'طلب محال إليك', body: `أُحيل إليك الطلب ${request.no} (${request.service.label}).`, url: '/', tag: 'requests' });
+    c.json(200, { request });
+  });
   // الوحدات التي يستطيع المستخدم الإحالة إليها (حسب ارتباط وحدته)
   r.add('GET', '/api/units/targets', (c) => {
     need(c, 'request:forward');
@@ -640,7 +674,10 @@ export async function buildRouter(deps) {
   registerTeachingRoutes(r, deps);
   registerRecruitmentRoutes(r, deps);
   registerFacilitiesRoutes(r, deps);
+  registerPlatformRoutes(r, deps);
   registerGradingRoutes(r, deps);
+  registerBiometricRoutes(r, deps);
+  registerAppraisalRoutes(r, deps);
   registerSecurityCenterRoutes(r, deps);
   registerConsentRoutes(r, deps);
   registerWarehouseRoutes(r, deps);
@@ -651,6 +688,9 @@ export async function buildRouter(deps) {
     c.json(200, { items: DATA_CLASSIFICATION, sensitivity: SENSITIVITY });
   });
   registerQuotationRoutes(r, deps);
+  registerIssueFlowRoutes(r, deps);
+  registerAssetRoutes(r, deps);
+  registerProcReportRoutes(r, deps);
 
   // ---- محرك الأداء الفائق والضغط العالي (10,000+ مستخدم متزامن + 10+ مراسلات/إضافات مالية بالثانية) ----
   r.add('GET', '/api/v12/high-concurrency/telemetry', (c) => {

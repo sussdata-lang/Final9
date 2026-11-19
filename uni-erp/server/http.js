@@ -142,8 +142,30 @@ async function readBody(req, limit) {
   } finally { clearTimeout(slow); }
   if (!size) return {};
   if (!/^application\/json/i.test(req.headers['content-type'] || '')) throw new HttpError(415, 'يُقبل JSON فقط.', 'bad_content_type');
-  try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+  let body;
+  try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
   catch { throw new HttpError(400, 'JSON غير صالح.', 'bad_json'); }
+  checkContactFields(body);
+  return body;
+}
+
+/* تقييد عام لحقول التواصل في كل الأقسام: أي حقل اسمه هاتف/جوال/فاكس أو بريد يجب أن تكون قيمته (إن وُجدت) بصيغة صحيحة،
+   فلا يُخزَّن «رقم هاتف» فيه أحرف أو «بريد» بلا @ حتى لو تجاوز المستخدم تقييد الواجهة. */
+const PHONE_KEY = /(^|_|[a-z])(phone|mobile|fax|telephone)$/i;
+const EMAIL_KEY = /(^|_|[a-z])e?mail$/i;
+const PHONE_RE = /^\+?[\d٠-٩\s()-]{6,20}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+function checkContactFields(v, depth = 0) {
+  if (!v || typeof v !== 'object' || depth > 3) return;
+  if (Array.isArray(v)) { v.slice(0, 500).forEach((x) => checkContactFields(x, depth + 1)); return; }
+  for (const [k, x] of Object.entries(v)) {
+    if (typeof x === 'string') {
+      const s = x.trim();
+      if (!s) continue;
+      if (PHONE_KEY.test(k) && (!PHONE_RE.test(s) || (s.match(/[\d٠-٩]/g) || []).length < 6)) throw new HttpError(400, 'رقم الهاتف غير صالح: أرقام فقط (ويُسمح بـ + في البداية)، من 6 إلى 15 رقماً.', 'validation', k);
+      if (EMAIL_KEY.test(k) && (s.length > 120 || !EMAIL_RE.test(s))) throw new HttpError(400, 'البريد الإلكتروني غير صالح، مثال صحيح: name@example.com', 'validation', k);
+    } else if (x && typeof x === 'object') checkContactFields(x, depth + 1);
+  }
 }
 
 const ASYNC_COMPRESS_CHARS = 256 * 1024;
@@ -347,6 +369,8 @@ export function makeHandler({ cfg, router, getUser }) {
       await new Promise((resolve) => waf(req, res, () => { resolve(); }));
       if (res.writableEnded) return; // WAF حظر الطلب
 
+      // أجهزة البصمة ZKTeco (ADMS) ترسل إلى /iclock/… ولا يمكن تغيير مسارها: تُخدَم من مسارات /api/iclock/…
+      if (url.pathname.startsWith('/iclock/')) url.pathname = '/api' + url.pathname;
       if (!url.pathname.startsWith('/api/')) {
         if (req.method !== 'GET' && req.method !== 'HEAD') throw new HttpError(405, 'الطريقة غير مسموحة.');
         // الخرائط المعمارية للموظفين فقط

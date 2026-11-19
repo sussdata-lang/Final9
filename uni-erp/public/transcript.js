@@ -6,10 +6,11 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const LV = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة'];
   const lvName = (n) => `السنة ${LV[n - 1] || n}`;
-  const SEM = { 1: 'الفصل الأول', 2: 'الفصل الثاني' };
+  const SEM = { 1: 'الفصل الأول', 2: 'الفصل الثاني', 3: 'الفصل الثالث' };   // السنة ثلاثة فصول (دليل الطالب)
   const PASS = 60;
   const STATUS = { active: 'مقيَّد', suspended: 'موقوف القيد', withdrawn: 'منسحب', transferred: 'محوَّل', graduated: 'متخرج' };
-  const rating = (m) => (m === null || m === undefined ? '—' : m >= 90 ? 'ممتاز' : m >= 80 ? 'جيد جداً' : m >= 70 ? 'جيد' : m >= PASS ? 'مقبول' : 'راسب');
+  // احتياط فقط: التقدير يأتي محسوباً من الخادم (r.rating) بسلّم دليل الطالب المحفوظ في الوثيقة
+  const rating = (m) => (m === null || m === undefined ? '—' : m >= 95 ? 'شرف' : m >= 85 ? 'امتياز' : m >= 75 ? 'جيد جداً' : m >= 65 ? 'جيد' : m >= PASS ? 'مقبول' : 'راسب');
   const f1 = (n) => (n === null || n === undefined ? '—' : String(Math.round(n * 10) / 10));
   const dt = (t) => { try { return new Date(t).toLocaleDateString('ar-EG-u-nu-latn', { year: 'numeric', month: 'long', day: 'numeric' }); } catch { return ''; } };
   const wavg = (rows) => { const h = rows.reduce((s, r) => s + r.hours, 0); return h ? rows.reduce((s, r) => s + r.hours * r.mark, 0) / h : null; };
@@ -27,7 +28,7 @@
   const qr = (n) => (window.TR_QR ? `<img class="trp-qr" alt="رمز QR للتحقق" src="${esc(window.TR_QR)}">` : `<img class="trp-qr" alt="رمز QR للتحقق" src="/api/documents/${encodeURIComponent(n.code)}/qr.svg">`);
   const seal = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7.5 2.8v5.6c0 4.4-3.1 7.6-7.5 9.6-4.4-2-7.5-5.2-7.5-9.6V5.8z"/><path d="M8.8 12.2l2.2 2.2 4.2-4.4"/></svg>`;
   const markCls = (m) => (m === null || m === undefined ? 'na' : m >= PASS ? 'ok' : 'bad');
-  const mc = (r) => (r.pending ? 'na' : markCls(r.mark)), mt = (r) => (r.pending ? '—' : r.mark), rt = (r) => (r.pending ? 'لم تُرصد' : rating(r.mark));
+  const mc = (r) => (r.pending ? 'na' : markCls(r.mark)), mt = (r) => (r.pending ? '—' : r.mark), rt = (r) => (r.pending ? 'لم تُرصد' : r.rating || rating(r.mark));
   const rc = (r) => (r.prev ? 'prev' : r.pending ? 'pend' : '');
   const emptyYear = (y) => (y.empty ? '<p class="trp-empty">لا توجد مقررات مسجلة لهذه السنة.</p>' : '');
   /* ملخص المواد: صف لكل سنة (المقررات، الناجح، الراسب، لم تُرصد، الساعات، المعدل) + التراكمي */

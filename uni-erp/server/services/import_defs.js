@@ -10,7 +10,7 @@ import { HttpError } from '../http.js';
 import { yearFor } from './finance/core.js';
 import { createCharge, voidCharge, createPayment, voidPayment } from './finance/fees.js';
 import { LIFECYCLE_STATUS, LIFECYCLE_IMPACT } from './student_affairs_suite.js';
-import { createReceipt, createIssue } from './procurement/core.js';
+import { createReceipt, createIssue, reverseStockMoves, whQty } from './procurement/core.js';
 import { createEntry, reverseEntry, toMinor } from './finance/core.js';
 import { getSetting } from './settings.js';
 import { GROUP_KINDS } from './student_groups.js';
@@ -340,7 +340,7 @@ const list = [
     },
     touches: (head, lines) => [['proc_orders', head.order_id], ...lines.map((l) => ['proc_items', l.item_id])],
     createDoc: ({ deps, actor, head, lines, ip }) => {
-      const { receiptId } = createReceipt(deps, actor, { orderId: head.order_id, note: head.note ?? '', lines: lines.map((l) => ({ itemId: l.item_id, qty: l.qty, unitCost: l.unit_cost })) }, ip);
+      const { receiptId } = createReceipt(deps, actor, { orderId: head.order_id, note: head.note ?? '', lines: lines.map((l) => ({ itemId: l.item_id, qty: l.qty, unitCost: l.unit_cost })) }, ip, { imported: true });
       deps.db.prepare('UPDATE proc_receipts SET received_at = ?, import_ref = ? WHERE id = ?').run(head.received_at, head.import_ref, receiptId);
       return receiptId;
     },
@@ -348,6 +348,7 @@ const list = [
       const entry = deps.db.prepare('SELECT id FROM fin_entries WHERE source = ? AND reversed_by IS NULL').get(`proc_receipt:${id}`);
       if (entry) { entryYearStillOpen(deps.db, entry.id); reverseEntry(deps, actor, entry.id, { reason: 'تراجع عن دفعة استيراد' }, ip); }
       deps.db.prepare('UPDATE proc_receipts SET reversed_at = ?, reversed_by = ? WHERE id = ?').run(Date.now(), actor.id, id);
+      reverseStockMoves(deps.db, actor, 'receipt', id, 'تراجع عن دفعة استيراد');
     } },
   { kind: 'proc_issues', table: 'proc_issues', linesTable: 'proc_issue_lines', title: 'صرف المخزون', group: 'procurement', perm: 'import:procurement', risk: 'high', key: ['no'], deps: ['proc_warehouses', 'proc_items'], side: { proc_items: 'id' }, undoKeepsRow: true,
     desc: 'سند صرف ينقص رصيد الأصناف. يُرفض إذا لم يكفِ الرصيد، ويُحسب ذلك داخل الملف نفسه.',
@@ -358,8 +359,9 @@ const list = [
     validateDoc: (head, lines, ctx) => {
       const stock = ctx.memo('stock', () => new Map()), pending = new Map();
       for (const l of lines) {
-        const id = Number(l.item_id), have = pending.get(id) ?? stock.get(id) ?? Number(ctx.db.prepare('SELECT qty_on_hand FROM proc_items WHERE id = ?').get(id).qty_on_hand);
-        if (l.qty > have) return `رصيد الصنف لا يكفي (${have} متاح).`;
+        // الرصيد في مستودع الصرف لا رصيد الجامعة كلها
+        const id = `${l.item_id}@${head.warehouse_id}`, have = pending.get(id) ?? stock.get(id) ?? whQty(ctx.db, l.item_id, head.warehouse_id);
+        if (l.qty > have) return `رصيد الصنف في مستودع الصرف لا يكفي (${have} متاح).`;
         pending.set(id, have - l.qty);
       }
       for (const [id, qty] of pending) stock.set(id, qty);
@@ -371,7 +373,11 @@ const list = [
       deps.db.prepare('UPDATE proc_issues SET no = ?, issued_at = ? WHERE id = ?').run(head.no, head.issued_at, issueId);
       return issueId;
     },
-    revertRow: ({ deps, actor, id }) => { deps.db.prepare('UPDATE proc_issues SET reversed_at = ?, reversed_by = ? WHERE id = ?').run(Date.now(), actor.id, id); } },
+    revertRow: ({ deps, actor, id, ip }) => {
+      const entry = deps.db.prepare('SELECT id FROM fin_entries WHERE source = ? AND reversed_by IS NULL').get(`proc_issue:${id}`);
+      if (entry) { entryYearStillOpen(deps.db, entry.id); reverseEntry(deps, actor, entry.id, { reason: 'تراجع عن دفعة استيراد' }, ip); }
+      deps.db.prepare('UPDATE proc_issues SET reversed_at = ?, reversed_by = ? WHERE id = ?').run(Date.now(), actor.id, id); reverseStockMoves(deps.db, actor, 'issue', id, 'تراجع عن دفعة استيراد');
+    } },
   { kind: 'proc_asset_moves', table: 'proc_asset_moves', title: 'حركات الأصول', group: 'procurement', perm: 'import:procurement', risk: 'high', key: ['asset_id', 'kind', 'moved_at'], deps: ['proc_assets', 'proc_warehouses'], stamp: { moved_by: 'actor' }, side: { proc_assets: 'id' }, undoKeepsRow: 2,
     desc: 'نقل الأصول وإتلافها وصيانتها وإعادتها. الصفوف تُطبَّق بترتيب الملف وتغيّر موقع الأصل وحالته. الحركة المسجلة لا تُعدَّل.',
     impactNote: 'يغيّر موقع الأصل وحالته. التراجع يعيدهما ويسجّل حركة معاكسة، ويُمنع إذا تغيّر الأصل بعد الاستيراد.',

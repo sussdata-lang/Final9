@@ -68,3 +68,18 @@ test('القالب الجاهز: عمود لكل مكوّن باسمه، ويُ�
   assert.equal(r.errorCount, 0, JSON.stringify(r.errors));
   assert.equal(Number(grade('IMC-s2', 'IMC-101').mark), 78);
 });
+
+test('صف يُرفض داخل معاملة رصده لا يُفسد بقية الاستيراد: المعاينة لا تكتب شيئاً، والحفظ يحفظ الصالح فقط', async () => {
+  const yr = '2025/2026', at = (no) => app.db.prepare('SELECT g.* FROM grades g JOIN users u ON u.id = g.student_id WHERE u.student_no = ? AND g.course_id = ? AND g.academic_year = ?').get(no, plain, yr);
+  const s1 = app.db.prepare("SELECT id FROM users WHERE student_no = 'IMC-s1'").get().id;
+  // علامة معتمدة: تعديلها بالاستيراد دون تبرير يُرفض من داخل معاملة enterGrade
+  app.db.prepare("INSERT INTO grades (student_id, term, course, hours, mark, course_id, level, semester, academic_year, theory_mark, entered_at, workflow_status) VALUES (?, 't', 'برمجة', 3, 55, ?, 1, 1, ?, 55, ?, 'approved')").run(s1, plain, yr, Date.now());
+  const rows = [['الرقم الجامعي', 'رمز المقرر', 'العام الدراسي', 'العلامة النظرية'], ['IMC-s1', 'IMC-102', yr, '90'], ['IMC-s2', 'IMC-102', yr, '64']];
+  const pre = await imp(rows, false);
+  assert.equal(pre.errorCount, 1, JSON.stringify(pre.errors));
+  assert.equal(at('IMC-s2'), undefined, 'المعاينة لا تكتب الصف التالي للصف المرفوض');
+  const done = await imp(rows, true);
+  assert.equal(done.errorCount, 1);
+  assert.equal(Number(at('IMC-s2')?.mark), 64, 'الصف الصالح يُحفظ');
+  assert.equal(Number(at('IMC-s1').mark), 55, 'المعتمدة لم تتغير');
+});

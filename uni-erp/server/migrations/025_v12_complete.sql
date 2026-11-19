@@ -365,7 +365,7 @@ CREATE TABLE IF NOT EXISTS ai_advisor_chats (
   user_label TEXT NOT NULL,
   question TEXT NOT NULL,
   answer TEXT NOT NULL,
-  model_used TEXT NOT NULL DEFAULT 'gemini-3.8-flash',
+  model_used TEXT NOT NULL DEFAULT 'rule-based',
   created_at INTEGER NOT NULL
 );
 

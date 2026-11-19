@@ -95,3 +95,58 @@ test('المحروم لا تُرصد له علامة في المقرر حتى ي
   assert.equal((await api('POST', `/api/teaching/deprivations/${dep}/lift`, 'adm', { reason: 'عذر طبي مقبول' })).s, 200);
   assert.ok((await grade('s2')).s < 300);
 });
+
+test('كشف حضور المحاضرة: المدرّس يؤشّر الحاضرين، فتُحتسب المحاضرة منعقدة ويُحتسب غياب الباقين', async () => {
+  const day = iso(-1), roll = (who, d = day) => api('GET', `/api/teaching/rollcall/${course}?day=${d}`, who);
+  const save = (present, d = day) => api('POST', `/api/teaching/rollcall/${course}`, 'ins', { day: d, hall: 'ق2', present: present.map((s) => id[s]) });
+  const held = async () => (await api('GET', `/api/teaching/absence/${course}`, 'ins')).j;
+  const before = (await held()).held;
+  assert.equal((await roll('out')).s, 403, 'لمدرّس المقرر أو من يملك صلاحيته');
+  assert.equal((await roll('ins', iso(2))).s, 400, 'لا كشف لمحاضرة لم تنعقد');
+  const open = (await roll('ins')).j;
+  assert.equal(open.saved, false); assert.equal(open.students.length, 4); assert.ok(open.students.every((x) => x.present), 'الكل حاضر افتراضياً');
+
+  const r = await save(['s1']);
+  assert.equal(r.s, 200, JSON.stringify(r.j));
+  assert.deepEqual([r.j.session.present, r.j.session.absent], [1, 3]);
+  const h = await held();
+  assert.equal(h.held, before + 1, 'المحاضرة منعقدة رغم أن أحداً لم يمسح بطاقته');
+  assert.ok(h.rows.find((x) => x.studentId === id.s3).absent > (await held()).rows.find((x) => x.studentId === id.s1).absent);
+  // تعديل الكشف: يُضاف حاضر ويبقى عدد السجلات صحيحاً
+  assert.deepEqual([(await save(['s1', 's3'])).j.session.present], [2]);
+  assert.equal(Number(app.db.prepare("SELECT COUNT(*) AS n FROM hall_logs WHERE course_id = ? AND note = 'كشف حضور المحاضرة'").get(course).n), 2);
+  assert.equal((await save(['s1'])).j.session.absent, 3, 'إزالة التأشير تحذف حضوره اليدوي');
+
+  // يوم فيه مسح بطاقات: الماسح حاضر دائماً ولا يُحذف سجله
+  const cardDay = iso(-2), c = (await roll('ins', cardDay)).j.students.find((x) => x.studentId === id.s1);
+  assert.equal(c.byCard, true);
+  const k = await save([], cardDay);
+  assert.equal(k.j.session.present, 1, 'من مسح بطاقته يبقى حاضراً');
+
+  // محاضرة سُجّلت بالخطأ
+  const del = await api('DELETE', `/api/teaching/rollcall/${course}?day=${day}`, 'ins');
+  assert.equal(del.s, 200); assert.equal(del.j.saved, false);
+  assert.equal((await held()).held, before, 'لم تعد منعقدة');
+  assert.ok(app.db.prepare("SELECT 1 FROM hall_logs WHERE course_id = ? AND method = 'manual' AND note IS NULL").get(course), 'سجلات القاعة الأصلية باقية');
+});
+
+test('طلاب المقرر حسب الإعداد: الجمع افتراضياً، أو المسجلون ذاتياً فقط، أو البرنامج والسنة فقط', async () => {
+  const { currentTerm } = await import('../server/services/sections.js');
+  const now = Date.now(), hash = app.db.prepare('SELECT password_hash h FROM users WHERE id = ?').get(id.s1).h;
+  // طالب من سنة أخرى سجّل المقرر ذاتياً: ليس من دفعة المقرر
+  id.s5 = Number(app.db.prepare("INSERT INTO users (username, display_name, password_hash, role, student_no, created_at) VALUES ('s5', 'مستخدم s5', ?, 'student', 'TCH-s5', ?) RETURNING id").get(hash, now).id);
+  app.db.prepare(`INSERT INTO student_profiles (user_id, first_name, father_name, last_name, mother_name, national_id, gender, birth_date, birth_place, nationality, phone, governorate, city, address, hs_type, hs_year, hs_score, program_id, admission_type, enroll_year, enroll_term, study_level, status, guardian_name, guardian_relation, guardian_phone, created_at, updated_at)
+    VALUES (?, 'أ', 'ب', 's5', 'د', '69999999999', 'ذكر', '2005-01-01', 'دمشق', 'سورية', '0944111222', 'دمشق', 'المزة', 'دمشق', 'علمي', 2024, 220, ?, 'مفاضلة عامة', 2023, 'الفصل الأول', 2, 'active', 'هـ', 'أب', '0944111222', ?, ?)`).run(id.s5, prog, now, now);
+  app.db.prepare("INSERT INTO student_self_enrollments (student_no, student_name, course_code, course_name, semester, registered_at, course_id) VALUES ('TCH-s5', 's5', 'TCH-101', 'أمن الشبكات', ?, ?, ?)").run(currentTerm(app.db), now, course);
+  const roster = async () => (await api('GET', `/api/teaching/rollcall/${course}?day=${iso(-3)}`, 'ins')).j.students.map((x) => x.studentId).sort((a, b) => a - b);
+  const set = (v) => api('PUT', '/api/admin/general', 'adm', { values: { 'academic.course_roster': v } });
+  const cohort = ['s1', 's2', 's3', 's4'].map((s) => id[s]).sort((a, b) => a - b);
+  try {
+    assert.deepEqual(await roster(), [...cohort, id.s5].sort((a, b) => a - b), 'الافتراضي: المسجل ذاتياً مع الدفعة');
+    assert.equal((await set('enrolled')).s, 200);
+    assert.deepEqual(await roster(), [id.s5], 'المسجلون ذاتياً فقط');
+    assert.equal((await set('program')).s, 200);
+    assert.deepEqual(await roster(), cohort, 'البرنامج والسنة فقط');
+    assert.equal((await set('غير ذلك')).s, 400, 'قيمة من القائمة فقط');
+  } finally { await set('both'); }
+});

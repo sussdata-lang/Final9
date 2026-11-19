@@ -118,3 +118,18 @@ public/*.js  ── fetch ──►  server/http.js (CSP، حدود، جلسات
 - **الصلاحيات** 5: `procurement:read` · `procurement:request` · `procurement:manage` · `procurement:stock` · `procurement:assets` (في صفحة «الحسابات والصلاحيات» بمجموعة «المشتريات والمخازن والأصول»).
 - **القائمة** `public/app.js:viewsFor` بند «المشتريات والمخازن» → `procurement` يظهر لمن يملك أياً من الخمس. `NAV_GROUP` في `shell.js` تحت مجموعة «المشتريات والمالية» مع المالية. `NAV_ICON.procurement = layers`.
 - **الواجهة** `public/procurement.js` (RTL كامل): 8 تبويبات — نظرة عامة (KPIs) · المستودعات · الموردون · الأصناف والمخزون (low-stock + تصدير) · طلبات الشراء (مع بنود وتقديم/اعتماد/رفض/تحويل لأمر توريد) · أوامر التوريد (إرسال/استلام) · الحركة المخزنية (صرف + سجل الاستلام) · الأصول الثابتة (حركات). `sw.js` `v34` + `procurement.js` في PRECACHE، `UNITS 5.10 = done`.
+
+## مركز العمل — طبقة المنصة المشتركة (2026-11-17)
+- **الترحيل** `110_platform_core.sql`: `record_messages` و`record_followers` (النقاش والمتابعون)، و`activities`، و`approval_types/approval_type_steps/approval_requests/approval_request_steps`، و`automation_rules/automation_log`.
+- **الخلفية** `server/services/platform/`:
+  - `records.js`: سجل النماذج (`registerModel`) بعنوان وقاعدة رؤية لكل نموذج (request، proc_request، maintenance، student، employee، approval)، والتعليق (يُشعر المتابعين)، والملاحظة الداخلية، وتتبع التغييرات (`diff`/`track`)، والأنشطة مع تذكير يوم الاستحقاق وعند التأخر، والأحداث المؤجلة بعد المعاملة (`emit`).
+  - `approvals.js`: أنواع يعرّفها المدير، وخطوات تسلسلية أو متوازية بحد مبلغ، والمعتمد (موظف، أو حامل صلاحية، أو رئيس الوحدة `head_<code>`). فصل المهام: لا يعتمد مقدّم الطلب طلبه، ولا الشخص خطوتين. `onApprovalDone(code, fn)` لربط وحدة بنتيجة النوع.
+  - `automation.js`: قواعد حدث أو فحص دوري، وإجراءات مغلقة (إشعار، أو نشاط، أو ملاحظة). لا تتسلسل القواعد، والمجدولة مرة واحدة لكل سجل. `platformTick` كل ساعة من `app.js`.
+  - `pivot.js`: ثماني مجموعات بيانات بأبعاد ومقاييس مغلقة وصلاحية ونطاق، مع تصدير Excel.
+- **الصلاحيات**: `approvals:manage` و`approvals:read_all` (وللمدقق) و`automation:manage`. العرض `hub` («مركز العمل») لكل موظف.
+- **الواجهة** `public/platform.js` (كسول عبر `LAZY.hub`): أنشطتي، والموافقات، والتقارير المحورية، والأتمتة، ومكوّن نقاش أي سجل `UA.openRecord(model, id)`. الإشعارات بروابط `?view=hub` تفتحه.
+- **الاختبارات** `test/platform.test.js`.
+- **زر «النقاش»** (`data-act="recthread"` في `user_notifs.js`) في تفاصيل طلب الطالب (`app.js`) وطلبات الشراء (`procurement.js`) وأوامر الصيانة (`operations.js`)؛ يفتح نقاش السجل وأنشطته في مركز العمل.
+- **الصندوق الموحّد** `platform/sources.js` + `registerApprovalSource` في `approvals.js`: سلاسل المشتريات والمراسلات وحركات القيد تظهر في «بانتظار قراري» مع طلبات المحرك العام (`GET /api/approvals/inbox`). القرار (`POST /api/approvals/inbox/:source/:id/decide`) يمر عبر دالة الوحدة نفسها (`decideRequest`/`returnRequest`، `decideDoc` بقفل `corr:id`، `decideMovementStep` بقفل `movement:id`) فتبقى قواعدها (حدود المبالغ، رقم الصادر، براءة الذمة، فصل المهام)، ثم يُسجَّل في نقاش السجل. نماذج جديدة: `corr` و`movement`. لم تُنقل جداول السلاسل إلى المحرك العام عمداً.
+- **أنواع مملوكة لوحدة** (`111_owned_approval_types.sql`، عمود `approval_types.owner`): النوع `corr_doc` «المراسلات الداخلية» تُعرَّف خطواته من «أنواع الموافقات» (موظف محدد أو رئيس وحدة الكاتب، ويجوز بلا خطوات)، و`applyTemplate` في `correspondence.js` يضعها قبل معتمدي الكاتب عند الإرسال (بلا تكرار، ويخرج من النسخة من صار معتمداً، ويُستبعد الكاتب نفسه). لا يُقدَّم النوع المملوك من «طلب جديد».
+- **PENDING**: وبناء الدردشة فوق `record_messages`.
